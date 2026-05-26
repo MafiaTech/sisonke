@@ -1,0 +1,141 @@
+@page "/register-stokvel"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Helpers
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Register New Stokvel</PageTitle>
+
+<div class="mb-4">
+    <h1>Register New Stokvel</h1>
+    <p class="text-muted">
+        Create a new stokvel profile. After registration, you will complete the setup questionnaire so Sisonke can understand how your stokvel operates.
+    </p>
+    <a href="/my-stokvels">Back to My Stokvels</a>
+</div>
+
+@if (saveFailed)
+{
+    <div class="alert alert-danger" role="alert">
+        Unable to register stokvel. Please check the details and try again.
+    </div>
+}
+
+<EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="row g-3">
+        <div class="col-12 col-md-6">
+            <label class="form-label" for="stokvel-name">Name</label>
+            <InputText id="stokvel-name" class="form-control" @bind-Value="model.Name" />
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label" for="stokvel-type">Type</label>
+            <InputSelect id="stokvel-type" class="form-select" @bind-Value="model.Type">
+                @foreach (var stokvelType in Enum.GetValues<StokvelType>())
+                {
+                    <option value="@stokvelType">@stokvelType</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label" for="province">Province</label>
+            <select id="province" class="form-select" value="@model.Province" @onchange="OnProvinceChanged">
+                <option value="">-- Select province --</option>
+                @foreach (var province in provinces)
+                {
+                    <option value="@province">@province</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label" for="town-or-area">Town or area</label>
+            <select id="town-or-area" class="form-select" @bind="model.TownOrArea" disabled="@(!towns.Any())">
+                <option value="">-- Select town/area --</option>
+                @foreach (var town in towns)
+                {
+                    <option value="@town">@town</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label" for="established-date">Established date</label>
+            <InputDate id="established-date" class="form-control" @bind-Value="model.EstablishedDate" />
+        </div>
+
+        <div class="col-12">
+            <label class="form-label" for="description">Description</label>
+            <InputTextArea id="description" class="form-control" rows="4" @bind-Value="model.Description" />
+        </div>
+    </div>
+
+    <div class="mt-4 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Register Stokvel</button>
+        <a class="btn btn-outline-secondary" href="/my-stokvels">Back to My Stokvels</a>
+    </div>
+</EditForm>
+
+@code {
+    private readonly RegisterStokvelFormModel model = new();
+    private List<string> provinces = SouthAfricanLocations.GetProvinces();
+    private List<string> towns = new();
+    private bool saveFailed;
+
+    private void OnProvinceChanged(ChangeEventArgs args)
+    {
+        model.Province = args.Value?.ToString();
+        towns = SouthAfricanLocations.GetTownsByProvince(model.Province);
+        model.TownOrArea = null;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        saveFailed = false;
+
+        var createdStokvel = await StokvelService.RegisterStokvelAsync(
+            model.Name,
+            model.Type,
+            model.Province,
+            model.TownOrArea,
+            model.EstablishedDate,
+            model.Description);
+
+        if (createdStokvel is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/stokvel-questionnaire/{createdStokvel.Id}");
+    }
+
+    private sealed class RegisterStokvelFormModel
+    {
+        [Required]
+        [MaxLength(150)]
+        public string Name { get; set; } = string.Empty;
+
+        public StokvelType Type { get; set; } = StokvelType.BurialSociety;
+
+        [MaxLength(100)]
+        public string? Province { get; set; }
+
+        [MaxLength(100)]
+        public string? TownOrArea { get; set; }
+
+        public DateTime? EstablishedDate { get; set; }
+
+        [MaxLength(500)]
+        public string? Description { get; set; }
+    }
+}

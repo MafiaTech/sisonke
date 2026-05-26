@@ -1,0 +1,147 @@
+@page "/add-member/{StokvelId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject MemberService MemberService
+@inject StokvelService StokvelService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Add Member</PageTitle>
+
+@if (isLoading)
+{
+    <p>Loading member form...</p>
+}
+else if (stokvel is null)
+{
+    <div class="alert alert-danger" role="alert">
+        Stokvel not found.
+    </div>
+}
+else
+{
+    <div class="mb-4">
+        <h1>Add Member</h1>
+        <p class="text-muted mb-1">@stokvel.Name</p>
+        <a href="@($"/members/{StokvelId}")">Back to Members</a>
+    </div>
+
+    @if (saveFailed)
+    {
+        <div class="alert alert-danger" role="alert">
+            Stokvel not found.
+        </div>
+    }
+
+    <EditForm FormName="AddMemberForm" Model="@newMember" OnValidSubmit="@HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="full-name">Full name</label>
+                <InputText id="full-name" class="form-control" @bind-Value="newMember.FullName" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="cellphone-number">Cellphone number</label>
+                <InputText id="cellphone-number" class="form-control" @bind-Value="newMember.CellphoneNumber" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="email-address">Email address</label>
+                <InputText id="email-address" class="form-control" @bind-Value="newMember.EmailAddress" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="id-number">ID number</label>
+                <InputText id="id-number" class="form-control" @bind-Value="newMember.IdNumber" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="residential-area">Residential area</label>
+                <InputText id="residential-area" class="form-control" @bind-Value="newMember.ResidentialArea" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="joining-date">Joining date</label>
+                <InputDate id="joining-date" class="form-control" @bind-Value="newMember.JoiningDate" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="default-role">Default role</label>
+                <InputSelect id="default-role" class="form-select" @bind-Value="newMember.DefaultRole">
+                    @foreach (var role in Enum.GetValues<SisonkeRole>())
+                    {
+                        <option value="@role">@role</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="status">Status</label>
+                <InputSelect id="status" class="form-select" @bind-Value="newMember.Status">
+                    @foreach (var status in Enum.GetValues<MemberStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="col-12">
+                <div class="form-check">
+                    <InputCheckbox id="cooling-period" class="form-check-input" @bind-Value="newMember.IsInCoolingPeriod" />
+                    <label class="form-check-label" for="cooling-period">Is in cooling period</label>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="cooling-period-end-date">Cooling period end date</label>
+                <InputDate id="cooling-period-end-date" class="form-control" @bind-Value="newMember.CoolingPeriodEndDate" />
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-primary" type="submit">Save Member</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private Stokvel? stokvel;
+    private Member newMember = new()
+    {
+        JoiningDate = DateTime.Today,
+        Status = MemberStatus.Active,
+        DefaultRole = SisonkeRole.Member
+    };
+    private bool isLoading = true;
+    private bool saveFailed;
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        saveFailed = false;
+
+        var savedMember = await MemberService.AddMemberAsync(StokvelId, newMember);
+
+        if (savedMember is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/members/{StokvelId}");
+    }
+}

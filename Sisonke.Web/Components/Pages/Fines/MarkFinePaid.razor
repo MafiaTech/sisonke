@@ -1,0 +1,131 @@
+@page "/mark-fine-paid/{MemberFineId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Components.Shared
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject FineService FineService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Mark Fine Paid</PageTitle>
+
+@if (isLoading)
+{
+    <p>Loading fine details...</p>
+}
+else if (memberFine is null)
+{
+    <div class="alert alert-danger" role="alert">
+        Fine not found.
+    </div>
+}
+else
+{
+    <h1>Mark Fine Paid</h1>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success" role="alert">
+            @successMessage
+        </div>
+    }
+    else if (memberFine.Status == FineStatus.Paid)
+    {
+        <div class="alert alert-info" role="alert">
+            This fine has already been marked as paid.
+        </div>
+    }
+
+    @if (updateFailed)
+    {
+        <div class="alert alert-danger" role="alert">
+            Could not mark fine as paid.
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Member full name</dt>
+                <dd class="col-sm-8">@memberFine.Member.FullName</dd>
+
+                <dt class="col-sm-4">Fine type</dt>
+                <dd class="col-sm-8">@memberFine.FineType.Name</dd>
+
+                <dt class="col-sm-4">Amount</dt>
+                <dd class="col-sm-8">@memberFine.Amount.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</dd>
+
+                <dt class="col-sm-4">Reason</dt>
+                <dd class="col-sm-8">@memberFine.Reason</dd>
+
+                <dt class="col-sm-4">Fine date</dt>
+                <dd class="col-sm-8">@memberFine.FineDate.ToString("yyyy-MM-dd")</dd>
+
+                <dt class="col-sm-4">Current status</dt>
+                <dd class="col-sm-8">@memberFine.Status</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="@($"/member-profile/{memberFine.MemberId}")">Back to Member Profile</a>
+    </div>
+
+    <ConfirmationModal
+        IsVisible="@showPaymentConfirmation"
+        Title="Confirm Fine Payment"
+        Message="You are about to mark this fine as paid. Please confirm that payment was received before continuing."
+        ConfirmButtonText="Confirm Payment"
+        CancelButtonText="Cancel"
+        ModalType="warning"
+        OnConfirm="@ConfirmPaymentAsync"
+        OnCancel="@CancelPayment" />
+}
+
+@code {
+    private MemberFine? memberFine;
+    private bool isLoading = true;
+    private bool showPaymentConfirmation = true;
+    private bool updateFailed;
+    private string? successMessage;
+
+    [Parameter]
+    public Guid MemberFineId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        memberFine = await FineService.GetMemberFineByIdAsync(MemberFineId);
+        showPaymentConfirmation = memberFine?.Status == FineStatus.Unpaid;
+        isLoading = false;
+    }
+
+    private async Task ConfirmPaymentAsync()
+    {
+        updateFailed = false;
+
+        var updatedFine = await FineService.MarkFineAsPaidAsync(MemberFineId);
+
+        if (updatedFine is null)
+        {
+            updateFailed = true;
+            showPaymentConfirmation = false;
+            return;
+        }
+
+        memberFine = await FineService.GetMemberFineByIdAsync(MemberFineId) ?? updatedFine;
+        successMessage = "Fine has been marked as paid successfully.";
+        showPaymentConfirmation = false;
+    }
+
+    private void CancelPayment()
+    {
+        showPaymentConfirmation = false;
+
+        if (memberFine is not null)
+        {
+            NavigationManager.NavigateTo($"/member-profile/{memberFine.MemberId}");
+        }
+    }
+}

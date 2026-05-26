@@ -1,0 +1,84 @@
+@rendermode InteractiveServer
+
+@if (IsVisible)
+{
+    <div class="confirmation-modal-backdrop">
+        <div class="confirmation-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmation-modal-title">
+            <div class="confirmation-modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="confirmation-modal-title">@Title</h2>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">@Message</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="OnCancel">@CancelButtonText</button>
+                    <button type="button" class="btn @ConfirmButtonClass" @onclick="OnConfirm">@ConfirmButtonText</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .confirmation-modal-backdrop {
+        align-items: center;
+        background-color: rgba(0, 0, 0, 0.55);
+        bottom: 0;
+        display: flex;
+        justify-content: center;
+        left: 0;
+        padding: 1rem;
+        position: fixed;
+        right: 0;
+        top: 0;
+        z-index: 1055;
+    }
+
+    .confirmation-modal-dialog {
+        max-width: 520px;
+        width: 100%;
+    }
+
+    .confirmation-modal-content {
+        background-color: #fff;
+        border-radius: 0.5rem;
+        box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ConfirmButtonText { get; set; } = "Confirm";
+
+    [Parameter]
+    public string CancelButtonText { get; set; } = "Cancel";
+
+    [Parameter]
+    public string ModalType { get; set; } = "info";
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string ConfirmButtonClass => ModalType?.ToLowerInvariant() switch
+    {
+        "warning" => "btn-warning",
+        "danger" => "btn-danger",
+        "success" => "btn-success",
+        "info" => "btn-primary",
+        _ => "btn-primary"
+    };
+}

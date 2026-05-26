@@ -1,0 +1,133 @@
+@page "/add-beneficiary/{MemberId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject MemberService MemberService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Add Beneficiary</PageTitle>
+
+@if (isLoading)
+{
+    <p>Loading beneficiary form...</p>
+}
+else if (member is null)
+{
+    <div class="alert alert-danger" role="alert">
+        Member not found.
+    </div>
+}
+else
+{
+    <div class="mb-4">
+        <h1>Add Beneficiary</h1>
+        <p class="text-muted mb-1">@member.FullName</p>
+        <a href="@($"/member-profile/{MemberId}")">Back to Member Profile</a>
+    </div>
+
+    @if (saveFailed)
+    {
+        <div class="alert alert-danger" role="alert">
+            Unable to save beneficiary.
+        </div>
+    }
+
+    <EditForm Model="@newBeneficiary" OnValidSubmit="@HandleValidSubmit" FormName="AddBeneficiaryForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="full-name">Full name</label>
+                <InputText id="full-name" class="form-control" @bind-Value="newBeneficiary.FullName" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="relationship">Relationship</label>
+                <InputSelect id="relationship" class="form-select" @bind-Value="newBeneficiary.Relationship">
+                    @foreach (var relationship in relationshipOptions)
+                    {
+                        <option value="@relationship">@relationship</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="id-number">ID number</label>
+                <InputText id="id-number" class="form-control" @bind-Value="newBeneficiary.IdNumber" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="cellphone-number">Cellphone number</label>
+                <InputText id="cellphone-number" class="form-control" @bind-Value="newBeneficiary.CellphoneNumber" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="date-of-birth">Date of birth</label>
+                <InputDate id="date-of-birth" class="form-control" @bind-Value="newBeneficiary.DateOfBirth" />
+            </div>
+
+            <div class="col-12">
+                <div class="form-check">
+                    <InputCheckbox id="is-active" class="form-check-input" @bind-Value="newBeneficiary.IsActive" />
+                    <label class="form-check-label" for="is-active">Active beneficiary</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-primary" type="submit">Save Beneficiary</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private static readonly string[] relationshipOptions =
+    [
+        "Spouse",
+        "Child",
+        "Parent",
+        "Sibling",
+        "Grandparent",
+        "Grandchild",
+        "Aunt/Uncle",
+        "Cousin",
+        "Friend",
+        "Other"
+    ];
+
+    private Member? member;
+    private Beneficiary newBeneficiary = new()
+    {
+        IsActive = true,
+        Relationship = "Child"
+    };
+    private bool isLoading = true;
+    private bool saveFailed;
+
+    [Parameter]
+    public Guid MemberId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        saveFailed = false;
+
+        var savedBeneficiary = await MemberService.AddBeneficiaryAsync(MemberId, newBeneficiary);
+
+        if (savedBeneficiary is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/member-profile/{MemberId}");
+    }
+}

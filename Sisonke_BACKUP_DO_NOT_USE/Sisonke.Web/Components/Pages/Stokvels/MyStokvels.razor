@@ -1,0 +1,47 @@
+@page "/my-stokvels"
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+@inject StokvelService StokvelService
+
+<PageTitle>My Stokvels</PageTitle>
+
+<h1>My Stokvels</h1>
+
+<p class="text-muted">Select a stokvel to manage.</p>
+
+@if (stokvels is null)
+{
+    <p>Loading...</p>
+}
+else if (stokvels.Count == 0)
+{
+    <p>No stokvels found.</p>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var stokvel in stokvels)
+        {
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5 card-title">@stokvel.Name</h2>
+                        <p class="card-text mb-1"><strong>Type:</strong> @stokvel.Type</p>
+                        <p class="card-text mb-1"><strong>Tenant:</strong> @stokvel.Tenant.Name</p>
+                        <p class="card-text"><strong>Status:</strong> @(stokvel.IsActive ? "Active" : "Inactive")</p>
+                        <a class="btn btn-primary" href="#">Open Dashboard</a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Stokvel>? stokvels;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stokvels = await StokvelService.GetAllStokvelsAsync();
+    }
+}

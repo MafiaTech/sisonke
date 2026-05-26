@@ -1,0 +1,290 @@
+@page "/member-profile/{MemberId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject FineService FineService
+@inject MemberService MemberService
+@inject StokvelService StokvelService
+
+<PageTitle>Member Profile</PageTitle>
+
+@if (isLoading)
+{
+    <p>Loading member profile...</p>
+}
+else if (member is null)
+{
+    <div class="alert alert-danger" role="alert">
+        Member not found.
+    </div>
+}
+else
+{
+    <div class="mb-4">
+        <h1>Member Profile</h1>
+        <h2 class="h4">@member.FullName</h2>
+
+        <div class="d-flex gap-2 align-items-center">
+            <a class="btn btn-primary" href="@($"/edit-member/{MemberId}")">Edit Member</a>
+
+            @if (stokvel is not null)
+            {
+                <a href="@($"/members/{stokvel.Id}")">Back to Members</a>
+            }
+            else
+            {
+                <a href="/my-stokvels">Back to Members</a>
+            }
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="h5 card-title">Personal Details</h3>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Full name</dt>
+                        <dd class="col-sm-7">@member.FullName</dd>
+
+                        <dt class="col-sm-5">Cellphone number</dt>
+                        <dd class="col-sm-7">@member.CellphoneNumber</dd>
+
+                        <dt class="col-sm-5">Email address</dt>
+                        <dd class="col-sm-7">@(member.EmailAddress ?? "-")</dd>
+
+                        <dt class="col-sm-5">ID number</dt>
+                        <dd class="col-sm-7">@(member.IdNumber ?? "-")</dd>
+
+                        <dt class="col-sm-5">Residential area</dt>
+                        <dd class="col-sm-7">@(member.ResidentialArea ?? "-")</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="h5 card-title">Membership Details</h3>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Member number</dt>
+                        <dd class="col-sm-7">@member.MemberNumber</dd>
+
+                        <dt class="col-sm-5">Joining date</dt>
+                        <dd class="col-sm-7">@member.JoiningDate.ToString("yyyy-MM-dd")</dd>
+
+                        <dt class="col-sm-5">Default role</dt>
+                        <dd class="col-sm-7">@member.DefaultRole</dd>
+
+                        <dt class="col-sm-5">Status</dt>
+                        <dd class="col-sm-7">@member.Status</dd>
+
+                        <dt class="col-sm-5">Cooling period</dt>
+                        <dd class="col-sm-7">@(member.IsInCoolingPeriod ? "Yes" : "No")</dd>
+
+                        @if (member.CoolingPeriodEndDate is not null)
+                        {
+                            <dt class="col-sm-5">Cooling period end date</dt>
+                            <dd class="col-sm-7">@member.CoolingPeriodEndDate.Value.ToString("yyyy-MM-dd")</dd>
+                        }
+
+                        <dt class="col-sm-5">Tenant</dt>
+                        <dd class="col-sm-7">@member.Tenant.Name</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="h5 card-title mb-0">Next of Kin</h3>
+                        @if (member.NextOfKinRecords.Count < 2)
+                        {
+                            <a class="btn btn-sm btn-primary" href="@($"/add-next-of-kin/{MemberId}")">Add Next of Kin</a>
+                        }
+                    </div>
+
+                    @if (member.NextOfKinRecords.Count >= 2)
+                    {
+                        <p class="small text-muted">Maximum of 2 next of kin records captured.</p>
+                    }
+
+                    @if (member.NextOfKinRecords.Count == 0)
+                    {
+                        <p class="mb-0">No next of kin records captured yet.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Full name</th>
+                                        <th>Relationship</th>
+                                        <th>Cellphone number</th>
+                                        <th>Is primary</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var nextOfKin in member.NextOfKinRecords)
+                                    {
+                                        <tr>
+                                            <td>@nextOfKin.FullName</td>
+                                            <td>@nextOfKin.Relationship</td>
+                                            <td>@nextOfKin.CellphoneNumber</td>
+                                            <td>@(nextOfKin.IsPrimary ? "Yes" : "No")</td>
+                                            <td>
+                                                <a class="btn btn-sm btn-secondary" href="@($"/edit-next-of-kin/{nextOfKin.Id}")">Edit</a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="h5 card-title mb-0">Beneficiaries</h3>
+                        @if (member.Beneficiaries.Count == 0)
+                        {
+                            <a class="btn btn-sm btn-primary" href="@($"/add-beneficiary/{MemberId}")">Add Beneficiary</a>
+                        }
+                    </div>
+
+                    @if (member.Beneficiaries.Count > 0)
+                    {
+                        <p class="small text-muted">Beneficiary already captured.</p>
+                    }
+
+                    @if (member.Beneficiaries.Count == 0)
+                    {
+                        <p class="mb-0">No beneficiaries captured yet.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Full name</th>
+                                        <th>Relationship</th>
+                                        <th>Cellphone number</th>
+                                        <th>Date of birth</th>
+                                        <th>Active status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var beneficiary in member.Beneficiaries)
+                                    {
+                                        <tr>
+                                            <td>@beneficiary.FullName</td>
+                                            <td>@beneficiary.Relationship</td>
+                                            <td>@(beneficiary.CellphoneNumber ?? "-")</td>
+                                            <td>@(beneficiary.DateOfBirth?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                            <td>@(beneficiary.IsActive ? "Active" : "Inactive")</td>
+                                            <td>
+                                                <a class="btn btn-sm btn-secondary" href="@($"/edit-beneficiary/{beneficiary.Id}")">Edit</a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="h5 card-title mb-0">Fines</h3>
+                        <a class="btn btn-sm btn-primary" href="@($"/add-fine/{MemberId}")">Add Fine</a>
+                    </div>
+
+                    @if (memberFines.Count == 0)
+                    {
+                        <p class="mb-0">No fines captured yet.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Fine type</th>
+                                        <th>Amount</th>
+                                        <th>Reason</th>
+                                        <th>Fine date</th>
+                                        <th>Status</th>
+                                        <th>Paid date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var fine in memberFines)
+                                    {
+                                        <tr>
+                                            <td>@fine.FineType.Name</td>
+                                            <td>@fine.Amount.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</td>
+                                            <td>@fine.Reason</td>
+                                            <td>@fine.FineDate.ToString("yyyy-MM-dd")</td>
+                                            <td>@fine.Status</td>
+                                            <td>@(fine.PaidDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                            <td>
+                                                @if (fine.Status == FineStatus.Unpaid)
+                                                {
+                                                    <a class="btn btn-sm btn-success" href="@($"/mark-fine-paid/{fine.Id}")">Mark as Paid</a>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Member? member;
+    private List<MemberFine> memberFines = [];
+    private Stokvel? stokvel;
+    private bool isLoading = true;
+
+    [Parameter]
+    public Guid MemberId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        stokvel = member is null
+            ? null
+            : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+        memberFines = member is null
+            ? []
+            : await FineService.GetMemberFinesAsync(MemberId);
+
+        isLoading = false;
+    }
+}

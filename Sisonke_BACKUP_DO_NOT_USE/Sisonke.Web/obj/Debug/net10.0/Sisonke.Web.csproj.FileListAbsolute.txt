@@ -1,0 +1,9 @@
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\EmbeddedAttribute.cs
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\ValidatableTypeAttribute.cs
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.csproj.AssemblyReference.cache
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\rpswa.dswa.cache.json
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.AssemblyInfoInputs.cache
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.AssemblyInfo.cs
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.csproj.CoreCompileInputs.cache
+C:\Users\mpshe\Projects\Sisonke\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.MvcApplicationPartsAssemblyInfo.cache

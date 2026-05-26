@@ -1,0 +1,128 @@
+@page "/edit-next-of-kin/{NextOfKinId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject MemberService MemberService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Next of Kin</PageTitle>
+
+@if (isLoading)
+{
+    <p>Loading next of kin...</p>
+}
+else if (editNextOfKin is null)
+{
+    <div class="alert alert-danger" role="alert">
+        Next of kin record not found.
+    </div>
+}
+else
+{
+    <div class="mb-4">
+        <h1>Edit Next of Kin</h1>
+        <p class="text-muted mb-1">@editNextOfKin.Member.FullName</p>
+        <a href="@($"/member-profile/{editNextOfKin.MemberId}")">Back to Member Profile</a>
+    </div>
+
+    @if (saveFailed)
+    {
+        <div class="alert alert-danger" role="alert">
+            Unable to update next of kin record.
+        </div>
+    }
+
+    <EditForm Model="@editNextOfKin" OnValidSubmit="@HandleValidSubmit" FormName="EditNextOfKinForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="full-name">Full name</label>
+                <InputText id="full-name" class="form-control" @bind-Value="editNextOfKin.FullName" />
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="relationship">Relationship</label>
+                <InputSelect id="relationship" class="form-select" @bind-Value="editNextOfKin.Relationship">
+                    @foreach (var relationship in relationshipOptions)
+                    {
+                        <option value="@relationship">@relationship</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="cellphone-number">Cellphone number</label>
+                <InputText id="cellphone-number" class="form-control" @bind-Value="editNextOfKin.CellphoneNumber" />
+            </div>
+
+            <div class="col-12">
+                <label class="form-label" for="address">Address</label>
+                <InputText id="address" class="form-control" @bind-Value="editNextOfKin.Address" />
+            </div>
+
+            <div class="col-12">
+                <div class="form-check">
+                    <InputCheckbox id="is-primary" class="form-check-input" @bind-Value="editNextOfKin.IsPrimary" />
+                    <label class="form-check-label" for="is-primary">Primary next of kin</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-primary" type="submit">Save Changes</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private static readonly string[] relationshipOptions =
+    [
+        "Spouse",
+        "Child",
+        "Parent",
+        "Sibling",
+        "Grandparent",
+        "Grandchild",
+        "Aunt/Uncle",
+        "Cousin",
+        "Friend",
+        "Other"
+    ];
+
+    private NextOfKin? editNextOfKin;
+    private bool isLoading = true;
+    private bool saveFailed;
+
+    [Parameter]
+    public Guid NextOfKinId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        editNextOfKin = await MemberService.GetNextOfKinByIdAsync(NextOfKinId);
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (editNextOfKin is null)
+        {
+            return;
+        }
+
+        saveFailed = false;
+
+        var updatedNextOfKin = await MemberService.UpdateNextOfKinAsync(editNextOfKin);
+
+        if (updatedNextOfKin is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/member-profile/{editNextOfKin.MemberId}");
+    }
+}
