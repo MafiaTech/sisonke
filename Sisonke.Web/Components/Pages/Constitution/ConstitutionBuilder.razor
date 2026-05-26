@@ -62,6 +62,18 @@ else
         <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
     }
 
+    @if (previewGenerationFailed)
+    {
+        <div class="alert alert-danger" role="alert">
+            Could not generate constitution preview.
+        </div>
+    }
+
+    @if (IsApproved)
+    {
+        <AlertBanner Type="success" Title="This constitution has been approved." Message="" Icon="bi bi-check-circle-fill" />
+    }
+
     <div class="card mb-4">
         <div class="card-body p-4">
             <div class="constitution-preview">
@@ -74,21 +86,27 @@ else
         <button type="button" class="btn btn-primary" @onclick="SaveDraftAsync">
             <i class="bi bi-floppy me-2"></i>Save Draft
         </button>
-        <button type="button" class="btn btn-success" @onclick="ShowApprovalConfirmation">
-            <i class="bi bi-check-circle me-2"></i>Approve Constitution
-        </button>
+        @if (!IsApproved)
+        {
+            <button type="button" class="btn btn-success" @onclick="ShowApprovalConfirmation" disabled="@previewGenerationFailed">
+                <i class="bi bi-check-circle me-2"></i>Approve Constitution
+            </button>
+        }
         <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
     </div>
 
-    <ConfirmationModal
-        IsVisible="@showApprovalConfirmation"
-        Title="Approve Constitution"
-        Message="You are about to approve this constitution. Please confirm that the content has been reviewed and accepted by the stokvel."
-        ConfirmButtonText="Confirm Approval"
-        CancelButtonText="Cancel"
-        ModalType="warning"
-        OnConfirm="@ConfirmApprovalAsync"
-        OnCancel="@CancelApproval" />
+    @if (!IsApproved)
+    {
+        <ConfirmationModal
+            IsVisible="@showApprovalConfirmation"
+            Title="Approve Constitution"
+            Message="You are about to approve this constitution. Please confirm that the content has been reviewed and accepted by the stokvel."
+            ConfirmButtonText="Confirm Approval"
+            CancelButtonText="Cancel"
+            ModalType="warning"
+            OnConfirm="@ConfirmApprovalAsync"
+            OnCancel="@CancelApproval" />
+    }
 }
 
 @code {
@@ -98,8 +116,11 @@ else
     private string? previewContent;
     private bool isLoading = true;
     private bool showApprovalConfirmation;
+    private bool previewGenerationFailed;
     private string? successMessage;
     private string? errorMessage;
+
+    private bool IsApproved => string.Equals(constitutionStatus, "Approved", StringComparison.OrdinalIgnoreCase);
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -110,11 +131,10 @@ else
         successMessage = null;
         errorMessage = null;
         showApprovalConfirmation = false;
+        previewGenerationFailed = false;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
-        constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
-        latestConstitution = await ConstitutionService.GetLatestConstitutionAsync(StokvelId);
-        previewContent = latestConstitution?.Content ?? await ConstitutionService.GenerateConstitutionPreviewAsync(StokvelId);
+        await LoadConstitutionAsync();
 
         isLoading = false;
     }
@@ -130,15 +150,15 @@ else
             return;
         }
 
-        latestConstitution = await ConstitutionService.SaveDraftAsync(StokvelId, previewContent);
+        var savedConstitution = await ConstitutionService.SaveDraftAsync(StokvelId, previewContent);
 
-        if (latestConstitution is null)
+        if (savedConstitution is null)
         {
             errorMessage = "Constitution draft could not be saved.";
             return;
         }
 
-        constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
+        await LoadConstitutionAsync();
         successMessage = "Constitution draft saved successfully.";
     }
 
@@ -168,9 +188,24 @@ else
             return;
         }
 
-        constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
-        previewContent = latestConstitution.Content;
+        await LoadConstitutionAsync();
         successMessage = "Constitution approved successfully.";
+    }
+
+    private async Task LoadConstitutionAsync()
+    {
+        constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
+        latestConstitution = await ConstitutionService.GetLatestConstitutionAsync(StokvelId);
+
+        if (latestConstitution is not null)
+        {
+            previewContent = latestConstitution.Content;
+            previewGenerationFailed = false;
+            return;
+        }
+
+        previewContent = await ConstitutionService.GenerateConstitutionPreviewAsync(StokvelId);
+        previewGenerationFailed = string.IsNullOrWhiteSpace(previewContent);
     }
 
     private static string GetStatusBadgeType(string status)

@@ -11,16 +11,18 @@ public class ConstitutionService(ApplicationDbContext context)
 
     public async Task<ConstitutionDocument?> GetLatestConstitutionAsync(Guid stokvelId)
     {
-        var stokvel = await context.Stokvels
-            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+        var tenantId = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .Select(existingStokvel => (Guid?)existingStokvel.TenantId)
+            .FirstOrDefaultAsync();
 
-        if (stokvel is null)
+        if (tenantId is null)
         {
             return null;
         }
 
         return await context.ConstitutionDocuments
-            .Where(document => document.TenantId == stokvel.TenantId)
+            .Where(document => document.TenantId == tenantId.Value)
             .OrderByDescending(document => document.VersionNumber)
             .ThenByDescending(document => document.CreatedAt)
             .FirstOrDefaultAsync();
@@ -60,14 +62,14 @@ public class ConstitutionService(ApplicationDbContext context)
             <p><strong>Constitution note:</strong> {Encode(existingConstitutionNote)}</p>
 
             <h2>1. Name of the Stokvel</h2>
-            <p>The name of the stokvel is <strong>{Encode(stokvel.Name)}</strong>.</p>
+            <p>The name of the stokvel is <strong>{EncodeOrDefault(stokvel.Name)}</strong>.</p>
             <p>Type: {Encode(stokvel.Type.ToString())}. Province: {EncodeOrDefault(stokvel.Province)}. Town or area: {EncodeOrDefault(stokvel.TownOrArea)}.</p>
 
             <h2>2. Purpose</h2>
             <p>{Encode(purpose)}</p>
 
             <h2>3. Membership</h2>
-            <p>Membership rules, admission requirements and member responsibilities will be administered by the stokvel committee and recorded by {Encode(stokvel.Tenant.Name)}.</p>
+            <p>Membership rules, admission requirements and member responsibilities will be administered by the stokvel committee and recorded by {EncodeOrDefault(stokvel.Tenant?.Name)}.</p>
 
             <h2>4. Contributions</h2>
             <p>Each member must contribute {Encode(contributionAmount)} on a {Encode(contributionFrequency)} basis.</p>
@@ -123,7 +125,7 @@ public class ConstitutionService(ApplicationDbContext context)
             Id = Guid.NewGuid(),
             TenantId = stokvel.TenantId,
             Title = $"{stokvel.Name} Constitution",
-            Content = content,
+            Content = string.IsNullOrWhiteSpace(content) ? ToBeConfirmed : content,
             VersionNumber = version,
             IsApproved = false,
             CreatedAt = DateTime.UtcNow
@@ -183,22 +185,24 @@ public class ConstitutionService(ApplicationDbContext context)
         var records = await context.StokvelQuestionnaireAnswers
             .Include(answer => answer.QuestionnaireQuestion)
             .Where(answer => answer.TenantId == tenantId)
+            .OrderByDescending(answer => answer.AnsweredAt)
             .ToListAsync();
 
-        var answers = new Dictionary<string, string>();
+        var answers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var record in records)
         {
             var questionText = record.QuestionnaireQuestion?.QuestionText;
+            var answerValue = record.AnswerValue;
 
-            if (string.IsNullOrWhiteSpace(questionText))
+            if (string.IsNullOrWhiteSpace(questionText) || string.IsNullOrWhiteSpace(answerValue))
             {
                 continue;
             }
 
-            if (!answers.ContainsKey(questionText) && !string.IsNullOrWhiteSpace(record.AnswerValue))
+            if (!answers.ContainsKey(questionText))
             {
-                answers[questionText] = record.AnswerValue;
+                answers[questionText] = answerValue;
             }
         }
 

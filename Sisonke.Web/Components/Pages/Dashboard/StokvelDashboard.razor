@@ -187,7 +187,21 @@ else
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
+        memberCount = 0;
+        expectedMonthlyContributions = 0;
+        outstandingFinesTotal = 0;
+        activeSubscription = null;
+        memberLimitMessage = string.Empty;
+        constitutionStatus = "Not Created";
+
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        if (stokvel is null)
+        {
+            isLoading = false;
+            return;
+        }
+
         activeSubscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(StokvelId);
         memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
