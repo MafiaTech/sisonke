@@ -152,7 +152,6 @@ C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\scopedcss\Componen
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\scopedcss\Components\Layout\ReconnectModal.razor.rz.scp.css
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\scopedcss\bundle\Sisonke.Web.styles.css
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\scopedcss\projectbundle\Sisonke.Web.bundle.scp.css
-C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\nhy6tht084-{0}-khy4lop6wu-khy4lop6wu.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\37ul6ttf6f-{0}-bqjiyaj88i-bqjiyaj88i.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\2580mpvboq-{0}-c2jlpeoesf-c2jlpeoesf.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\x9xu9sw0o6-{0}-erw9l3u2r3-erw9l3u2r3.gz
@@ -201,8 +200,6 @@ C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\us8mcbd
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\iz97a3pts6-{0}-abdmv1u4y3-abdmv1u4y3.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\3m3fdbhsl6-{0}-ej96puwv3k-ej96puwv3k.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\3ht0l14at0-{0}-cj5793hgrt-cj5793hgrt.gz
-C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\xa414wal04-{0}-etpu75sdur-etpu75sdur.gz
-C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\b8qlot7hwn-{0}-etpu75sdur-etpu75sdur.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\staticwebassets.build.json
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\staticwebassets.build.json.cache
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\staticwebassets.development.json
@@ -214,3 +211,8 @@ C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\refint\Sisonke.Web
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.pdb
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.genruntimeconfig.cache
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\ref\Sisonke.Web.dll
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\scopedcss\Components\Pages\Stokvels\MyStokvels.razor.rz.scp.css
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\scopedcss\Components\Pages\Members\AddMember.razor.rz.scp.css
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\xa414wal04-{0}-pqgaw5jgp1-pqgaw5jgp1.gz
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\b8qlot7hwn-{0}-pqgaw5jgp1-pqgaw5jgp1.gz
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\nhy6tht084-{0}-6cjtlj9njd-6cjtlj9njd.gz

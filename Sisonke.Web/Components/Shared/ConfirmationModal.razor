@@ -5,46 +5,226 @@
     <div class="confirmation-modal-backdrop">
         <div class="confirmation-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmation-modal-title">
             <div class="confirmation-modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title h5" id="confirmation-modal-title">@Title</h2>
+
+                <div class="cm-icon-zone">
+                    <div class="cm-icon-circle cm-icon-@ModalType">
+                        <i class="bi @ModalIcon" aria-hidden="true"></i>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <p class="mb-0">@Message</p>
+
+                <div class="cm-header">
+                    <h2 class="cm-title" id="confirmation-modal-title">@Title</h2>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="OnCancel">@CancelButtonText</button>
-                    <button type="button" class="btn @ConfirmButtonClass" @onclick="OnConfirm">@ConfirmButtonText</button>
+
+                <div class="cm-body">
+                    <p class="cm-message">@Message</p>
                 </div>
+
+                <div class="cm-footer">
+                    <button type="button" class="btn cm-btn-cancel" @onclick="OnCancel">@CancelButtonText</button>
+                    <button type="button" class="btn @ConfirmButtonClass cm-btn-confirm" @onclick="OnConfirm">@ConfirmButtonText</button>
+                </div>
+
             </div>
         </div>
     </div>
 }
 
 <style>
+    /* ── Backdrop ───────────────────────────────────── */
     .confirmation-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1055;
+        display: flex;
         align-items: center;
-        background-color: rgba(0, 0, 0, 0.55);
-        bottom: 0;
+        justify-content: center;
+        padding: 1.25rem;
+        background-color: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+
+    /* ── Dialog shell ───────────────────────────────── */
+    .confirmation-modal-dialog {
+        max-width: 460px;
+        width: 100%;
+        animation: cm-slide-in 0.2s ease-out;
+    }
+
+    @@keyframes cm-slide-in {
+        from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+        to   { opacity: 1; transform: translateY(0)     scale(1);    }
+    }
+
+    /* ── Content card ───────────────────────────────── */
+    .confirmation-modal-content {
+        background: #fff;
+        border-radius: 1.25rem;
+        box-shadow:
+            0 4px 6px rgba(0, 0, 0, 0.06),
+            0 20px 60px rgba(0, 0, 0, 0.22);
+        overflow: hidden;
+        padding-bottom: 0.5rem;
+    }
+
+    /* ── Icon zone ──────────────────────────────────── */
+    .cm-icon-zone {
         display: flex;
         justify-content: center;
-        left: 0;
-        padding: 1rem;
-        position: fixed;
-        right: 0;
-        top: 0;
-        z-index: 1055;
+        padding: 2rem 1.5rem 0.75rem;
     }
 
-    .confirmation-modal-dialog {
-        max-width: 520px;
-        width: 100%;
+    .cm-icon-circle {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
     }
 
-    .confirmation-modal-content {
-        background-color: #fff;
-        border-radius: 0.5rem;
-        box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.2);
-        overflow: hidden;
+    /* Per-type colour tokens */
+    .cm-icon-warning {
+        background-color: #fef3c7;
+        color: #d97706;
+        box-shadow: 0 0 0 8px #fef9e7;
+    }
+    .cm-icon-danger {
+        background-color: #fee2e2;
+        color: #dc2626;
+        box-shadow: 0 0 0 8px #fff5f5;
+    }
+    .cm-icon-success {
+        background-color: #dcfce7;
+        color: #16a34a;
+        box-shadow: 0 0 0 8px #f0fdf4;
+    }
+    .cm-icon-info {
+        background-color: #dbeafe;
+        color: #2563eb;
+        box-shadow: 0 0 0 8px #eff6ff;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    .cm-header {
+        text-align: center;
+        padding: 0.75rem 2rem 0;
+    }
+
+    .cm-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+        line-height: 1.3;
+    }
+
+    /* ── Body ───────────────────────────────────────── */
+    .cm-body {
+        padding: 0.75rem 2rem 1.25rem;
+        text-align: center;
+    }
+
+    .cm-message {
+        color: #475569;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    /* ── Footer ─────────────────────────────────────── */
+    .cm-footer {
+        display: flex;
+        flex-direction: column;
+        gap: 0.625rem;
+        padding: 0 1.5rem 1.75rem;
+    }
+
+    @@media (min-width: 420px) {
+        .cm-footer {
+            flex-direction: row;
+            justify-content: center;
+        }
+        .cm-btn-cancel,
+        .cm-btn-confirm {
+            min-width: 140px;
+        }
+    }
+
+    /* ── Cancel button (ghost) ──────────────────────── */
+    .cm-btn-cancel {
+        background: transparent;
+        border: 1.5px solid #d1d5db;
+        color: #374151;
+        font-weight: 500;
+        border-radius: 0.625rem;
+        padding: 0.5rem 1.25rem;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .cm-btn-cancel:hover,
+    .cm-btn-cancel:focus {
+        background-color: #f3f4f6;
+        border-color: #9ca3af;
+        color: #111827;
+    }
+
+    /* ── Confirm button — polished warning (amber) ──── */
+    .cm-btn-confirm {
+        font-weight: 600;
+        border-radius: 0.625rem;
+        padding: 0.5rem 1.25rem;
+        transition: filter 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .cm-btn-confirm.btn-warning {
+        background-color: #d97706;
+        border-color: #d97706;
+        color: #fff;
+        box-shadow: 0 1px 3px rgba(217, 119, 6, 0.35);
+    }
+
+    .cm-btn-confirm.btn-warning:hover,
+    .cm-btn-confirm.btn-warning:focus {
+        background-color: #b45309;
+        border-color: #b45309;
+        color: #fff;
+        box-shadow: 0 3px 10px rgba(180, 83, 9, 0.4);
+    }
+
+    .cm-btn-confirm.btn-danger {
+        background-color: #dc2626;
+        border-color: #dc2626;
+        color: #fff;
+        box-shadow: 0 1px 3px rgba(220, 38, 38, 0.35);
+    }
+
+    .cm-btn-confirm.btn-danger:hover {
+        background-color: #b91c1c;
+        border-color: #b91c1c;
+        box-shadow: 0 3px 10px rgba(185, 28, 28, 0.4);
+    }
+
+    .cm-btn-confirm.btn-success {
+        box-shadow: 0 1px 3px rgba(22, 163, 74, 0.35);
+    }
+
+    .cm-btn-confirm.btn-success:hover {
+        box-shadow: 0 3px 10px rgba(22, 163, 74, 0.4);
+    }
+
+    .cm-btn-confirm.btn-primary {
+        background-color: #052767;
+        border-color: #052767;
+        box-shadow: 0 1px 3px rgba(5, 39, 103, 0.35);
+    }
+
+    .cm-btn-confirm.btn-primary:hover {
+        background-color: #03194a;
+        border-color: #03194a;
+        box-shadow: 0 3px 10px rgba(5, 39, 103, 0.4);
     }
 </style>
 
@@ -76,9 +256,17 @@
     private string ConfirmButtonClass => ModalType?.ToLowerInvariant() switch
     {
         "warning" => "btn-warning",
-        "danger" => "btn-danger",
+        "danger"  => "btn-danger",
         "success" => "btn-success",
-        "info" => "btn-primary",
-        _ => "btn-primary"
+        "info"    => "btn-primary",
+        _         => "btn-primary"
+    };
+
+    private string ModalIcon => ModalType?.ToLowerInvariant() switch
+    {
+        "warning" => "bi-shield-check",
+        "danger"  => "bi-exclamation-triangle-fill",
+        "success" => "bi-check-circle-fill",
+        _         => "bi-info-circle-fill"
     };
 }

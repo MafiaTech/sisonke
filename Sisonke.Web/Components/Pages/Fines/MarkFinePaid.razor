@@ -13,64 +13,73 @@
 
 @if (isLoading)
 {
-    <p>Loading fine details...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading fine details...
+    </div>
 }
 else if (memberFine is null)
 {
-    <div class="alert alert-danger" role="alert">
-        Fine not found.
-    </div>
+    <AlertBanner Type="danger" Title="Fine not found." Message="" Icon="bi bi-x-circle-fill" />
 }
 else
 {
-    <h1>Mark Fine Paid</h1>
+    <PageHeader
+        Title="Mark Fine Paid"
+        Subtitle="@memberFine.Member.FullName"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{memberFine.MemberId}")" />
 
     @if (!string.IsNullOrWhiteSpace(successMessage))
     {
-        <div class="alert alert-success" role="alert">
-            @successMessage
-        </div>
+        <AlertBanner Type="success" Title="Payment confirmed" Message="@successMessage" Icon="bi bi-check-circle-fill" />
     }
     else if (memberFine.Status == FineStatus.Paid)
     {
-        <div class="alert alert-info" role="alert">
-            This fine has already been marked as paid.
-        </div>
+        <AlertBanner Type="info" Title="Already paid" Message="This fine has already been marked as paid." Icon="bi bi-info-circle-fill" />
     }
 
     @if (updateFailed)
     {
-        <div class="alert alert-danger" role="alert">
-            Could not mark fine as paid.
-        </div>
+        <AlertBanner Type="danger" Title="Could not mark fine as paid." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-4">Member full name</dt>
-                <dd class="col-sm-8">@memberFine.Member.FullName</dd>
+    <div class="form-page">
+        <div class="card">
+            <div class="card-body p-4">
+                <h3 class="h6 text-muted text-uppercase mb-3" style="letter-spacing: .05em; font-size: .7rem;">Fine Details</h3>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 fw-normal text-muted small">Member</dt>
+                    <dd class="col-sm-8 fw-medium">@memberFine.Member.FullName</dd>
 
-                <dt class="col-sm-4">Fine type</dt>
-                <dd class="col-sm-8">@memberFine.FineType.Name</dd>
+                    <dt class="col-sm-4 fw-normal text-muted small">Fine type</dt>
+                    <dd class="col-sm-8">@memberFine.FineType.Name</dd>
 
-                <dt class="col-sm-4">Amount</dt>
-                <dd class="col-sm-8">@memberFine.Amount.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</dd>
+                    <dt class="col-sm-4 fw-normal text-muted small">Amount</dt>
+                    <dd class="col-sm-8 fw-semibold">@memberFine.Amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</dd>
 
-                <dt class="col-sm-4">Reason</dt>
-                <dd class="col-sm-8">@memberFine.Reason</dd>
+                    <dt class="col-sm-4 fw-normal text-muted small">Reason</dt>
+                    <dd class="col-sm-8">@memberFine.Reason</dd>
 
-                <dt class="col-sm-4">Fine date</dt>
-                <dd class="col-sm-8">@memberFine.FineDate.ToString("yyyy-MM-dd")</dd>
+                    <dt class="col-sm-4 fw-normal text-muted small">Fine date</dt>
+                    <dd class="col-sm-8">@memberFine.FineDate.ToString("dd MMM yyyy")</dd>
 
-                <dt class="col-sm-4">Current status</dt>
-                <dd class="col-sm-8">@memberFine.Status</dd>
-            </dl>
+                    <dt class="col-sm-4 fw-normal text-muted small">Current status</dt>
+                    <dd class="col-sm-8">
+                        @if (memberFine.Status == FineStatus.Paid)
+                        {
+                            <StatusBadge Text="Paid" Type="success" />
+                        }
+                        else
+                        {
+                            <StatusBadge Text="Unpaid" Type="danger" />
+                        }
+                    </dd>
+                </dl>
+            </div>
         </div>
-    </div>
-
-    <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" href="@($"/member-profile/{memberFine.MemberId}")">Back to Member Profile</a>
     </div>
 
     <ConfirmationModal

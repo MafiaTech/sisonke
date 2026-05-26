@@ -1,0 +1,22 @@
+@if (!string.IsNullOrWhiteSpace(Text))
+{
+    <span class="badge @BadgeClass">@Text</span>
+}
+
+@code {
+    [Parameter]
+    public string Text { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Type { get; set; } = "secondary";
+
+    private string BadgeClass => Type.ToLowerInvariant() switch
+    {
+        "success" => "bg-success",
+        "warning" => "bg-warning text-dark",
+        "danger" => "bg-danger",
+        "info" => "bg-info text-dark",
+        "secondary" => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

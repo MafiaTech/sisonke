@@ -5,78 +5,153 @@
 
 <PageTitle>My Stokvels</PageTitle>
 
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
-    <div>
+<div class="page-header">
+    <div class="page-header-text">
         <h1>My Stokvels</h1>
-        <p class="text-muted mb-0">Manage your registered stokvels and continue any incomplete setup.</p>
+        <p class="page-subtitle">Manage your registered stokvels and continue any incomplete setup.</p>
     </div>
-    <a class="btn btn-primary" href="/register-stokvel">Register New Stokvel</a>
+    <a class="btn btn-primary" href="/register-stokvel">
+        <i class="bi bi-plus-circle me-2"></i>Register New Stokvel
+    </a>
 </div>
 
 @if (stokvels is null)
 {
-    <p>Loading...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading stokvels...
+    </div>
+}
+else if (stokvels.Count == 0)
+{
+    <div class="ms-empty-state">
+        <div class="ms-empty-icon-ring">
+            <i class="bi bi-collection" aria-hidden="true"></i>
+        </div>
+        <h2 class="ms-empty-title">No stokvels yet</h2>
+        <p class="ms-empty-text">Register your first stokvel to get started managing your community finances.</p>
+        <a class="btn btn-primary btn-lg px-4" href="/register-stokvel">
+            <i class="bi bi-plus-circle me-2"></i>Register Your First Stokvel
+        </a>
+    </div>
 }
 else
 {
-    <section class="mb-5">
-        <h2 class="h4 mb-2">Ready Stokvels</h2>
-        <p class="text-muted">These stokvels are ready for day-to-day management.</p>
+    <div class="ms-summary-strip">
+        <div class="ms-summary-item">
+            <span class="ms-summary-value">@stokvels.Count</span>
+            <span class="ms-summary-label">Total</span>
+        </div>
+        <div class="ms-summary-divider" aria-hidden="true"></div>
+        <div class="ms-summary-item">
+            <span class="ms-summary-value text-success">@ReadyStokvels.Count</span>
+            <span class="ms-summary-label">Ready</span>
+        </div>
+        <div class="ms-summary-divider" aria-hidden="true"></div>
+        <div class="ms-summary-item">
+            <span class="ms-summary-value text-warning">@IncompleteSetupStokvels.Count</span>
+            <span class="ms-summary-label">Setup pending</span>
+        </div>
+    </div>
 
-        @if (ReadyStokvels.Count == 0)
-        {
-            <p class="text-muted">No completed stokvels yet.</p>
-        }
-        else
-        {
+    @if (ReadyStokvels.Count > 0)
+    {
+        <section class="mb-5">
+            <div class="ms-section-heading">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+                    <h2 class="h5 mb-0">Ready Stokvels</h2>
+                    <StatusBadge Text="@ReadyStokvels.Count.ToString()" Type="success" />
+                </div>
+                <p class="ms-section-sub">Set up and ready for day-to-day management.</p>
+            </div>
+
             <div class="row g-3">
                 @foreach (var stokvel in ReadyStokvels)
                 {
-                    <div class="col-12 col-md-6 col-lg-4">
-                        <div class="card h-100">
-                            <div class="card-body d-flex flex-column">
-                                <h3 class="h5 card-title">@stokvel.Name</h3>
-                                <p class="card-text mb-1"><strong>Type:</strong> @stokvel.Type</p>
-                                <p class="card-text mb-1"><strong>Tenant:</strong> @stokvel.Tenant.Name</p>
-                                <p class="card-text"><strong>Status:</strong> @(stokvel.IsActive ? "Active" : "Inactive")</p>
-                                <a class="btn btn-primary mt-auto align-self-start" href="@($"/stokvel-dashboard/{stokvel.Id}")">Open Dashboard</a>
+                    <div class="col-12 col-sm-6 col-xl-4">
+                        <div class="card h-100 ms-card ms-card-ready">
+                            <div class="card-body d-flex flex-column p-4">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                                    <h3 class="ms-card-title">@stokvel.Name</h3>
+                                    @if (stokvel.IsActive)
+                                    {
+                                        <StatusBadge Text="Active" Type="success" />
+                                    }
+                                    else
+                                    {
+                                        <StatusBadge Text="Inactive" Type="secondary" />
+                                    }
+                                </div>
+
+                                <div class="ms-card-meta mb-auto">
+                                    <span class="ms-type-chip">@stokvel.Type</span>
+                                    <span class="ms-tenant-name">@stokvel.Tenant.Name</span>
+                                </div>
+
+                                <div class="ms-card-footer">
+                                    <a class="btn btn-primary btn-sm w-100" href="@($"/stokvel-dashboard/{stokvel.Id}")">
+                                        <i class="bi bi-speedometer2 me-2"></i>Open Dashboard
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
                 }
             </div>
-        }
-    </section>
+        </section>
+    }
 
-    <section>
-        <h2 class="h4 mb-2">Incomplete Setup</h2>
-        <p class="text-muted">These stokvels have been created but registration has not been submitted yet.</p>
+    @if (IncompleteSetupStokvels.Count > 0)
+    {
+        <section>
+            <div class="ms-section-heading">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-hourglass-split text-warning" aria-hidden="true"></i>
+                    <h2 class="h5 mb-0">Incomplete Setup</h2>
+                    <StatusBadge Text="@IncompleteSetupStokvels.Count.ToString()" Type="warning" />
+                </div>
+                <p class="ms-section-sub">Created but not yet submitted for management.</p>
+            </div>
 
-        @if (IncompleteSetupStokvels.Count == 0)
-        {
-            <p class="text-muted">No incomplete setup items.</p>
-        }
-        else
-        {
             <div class="row g-3">
                 @foreach (var stokvel in IncompleteSetupStokvels)
                 {
-                    <div class="col-12 col-md-6 col-lg-4">
-                        <div class="card h-100">
-                            <div class="card-body d-flex flex-column">
-                                <h3 class="h5 card-title">@stokvel.Name</h3>
-                                <p class="card-text mb-1"><strong>Type:</strong> @stokvel.Type</p>
-                                <p class="card-text mb-1"><strong>Tenant:</strong> @stokvel.Tenant.Name</p>
-                                <p class="card-text mb-1"><strong>Status:</strong> @(stokvel.IsActive ? "Active" : "Inactive")</p>
-                                <p class="card-text"><strong>Setup completion:</strong> @(stokvel.IsSetupComplete ? "Complete" : "Incomplete")</p>
-                                <a class="btn btn-primary mt-auto align-self-start" href="@($"/stokvel-questionnaire/{stokvel.Id}")">Continue Registration</a>
+                    <div class="col-12 col-sm-6 col-xl-4">
+                        <div class="card h-100 ms-card ms-card-pending">
+                            <div class="card-body d-flex flex-column p-4">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                                    <h3 class="ms-card-title">@stokvel.Name</h3>
+                                    <StatusBadge Text="Setup pending" Type="warning" />
+                                </div>
+
+                                <div class="ms-card-meta mb-auto">
+                                    <span class="ms-type-chip">@stokvel.Type</span>
+                                    <span class="ms-tenant-name">@stokvel.Tenant.Name</span>
+                                </div>
+
+                                <div class="ms-card-footer">
+                                    <a class="btn btn-warning btn-sm w-100" href="@($"/stokvel-questionnaire/{stokvel.Id}")">
+                                        <i class="bi bi-clipboard-check me-2"></i>Continue Registration
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
                 }
             </div>
-        }
-    </section>
+        </section>
+    }
+
+    @if (ReadyStokvels.Count == 0 && IncompleteSetupStokvels.Count > 0)
+    {
+        <div class="ms-hint-banner">
+            <i class="bi bi-lightbulb-fill text-warning me-2" aria-hidden="true"></i>
+            Complete your stokvel setup to unlock the full dashboard and start managing contributions.
+        </div>
+    }
 }
 
 @code {

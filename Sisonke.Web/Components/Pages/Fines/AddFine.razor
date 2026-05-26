@@ -14,73 +14,81 @@
 
 @if (isLoading)
 {
-    <p>Loading fine form...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading fine form...
+    </div>
 }
 else if (member is null)
 {
-    <div class="alert alert-danger" role="alert">
-        Member not found.
-    </div>
+    <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
 }
 else
 {
-    <div class="mb-4">
-        <h1>Add Fine</h1>
-        <p class="text-muted mb-1">@member.FullName</p>
-        <a href="@($"/member-profile/{MemberId}")">Back to Member Profile</a>
-    </div>
+    <PageHeader
+        Title="Add Fine"
+        Subtitle="@member.FullName"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{MemberId}")" />
 
     @if (saveFailed)
     {
-        <div class="alert alert-danger" role="alert">
-            Unable to save fine.
-        </div>
+        <AlertBanner Type="danger" Title="Unable to save fine." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
     @if (fineTypes.Count == 0)
     {
-        <div class="alert alert-info" role="alert">
-            No fine types configured for this stokvel.
-        </div>
+        <AlertBanner Type="info" Title="No fine types configured." Message="Configure fine types for this stokvel before adding fines." Icon="bi bi-info-circle-fill" />
     }
     else
     {
-        <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="AddFineForm">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
+        <div class="form-page">
+            <div class="card">
+                <div class="card-body p-4">
+                    <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="AddFineForm">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="alert alert-danger" />
 
-            <div class="row g-3">
-                <div class="col-12 col-md-6">
-                    <label class="form-label" for="fine-type">Fine type</label>
-                    <InputSelect id="fine-type" class="form-select" @bind-Value="model.FineTypeId">
-                        <option value="@Guid.Empty">Select fine type</option>
-                        @foreach (var fineType in fineTypes)
-                        {
-                            <option value="@fineType.Id">@fineType.Name - default @fineType.DefaultAmount.ToString("C")</option>
-                        }
-                    </InputSelect>
-                </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="fine-type">Fine type</label>
+                                <InputSelect id="fine-type" class="form-select" @bind-Value="model.FineTypeId">
+                                    <option value="@Guid.Empty">— Select fine type —</option>
+                                    @foreach (var fineType in fineTypes)
+                                    {
+                                        <option value="@fineType.Id">@fineType.Name — default @fineType.DefaultAmount.ToString("C0")</option>
+                                    }
+                                </InputSelect>
+                            </div>
 
-                <div class="col-12 col-md-6">
-                    <label class="form-label" for="amount">Amount</label>
-                    <InputNumber id="amount" class="form-control" @bind-Value="model.Amount" />
-                </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="amount">Amount (R)</label>
+                                <InputNumber id="amount" class="form-control" @bind-Value="model.Amount" />
+                            </div>
 
-                <div class="col-12 col-md-6">
-                    <label class="form-label" for="fine-date">Fine date</label>
-                    <InputDate id="fine-date" class="form-control" @bind-Value="model.FineDate" />
-                </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="fine-date">Fine date</label>
+                                <InputDate id="fine-date" class="form-control" @bind-Value="model.FineDate" />
+                            </div>
 
-                <div class="col-12">
-                    <label class="form-label" for="reason">Reason</label>
-                    <InputTextArea id="reason" class="form-control" @bind-Value="model.Reason" />
+                            <div class="col-12">
+                                <label class="form-label" for="reason">Reason</label>
+                                <InputTextArea id="reason" class="form-control" rows="3" @bind-Value="model.Reason" />
+                            </div>
+                        </div>
+
+                        <div class="mt-4 d-flex gap-2">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-check-lg me-2"></i>Save Fine
+                            </button>
+                            <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
+                        </div>
+                    </EditForm>
                 </div>
             </div>
-
-            <div class="mt-4">
-                <button class="btn btn-primary" type="submit">Save Fine</button>
-            </div>
-        </EditForm>
+        </div>
     }
 }
 

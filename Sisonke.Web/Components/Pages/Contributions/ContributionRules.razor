@@ -13,88 +13,96 @@
 
 @if (isLoading)
 {
-    <p>Loading contribution rules...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading contribution rules...
+    </div>
 }
 else if (stokvel is null)
 {
-    <div class="alert alert-danger" role="alert">
-        Stokvel not found.
-    </div>
+    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
 }
 else
 {
-    <div class="mb-4">
-        <h1>Contribution Rules</h1>
-        <p class="text-muted mb-1">@stokvel.Name</p>
-        <a href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
-    </div>
+    <PageHeader
+        Title="Contribution Rules"
+        Subtitle="@stokvel.Name"
+        BackText="Back to Dashboard"
+        BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
 
     @if (savedSuccessfully)
     {
-        <div class="alert alert-success" role="alert">
-            Contribution rule saved successfully.
-        </div>
+        <AlertBanner Type="success" Title="Contribution rule saved." Message="" Icon="bi bi-check-circle-fill" />
     }
 
     @if (saveFailed)
     {
-        <div class="alert alert-danger" role="alert">
-            Unable to save contribution rule.
-        </div>
+        <AlertBanner Type="danger" Title="Unable to save contribution rule." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
-    <EditForm Model="@rule" OnValidSubmit="@HandleValidSubmit" FormName="ContributionRuleForm">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
+    <div class="form-page">
+        <div class="card">
+            <div class="card-body p-4">
+                <EditForm Model="@rule" OnValidSubmit="@HandleValidSubmit" FormName="ContributionRuleForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
 
-        <div class="row g-3">
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="amount">Amount</label>
-                <InputNumber id="amount" class="form-control" @bind-Value="rule.Amount" />
-            </div>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="amount">Contribution amount (R)</label>
+                            <InputNumber id="amount" class="form-control" @bind-Value="rule.Amount" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="frequency">Frequency</label>
-                <InputSelect id="frequency" class="form-select" @bind-Value="rule.Frequency">
-                    @foreach (var frequency in Enum.GetValues<ContributionFrequency>())
-                    {
-                        <option value="@frequency">@frequency</option>
-                    }
-                </InputSelect>
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="frequency">Frequency</label>
+                            <InputSelect id="frequency" class="form-select" @bind-Value="rule.Frequency">
+                                @foreach (var frequency in Enum.GetValues<ContributionFrequency>())
+                                {
+                                    <option value="@frequency">@frequency</option>
+                                }
+                            </InputSelect>
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="due-day">Due day of month</label>
-                <InputNumber id="due-day" class="form-control" @bind-Value="rule.DueDayOfMonth" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="due-day">Due day of month</label>
+                            <InputNumber id="due-day" class="form-control" @bind-Value="rule.DueDayOfMonth" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="late-payment-fine">Late payment fine amount</label>
-                <InputNumber id="late-payment-fine" class="form-control" @bind-Value="rule.LatePaymentFineAmount" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="late-payment-fine">Late payment fine (R)</label>
+                            <InputNumber id="late-payment-fine" class="form-control" @bind-Value="rule.LatePaymentFineAmount" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="grace-period">Grace period days</label>
-                <InputNumber id="grace-period" class="form-control" @bind-Value="rule.GracePeriodDays" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="grace-period">Grace period (days)</label>
+                            <InputNumber id="grace-period" class="form-control" @bind-Value="rule.GracePeriodDays" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="effective-from">Effective from</label>
-                <InputDate id="effective-from" class="form-control" @bind-Value="rule.EffectiveFrom" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="effective-from">Effective from</label>
+                            <InputDate id="effective-from" class="form-control" @bind-Value="rule.EffectiveFrom" />
+                        </div>
 
-            <div class="col-12">
-                <div class="form-check">
-                    <InputCheckbox id="allow-partial-payments" class="form-check-input" @bind-Value="rule.AllowPartialPayments" />
-                    <label class="form-check-label" for="allow-partial-payments">Allow partial payments</label>
-                </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <InputCheckbox id="allow-partial-payments" class="form-check-input" @bind-Value="rule.AllowPartialPayments" />
+                                <label class="form-check-label" for="allow-partial-payments">Allow partial payments</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-check-lg me-2"></i>Save Contribution Rule
+                        </button>
+                        <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">Cancel</a>
+                    </div>
+                </EditForm>
             </div>
         </div>
-
-        <div class="mt-4">
-            <button class="btn btn-primary" type="submit">Save Contribution Rule</button>
-        </div>
-    </EditForm>
+    </div>
 }
 
 @code {

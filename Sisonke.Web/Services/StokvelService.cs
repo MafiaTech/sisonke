@@ -13,9 +13,22 @@ public class StokvelService(ApplicationDbContext context)
         string? province,
         string? townOrArea,
         DateTime? establishedDate,
+        int? expectedMemberCount,
+        Guid subscriptionPlanId,
         string? description)
     {
         if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        var plan = await context.SubscriptionPlans
+            .SingleOrDefaultAsync(subscriptionPlan =>
+                subscriptionPlan.Id == subscriptionPlanId &&
+                subscriptionPlan.IsActive &&
+                subscriptionPlan.Name != "Pilot");
+
+        if (plan is null)
         {
             return null;
         }
@@ -41,6 +54,7 @@ public class StokvelService(ApplicationDbContext context)
             Province = province,
             TownOrArea = townOrArea,
             EstablishedDate = establishedDate,
+            ExpectedMemberCount = expectedMemberCount,
             Description = description,
             IsActive = true,
             IsSetupComplete = false,
@@ -48,30 +62,48 @@ public class StokvelService(ApplicationDbContext context)
             CreatedAt = createdAt
         };
 
-        var plan = await context.SubscriptionPlans
-            .Where(subscriptionPlan => subscriptionPlan.IsActive)
-            .OrderByDescending(subscriptionPlan => subscriptionPlan.Name == "Pilot")
-            .ThenBy(subscriptionPlan => subscriptionPlan.Name)
-            .FirstOrDefaultAsync();
-
-        if (plan is not null)
+        context.TenantSubscriptions.Add(new TenantSubscription
         {
-            context.TenantSubscriptions.Add(new TenantSubscription
-            {
-                TenantId = tenant.Id,
-                Tenant = tenant,
-                SubscriptionPlanId = plan.Id,
-                SubscriptionPlan = plan,
-                Status = SubscriptionStatus.Active,
-                StartDate = createdAt,
-                IsTrial = true
-            });
-        }
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            SubscriptionPlanId = plan.Id,
+            SubscriptionPlan = plan,
+            Status = SubscriptionStatus.Active,
+            StartDate = createdAt,
+            IsTrial = true
+        });
 
         context.Stokvels.Add(stokvel);
         await context.SaveChangesAsync();
 
         return stokvel;
+    }
+
+    public async Task<List<SubscriptionPlan>> GetPublicSubscriptionPlansAsync()
+    {
+        return await context.SubscriptionPlans
+            .Where(subscriptionPlan =>
+                subscriptionPlan.IsActive &&
+                subscriptionPlan.Name != "Pilot")
+            .OrderBy(subscriptionPlan => subscriptionPlan.MinMembers)
+            .ToListAsync();
+    }
+
+    public async Task<SubscriptionPlan?> GetRecommendedSubscriptionPlanAsync(int? expectedMemberCount)
+    {
+        if (expectedMemberCount is null || expectedMemberCount < 1)
+        {
+            return null;
+        }
+
+        return await context.SubscriptionPlans
+            .Where(subscriptionPlan =>
+                subscriptionPlan.IsActive &&
+                subscriptionPlan.Name != "Pilot" &&
+                expectedMemberCount >= subscriptionPlan.MinMembers &&
+                (subscriptionPlan.MaxMembers == null || expectedMemberCount <= subscriptionPlan.MaxMembers))
+            .OrderBy(subscriptionPlan => subscriptionPlan.MinMembers)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<List<Stokvel>> GetAllStokvelsAsync()
@@ -101,6 +133,91 @@ public class StokvelService(ApplicationDbContext context)
                 stokvel.IsActive)
             .OrderBy(stokvel => stokvel.Name)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<TenantSubscription?> GetActiveSubscriptionByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return null;
+        }
+
+        return await context.TenantSubscriptions
+            .Include(subscription => subscription.SubscriptionPlan)
+            .SingleOrDefaultAsync(subscription =>
+                subscription.TenantId == stokvel.TenantId &&
+                subscription.Status == SubscriptionStatus.Active);
+    }
+
+    public async Task<bool> CanAddMemberAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var subscription = await context.TenantSubscriptions
+            .Include(existingSubscription => existingSubscription.SubscriptionPlan)
+            .SingleOrDefaultAsync(existingSubscription =>
+                existingSubscription.TenantId == stokvel.TenantId &&
+                existingSubscription.Status == SubscriptionStatus.Active);
+
+        if (subscription?.SubscriptionPlan is null)
+        {
+            return false;
+        }
+
+        if (subscription.SubscriptionPlan.MaxMembers is null)
+        {
+            return true;
+        }
+
+        var activeMemberCount = await context.Members
+            .CountAsync(member =>
+                member.TenantId == stokvel.TenantId &&
+                member.Status == MemberStatus.Active);
+
+        return activeMemberCount < subscription.SubscriptionPlan.MaxMembers;
+    }
+
+    public async Task<string> GetMemberLimitMessageAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return "Subscription package could not be found.";
+        }
+
+        var subscription = await context.TenantSubscriptions
+            .Include(existingSubscription => existingSubscription.SubscriptionPlan)
+            .SingleOrDefaultAsync(existingSubscription =>
+                existingSubscription.TenantId == stokvel.TenantId &&
+                existingSubscription.Status == SubscriptionStatus.Active);
+
+        if (subscription?.SubscriptionPlan is null)
+        {
+            return "Subscription package could not be found.";
+        }
+
+        var activeMemberCount = await context.Members
+            .CountAsync(member =>
+                member.TenantId == stokvel.TenantId &&
+                member.Status == MemberStatus.Active);
+
+        if (subscription.SubscriptionPlan.MaxMembers is null)
+        {
+            return "Unlimited members allowed on this package.";
+        }
+
+        return $"{activeMemberCount} of {subscription.SubscriptionPlan.MaxMembers} members captured on the {subscription.SubscriptionPlan.Name} package.";
     }
 
     private async Task<string> CreateUniqueSlugAsync(string name)

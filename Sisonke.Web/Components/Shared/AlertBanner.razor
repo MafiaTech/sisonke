@@ -1,0 +1,36 @@
+<div class="alert @AlertClass d-flex gap-2 align-items-start" role="alert">
+    @if (!string.IsNullOrWhiteSpace(Icon))
+    {
+        <i class="@Icon flex-shrink-0 mt-1" aria-hidden="true"></i>
+    }
+    <div>
+        <strong>@Title</strong>
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <p class="mb-0">@Message</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Type { get; set; } = "info";
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Icon { get; set; }
+
+    private string AlertClass => Type.ToLowerInvariant() switch
+    {
+        "success" => "alert-success",
+        "warning" => "alert-warning",
+        "danger" => "alert-danger",
+        "info" => "alert-info",
+        _ => "alert-info"
+    };
+}

@@ -15,63 +15,63 @@ public static class SisonkeSeedData
 
     private static async Task SeedSubscriptionPlansAsync(ApplicationDbContext context)
     {
-        var plans = new[]
-        {
-            new SubscriptionPlan
-            {
-                Id = Guid.NewGuid(),
-                Name = "Pilot",
-                MinMembers = 1,
-                MaxMembers = null,
-                MonthlyPrice = 0,
-                AnnualPrice = 0,
-                IsActive = true
-            },
-            new SubscriptionPlan
-            {
-                Id = Guid.NewGuid(),
-                Name = "Starter",
-                MinMembers = 1,
-                MaxMembers = 30,
-                MonthlyPrice = 50,
-                AnnualPrice = 500,
-                IsActive = true
-            },
-            new SubscriptionPlan
-            {
-                Id = Guid.NewGuid(),
-                Name = "Growth",
-                MinMembers = 31,
-                MaxMembers = 50,
-                MonthlyPrice = 70,
-                AnnualPrice = 700,
-                IsActive = true
-            },
-            new SubscriptionPlan
-            {
-                Id = Guid.NewGuid(),
-                Name = "Premium",
-                MinMembers = 51,
-                MaxMembers = null,
-                MonthlyPrice = 100,
-                AnnualPrice = 1000,
-                IsActive = true
-            }
-        };
+        await UpsertSubscriptionPlanAsync(context, "Pilot", null, 1, null, 0, 0);
+        await UpsertSubscriptionPlanAsync(context, "Basic", "Starter", 1, 30, 149, 1490);
+        await UpsertSubscriptionPlanAsync(context, "Standard", "Growth", 31, 50, 279, 2790);
+        await UpsertSubscriptionPlanAsync(context, "Premium", null, 51, null, 459, 4590);
 
-        var existingPlanNames = await context.SubscriptionPlans
-            .Select(plan => plan.Name)
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task UpsertSubscriptionPlanAsync(
+        ApplicationDbContext context,
+        string name,
+        string? legacyName,
+        int minMembers,
+        int? maxMembers,
+        decimal monthlyPrice,
+        decimal annualPrice)
+    {
+        var matchingPlans = await context.SubscriptionPlans
+            .Where(existingPlan =>
+                existingPlan.Name == name ||
+                (legacyName != null && existingPlan.Name == legacyName))
             .ToListAsync();
 
-        var missingPlans = plans
-            .Where(plan => !existingPlanNames.Contains(plan.Name))
-            .ToList();
+        var plan = matchingPlans.FirstOrDefault(existingPlan => existingPlan.Name == name)
+            ?? matchingPlans.FirstOrDefault();
 
-        if (missingPlans.Count > 0)
+        if (plan is null)
         {
-            context.SubscriptionPlans.AddRange(missingPlans);
-            await context.SaveChangesAsync();
+            plan = new SubscriptionPlan
+            {
+                Id = Guid.NewGuid()
+            };
+
+            context.SubscriptionPlans.Add(plan);
         }
+
+        foreach (var duplicatePlan in matchingPlans.Where(existingPlan => existingPlan.Id != plan.Id))
+        {
+            var duplicateSubscriptions = await context.TenantSubscriptions
+                .Where(subscription => subscription.SubscriptionPlanId == duplicatePlan.Id)
+                .ToListAsync();
+
+            foreach (var duplicateSubscription in duplicateSubscriptions)
+            {
+                duplicateSubscription.SubscriptionPlanId = plan.Id;
+                duplicateSubscription.SubscriptionPlan = plan;
+            }
+
+            context.SubscriptionPlans.Remove(duplicatePlan);
+        }
+
+        plan.Name = name;
+        plan.MinMembers = minMembers;
+        plan.MaxMembers = maxMembers;
+        plan.MonthlyPrice = monthlyPrice;
+        plan.AnnualPrice = annualPrice;
+        plan.IsActive = true;
     }
 
     private static async Task SeedPilotTenantsAsync(ApplicationDbContext context)

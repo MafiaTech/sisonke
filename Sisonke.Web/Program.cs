@@ -44,6 +44,7 @@ builder.Services.AddScoped<MemberService>();
 builder.Services.AddScoped<FineService>();
 builder.Services.AddScoped<ContributionService>();
 builder.Services.AddScoped<QuestionnaireService>();
+builder.Services.AddScoped<OperatingRuleService>();
 
 var app = builder.Build();
 

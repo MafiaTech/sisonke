@@ -773,6 +773,9 @@ namespace Sisonke.Web.Migrations
                     b.Property<DateTime?>("EstablishedDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("ExpectedMemberCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 

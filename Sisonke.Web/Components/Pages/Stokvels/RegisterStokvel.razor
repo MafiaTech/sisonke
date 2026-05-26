@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 
 @using System.ComponentModel.DataAnnotations
+@using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Helpers
 @using Sisonke.Web.Services
@@ -11,85 +12,152 @@
 
 <PageTitle>Register New Stokvel</PageTitle>
 
-<div class="mb-4">
-    <h1>Register New Stokvel</h1>
-    <p class="text-muted">
-        Create a new stokvel profile. After registration, you will complete the setup questionnaire so Sisonke can understand how your stokvel operates.
-    </p>
-    <a href="/my-stokvels">Back to My Stokvels</a>
-</div>
+<PageHeader
+    Title="Register New Stokvel"
+    Subtitle="After registration you will complete the setup questionnaire so Sisonke can understand how your stokvel operates."
+    BackText="Back to My Stokvels"
+    BackHref="/my-stokvels" />
 
 @if (saveFailed)
 {
-    <div class="alert alert-danger" role="alert">
-        Unable to register stokvel. Please check the details and try again.
-    </div>
+    <AlertBanner Type="danger" Title="Unable to register stokvel." Message="Please check the details and try again." Icon="bi bi-x-circle-fill" />
 }
 
-<EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+@if (packageSelectionFailed)
+{
+    <AlertBanner Type="danger" Title="Please select a subscription package." Message="" Icon="bi bi-x-circle-fill" />
+}
 
-    <div class="row g-3">
-        <div class="col-12 col-md-6">
-            <label class="form-label" for="stokvel-name">Name</label>
-            <InputText id="stokvel-name" class="form-control" @bind-Value="model.Name" />
-        </div>
+<div class="form-page">
+    <div class="card">
+        <div class="card-body p-4">
+            <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="alert alert-danger" />
 
-        <div class="col-12 col-md-6">
-            <label class="form-label" for="stokvel-type">Type</label>
-            <InputSelect id="stokvel-type" class="form-select" @bind-Value="model.Type">
-                @foreach (var stokvelType in Enum.GetValues<StokvelType>())
-                {
-                    <option value="@stokvelType">@stokvelType</option>
-                }
-            </InputSelect>
-        </div>
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="stokvel-name">Name <span class="text-danger">*</span></label>
+                        <InputText id="stokvel-name" class="form-control" @bind-Value="model.Name" />
+                    </div>
 
-        <div class="col-12 col-md-6">
-            <label class="form-label" for="province">Province</label>
-            <select id="province" class="form-select" value="@model.Province" @onchange="OnProvinceChanged">
-                <option value="">-- Select province --</option>
-                @foreach (var province in provinces)
-                {
-                    <option value="@province">@province</option>
-                }
-            </select>
-        </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="stokvel-type">Type</label>
+                        <InputSelect id="stokvel-type" class="form-select" @bind-Value="model.Type">
+                            @foreach (var stokvelType in Enum.GetValues<StokvelType>())
+                            {
+                                <option value="@stokvelType">@stokvelType</option>
+                            }
+                        </InputSelect>
+                    </div>
 
-        <div class="col-12 col-md-6">
-            <label class="form-label" for="town-or-area">Town or area</label>
-            <select id="town-or-area" class="form-select" @bind="model.TownOrArea" disabled="@(!towns.Any())">
-                <option value="">-- Select town/area --</option>
-                @foreach (var town in towns)
-                {
-                    <option value="@town">@town</option>
-                }
-            </select>
-        </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="expected-member-count">Total Number of Members</label>
+                        <InputNumber id="expected-member-count" class="form-control" TValue="int?"
+                            Value="@model.ExpectedMemberCount"
+                            ValueChanged="@((int? value) => OnExpectedMemberCountChangedAsync(value))"
+                            ValueExpression="@(() => model.ExpectedMemberCount)" />
+                        <div class="form-text">This helps Sisonke recommend the right package and track member capture progress.</div>
+                    </div>
 
-        <div class="col-12 col-md-6">
-            <label class="form-label" for="established-date">Established date</label>
-            <InputDate id="established-date" class="form-control" @bind-Value="model.EstablishedDate" />
-        </div>
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="h5 mb-0">Subscription package</h2>
+                            @if (model.SubscriptionPlanId is null)
+                            {
+                                <span class="text-danger small">Please select a subscription package.</span>
+                            }
+                        </div>
+                        <div class="row g-3">
+                            @foreach (var plan in subscriptionPlans)
+                            {
+                                var isSelected = model.SubscriptionPlanId == plan.Id;
+                                var isRecommended = recommendedPlanId == plan.Id;
 
-        <div class="col-12">
-            <label class="form-label" for="description">Description</label>
-            <InputTextArea id="description" class="form-control" rows="4" @bind-Value="model.Description" />
+                                <div class="col-12 col-md-4">
+                                    <div class="card h-100 @(isSelected ? "border-primary shadow-sm" : string.Empty)">
+                                        <div class="card-body d-flex flex-column">
+                                            <div class="d-flex justify-content-between gap-2 mb-2">
+                                                <h3 class="h5 card-title mb-0">@plan.Name</h3>
+                                                @if (isRecommended)
+                                                {
+                                                    <StatusBadge Text="Recommended" Type="success" />
+                                                }
+                                            </div>
+                                            <p class="card-text text-muted mb-2">@GetMemberRangeText(plan)</p>
+                                            <p class="card-text mb-1"><strong>Monthly:</strong> @FormatCurrency(plan.MonthlyPrice)</p>
+                                            <p class="card-text"><strong>Annual:</strong> @FormatCurrency(plan.AnnualPrice)</p>
+                                            <button type="button" class="btn @(isSelected ? "btn-primary" : "btn-outline-primary") mt-auto" @onclick="@(() => SelectSubscriptionPlan(plan.Id))">
+                                                @(isSelected ? "Selected" : "Select Package")
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        @if (model.SubscriptionPlanId is null)
+                        {
+                            <div class="form-text mt-2">Please select a subscription package.</div>
+                        }
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="province">Province</label>
+                        <select id="province" class="form-select" value="@model.Province" @onchange="OnProvinceChanged">
+                            <option value="">— Select province —</option>
+                            @foreach (var province in provinces)
+                            {
+                                <option value="@province">@province</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="town-or-area">Town or area</label>
+                        <select id="town-or-area" class="form-select" @bind="model.TownOrArea" disabled="@(!towns.Any())">
+                            <option value="">— Select town/area —</option>
+                            @foreach (var town in towns)
+                            {
+                                <option value="@town">@town</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="established-date">Established date</label>
+                        <InputDate id="established-date" class="form-control" @bind-Value="model.EstablishedDate" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label" for="description">Description</label>
+                        <InputTextArea id="description" class="form-control" rows="3" @bind-Value="model.Description" />
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-check-lg me-2"></i>Register Stokvel
+                    </button>
+                    <a class="btn btn-outline-secondary" href="/my-stokvels">Cancel</a>
+                </div>
+            </EditForm>
         </div>
     </div>
-
-    <div class="mt-4 d-flex gap-2">
-        <button class="btn btn-primary" type="submit">Register Stokvel</button>
-        <a class="btn btn-outline-secondary" href="/my-stokvels">Back to My Stokvels</a>
-    </div>
-</EditForm>
+</div>
 
 @code {
     private readonly RegisterStokvelFormModel model = new();
     private List<string> provinces = SouthAfricanLocations.GetProvinces();
     private List<string> towns = new();
+    private List<SubscriptionPlan> subscriptionPlans = [];
+    private Guid? recommendedPlanId;
     private bool saveFailed;
+    private bool packageSelectionFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        subscriptionPlans = await StokvelService.GetPublicSubscriptionPlansAsync();
+    }
 
     private void OnProvinceChanged(ChangeEventArgs args)
     {
@@ -98,9 +166,35 @@
         model.TownOrArea = null;
     }
 
+    private async Task OnExpectedMemberCountChangedAsync(int? expectedMemberCount)
+    {
+        model.ExpectedMemberCount = expectedMemberCount;
+        var recommendedPlan = await StokvelService.GetRecommendedSubscriptionPlanAsync(model.ExpectedMemberCount);
+        recommendedPlanId = recommendedPlan?.Id;
+
+        if (recommendedPlan is not null)
+        {
+            model.SubscriptionPlanId = recommendedPlan.Id;
+            packageSelectionFailed = false;
+        }
+    }
+
+    private void SelectSubscriptionPlan(Guid subscriptionPlanId)
+    {
+        model.SubscriptionPlanId = subscriptionPlanId;
+        packageSelectionFailed = false;
+    }
+
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
+        packageSelectionFailed = false;
+
+        if (model.SubscriptionPlanId is null)
+        {
+            packageSelectionFailed = true;
+            return;
+        }
 
         var createdStokvel = await StokvelService.RegisterStokvelAsync(
             model.Name,
@@ -108,6 +202,8 @@
             model.Province,
             model.TownOrArea,
             model.EstablishedDate,
+            model.ExpectedMemberCount,
+            model.SubscriptionPlanId.Value,
             model.Description);
 
         if (createdStokvel is null)
@@ -135,7 +231,23 @@
 
         public DateTime? EstablishedDate { get; set; }
 
+        public int? ExpectedMemberCount { get; set; }
+
+        public Guid? SubscriptionPlanId { get; set; }
+
         [MaxLength(500)]
         public string? Description { get; set; }
+    }
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+    }
+
+    private static string GetMemberRangeText(SubscriptionPlan plan)
+    {
+        return plan.MaxMembers is null
+            ? $"{plan.MinMembers}+ members"
+            : $"{plan.MinMembers}-{plan.MaxMembers} members";
     }
 }

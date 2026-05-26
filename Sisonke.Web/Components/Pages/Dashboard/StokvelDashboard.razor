@@ -12,90 +12,154 @@
 
 @if (isLoading)
 {
-    <p>Loading dashboard...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading dashboard...
+    </div>
 }
 else if (stokvel is null)
 {
-    <div class="alert alert-warning" role="alert">
-        Stokvel not found.
-    </div>
-
-    <a class="btn btn-link px-0" href="/my-stokvels">Back to My Stokvels</a>
+    <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
+    <a class="back-nav" href="/my-stokvels">
+        <i class="bi bi-chevron-left"></i> Back to My Stokvels
+    </a>
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <h1>Dashboard</h1>
-            <h2 class="h4">@stokvel.Name</h2>
-            <p class="text-muted mb-0">Manage this stokvel's activity and overview.</p>
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>@stokvel.Name</h1>
+            <p class="page-subtitle">
+                <StatusBadge Text="@stokvel.Type.ToString()" Type="secondary" />
+                @if (stokvel.IsActive)
+                {
+                    <StatusBadge Text="Active" Type="success" />
+                }
+                else
+                {
+                    <StatusBadge Text="Inactive" Type="secondary" />
+                }
+            </p>
         </div>
-        <a class="btn btn-outline-secondary" href="/my-stokvels">Back to My Stokvels</a>
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-3">Stokvel type</dt>
-                <dd class="col-sm-9">@stokvel.Type</dd>
-
-                <dt class="col-sm-3">Tenant</dt>
-                <dd class="col-sm-9">@stokvel.Tenant.Name</dd>
-
-                <dt class="col-sm-3">Status</dt>
-                <dd class="col-sm-9">@(stokvel.IsActive ? "Active" : "Inactive")</dd>
-            </dl>
-        </div>
+        <a class="btn btn-outline-secondary btn-sm" href="/my-stokvels">
+            <i class="bi bi-chevron-left me-1"></i>My Stokvels
+        </a>
     </div>
 
     @if (!stokvel.IsSetupComplete)
     {
-        <div class="alert alert-warning" role="alert">
-            This stokvel setup is not complete. Please complete the setup questionnaire before accessing the dashboard.
-        </div>
-
-        <a class="btn btn-primary" href="@($"/stokvel-questionnaire/{StokvelId}")">Complete Setup Questionnaire</a>
+        <AlertBanner Type="warning" Title="Setup incomplete." Message="Complete the setup questionnaire before accessing the full dashboard." Icon="bi bi-exclamation-triangle-fill" />
+        <a class="btn btn-primary" href="@($"/stokvel-questionnaire/{StokvelId}")">
+            <i class="bi bi-clipboard-check me-2"></i>Complete Setup Questionnaire
+        </a>
     }
     else
     {
-        <div class="mb-4">
-            <a class="btn btn-primary" href="@($"/members/{StokvelId}")">Manage Members</a>
-            <a class="btn btn-outline-primary ms-2" href="@($"/contribution-rules/{StokvelId}")">Contribution Rules</a>
+        <div class="d-flex gap-2 flex-wrap mb-4">
+            <a class="btn btn-primary" href="@($"/members/{StokvelId}")">
+                <i class="bi bi-people-fill me-2"></i>Manage Members
+            </a>
+            <a class="btn btn-outline-primary" href="@($"/contribution-rules/{StokvelId}")">
+                <i class="bi bi-sliders me-2"></i>Contribution Rules
+            </a>
         </div>
 
         <div class="row g-3">
             <div class="col-12 col-md-6 col-xl-3">
-                <div class="card h-100">
+                <div class="card stat-card stat-members h-100">
                     <div class="card-body">
-                        <h3 class="h6 text-muted">Members</h3>
-                        <p class="display-6 mb-0">@memberCount</p>
+                        <i class="bi bi-people-fill stat-icon" aria-hidden="true"></i>
+                        <div class="stat-label">Members</div>
+                        <p class="stat-value">@memberCount</p>
+                        @if (!string.IsNullOrWhiteSpace(memberLimitMessage))
+                        {
+                            <p class="small text-muted mb-2">@memberLimitMessage</p>
+                        }
+                        @if (activeSubscription?.SubscriptionPlan.MaxMembers is int maxMembers)
+                        {
+                            <div class="progress" role="progressbar" aria-label="Member limit progress" aria-valuenow="@GetMemberLimitProgress(maxMembers)" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar" style="@($"width: {GetMemberLimitProgress(maxMembers)}%")"></div>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
 
             <div class="col-12 col-md-6 col-xl-3">
-                <div class="card h-100">
+                <div class="card stat-card stat-contributions h-100">
                     <div class="card-body">
-                        <h3 class="h6 text-muted">Contributions</h3>
-                        <p class="display-6 mb-0">@expectedMonthlyContributions.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</p>
+                        <i class="bi bi-cash-coin stat-icon" aria-hidden="true"></i>
+                        <div class="stat-label">Monthly Contributions</div>
+                        <p class="stat-value">@expectedMonthlyContributions.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</p>
                     </div>
                 </div>
             </div>
 
             <div class="col-12 col-md-6 col-xl-3">
-                <div class="card h-100">
+                <div class="card stat-card stat-fines h-100">
                     <div class="card-body">
-                        <h3 class="h6 text-muted">Outstanding Fines</h3>
-                        <p class="display-6 mb-0">@outstandingFinesTotal.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</p>
+                        <i class="bi bi-exclamation-circle-fill stat-icon" aria-hidden="true"></i>
+                        <div class="stat-label">Outstanding Fines</div>
+                        <p class="stat-value">@outstandingFinesTotal.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</p>
                     </div>
                 </div>
             </div>
 
             <div class="col-12 col-md-6 col-xl-3">
+                <div class="card stat-card stat-meetings h-100">
+                    <div class="card-body">
+                        <i class="bi bi-calendar-event-fill stat-icon" aria-hidden="true"></i>
+                        <div class="stat-label">Upcoming Meetings</div>
+                        <p class="stat-value">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-12 col-lg-6">
                 <div class="card h-100">
                     <div class="card-body">
-                        <h3 class="h6 text-muted">Upcoming Meetings</h3>
-                        <p class="display-6 mb-0">0</p>
+                        <h2 class="h5 card-title">Subscription Package</h2>
+                        @if (activeSubscription is null)
+                        {
+                            <p class="card-text mb-0 text-muted">No active subscription found.</p>
+                        }
+                        else
+                        {
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5">Package name</dt>
+                                <dd class="col-sm-7">@activeSubscription.SubscriptionPlan.Name</dd>
+
+                                <dt class="col-sm-5">Monthly price</dt>
+                                <dd class="col-sm-7">@activeSubscription.SubscriptionPlan.MonthlyPrice.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</dd>
+
+                                <dt class="col-sm-5">Member range</dt>
+                                <dd class="col-sm-7">@GetMemberRangeText(activeSubscription.SubscriptionPlan)</dd>
+
+                                <dt class="col-sm-5">Status</dt>
+                                <dd class="col-sm-7">@activeSubscription.Status</dd>
+                            </dl>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+                            <div>
+                                <h2 class="h5 card-title">Constitution</h2>
+                                <p class="card-text mb-0"><strong>Status:</strong> Not Created</p>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-start">
+                                <a class="btn btn-primary" href="@($"/constitution-builder/{StokvelId}")">Create Constitution</a>
+                                <a class="btn btn-outline-primary" href="#">Upload Existing Constitution</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -108,6 +172,8 @@ else
     private int memberCount;
     private decimal expectedMonthlyContributions;
     private decimal outstandingFinesTotal;
+    private TenantSubscription? activeSubscription;
+    private string memberLimitMessage = string.Empty;
     private bool isLoading = true;
 
     [Parameter]
@@ -117,9 +183,28 @@ else
     {
         isLoading = true;
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+        activeSubscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(StokvelId);
+        memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
         memberCount = await MemberService.GetMemberCountByStokvelIdAsync(StokvelId);
         expectedMonthlyContributions = await ContributionService.GetExpectedMonthlyContributionsByStokvelIdAsync(StokvelId);
         outstandingFinesTotal = await FineService.GetOutstandingFinesTotalByStokvelIdAsync(StokvelId);
         isLoading = false;
+    }
+
+    private static string GetMemberRangeText(SubscriptionPlan plan)
+    {
+        return plan.MaxMembers is null
+            ? $"{plan.MinMembers}+ members"
+            : $"{plan.MinMembers}-{plan.MaxMembers} members";
+    }
+
+    private int GetMemberLimitProgress(int maxMembers)
+    {
+        if (maxMembers <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Min(100, memberCount * 100 / maxMembers);
     }
 }

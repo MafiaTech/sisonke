@@ -4,7 +4,10 @@ using Sisonke.Web.Data.Entities;
 
 namespace Sisonke.Web.Services;
 
-public class MemberService(ApplicationDbContext context)
+public class MemberService(
+    ApplicationDbContext context,
+    OperatingRuleService operatingRuleService,
+    StokvelService stokvelService)
 {
     public async Task<Member?> GetMemberByIdAsync(Guid memberId)
     {
@@ -49,6 +52,11 @@ public class MemberService(ApplicationDbContext context)
 
     public async Task<Member?> AddMemberAsync(Guid stokvelId, Member member)
     {
+        if (!await stokvelService.CanAddMemberAsync(stokvelId))
+        {
+            return null;
+        }
+
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 
@@ -223,17 +231,51 @@ public class MemberService(ApplicationDbContext context)
 
     public async Task<bool> CanAddNextOfKinAsync(Guid memberId)
     {
+        var member = await context.Members
+            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+
+        if (member is null)
+        {
+            return false;
+        }
+
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.TenantId == member.TenantId);
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var maxNextOfKin = await operatingRuleService.GetMaxNextOfKinAsync(stokvel.Id);
         var nextOfKinCount = await context.NextOfKinRecords
             .CountAsync(nextOfKin => nextOfKin.MemberId == memberId);
 
-        return nextOfKinCount < 2;
+        return nextOfKinCount < maxNextOfKin;
     }
 
     public async Task<bool> CanAddBeneficiaryAsync(Guid memberId)
     {
+        var member = await context.Members
+            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+
+        if (member is null)
+        {
+            return false;
+        }
+
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.TenantId == member.TenantId);
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var maxBeneficiaries = await operatingRuleService.GetMaxBeneficiariesAsync(stokvel.Id);
         var beneficiaryCount = await context.Beneficiaries
             .CountAsync(beneficiary => beneficiary.MemberId == memberId);
 
-        return beneficiaryCount < 1;
+        return beneficiaryCount < maxBeneficiaries;
     }
 }

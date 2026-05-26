@@ -231,10 +231,6 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXEFkZEJlbmVmaWNpYXJ5LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Members/AddMember.razor]
-build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXEFkZE1lbWJlci5yYXpvcg==
-build_metadata.AdditionalFiles.CssScope = 
-
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Members/AddNextOfKin.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXEFkZE5leHRPZktpbi5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -263,10 +259,6 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xOb3RGb3VuZC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Stokvels/MyStokvels.razor]
-build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xNeVN0b2t2ZWxzLnJhem9y
-build_metadata.AdditionalFiles.CssScope = 
-
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Stokvels/RegisterStokvel.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xSZWdpc3RlclN0b2t2ZWwucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
@@ -283,8 +275,20 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xSb3V0ZXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Shared/AlertBanner.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xTaGFyZWRcQWxlcnRCYW5uZXIucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Shared/ConfirmationModal.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xTaGFyZWRcQ29uZmlybWF0aW9uTW9kYWwucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Shared/PageHeader.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xTaGFyZWRcUGFnZUhlYWRlci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Shared/StatusBadge.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xTaGFyZWRcU3RhdHVzQmFkZ2UucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/_Imports.razor]
@@ -302,3 +306,11 @@ build_metadata.AdditionalFiles.CssScope = b-t6opjqoptc
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Layout/ReconnectModal.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcUmVjb25uZWN0TW9kYWwucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-fnn97cbrvg
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Members/AddMember.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXEFkZE1lbWJlci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = b-qxg81lgd8m
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Stokvels/MyStokvels.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xNeVN0b2t2ZWxzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = b-k3n9q4vsjb

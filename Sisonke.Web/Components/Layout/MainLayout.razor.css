@@ -36,6 +36,21 @@ main {
         text-overflow: ellipsis;
     }
 
+.top-row-user {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #495057;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.top-row-user:hover {
+    color: #052767;
+    text-decoration: none;
+}
+
 @media (max-width: 640.98px) {
     .top-row {
         justify-content: space-between;

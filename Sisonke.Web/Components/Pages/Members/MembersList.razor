@@ -10,64 +10,88 @@
 
 @if (isLoading)
 {
-    <p>Loading members...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading members...
+    </div>
 }
 else if (stokvel is null)
 {
-    <div class="alert alert-danger" role="alert">
-        Stokvel not found.
-    </div>
+    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <h1>Members</h1>
-            <h2 class="h4">@stokvel.Name</h2>
-            <p class="text-muted mb-0">Manage members for this stokvel.</p>
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+        <PageHeader Title="Members" Subtitle="@stokvel.Name" />
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
+                <i class="bi bi-chevron-left me-1"></i>Dashboard
+            </a>
+            <a class="btn btn-primary" href="@($"/add-member/{StokvelId}")">
+                <i class="bi bi-person-plus-fill me-2"></i>Add Member
+            </a>
         </div>
-        <a class="btn btn-primary" href="@($"/add-member/{StokvelId}")">Add Member</a>
-    </div>
-
-    <div class="mb-3">
-        <a href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
     </div>
 
     @if (members.Count == 0)
     {
-        <div class="alert alert-info" role="alert">
-            No members have been added yet.
-        </div>
+        <AlertBanner Type="info" Title="No members yet" Message="Add your first member to start capturing profiles, next of kin, beneficiaries and fines." Icon="bi bi-info-circle-fill" />
     }
     else
     {
         <div class="table-responsive">
-            <table class="table table-striped align-middle">
-                <thead>
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
                     <tr>
-                        <th>Member Number</th>
+                        <th>Member #</th>
                         <th>Full Name</th>
                         <th>Cellphone</th>
                         <th>Role</th>
                         <th>Status</th>
-                        <th>Joining Date</th>
+                        <th>Joined</th>
                         <th>Cooling Period</th>
-                        <th>Actions</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var member in members)
                     {
                         <tr>
-                            <td>@member.MemberNumber</td>
-                            <td>@member.FullName</td>
+                            <td class="text-muted small">@member.MemberNumber</td>
+                            <td class="fw-medium">@member.FullName</td>
                             <td>@member.CellphoneNumber</td>
-                            <td>@member.DefaultRole</td>
-                            <td>@member.Status</td>
-                            <td>@member.JoiningDate.ToString("yyyy-MM-dd")</td>
-                            <td>@(member.IsInCoolingPeriod ? "Yes" : "No")</td>
+                            <td><StatusBadge Text="@member.DefaultRole.ToString()" Type="secondary" /></td>
                             <td>
-                                <a class="btn btn-sm btn-outline-primary" href="@($"/member-profile/{member.Id}")">View</a>
+                                @if (member.Status.ToString() == "Active")
+                                {
+                                    <StatusBadge Text="Active" Type="success" />
+                                }
+                                else if (member.Status.ToString() == "Suspended")
+                                {
+                                    <StatusBadge Text="@member.Status.ToString()" Type="warning" />
+                                }
+                                else
+                                {
+                                    <StatusBadge Text="@member.Status.ToString()" Type="secondary" />
+                                }
+                            </td>
+                            <td class="text-muted small">@member.JoiningDate.ToString("dd MMM yyyy")</td>
+                            <td>
+                                @if (member.IsInCoolingPeriod)
+                                {
+                                    <StatusBadge Text="Cooling" Type="info" />
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">—</span>
+                                }
+                            </td>
+                            <td>
+                                <a class="btn btn-sm btn-outline-primary" href="@($"/member-profile/{member.Id}")">
+                                    View
+                                </a>
                             </td>
                         </tr>
                     }

@@ -12,101 +12,111 @@
 
 @if (isLoading)
 {
-    <p>Loading member details...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading member details...
+    </div>
 }
 else if (editMember is null)
 {
-    <div class="alert alert-danger" role="alert">
-        Member not found.
-    </div>
+    <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
 }
 else
 {
-    <div class="mb-4">
-        <h1>Edit Member</h1>
-        <p class="text-muted mb-1">Member number: @editMember.MemberNumber</p>
-        <a href="@($"/member-profile/{MemberId}")">Back to Member Profile</a>
-    </div>
+    <PageHeader
+        Title="Edit Member"
+        Subtitle="@($"Member #{editMember.MemberNumber}")"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{MemberId}")" />
 
     @if (saveFailed)
     {
-        <div class="alert alert-danger" role="alert">
-            Unable to update member.
-        </div>
+        <AlertBanner Type="danger" Title="Unable to update member." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
-    <EditForm Model="@editMember" OnValidSubmit="@HandleValidSubmit" FormName="EditMemberForm">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
+    <div class="form-page">
+        <div class="card">
+            <div class="card-body p-4">
+                <EditForm Model="@editMember" OnValidSubmit="@HandleValidSubmit" FormName="EditMemberForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
 
-        <div class="row g-3">
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="full-name">Full name</label>
-                <InputText id="full-name" class="form-control" @bind-Value="editMember.FullName" />
-            </div>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="full-name">Full name</label>
+                            <InputText id="full-name" class="form-control" @bind-Value="editMember.FullName" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="cellphone-number">Cellphone number</label>
-                <InputText id="cellphone-number" class="form-control" @bind-Value="editMember.CellphoneNumber" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="cellphone-number">Cellphone number</label>
+                            <InputText id="cellphone-number" class="form-control" @bind-Value="editMember.CellphoneNumber" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="email-address">Email address</label>
-                <InputText id="email-address" class="form-control" @bind-Value="editMember.EmailAddress" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="email-address">Email address</label>
+                            <InputText id="email-address" class="form-control" @bind-Value="editMember.EmailAddress" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="id-number">ID number</label>
-                <InputText id="id-number" class="form-control" @bind-Value="editMember.IdNumber" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="id-number">ID number</label>
+                            <InputText id="id-number" class="form-control" @bind-Value="editMember.IdNumber" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="residential-area">Residential area</label>
-                <InputText id="residential-area" class="form-control" @bind-Value="editMember.ResidentialArea" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="residential-area">Residential area</label>
+                            <InputText id="residential-area" class="form-control" @bind-Value="editMember.ResidentialArea" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="joining-date">Joining date</label>
-                <InputDate id="joining-date" class="form-control" @bind-Value="editMember.JoiningDate" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="joining-date">Joining date</label>
+                            <InputDate id="joining-date" class="form-control" @bind-Value="editMember.JoiningDate" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="default-role">Default role</label>
-                <InputSelect id="default-role" class="form-select" @bind-Value="editMember.DefaultRole">
-                    @foreach (var role in Enum.GetValues<SisonkeRole>())
-                    {
-                        <option value="@role">@role</option>
-                    }
-                </InputSelect>
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="default-role">Default role</label>
+                            <InputSelect id="default-role" class="form-select" @bind-Value="editMember.DefaultRole">
+                                @foreach (var role in Enum.GetValues<SisonkeRole>())
+                                {
+                                    <option value="@role">@role</option>
+                                }
+                            </InputSelect>
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="status">Status</label>
-                <InputSelect id="status" class="form-select" @bind-Value="editMember.Status">
-                    @foreach (var status in Enum.GetValues<MemberStatus>())
-                    {
-                        <option value="@status">@status</option>
-                    }
-                </InputSelect>
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="status">Status</label>
+                            <InputSelect id="status" class="form-select" @bind-Value="editMember.Status">
+                                @foreach (var status in Enum.GetValues<MemberStatus>())
+                                {
+                                    <option value="@status">@status</option>
+                                }
+                            </InputSelect>
+                        </div>
 
-            <div class="col-12">
-                <div class="form-check">
-                    <InputCheckbox id="cooling-period" class="form-check-input" @bind-Value="editMember.IsInCoolingPeriod" />
-                    <label class="form-check-label" for="cooling-period">Is in cooling period</label>
-                </div>
-            </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <InputCheckbox id="cooling-period" class="form-check-input" @bind-Value="editMember.IsInCoolingPeriod" />
+                                <label class="form-check-label" for="cooling-period">Is in cooling period</label>
+                            </div>
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="cooling-period-end-date">Cooling period end date</label>
-                <InputDate id="cooling-period-end-date" class="form-control" @bind-Value="editMember.CoolingPeriodEndDate" />
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="cooling-period-end-date">Cooling period end date</label>
+                            <InputDate id="cooling-period-end-date" class="form-control" @bind-Value="editMember.CoolingPeriodEndDate" />
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-check-lg me-2"></i>Save Changes
+                        </button>
+                        <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
+                    </div>
+                </EditForm>
             </div>
         </div>
-
-        <div class="mt-4">
-            <button class="btn btn-primary" type="submit">Save Changes</button>
-        </div>
-    </EditForm>
+    </div>
 }
 
 @code {

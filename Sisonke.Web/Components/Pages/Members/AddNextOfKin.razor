@@ -11,71 +11,81 @@
 
 @if (isLoading)
 {
-    <p>Loading next of kin form...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading...
+    </div>
 }
 else if (member is null)
 {
-    <div class="alert alert-danger" role="alert">
-        Member not found.
-    </div>
+    <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
 }
 else
 {
-    <div class="mb-4">
-        <h1>Add Next of Kin</h1>
-        <p class="text-muted mb-1">@member.FullName</p>
-        <a href="@($"/member-profile/{MemberId}")">Back to Member Profile</a>
-    </div>
+    <PageHeader
+        Title="Add Next of Kin"
+        Subtitle="@member.FullName"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{MemberId}")" />
 
     @if (saveFailed)
     {
-        <div class="alert alert-danger" role="alert">
-            Unable to save next of kin record.
-        </div>
+        <AlertBanner Type="danger" Title="Unable to save next of kin record." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
-    <EditForm Model="@newNextOfKin" OnValidSubmit="@HandleValidSubmit" FormName="AddNextOfKinForm">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
+    <div class="form-page">
+        <div class="card">
+            <div class="card-body p-4">
+                <EditForm Model="@newNextOfKin" OnValidSubmit="@HandleValidSubmit" FormName="AddNextOfKinForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
 
-        <div class="row g-3">
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="full-name">Full name</label>
-                <InputText id="full-name" class="form-control" @bind-Value="newNextOfKin.FullName" />
-            </div>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="full-name">Full name</label>
+                            <InputText id="full-name" class="form-control" @bind-Value="newNextOfKin.FullName" />
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="relationship">Relationship</label>
-                <InputSelect id="relationship" class="form-select" @bind-Value="newNextOfKin.Relationship">
-                    @foreach (var relationship in relationshipOptions)
-                    {
-                        <option value="@relationship">@relationship</option>
-                    }
-                </InputSelect>
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="relationship">Relationship</label>
+                            <InputSelect id="relationship" class="form-select" @bind-Value="newNextOfKin.Relationship">
+                                @foreach (var relationship in relationshipOptions)
+                                {
+                                    <option value="@relationship">@relationship</option>
+                                }
+                            </InputSelect>
+                        </div>
 
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="cellphone-number">Cellphone number</label>
-                <InputText id="cellphone-number" class="form-control" @bind-Value="newNextOfKin.CellphoneNumber" />
-            </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="cellphone-number">Cellphone number</label>
+                            <InputText id="cellphone-number" class="form-control" @bind-Value="newNextOfKin.CellphoneNumber" />
+                        </div>
 
-            <div class="col-12">
-                <label class="form-label" for="address">Address</label>
-                <InputText id="address" class="form-control" @bind-Value="newNextOfKin.Address" />
-            </div>
+                        <div class="col-12">
+                            <label class="form-label" for="address">Address</label>
+                            <InputText id="address" class="form-control" @bind-Value="newNextOfKin.Address" />
+                        </div>
 
-            <div class="col-12">
-                <div class="form-check">
-                    <InputCheckbox id="is-primary" class="form-check-input" @bind-Value="newNextOfKin.IsPrimary" />
-                    <label class="form-check-label" for="is-primary">Primary next of kin</label>
-                </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <InputCheckbox id="is-primary" class="form-check-input" @bind-Value="newNextOfKin.IsPrimary" />
+                                <label class="form-check-label" for="is-primary">Primary next of kin</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-person-check me-2"></i>Save Next of Kin
+                        </button>
+                        <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
+                    </div>
+                </EditForm>
             </div>
         </div>
-
-        <div class="mt-4">
-            <button class="btn btn-primary" type="submit">Save Next of Kin</button>
-        </div>
-    </EditForm>
+    </div>
 }
 
 @code {

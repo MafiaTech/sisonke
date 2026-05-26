@@ -11,7 +11,7 @@
 @inject QuestionnaireService QuestionnaireService
 @inject NavigationManager NavigationManager
 
-<PageTitle>Stokvel Setup Questionnaire</PageTitle>
+<PageTitle>Quick Stokvel Setup</PageTitle>
 
 @if (isLoading)
 {
@@ -19,35 +19,25 @@
 }
 else if (stokvel is null)
 {
-    <div class="alert alert-danger" role="alert">
-        Stokvel not found.
-    </div>
+    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <h1>Stokvel Setup Questionnaire</h1>
-            <h2 class="h4">@stokvel.Name</h2>
-            <p class="text-muted mb-0">
-                These answers will help Sisonke understand how this stokvel operates and will later support constitution generation.
-            </p>
-        </div>
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+        <PageHeader
+            Title="Quick Stokvel Setup"
+            Subtitle="@($"{stokvel.Name} - Complete the key setup details Sisonke needs to configure this stokvel for day-to-day management. You can create or upload a constitution later from the dashboard.")" />
         <a class="btn btn-outline-secondary" href="@BackLinkHref">@BackLinkText</a>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(successMessage))
     {
-        <div class="alert alert-success" role="alert">
-            @successMessage
-        </div>
+        <AlertBanner Type="success" Title="Saved" Message="@successMessage" Icon="bi bi-check-circle-fill" />
     }
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
-        <div class="alert alert-danger" role="alert">
-            @errorMessage
-        </div>
+        <AlertBanner Type="danger" Title="Action failed" Message="@errorMessage" Icon="bi bi-x-circle-fill" />
     }
 
     <div class="mb-4">
@@ -155,7 +145,7 @@ else
     <div class="d-flex flex-wrap gap-2 mb-2">
         <button type="button" class="btn btn-primary" @onclick="SaveQuestionnaireAsync">Save Draft</button>
         <button type="button" class="btn btn-success" disabled="@(completionPercentage < 100)" @onclick="ShowSubmitRegistrationConfirmation">
-            Submit Registration
+            Complete Setup
         </button>
         <a class="btn btn-outline-secondary" href="@BackLinkHref">@BackLinkText</a>
     </div>
@@ -167,9 +157,9 @@ else
 
     <ConfirmationModal
         IsVisible="@showSubmitConfirmation"
-        Title="Submit Registration"
-        Message="You are about to submit this stokvel registration. Once submitted, Sisonke will use these answers as the operating rules for this stokvel. Please confirm that the information is correct."
-        ConfirmButtonText="Confirm Submit Registration"
+        Title="Complete Stokvel Setup"
+        Message="You are about to complete this stokvel setup. Sisonke will use these answers to configure the stokvel for day-to-day management. You can still create or upload a constitution later."
+        ConfirmButtonText="Confirm Complete Setup"
         CancelButtonText="Cancel"
         ModalType="warning"
         OnConfirm="@ConfirmSubmitRegistrationAsync"

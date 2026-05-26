@@ -7,37 +7,64 @@
 
 @inject FineService FineService
 @inject MemberService MemberService
+@inject OperatingRuleService OperatingRuleService
 @inject StokvelService StokvelService
 
 <PageTitle>Member Profile</PageTitle>
 
 @if (isLoading)
 {
-    <p>Loading member profile...</p>
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading member profile...
+    </div>
 }
 else if (member is null)
 {
-    <div class="alert alert-danger" role="alert">
-        Member not found.
-    </div>
+    <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
 }
 else
 {
-    <div class="mb-4">
-        <h1>Member Profile</h1>
-        <h2 class="h4">@member.FullName</h2>
-
-        <div class="d-flex gap-2 align-items-center">
-            <a class="btn btn-primary" href="@($"/edit-member/{MemberId}")">Edit Member</a>
-
+    <div class="page-header">
+        <div class="d-flex align-items-center gap-3">
+            <div class="member-avatar" aria-hidden="true">@GetInitials(member.FullName)</div>
+            <div class="page-header-text">
+                <h1>@member.FullName</h1>
+                <p class="page-subtitle">
+                    <StatusBadge Text="@member.DefaultRole.ToString()" Type="secondary" />
+                    @if (member.Status.ToString() == "Active")
+                    {
+                        <StatusBadge Text="Active" Type="success" />
+                    }
+                    else if (member.Status.ToString() == "Suspended")
+                    {
+                        <StatusBadge Text="@member.Status.ToString()" Type="warning" />
+                    }
+                    else
+                    {
+                        <StatusBadge Text="@member.Status.ToString()" Type="secondary" />
+                    }
+                </p>
+            </div>
+        </div>
+        <div class="d-flex gap-2 align-items-start flex-wrap">
             @if (stokvel is not null)
             {
-                <a href="@($"/members/{stokvel.Id}")">Back to Members</a>
+                <a class="btn btn-outline-secondary btn-sm" href="@($"/members/{stokvel.Id}")">
+                    <i class="bi bi-chevron-left me-1"></i>Members
+                </a>
             }
             else
             {
-                <a href="/my-stokvels">Back to Members</a>
+                <a class="btn btn-outline-secondary btn-sm" href="/my-stokvels">
+                    <i class="bi bi-chevron-left me-1"></i>My Stokvels
+                </a>
             }
+            <a class="btn btn-primary btn-sm" href="@($"/edit-member/{MemberId}")">
+                <i class="bi bi-pencil me-1"></i>Edit Member
+            </a>
         </div>
     </div>
 
@@ -45,22 +72,22 @@ else
         <div class="col-12 col-lg-6">
             <div class="card h-100">
                 <div class="card-body">
-                    <h3 class="h5 card-title">Personal Details</h3>
-                    <dl class="row mb-0">
-                        <dt class="col-sm-5">Full name</dt>
+                    <h3 class="h6 card-title text-muted text-uppercase" style="letter-spacing: .05em; font-size: .7rem;">Personal Details</h3>
+                    <dl class="row mb-0 mt-2">
+                        <dt class="col-sm-5 fw-normal text-muted small">Full name</dt>
                         <dd class="col-sm-7">@member.FullName</dd>
 
-                        <dt class="col-sm-5">Cellphone number</dt>
+                        <dt class="col-sm-5 fw-normal text-muted small">Cellphone</dt>
                         <dd class="col-sm-7">@member.CellphoneNumber</dd>
 
-                        <dt class="col-sm-5">Email address</dt>
-                        <dd class="col-sm-7">@(member.EmailAddress ?? "-")</dd>
+                        <dt class="col-sm-5 fw-normal text-muted small">Email</dt>
+                        <dd class="col-sm-7">@(member.EmailAddress ?? "—")</dd>
 
-                        <dt class="col-sm-5">ID number</dt>
-                        <dd class="col-sm-7">@(member.IdNumber ?? "-")</dd>
+                        <dt class="col-sm-5 fw-normal text-muted small">ID number</dt>
+                        <dd class="col-sm-7">@(member.IdNumber ?? "—")</dd>
 
-                        <dt class="col-sm-5">Residential area</dt>
-                        <dd class="col-sm-7">@(member.ResidentialArea ?? "-")</dd>
+                        <dt class="col-sm-5 fw-normal text-muted small">Residential area</dt>
+                        <dd class="col-sm-7">@(member.ResidentialArea ?? "—")</dd>
                     </dl>
                 </div>
             </div>
@@ -69,31 +96,35 @@ else
         <div class="col-12 col-lg-6">
             <div class="card h-100">
                 <div class="card-body">
-                    <h3 class="h5 card-title">Membership Details</h3>
-                    <dl class="row mb-0">
-                        <dt class="col-sm-5">Member number</dt>
+                    <h3 class="h6 card-title text-muted text-uppercase" style="letter-spacing: .05em; font-size: .7rem;">Membership Details</h3>
+                    <dl class="row mb-0 mt-2">
+                        <dt class="col-sm-5 fw-normal text-muted small">Member number</dt>
                         <dd class="col-sm-7">@member.MemberNumber</dd>
 
-                        <dt class="col-sm-5">Joining date</dt>
-                        <dd class="col-sm-7">@member.JoiningDate.ToString("yyyy-MM-dd")</dd>
+                        <dt class="col-sm-5 fw-normal text-muted small">Joining date</dt>
+                        <dd class="col-sm-7">@member.JoiningDate.ToString("dd MMM yyyy")</dd>
 
-                        <dt class="col-sm-5">Default role</dt>
+                        <dt class="col-sm-5 fw-normal text-muted small">Default role</dt>
                         <dd class="col-sm-7">@member.DefaultRole</dd>
 
-                        <dt class="col-sm-5">Status</dt>
-                        <dd class="col-sm-7">@member.Status</dd>
-
-                        <dt class="col-sm-5">Cooling period</dt>
-                        <dd class="col-sm-7">@(member.IsInCoolingPeriod ? "Yes" : "No")</dd>
-
-                        @if (member.CoolingPeriodEndDate is not null)
-                        {
-                            <dt class="col-sm-5">Cooling period end date</dt>
-                            <dd class="col-sm-7">@member.CoolingPeriodEndDate.Value.ToString("yyyy-MM-dd")</dd>
-                        }
-
-                        <dt class="col-sm-5">Tenant</dt>
+                        <dt class="col-sm-5 fw-normal text-muted small">Tenant</dt>
                         <dd class="col-sm-7">@member.Tenant.Name</dd>
+
+                        <dt class="col-sm-5 fw-normal text-muted small">Cooling period</dt>
+                        <dd class="col-sm-7">
+                            @if (member.IsInCoolingPeriod)
+                            {
+                                <StatusBadge Text="Active" Type="info" />
+                                @if (member.CoolingPeriodEndDate is not null)
+                                {
+                                    <span class="ms-2 small text-muted">until @member.CoolingPeriodEndDate.Value.ToString("dd MMM yyyy")</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </dd>
                     </dl>
                 </div>
             </div>
@@ -103,33 +134,33 @@ else
             <div class="card h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="h5 card-title mb-0">Next of Kin</h3>
-                        @if (member.NextOfKinRecords.Count < 2)
+                        <h3 class="h6 card-title mb-0 text-muted text-uppercase" style="letter-spacing: .05em; font-size: .7rem;">
+                            Next of Kin
+                            <StatusBadge Text="@($"{member.NextOfKinRecords.Count} / {maxNextOfKin}")" Type="secondary" />
+                        </h3>
+                        @if (member.NextOfKinRecords.Count < maxNextOfKin)
                         {
-                            <a class="btn btn-sm btn-primary" href="@($"/add-next-of-kin/{MemberId}")">Add Next of Kin</a>
+                            <a class="btn btn-sm btn-primary" href="@($"/add-next-of-kin/{MemberId}")">
+                                <i class="bi bi-plus me-1"></i>Add
+                            </a>
                         }
                     </div>
 
-                    @if (member.NextOfKinRecords.Count >= 2)
-                    {
-                        <p class="small text-muted">Maximum of 2 next of kin records captured.</p>
-                    }
-
                     @if (member.NextOfKinRecords.Count == 0)
                     {
-                        <p class="mb-0">No next of kin records captured yet.</p>
+                        <p class="text-muted small mb-0">No next of kin records captured yet.</p>
                     }
                     else
                     {
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
-                                <thead>
+                                <thead class="table-light">
                                     <tr>
                                         <th>Full name</th>
                                         <th>Relationship</th>
-                                        <th>Cellphone number</th>
-                                        <th>Is primary</th>
-                                        <th>Actions</th>
+                                        <th>Cellphone</th>
+                                        <th>Primary</th>
+                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -137,11 +168,16 @@ else
                                     {
                                         <tr>
                                             <td>@nextOfKin.FullName</td>
-                                            <td>@nextOfKin.Relationship</td>
-                                            <td>@nextOfKin.CellphoneNumber</td>
-                                            <td>@(nextOfKin.IsPrimary ? "Yes" : "No")</td>
+                                            <td class="text-muted small">@nextOfKin.Relationship</td>
+                                            <td class="text-muted small">@nextOfKin.CellphoneNumber</td>
                                             <td>
-                                                <a class="btn btn-sm btn-secondary" href="@($"/edit-next-of-kin/{nextOfKin.Id}")">Edit</a>
+                                                @if (nextOfKin.IsPrimary)
+                                                {
+                                                    <StatusBadge Text="Primary" Type="info" />
+                                                }
+                                            </td>
+                                            <td>
+                                                <a class="btn btn-sm btn-outline-secondary" href="@($"/edit-next-of-kin/{nextOfKin.Id}")">Edit</a>
                                             </td>
                                         </tr>
                                     }
@@ -157,34 +193,33 @@ else
             <div class="card h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="h5 card-title mb-0">Beneficiaries</h3>
-                        @if (member.Beneficiaries.Count == 0)
+                        <h3 class="h6 card-title mb-0 text-muted text-uppercase" style="letter-spacing: .05em; font-size: .7rem;">
+                            Beneficiaries
+                            <StatusBadge Text="@($"{member.Beneficiaries.Count} / {maxBeneficiaries}")" Type="secondary" />
+                        </h3>
+                        @if (member.Beneficiaries.Count < maxBeneficiaries)
                         {
-                            <a class="btn btn-sm btn-primary" href="@($"/add-beneficiary/{MemberId}")">Add Beneficiary</a>
+                            <a class="btn btn-sm btn-primary" href="@($"/add-beneficiary/{MemberId}")">
+                                <i class="bi bi-plus me-1"></i>Add
+                            </a>
                         }
                     </div>
 
-                    @if (member.Beneficiaries.Count > 0)
-                    {
-                        <p class="small text-muted">Beneficiary already captured.</p>
-                    }
-
                     @if (member.Beneficiaries.Count == 0)
                     {
-                        <p class="mb-0">No beneficiaries captured yet.</p>
+                        <p class="text-muted small mb-0">No beneficiaries captured yet.</p>
                     }
                     else
                     {
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
-                                <thead>
+                                <thead class="table-light">
                                     <tr>
                                         <th>Full name</th>
                                         <th>Relationship</th>
-                                        <th>Cellphone number</th>
-                                        <th>Date of birth</th>
-                                        <th>Active status</th>
-                                        <th>Actions</th>
+                                        <th>Cellphone</th>
+                                        <th>Status</th>
+                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -192,12 +227,20 @@ else
                                     {
                                         <tr>
                                             <td>@beneficiary.FullName</td>
-                                            <td>@beneficiary.Relationship</td>
-                                            <td>@(beneficiary.CellphoneNumber ?? "-")</td>
-                                            <td>@(beneficiary.DateOfBirth?.ToString("yyyy-MM-dd") ?? "-")</td>
-                                            <td>@(beneficiary.IsActive ? "Active" : "Inactive")</td>
+                                            <td class="text-muted small">@beneficiary.Relationship</td>
+                                            <td class="text-muted small">@(beneficiary.CellphoneNumber ?? "—")</td>
                                             <td>
-                                                <a class="btn btn-sm btn-secondary" href="@($"/edit-beneficiary/{beneficiary.Id}")">Edit</a>
+                                                @if (beneficiary.IsActive)
+                                                {
+                                                    <span class="badge text-bg-success">Active</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-secondary">Inactive</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <a class="btn btn-sm btn-outline-secondary" href="@($"/edit-beneficiary/{beneficiary.Id}")">Edit</a>
                                             </td>
                                         </tr>
                                     }
@@ -213,27 +256,29 @@ else
             <div class="card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="h5 card-title mb-0">Fines</h3>
-                        <a class="btn btn-sm btn-primary" href="@($"/add-fine/{MemberId}")">Add Fine</a>
+                        <h3 class="h6 card-title mb-0 text-muted text-uppercase" style="letter-spacing: .05em; font-size: .7rem;">Fines</h3>
+                        <a class="btn btn-sm btn-primary" href="@($"/add-fine/{MemberId}")">
+                            <i class="bi bi-plus me-1"></i>Add Fine
+                        </a>
                     </div>
 
                     @if (memberFines.Count == 0)
                     {
-                        <p class="mb-0">No fines captured yet.</p>
+                        <p class="text-muted small mb-0">No fines captured yet.</p>
                     }
                     else
                     {
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
-                                <thead>
+                                <thead class="table-light">
                                     <tr>
                                         <th>Fine type</th>
                                         <th>Amount</th>
                                         <th>Reason</th>
-                                        <th>Fine date</th>
+                                        <th>Date</th>
                                         <th>Status</th>
                                         <th>Paid date</th>
-                                        <th>Actions</th>
+                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -241,15 +286,24 @@ else
                                     {
                                         <tr>
                                             <td>@fine.FineType.Name</td>
-                                            <td>@fine.Amount.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</td>
-                                            <td>@fine.Reason</td>
-                                            <td>@fine.FineDate.ToString("yyyy-MM-dd")</td>
-                                            <td>@fine.Status</td>
-                                            <td>@(fine.PaidDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                            <td>@fine.Amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</td>
+                                            <td class="text-muted small">@fine.Reason</td>
+                                            <td class="text-muted small">@fine.FineDate.ToString("dd MMM yyyy")</td>
+                                            <td>
+                                                @if (fine.Status == FineStatus.Paid)
+                                                {
+                                                    <span class="badge text-bg-success">Paid</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-danger">Unpaid</span>
+                                                }
+                                            </td>
+                                            <td class="text-muted small">@(fine.PaidDate?.ToString("dd MMM yyyy") ?? "—")</td>
                                             <td>
                                                 @if (fine.Status == FineStatus.Unpaid)
                                                 {
-                                                    <a class="btn btn-sm btn-success" href="@($"/mark-fine-paid/{fine.Id}")">Mark as Paid</a>
+                                                    <a class="btn btn-sm btn-success" href="@($"/mark-fine-paid/{fine.Id}")">Mark Paid</a>
                                                 }
                                             </td>
                                         </tr>
@@ -268,6 +322,8 @@ else
     private Member? member;
     private List<MemberFine> memberFines = [];
     private Stokvel? stokvel;
+    private int maxNextOfKin;
+    private int maxBeneficiaries;
     private bool isLoading = true;
 
     [Parameter]
@@ -281,10 +337,24 @@ else
         stokvel = member is null
             ? null
             : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+        maxNextOfKin = stokvel is null
+            ? 0
+            : await OperatingRuleService.GetMaxNextOfKinAsync(stokvel.Id);
+        maxBeneficiaries = stokvel is null
+            ? 0
+            : await OperatingRuleService.GetMaxBeneficiariesAsync(stokvel.Id);
         memberFines = member is null
             ? []
             : await FineService.GetMemberFinesAsync(MemberId);
 
         isLoading = false;
+    }
+
+    private static string GetInitials(string fullName)
+    {
+        var parts = fullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[^1][0]}".ToUpperInvariant()
+            : fullName.Length > 0 ? fullName[0].ToString().ToUpperInvariant() : "?";
     }
 }

@@ -24,6 +24,8 @@ public class Stokvel
 
     public DateTime? EstablishedDate { get; set; }
 
+    public int? ExpectedMemberCount { get; set; }
+
     [MaxLength(500)]
     public string? Description { get; set; }
 

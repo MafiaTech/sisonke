@@ -5,7 +5,12 @@
       "Bash(Select-Object FullName)",
       "Bash(Format-List)",
       "Bash(xargs ls -la)",
-      "Bash(grep -v \"\\\\.cs$\")"
+      "Bash(grep -v \"\\\\.cs$\")",
+      "Bash(xargs -I {} basename {})",
+      "Read(//c/Users/mpshe/.claude/projects/c--Users-mpshe-Projects-Sisonke/memory/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\mpshe\\.claude\\projects\\c--Users-mpshe-Projects-Sisonke\\memory"
     ]
   }
 }
