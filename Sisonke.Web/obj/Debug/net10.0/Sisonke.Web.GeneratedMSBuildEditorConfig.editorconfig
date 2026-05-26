@@ -199,6 +199,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdXRoLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Constitution/ConstitutionBuilder.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb25zdGl0dXRpb25cQ29uc3RpdHV0aW9uQnVpbGRlci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Contributions/ContributionRules.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb250cmlidXRpb25zXENvbnRyaWJ1dGlvblJ1bGVzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 

@@ -302,6 +302,18 @@ public static class SisonkeSeedData
             stokvelTypeQuestion,
             ["Burial Society", "Savings Stokvel", "Grocery Stokvel", "Investment Stokvel", "Social Club", "Family Society"]);
 
+        var existingConstitutionQuestion = await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            stokvelIdentity,
+            "Does this stokvel already have a constitution?",
+            QuestionType.SingleSelect,
+            true,
+            3);
+        await SeedQuestionnaireOptionsAsync(
+            context,
+            existingConstitutionQuestion,
+            ["Yes", "No", "Not sure"]);
+
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
             membershipRules,

@@ -75,7 +75,7 @@
                                 var isRecommended = recommendedPlanId == plan.Id;
 
                                 <div class="col-12 col-md-4">
-                                    <div class="card h-100 @(isSelected ? "border-primary shadow-sm" : string.Empty)">
+                                    <div class="@GetSubscriptionPlanCardClass(isSelected, isRecommended)">
                                         <div class="card-body d-flex flex-column">
                                             <div class="d-flex justify-content-between gap-2 mb-2">
                                                 <h3 class="h5 card-title mb-0">@plan.Name</h3>
@@ -249,5 +249,17 @@
         return plan.MaxMembers is null
             ? $"{plan.MinMembers}+ members"
             : $"{plan.MinMembers}-{plan.MaxMembers} members";
+    }
+
+    private static string GetSubscriptionPlanCardClass(bool isSelected, bool isRecommended)
+    {
+        if (isSelected)
+        {
+            return "card h-100 border-primary shadow-sm";
+        }
+
+        return isRecommended
+            ? "card h-100 border-success shadow-sm"
+            : "card h-100";
     }
 }

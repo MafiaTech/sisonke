@@ -49,111 +49,172 @@ else
         </div>
     </div>
 
-    <div class="row">
-        @foreach (var section in sections)
+    <div class="row g-2 mb-4">
+        @for (var step = 1; step <= 4; step++)
         {
-            <div class="col-12 col-md-6 mb-4">
-                <section class="card h-100">
-                    <div class="card-body">
-                        <h3 class="h5">@section.Name</h3>
-
-                        @if (!string.IsNullOrWhiteSpace(section.Description))
-                        {
-                            <p class="text-muted">@section.Description</p>
-                        }
-
-                        @foreach (var question in section.Questions)
-                        {
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold" for="@GetQuestionInputId(question.Id)">
-                                    @question.QuestionText
-                                    @if (question.IsRequired)
-                                    {
-                                        <span class="text-danger">*</span>
-                                    }
-                                </label>
-
-                                @if (!string.IsNullOrWhiteSpace(question.HelpText))
-                                {
-                                    <div class="form-text mb-1">@question.HelpText</div>
-                                }
-
-                                @switch (question.QuestionType)
-                                {
-                                    case QuestionType.Number:
-                                        <InputNumber id="@GetQuestionInputId(question.Id)" class="form-control" TValue="int?"
-                                            Value="@GetIntAnswer(question.Id)"
-                                            ValueChanged="@((int? value) => SetAnswer(question.Id, value?.ToString()))"
-                                            ValueExpression="@(() => intValueExpression)" />
-                                        break;
-                                    case QuestionType.Currency:
-                                        <InputNumber id="@GetQuestionInputId(question.Id)" class="form-control" TValue="decimal?"
-                                            Value="@GetDecimalAnswer(question.Id)"
-                                            ValueChanged="@((decimal? value) => SetAnswer(question.Id, value?.ToString()))"
-                                            ValueExpression="@(() => decimalValueExpression)" />
-                                        break;
-                                    case QuestionType.Date:
-                                        <InputDate id="@GetQuestionInputId(question.Id)" class="form-control" TValue="DateTime?"
-                                            Value="@GetDateAnswer(question.Id)"
-                                            ValueChanged="@((DateTime? value) => SetAnswer(question.Id, value?.ToString("yyyy-MM-dd")))"
-                                            ValueExpression="@(() => dateValueExpression)" />
-                                        break;
-                                    case QuestionType.YesNo:
-                                        <InputSelect id="@GetQuestionInputId(question.Id)" class="form-select" TValue="string"
-                                            Value="@GetAnswer(question.Id)"
-                                            ValueChanged="@((string? value) => SetAnswer(question.Id, value))"
-                                            ValueExpression="@(() => stringValueExpression)">
-                                            <option value="">Select an answer</option>
-                                            <option value="Yes">Yes</option>
-                                            <option value="No">No</option>
-                                        </InputSelect>
-                                        break;
-                                    case QuestionType.SingleSelect:
-                                        <InputSelect id="@GetQuestionInputId(question.Id)" class="form-select" TValue="string"
-                                            Value="@GetAnswer(question.Id)"
-                                            ValueChanged="@((string? value) => SetAnswer(question.Id, value))"
-                                            ValueExpression="@(() => stringValueExpression)">
-                                            <option value="">Select an answer</option>
-                                            @foreach (var option in question.Options)
-                                            {
-                                                <option value="@(option.OptionValue ?? option.OptionText)">@option.OptionText</option>
-                                            }
-                                        </InputSelect>
-                                        break;
-                                    case QuestionType.MultiSelect:
-                                        <InputText id="@GetQuestionInputId(question.Id)" class="form-control"
-                                            Value="@GetAnswer(question.Id)"
-                                            ValueChanged="@((string? value) => SetAnswer(question.Id, value))"
-                                            ValueExpression="@(() => stringValueExpression)" />
-                                        <div class="form-text">Enter comma-separated values.</div>
-                                        break;
-                                    default:
-                                        <InputText id="@GetQuestionInputId(question.Id)" class="form-control"
-                                            Value="@GetAnswer(question.Id)"
-                                            ValueChanged="@((string? value) => SetAnswer(question.Id, value))"
-                                            ValueExpression="@(() => stringValueExpression)" />
-                                        break;
-                                }
-                            </div>
-                        }
-                    </div>
-                </section>
+            <div class="col-6 col-lg-3">
+                <div class="border rounded p-3 h-100 @(GetStepIndicatorClass(step))">
+                    <div class="small fw-semibold">Step @step</div>
+                    <div>@GetStepName(step)</div>
+                </div>
             </div>
         }
     </div>
 
+    @if (currentStep < 4)
+    {
+        <div class="row">
+            @foreach (var section in CurrentStepSections)
+            {
+                <div class="col-12 col-md-6 mb-4">
+                    <section class="card h-100">
+                        <div class="card-body">
+                            <h3 class="h5">@section.Name</h3>
+
+                            @if (!string.IsNullOrWhiteSpace(section.Description))
+                            {
+                                <p class="text-muted">@section.Description</p>
+                            }
+
+                            @foreach (var question in section.Questions)
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold" for="@GetQuestionInputId(question.Id)">
+                                        @question.QuestionText
+                                        @if (question.IsRequired)
+                                        {
+                                            <span class="text-danger">*</span>
+                                        }
+                                    </label>
+
+                                    @if (!string.IsNullOrWhiteSpace(question.HelpText))
+                                    {
+                                        <div class="form-text mb-1">@question.HelpText</div>
+                                    }
+
+                                    @switch (question.QuestionType)
+                                    {
+                                        case QuestionType.Number:
+                                            <InputNumber id="@GetQuestionInputId(question.Id)" class="form-control" TValue="int?"
+                                                Value="@GetIntAnswer(question.Id)"
+                                                ValueChanged="@((int? value) => SetAnswer(question.Id, value?.ToString()))"
+                                                ValueExpression="@(() => intValueExpression)" />
+                                            break;
+                                        case QuestionType.Currency:
+                                            <InputNumber id="@GetQuestionInputId(question.Id)" class="form-control" TValue="decimal?"
+                                                Value="@GetDecimalAnswer(question.Id)"
+                                                ValueChanged="@((decimal? value) => SetAnswer(question.Id, value?.ToString()))"
+                                                ValueExpression="@(() => decimalValueExpression)" />
+                                            break;
+                                        case QuestionType.Date:
+                                            <InputDate id="@GetQuestionInputId(question.Id)" class="form-control" TValue="DateTime?"
+                                                Value="@GetDateAnswer(question.Id)"
+                                                ValueChanged="@((DateTime? value) => SetAnswer(question.Id, value?.ToString("yyyy-MM-dd")))"
+                                                ValueExpression="@(() => dateValueExpression)" />
+                                            break;
+                                        case QuestionType.YesNo:
+                                            <InputSelect id="@GetQuestionInputId(question.Id)" class="form-select" TValue="string"
+                                                Value="@GetAnswer(question.Id)"
+                                                ValueChanged="@((string? value) => SetAnswer(question.Id, value))"
+                                                ValueExpression="@(() => stringValueExpression)">
+                                                <option value="">Select an answer</option>
+                                                <option value="Yes">Yes</option>
+                                                <option value="No">No</option>
+                                            </InputSelect>
+                                            break;
+                                        case QuestionType.SingleSelect:
+                                            <InputSelect id="@GetQuestionInputId(question.Id)" class="form-select" TValue="string"
+                                                Value="@GetAnswer(question.Id)"
+                                                ValueChanged="@((string? value) => SetAnswer(question.Id, value))"
+                                                ValueExpression="@(() => stringValueExpression)">
+                                                <option value="">Select an answer</option>
+                                                @foreach (var option in question.Options)
+                                                {
+                                                    <option value="@(option.OptionValue ?? option.OptionText)">@option.OptionText</option>
+                                                }
+                                            </InputSelect>
+                                            break;
+                                        case QuestionType.MultiSelect:
+                                            <InputText id="@GetQuestionInputId(question.Id)" class="form-control"
+                                                Value="@GetAnswer(question.Id)"
+                                                ValueChanged="@((string? value) => SetAnswer(question.Id, value))"
+                                                ValueExpression="@(() => stringValueExpression)" />
+                                            <div class="form-text">Enter comma-separated values.</div>
+                                            break;
+                                        default:
+                                            <InputText id="@GetQuestionInputId(question.Id)" class="form-control"
+                                                Value="@GetAnswer(question.Id)"
+                                                ValueChanged="@((string? value) => SetAnswer(question.Id, value))"
+                                                ValueExpression="@(() => stringValueExpression)" />
+                                            break;
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </section>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3 class="h5">Review and Submit</h3>
+                <p class="text-muted">Review your setup answers before completing setup.</p>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="fw-semibold">Completion: @completionPercentage%</span>
+                    </div>
+                    <div class="progress" role="progressbar" aria-label="Setup completion" aria-valuenow="@completionPercentage" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar" style="@($"width: {completionPercentage}%")">@completionPercentage%</div>
+                    </div>
+                </div>
+
+                @foreach (var section in sections)
+                {
+                    <section class="border rounded p-3 mb-3">
+                        <h4 class="h6">@section.Name</h4>
+                        <dl class="row mb-0">
+                            @foreach (var question in section.Questions)
+                            {
+                                <dt class="col-12 col-lg-6 fw-normal text-muted">@question.QuestionText</dt>
+                                <dd class="col-12 col-lg-6">@GetReviewAnswer(question.Id)</dd>
+                            }
+                        </dl>
+                    </section>
+                }
+
+                @if (completionPercentage < 100)
+                {
+                    <AlertBanner Type="warning" Title="Setup incomplete" Message="Please complete all required questions before completing setup." Icon="bi bi-exclamation-triangle-fill" />
+                }
+            </div>
+        </div>
+    }
+
     <div class="d-flex flex-wrap gap-2 mb-2">
+        @if (currentStep > 1)
+        {
+            <button type="button" class="btn btn-outline-secondary" @onclick="GoToPreviousStep">Previous</button>
+        }
+
         <button type="button" class="btn btn-primary" @onclick="SaveQuestionnaireAsync">Save Draft</button>
-        <button type="button" class="btn btn-success" disabled="@(completionPercentage < 100)" @onclick="ShowSubmitRegistrationConfirmation">
-            Complete Setup
-        </button>
+
+        @if (currentStep < 4)
+        {
+            <button type="button" class="btn btn-primary" @onclick="GoToNextStep">Next</button>
+        }
+        else if (completionPercentage == 100)
+        {
+            <button type="button" class="btn btn-success" @onclick="ShowSubmitRegistrationConfirmation">
+                Complete Setup
+            </button>
+        }
+
         <a class="btn btn-outline-secondary" href="@BackLinkHref">@BackLinkText</a>
     </div>
-
-    @if (completionPercentage < 100)
-    {
-        <p class="text-muted mb-4">Complete all required questions before submitting registration.</p>
-    }
 
     <ConfirmationModal
         IsVisible="@showSubmitConfirmation"
@@ -170,6 +231,7 @@ else
     private Stokvel? stokvel;
     private List<QuestionnaireSection> sections = [];
     private Dictionary<Guid, string> answers = [];
+    private int currentStep = 1;
     private int completionPercentage;
     private bool isLoading = true;
     private bool showSubmitConfirmation;
@@ -190,6 +252,10 @@ else
     private string BackLinkText => stokvel?.IsSetupComplete == true
         ? "Back to Dashboard"
         : "Back to My Stokvels";
+
+    private List<QuestionnaireSection> CurrentStepSections => sections
+        .Where(section => GetSectionStep(section.Name) == currentStep)
+        .ToList();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -215,6 +281,15 @@ else
         return answers.TryGetValue(questionId, out var answer)
             ? answer
             : string.Empty;
+    }
+
+    private string GetReviewAnswer(Guid questionId)
+    {
+        var answer = GetAnswer(questionId);
+
+        return string.IsNullOrWhiteSpace(answer)
+            ? "Not answered"
+            : answer;
     }
 
     private void SetAnswer(Guid questionId, string? value)
@@ -263,7 +338,7 @@ else
         }
 
         completionPercentage = await QuestionnaireService.GetCompletionPercentageAsync(StokvelId);
-        successMessage = "Questionnaire draft saved successfully.";
+        successMessage = "Setup draft saved successfully.";
     }
 
     private void ShowSubmitRegistrationConfirmation()
@@ -304,5 +379,55 @@ else
         showSubmitConfirmation = false;
         successMessage = "Registration submitted successfully. This stokvel is now ready for management.";
         NavigationManager.NavigateTo($"/stokvel-dashboard/{StokvelId}");
+    }
+
+    private void GoToPreviousStep()
+    {
+        currentStep = Math.Max(1, currentStep - 1);
+    }
+
+    private void GoToNextStep()
+    {
+        currentStep = Math.Min(4, currentStep + 1);
+    }
+
+    private static int GetSectionStep(string sectionName)
+    {
+        return sectionName switch
+        {
+            "Stokvel Identity" => 1,
+            "Membership Rules" => 1,
+            "Contributions and Fines" => 2,
+            "Meetings and Decisions" => 3,
+            "Claims and Payouts" => 3,
+            _ => 4
+        };
+    }
+
+    private static string GetStepName(int step)
+    {
+        return step switch
+        {
+            1 => "Basics",
+            2 => "Money",
+            3 => "Rules",
+            4 => "Sign-off",
+            _ => string.Empty
+        };
+    }
+
+    private string GetStepIndicatorClass(int step)
+    {
+        if (step == currentStep)
+        {
+            return "border-primary bg-primary text-white";
+        }
+
+        if (step < currentStep)
+        {
+            return "border-success bg-success-subtle text-success";
+        }
+
+        return "bg-light text-muted";
     }
 }

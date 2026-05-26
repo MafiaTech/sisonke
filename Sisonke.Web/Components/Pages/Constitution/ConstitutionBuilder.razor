@@ -1,0 +1,186 @@
+@page "/constitution-builder/{StokvelId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject ConstitutionService ConstitutionService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Constitution Builder</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading constitution builder...
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Constitution Builder"
+        Subtitle="Create, review and approve a constitution for this stokvel."
+        BackText="Back to Dashboard"
+        BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                <div>
+                    <h2 class="h5 mb-1">@stokvel.Name</h2>
+                    <p class="text-muted mb-0">@stokvel.Type</p>
+                </div>
+                <div>
+                    <div class="small text-muted mb-1">Constitution status</div>
+                    <StatusBadge Text="@constitutionStatus" Type="@GetStatusBadgeType(constitutionStatus)" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <AlertBanner
+        Type="info"
+        Title="Review before approval"
+        Message="This constitution is generated from the stokvel profile and quick setup answers. Please review it before approval."
+        Icon="bi bi-info-circle-fill" />
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
+    }
+
+    <div class="card mb-4">
+        <div class="card-body p-4">
+            <div class="constitution-preview">
+                @((MarkupString)(previewContent ?? string.Empty))
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <button type="button" class="btn btn-primary" @onclick="SaveDraftAsync">
+            <i class="bi bi-floppy me-2"></i>Save Draft
+        </button>
+        <button type="button" class="btn btn-success" @onclick="ShowApprovalConfirmation">
+            <i class="bi bi-check-circle me-2"></i>Approve Constitution
+        </button>
+        <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+    </div>
+
+    <ConfirmationModal
+        IsVisible="@showApprovalConfirmation"
+        Title="Approve Constitution"
+        Message="You are about to approve this constitution. Please confirm that the content has been reviewed and accepted by the stokvel."
+        ConfirmButtonText="Confirm Approval"
+        CancelButtonText="Cancel"
+        ModalType="warning"
+        OnConfirm="@ConfirmApprovalAsync"
+        OnCancel="@CancelApproval" />
+}
+
+@code {
+    private Stokvel? stokvel;
+    private ConstitutionDocument? latestConstitution;
+    private string constitutionStatus = string.Empty;
+    private string? previewContent;
+    private bool isLoading = true;
+    private bool showApprovalConfirmation;
+    private string? successMessage;
+    private string? errorMessage;
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        successMessage = null;
+        errorMessage = null;
+        showApprovalConfirmation = false;
+
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+        constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
+        latestConstitution = await ConstitutionService.GetLatestConstitutionAsync(StokvelId);
+        previewContent = latestConstitution?.Content ?? await ConstitutionService.GenerateConstitutionPreviewAsync(StokvelId);
+
+        isLoading = false;
+    }
+
+    private async Task SaveDraftAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(previewContent))
+        {
+            errorMessage = "Constitution preview could not be generated.";
+            return;
+        }
+
+        latestConstitution = await ConstitutionService.SaveDraftAsync(StokvelId, previewContent);
+
+        if (latestConstitution is null)
+        {
+            errorMessage = "Constitution draft could not be saved.";
+            return;
+        }
+
+        constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
+        successMessage = "Constitution draft saved successfully.";
+    }
+
+    private void ShowApprovalConfirmation()
+    {
+        successMessage = null;
+        errorMessage = null;
+        showApprovalConfirmation = true;
+    }
+
+    private void CancelApproval()
+    {
+        showApprovalConfirmation = false;
+    }
+
+    private async Task ConfirmApprovalAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+        showApprovalConfirmation = false;
+
+        latestConstitution = await ConstitutionService.ApproveLatestAsync(StokvelId);
+
+        if (latestConstitution is null)
+        {
+            errorMessage = "Constitution could not be approved.";
+            return;
+        }
+
+        constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
+        previewContent = latestConstitution.Content;
+        successMessage = "Constitution approved successfully.";
+    }
+
+    private static string GetStatusBadgeType(string status)
+    {
+        return status switch
+        {
+            "Approved" => "success",
+            "Draft" => "warning",
+            "Not Created" => "secondary",
+            _ => "info"
+        };
+    }
+}

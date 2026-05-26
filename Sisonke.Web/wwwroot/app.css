@@ -160,6 +160,23 @@ a, .btn-link {
     text-transform: uppercase;
 }
 
+.constitution-preview h2 {
+    color: #1a1a2e;
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-top: 1.4rem;
+    margin-bottom: 0.5rem;
+}
+
+.constitution-preview h2:first-child {
+    margin-top: 0;
+}
+
+.constitution-preview p {
+    color: #344054;
+    margin-bottom: 0.75rem;
+}
+
 /* ── Home page — hero & features ─────────────────────── */
 .home-welcome {
     padding: 2rem 0 1rem;

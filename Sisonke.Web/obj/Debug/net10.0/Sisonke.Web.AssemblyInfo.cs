@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Sisonke.Web")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a1aac9fcc7a4490fc8553dfb3324d92ee4cbfbc1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+34a81864f73870fdf0dea812596505eb4a66623e")]
 [assembly: System.Reflection.AssemblyProductAttribute("Sisonke.Web")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Sisonke.Web")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

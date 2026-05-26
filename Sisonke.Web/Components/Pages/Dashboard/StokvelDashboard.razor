@@ -7,6 +7,7 @@
 @inject MemberService MemberService
 @inject FineService FineService
 @inject ContributionService ContributionService
+@inject ConstitutionService ConstitutionService
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -153,11 +154,14 @@ else
                         <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
                             <div>
                                 <h2 class="h5 card-title">Constitution</h2>
-                                <p class="card-text mb-0"><strong>Status:</strong> Not Created</p>
+                                <p class="card-text mb-0">
+                                    <strong>Status:</strong>
+                                    <StatusBadge Text="@constitutionStatus" Type="@GetConstitutionStatusBadgeType(constitutionStatus)" />
+                                </p>
                             </div>
                             <div class="d-flex flex-wrap gap-2 align-items-start">
-                                <a class="btn btn-primary" href="@($"/constitution-builder/{StokvelId}")">Create Constitution</a>
-                                <a class="btn btn-outline-primary" href="#">Upload Existing Constitution</a>
+                                <a class="btn btn-primary" href="@($"/constitution-builder/{StokvelId}")">@GetConstitutionButtonText(constitutionStatus)</a>
+                                <a class="btn btn-outline-primary disabled" aria-disabled="true" href="#">Upload Existing Constitution</a>
                             </div>
                         </div>
                     </div>
@@ -174,6 +178,7 @@ else
     private decimal outstandingFinesTotal;
     private TenantSubscription? activeSubscription;
     private string memberLimitMessage = string.Empty;
+    private string constitutionStatus = "Not Created";
     private bool isLoading = true;
 
     [Parameter]
@@ -185,6 +190,7 @@ else
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
         activeSubscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(StokvelId);
         memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
+        constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         memberCount = await MemberService.GetMemberCountByStokvelIdAsync(StokvelId);
         expectedMonthlyContributions = await ContributionService.GetExpectedMonthlyContributionsByStokvelIdAsync(StokvelId);
         outstandingFinesTotal = await FineService.GetOutstandingFinesTotalByStokvelIdAsync(StokvelId);
@@ -206,5 +212,25 @@ else
         }
 
         return Math.Min(100, memberCount * 100 / maxMembers);
+    }
+
+    private static string GetConstitutionButtonText(string status)
+    {
+        return status switch
+        {
+            "Draft" => "Continue Constitution",
+            "Approved" => "View Constitution",
+            _ => "Create Constitution"
+        };
+    }
+
+    private static string GetConstitutionStatusBadgeType(string status)
+    {
+        return status switch
+        {
+            "Draft" => "warning",
+            "Approved" => "success",
+            _ => "secondary"
+        };
     }
 }
