@@ -1,0 +1,191 @@
+@page "/meeting-votes/{MeetingId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject MeetingService MeetingService
+@inject VotingService VotingService
+
+<PageTitle>Voting and Decisions</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading votes...
+    </div>
+}
+else if (meeting is null)
+{
+    <AlertBanner Type="danger" Title="Meeting not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Voting and Decisions"
+        Subtitle="Create and track decisions for this meeting."
+        BackText="Back to Meeting"
+        BackHref="@($"/meeting/{MeetingId}")" />
+
+    <div class="votes-toolbar mb-4">
+        <div>
+            <div class="detail-mini-label">Meeting</div>
+            <div class="fw-600">@meeting.Title</div>
+            <div class="text-muted small">@meeting.MeetingDate.ToString("dd MMM yyyy")</div>
+        </div>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+            <a class="btn btn-primary btn-sm" href="@($"/create-vote/{MeetingId}")">
+                <i class="bi bi-plus-circle me-2"></i>Create Vote
+            </a>
+            <a class="btn btn-outline-secondary btn-sm" href="@($"/meeting/{MeetingId}")">
+                <i class="bi bi-arrow-left me-2"></i>Back to Meeting
+            </a>
+        </div>
+    </div>
+
+    @if (votes.Count == 0)
+    {
+        <AlertBanner Type="info" Title="No votes have been created for this meeting yet." Message="" Icon="bi bi-info-circle-fill" />
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 votes-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Voting method</th>
+                                <th>Status</th>
+                                <th>Result</th>
+                                <th>Responses</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var vote in votes)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-600">@vote.Title</div>
+                                        @if (!string.IsNullOrWhiteSpace(vote.Description))
+                                        {
+                                            <div class="text-muted small">@vote.Description</div>
+                                        }
+                                    </td>
+                                    <td>@FormatVotingMethod(vote.VotingMethod)</td>
+                                    <td>
+                                        <StatusBadge Text="@vote.Status.ToString()" Type="@GetVoteStatusBadgeType(vote.Status.ToString())" />
+                                    </td>
+                                    <td>
+                                        <StatusBadge Text="@vote.Result.ToString()" Type="@GetVoteResultBadgeType(vote.Result.ToString())" />
+                                    </td>
+                                    <td>@vote.Responses.Count</td>
+                                    <td class="text-end">
+                                        <a class="btn btn-outline-primary btn-sm" href="@($"/vote/{vote.Id}")">
+                                            View
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<style>
+    .fw-600 { font-weight: 600; }
+    .detail-mini-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--sk-text-muted);
+        font-weight: 600;
+        margin-bottom: .15rem;
+    }
+    .votes-toolbar {
+        align-items: center;
+        background: var(--sk-card);
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+    }
+    .votes-table th {
+        color: var(--sk-text-muted);
+        font-size: .75rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .votes-table td,
+    .votes-table th {
+        padding: 1rem;
+    }
+    @@media (max-width: 768px) {
+        .votes-toolbar {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .votes-toolbar .ms-auto {
+            margin-left: 0 !important;
+        }
+    }
+</style>
+
+@code {
+    private Meeting? meeting;
+    private List<MeetingVote> votes = [];
+    private bool isLoading = true;
+
+    [Parameter]
+    public Guid MeetingId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+
+        if (meeting is not null)
+        {
+            votes = await VotingService.GetVotesByMeetingIdAsync(MeetingId);
+        }
+
+        isLoading = false;
+    }
+
+    private static string FormatVotingMethod(Sisonke.Web.Data.Enums.VotingMethod votingMethod) =>
+        votingMethod switch
+        {
+            Sisonke.Web.Data.Enums.VotingMethod.SimpleMajority => "Simple majority",
+            Sisonke.Web.Data.Enums.VotingMethod.TwoThirdsMajority => "Two-thirds majority",
+            Sisonke.Web.Data.Enums.VotingMethod.Unanimous => "Unanimous",
+            _ => votingMethod.ToString()
+        };
+
+    private static string GetVoteStatusBadgeType(string status) =>
+        status switch
+        {
+            "Open" => "success",
+            "Closed" => "secondary",
+            "Cancelled" => "danger",
+            _ => "secondary"
+        };
+
+    private static string GetVoteResultBadgeType(string result) =>
+        result switch
+        {
+            "Passed" => "success",
+            "Failed" => "danger",
+            "Cancelled" => "secondary",
+            "Pending" => "warning",
+            _ => "secondary"
+        };
+}

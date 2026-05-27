@@ -257,22 +257,21 @@ else
                             <div class="dash-card-icon-sm" style="background:#F3F0FF;color:#8B5CF6">
                                 <i class="bi bi-calendar-event-fill"></i>
                             </div>
-                            <h2 class="h6 mb-0 fw-700">Meetings &amp; Agenda</h2>
+                            <h2 class="h6 mb-0 fw-700">Meetings &amp; Calendar</h2>
                         </div>
                         <p class="stat-value">@upcomingMeetingCount</p>
                         <p class="stat-detail">Upcoming meetings</p>
-                        <p class="text-muted small mt-3 mb-0">Schedule and manage stokvel meetings, set agendas and capture minutes.</p>
+                        <p class="text-muted small mt-3 mb-0">Schedule meetings, view the calendar, generate agendas and capture attendance.</p>
                         <a class="btn btn-outline-primary btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
-                            <i class="bi bi-calendar-event me-1"></i>Open Meetings
+                            <i class="bi bi-calendar-event me-1"></i>Open Calendar
                         </a>
                     </div>
                 </div>
             </div>
 
-            <!-- Coming soon: Voting -->
+            <!-- Voting -->
             <div class="col-12 col-md-6 col-lg-4">
-                <div class="card h-100 card-coming-soon">
-                    <span class="coming-soon-badge">Coming Soon</span>
+                <div class="card h-100">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center gap-2 mb-3">
                             <div class="dash-card-icon-sm" style="background:#FFF7ED;color:#F97316">
@@ -280,9 +279,12 @@ else
                             </div>
                             <h2 class="h6 mb-0 fw-700">Voting &amp; Decisions</h2>
                         </div>
-                        <p class="stat-value">0</p>
+                        <p class="stat-value">@openVoteCount</p>
                         <p class="stat-detail">Open polls</p>
-                        <p class="text-muted small mt-3 mb-0">Create polls, record member votes and log stokvel decisions democratically.</p>
+                        <p class="text-muted small mt-3 mb-0">Voting is managed inside each meeting.</p>
+                        <a class="btn btn-outline-primary btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
+                            <i class="bi bi-check2-square me-1"></i>Open Voting
+                        </a>
                     </div>
                 </div>
             </div>
@@ -375,6 +377,7 @@ else
     private decimal expectedMonthlyContributions;
     private decimal outstandingFinesTotal;
     private int upcomingMeetingCount;
+    private int openVoteCount;
     private TenantSubscription? activeSubscription;
     private string memberLimitMessage = string.Empty;
     private string constitutionStatus = "Not Created";
@@ -390,6 +393,7 @@ else
         expectedMonthlyContributions = 0;
         outstandingFinesTotal = 0;
         upcomingMeetingCount = 0;
+        openVoteCount = 0;
         activeSubscription = null;
         memberLimitMessage = string.Empty;
         constitutionStatus = "Not Created";
@@ -405,6 +409,7 @@ else
         expectedMonthlyContributions = await ContributionService.GetExpectedMonthlyContributionsByStokvelIdAsync(StokvelId);
         outstandingFinesTotal = await FineService.GetOutstandingFinesTotalByStokvelIdAsync(StokvelId);
         upcomingMeetingCount = await MeetingService.GetUpcomingMeetingCountByStokvelIdAsync(StokvelId);
+        openVoteCount = 0;
         isLoading = false;
     }
 

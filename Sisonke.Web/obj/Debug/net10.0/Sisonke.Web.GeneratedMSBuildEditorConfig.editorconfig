@@ -239,12 +239,24 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZWV0aW5nc1xDcmVhdGVNZWV0aW5nLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Meetings/CreateVote.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZWV0aW5nc1xDcmVhdGVWb3RlLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Meetings/MeetingDetails.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZWV0aW5nc1xNZWV0aW5nRGV0YWlscy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Meetings/MeetingsList.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZWV0aW5nc1xNZWV0aW5nc0xpc3QucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Meetings/MeetingVotes.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZWV0aW5nc1xNZWV0aW5nVm90ZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Meetings/VoteDetails.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZWV0aW5nc1xWb3RlRGV0YWlscy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Members/AddBeneficiary.razor]

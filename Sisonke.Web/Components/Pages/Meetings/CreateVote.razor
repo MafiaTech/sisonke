@@ -1,0 +1,138 @@
+@page "/create-vote/{MeetingId:guid}"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject MeetingService MeetingService
+@inject VotingService VotingService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create Vote</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading vote form...
+    </div>
+}
+else if (meeting is null)
+{
+    <AlertBanner Type="danger" Title="Meeting not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Create Vote"
+        Subtitle="@meeting.Title"
+        BackText="Back to Votes"
+        BackHref="@($"/meeting-votes/{MeetingId}")" />
+
+    @if (saveFailed)
+    {
+        <AlertBanner Type="danger" Title="Unable to create vote." Message="Please check the vote details and try again." Icon="bi bi-x-circle-fill" />
+    }
+
+    <div class="form-page form-page-sm">
+        <div class="card">
+            <div class="card-body p-4">
+                <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="CreateVoteForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
+
+                    <div class="form-section-title">Vote Details</div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="title">Title <span class="text-danger">*</span></label>
+                            <InputText id="title" class="form-control" @bind-Value="model.Title" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="description">Description</label>
+                            <InputTextArea id="description" class="form-control" rows="4" @bind-Value="model.Description" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="voting-method">Voting method</label>
+                            <InputSelect id="voting-method" class="form-select" @bind-Value="model.VotingMethod">
+                                @foreach (var votingMethod in Enum.GetValues<VotingMethod>())
+                                {
+                                    <option value="@votingMethod">@FormatVotingMethod(votingMethod)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-check-circle me-2"></i>Create Vote
+                        </button>
+                        <a class="btn btn-outline-secondary" href="@($"/meeting-votes/{MeetingId}")">Back to Votes</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Meeting? meeting;
+    private CreateVoteModel model = new();
+    private bool isLoading = true;
+    private bool saveFailed;
+
+    [Parameter]
+    public Guid MeetingId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        saveFailed = false;
+
+        var vote = await VotingService.CreateVoteAsync(
+            MeetingId,
+            model.Title,
+            model.Description,
+            model.VotingMethod);
+
+        if (vote is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/vote/{vote.Id}");
+    }
+
+    private static string FormatVotingMethod(VotingMethod votingMethod) =>
+        votingMethod switch
+        {
+            VotingMethod.SimpleMajority => "Simple majority",
+            VotingMethod.TwoThirdsMajority => "Two-thirds majority",
+            VotingMethod.Unanimous => "Unanimous",
+            _ => votingMethod.ToString()
+        };
+
+    private class CreateVoteModel
+    {
+        [Required]
+        [MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+
+        public VotingMethod VotingMethod { get; set; } = VotingMethod.SimpleMajority;
+    }
+}

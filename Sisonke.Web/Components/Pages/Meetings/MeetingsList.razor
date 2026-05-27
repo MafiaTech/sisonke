@@ -51,6 +51,46 @@ else
     }
     else
     {
+        <div class="card mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+                    <div>
+                        <h2 class="h5 mb-1">Meeting Calendar</h2>
+                        <p class="text-muted small mb-0">@visibleMonth.ToString("MMMM yyyy")</p>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ShowPreviousMonth">
+                            <i class="bi bi-chevron-left me-1"></i>Previous Month
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ShowNextMonth">
+                            Next Month<i class="bi bi-chevron-right ms-1"></i>
+                        </button>
+                        <a class="btn btn-primary btn-sm" href="@($"/create-meeting/{StokvelId}")">
+                            <i class="bi bi-plus-circle me-2"></i>Create Meeting
+                        </a>
+                    </div>
+                </div>
+
+                <div class="meeting-calendar">
+                    @foreach (var dayName in CalendarDayNames)
+                    {
+                        <div class="calendar-weekday">@dayName</div>
+                    }
+
+                    @foreach (var calendarDay in GetCalendarDays())
+                    {
+                        <div class="calendar-day @(calendarDay.Month == visibleMonth.Month ? "" : "calendar-day-muted")">
+                            <div class="calendar-day-number">@calendarDay.Day</div>
+                            @foreach (var meeting in GetMeetingsForDay(calendarDay))
+                            {
+                                <a class="calendar-meeting-badge" href="@($"/meeting/{meeting.Id}")">@meeting.Title</a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -127,6 +167,58 @@ else
     .meetings-table th {
         padding: 1rem;
     }
+    .meeting-calendar {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        overflow: hidden;
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        background: var(--sk-border);
+        gap: 1px;
+    }
+    .calendar-weekday {
+        background: var(--sk-green-50);
+        color: var(--sk-green-800);
+        font-size: .75rem;
+        font-weight: 700;
+        padding: .65rem .5rem;
+        text-align: center;
+    }
+    .calendar-day {
+        background: var(--sk-card);
+        min-height: 6.5rem;
+        padding: .65rem;
+    }
+    .calendar-day-muted {
+        background: #f8fafc;
+        color: var(--sk-text-muted);
+    }
+    .calendar-day-number {
+        color: var(--sk-text);
+        font-size: .875rem;
+        font-weight: 700;
+        margin-bottom: .4rem;
+    }
+    .calendar-meeting-badge {
+        background: var(--sk-green-50);
+        border: 1px solid #bbf7d0;
+        border-radius: 999px;
+        color: var(--sk-green-800);
+        display: block;
+        font-size: .75rem;
+        font-weight: 600;
+        line-height: 1.2;
+        margin-top: .3rem;
+        overflow: hidden;
+        padding: .25rem .45rem;
+        text-decoration: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .calendar-meeting-badge:hover {
+        background: #dcfce7;
+        color: var(--sk-green-900);
+    }
     @@media (max-width: 768px) {
         .meetings-toolbar {
             align-items: flex-start;
@@ -135,13 +227,37 @@ else
         .meetings-toolbar .ms-auto {
             margin-left: 0 !important;
         }
+        .calendar-weekday {
+            font-size: .65rem;
+            padding: .5rem .2rem;
+        }
+        .calendar-day {
+            min-height: 5rem;
+            padding: .45rem;
+        }
+        .calendar-meeting-badge {
+            border-radius: 6px;
+            font-size: .6875rem;
+            white-space: normal;
+        }
     }
 </style>
 
 @code {
     private Stokvel? stokvel;
     private List<Meeting> meetings = [];
+    private DateTime visibleMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private bool isLoading = true;
+    private static readonly string[] CalendarDayNames =
+    [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+    ];
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -161,6 +277,35 @@ else
     private static string DisplayOrDash(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private void ShowPreviousMonth()
+    {
+        visibleMonth = visibleMonth.AddMonths(-1);
+    }
+
+    private void ShowNextMonth()
+    {
+        visibleMonth = visibleMonth.AddMonths(1);
+    }
+
+    private IEnumerable<DateTime> GetCalendarDays()
+    {
+        var firstDayOfMonth = new DateTime(visibleMonth.Year, visibleMonth.Month, 1);
+        var daysFromMonday = ((int)firstDayOfMonth.DayOfWeek + 6) % 7;
+        var calendarStart = firstDayOfMonth.AddDays(-daysFromMonday);
+
+        for (var index = 0; index < 42; index++)
+        {
+            yield return calendarStart.AddDays(index);
+        }
+    }
+
+    private IEnumerable<Meeting> GetMeetingsForDay(DateTime day)
+    {
+        return meetings
+            .Where(meeting => meeting.MeetingDate.Date == day.Date)
+            .OrderBy(meeting => meeting.MeetingDate);
     }
 
     private static string GetStatusBadgeType(string status) =>

@@ -34,6 +34,9 @@ else
         <a class="btn btn-success" href="@($"/meeting-attendance/{MeetingId}")">
             <i class="bi bi-person-check me-2"></i>Attendance Register
         </a>
+        <a class="btn btn-primary" href="@($"/meeting-votes/{MeetingId}")">
+            <i class="bi bi-check2-square me-2"></i>Voting and Decisions
+        </a>
         <a class="btn btn-outline-secondary" href="@backToMeetingsHref">
             <i class="bi bi-arrow-left me-2"></i>Back to Meetings
         </a>
@@ -65,10 +68,16 @@ else
     <div class="card">
         <div class="card-body p-4">
             <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-                <h2 class="h5 mb-0">Generated Agenda</h2>
+                <div>
+                    <h2 class="h5 mb-1">Generated Agenda</h2>
+                    <p class="text-muted small mb-0">Use Voting and Decisions to record formal approvals and meeting resolutions.</p>
+                </div>
                 <div class="d-flex flex-wrap gap-2">
                     <a class="btn btn-success btn-sm" href="@($"/meeting-attendance/{MeetingId}")">
                         <i class="bi bi-person-check me-1"></i>Attendance Register
+                    </a>
+                    <a class="btn btn-primary btn-sm" href="@($"/meeting-votes/{MeetingId}")">
+                        <i class="bi bi-check2-square me-1"></i>Voting and Decisions
                     </a>
                     <a class="btn btn-outline-secondary btn-sm" href="@backToMeetingsHref">Back to Meetings</a>
                 </div>

@@ -570,6 +570,74 @@ namespace Sisonke.Web.Migrations
                     b.ToTable("MeetingAttendances");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MeetingId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OpenedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Result")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("VotingMethod")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MeetingId");
+
+                    b.ToTable("MeetingVotes");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingVoteResponse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Choice")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("MeetingVoteId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("VotedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("MeetingVoteId", "MemberId")
+                        .IsUnique();
+
+                    b.ToTable("MeetingVoteResponses");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Member", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1299,6 +1367,36 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("Member");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingVote", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Meeting", "Meeting")
+                        .WithMany()
+                        .HasForeignKey("MeetingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Meeting");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingVoteResponse", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.MeetingVote", "MeetingVote")
+                        .WithMany("Responses")
+                        .HasForeignKey("MeetingVoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("MeetingVote");
+
+                    b.Navigation("Member");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Member", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.Tenant", "Tenant")
@@ -1476,6 +1574,11 @@ namespace Sisonke.Web.Migrations
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Meeting", b =>
                 {
                     b.Navigation("AgendaItems");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingVote", b =>
+                {
+                    b.Navigation("Responses");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Member", b =>

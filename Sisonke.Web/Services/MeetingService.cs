@@ -58,6 +58,11 @@ public class MeetingService(ApplicationDbContext context)
             return null;
         }
 
+        if (await HasMeetingOnDateAsync(stokvelId, meetingDate))
+        {
+            return null;
+        }
+
         var meeting = new Meeting
         {
             Id = Guid.NewGuid(),
@@ -75,6 +80,23 @@ public class MeetingService(ApplicationDbContext context)
         await context.SaveChangesAsync();
 
         return meeting;
+    }
+
+    public async Task<bool> HasMeetingOnDateAsync(Guid stokvelId, DateTime meetingDate)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        return await context.Meetings
+            .AnyAsync(meeting =>
+                meeting.TenantId == stokvel.TenantId &&
+                meeting.MeetingDate.Date == meetingDate.Date &&
+                meeting.Status != MeetingStatus.Cancelled);
     }
 
     public async Task<int> GetUpcomingMeetingCountByStokvelIdAsync(Guid stokvelId)

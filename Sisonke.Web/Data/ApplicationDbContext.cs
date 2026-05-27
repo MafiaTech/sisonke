@@ -22,6 +22,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<MeetingAgendaItem> MeetingAgendaItems => Set<MeetingAgendaItem>();
     public DbSet<MeetingAttendance> MeetingAttendances => Set<MeetingAttendance>();
+    public DbSet<MeetingVote> MeetingVotes => Set<MeetingVote>();
+    public DbSet<MeetingVoteResponse> MeetingVoteResponses => Set<MeetingVoteResponse>();
     public DbSet<QuestionnaireSection> QuestionnaireSections => Set<QuestionnaireSection>();
     public DbSet<QuestionnaireQuestion> QuestionnaireQuestions => Set<QuestionnaireQuestion>();
     public DbSet<QuestionnaireOption> QuestionnaireOptions => Set<QuestionnaireOption>();
@@ -181,6 +183,28 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<MeetingAttendance>()
             .HasIndex(a => new { a.MeetingId, a.MemberId })
+            .IsUnique();
+
+        builder.Entity<MeetingVote>()
+            .HasOne(v => v.Meeting)
+            .WithMany()
+            .HasForeignKey(v => v.MeetingId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MeetingVoteResponse>()
+            .HasOne(r => r.MeetingVote)
+            .WithMany(v => v.Responses)
+            .HasForeignKey(r => r.MeetingVoteId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MeetingVoteResponse>()
+            .HasOne(r => r.Member)
+            .WithMany()
+            .HasForeignKey(r => r.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MeetingVoteResponse>()
+            .HasIndex(r => new { r.MeetingVoteId, r.MemberId })
             .IsUnique();
 
         builder.Entity<QuestionnaireQuestion>()

@@ -1,0 +1,442 @@
+@page "/vote/{VoteId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject VotingService VotingService
+@inject MeetingService MeetingService
+@inject MemberService MemberService
+@inject StokvelService StokvelService
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(vote?.Title ?? "Vote")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading vote...
+    </div>
+}
+else if (vote is null)
+{
+    <AlertBanner Type="danger" Title="Vote not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="@vote.Title"
+        Subtitle="Voting and decision record"
+        BackText="Back to Meeting Votes"
+        BackHref="@($"/meeting-votes/{vote.MeetingId}")" />
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
+    }
+
+    <div class="vote-toolbar mb-4">
+        <div>
+            <div class="detail-mini-label">Meeting</div>
+            <div class="fw-600">@vote.Meeting.Title</div>
+            <div class="text-muted small">@vote.Meeting.MeetingDate.ToString("dd MMM yyyy")</div>
+        </div>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+            @if (vote.Status == VoteStatus.Open)
+            {
+                <button type="button" class="btn btn-warning btn-sm" @onclick="ShowCloseVoteModal">
+                    <i class="bi bi-lock me-2"></i>Close Vote
+                </button>
+            }
+            <a class="btn btn-outline-secondary btn-sm" href="@($"/meeting-votes/{vote.MeetingId}")">
+                <i class="bi bi-arrow-left me-2"></i>Back to Meeting Votes
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body p-4">
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="detail-mini-label">Description</div>
+                    <div>@DisplayOrDash(vote.Description)</div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="detail-mini-label">Voting method</div>
+                    <div>@FormatVotingMethod(vote.VotingMethod)</div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="detail-mini-label">Status</div>
+                    <StatusBadge Text="@vote.Status.ToString()" Type="@GetVoteStatusBadgeType(vote.Status)" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="detail-mini-label">Result</div>
+                    <StatusBadge Text="@vote.Result.ToString()" Type="@GetVoteResultBadgeType(vote.Result)" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-4">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Yes</div>
+                    <div class="summary-value">@voteSummary.Yes</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-4">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">No</div>
+                    <div class="summary-value">@voteSummary.No</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Abstain</div>
+                    <div class="summary-value">@voteSummary.Abstain</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (vote.Status == VoteStatus.Open)
+    {
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 vote-table">
+                        <thead>
+                            <tr>
+                                <th>Member name</th>
+                                <th>Current vote</th>
+                                <th>Cast vote</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var member in members)
+                            {
+                                var currentChoice = GetCurrentChoice(member.Id);
+
+                                <tr>
+                                    <td>
+                                        <div class="fw-600">@member.FullName</div>
+                                    </td>
+                                    <td>
+                                        @if (currentChoice is null)
+                                        {
+                                            <StatusBadge Text="Not voted" Type="secondary" />
+                                        }
+                                        else
+                                        {
+                                            <StatusBadge Text="@currentChoice.Value.ToString()" Type="@GetChoiceBadgeType(currentChoice.Value)" />
+                                        }
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm vote-choice-select"
+                                                value="@GetSelectedChoice(member.Id)"
+                                                @onchange="eventArgs => UpdateSelectedChoice(member.Id, eventArgs.Value)">
+                                            <option value="@VoteChoice.Yes">Yes</option>
+                                            <option value="@VoteChoice.No">No</option>
+                                            <option value="@VoteChoice.Abstain">Abstain</option>
+                                        </select>
+                                    </td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => SaveMemberVoteAsync(member.Id)">
+                                            @(currentChoice is null ? "Save" : "Update")
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 vote-table">
+                        <thead>
+                            <tr>
+                                <th>Member name</th>
+                                <th>Vote</th>
+                                <th>Voted at</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var response in vote.Responses.OrderBy(response => response.Member.FullName))
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-600">@response.Member.FullName</div>
+                                    </td>
+                                    <td>
+                                        <StatusBadge Text="@response.Choice.ToString()" Type="@GetChoiceBadgeType(response.Choice)" />
+                                    </td>
+                                    <td>@response.VotedAt.ToString("dd MMM yyyy HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <ConfirmationModal
+        IsVisible="@showCloseVoteModal"
+        Title="Close vote?"
+        Message="This will close voting and calculate the final result."
+        ConfirmButtonText="Close Vote"
+        CancelButtonText="Cancel"
+        ModalType="warning"
+        OnConfirm="@ConfirmCloseVoteAsync"
+        OnCancel="@HideCloseVoteModal" />
+}
+
+<style>
+    .fw-600 { font-weight: 600; }
+    .detail-mini-label,
+    .summary-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--sk-text-muted);
+        font-weight: 600;
+        margin-bottom: .15rem;
+    }
+    .summary-value {
+        color: var(--sk-text);
+        font-size: 1.75rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .summary-card {
+        border-left: 4px solid var(--sk-green-700);
+    }
+    .vote-toolbar {
+        align-items: center;
+        background: var(--sk-card);
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+    }
+    .vote-table th {
+        color: var(--sk-text-muted);
+        font-size: .75rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .vote-table td,
+    .vote-table th {
+        padding: 1rem;
+    }
+    .vote-choice-select {
+        min-width: 8rem;
+    }
+    @@media (max-width: 768px) {
+        .vote-toolbar {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .vote-toolbar .ms-auto {
+            margin-left: 0 !important;
+        }
+    }
+</style>
+
+@code {
+    private MeetingVote? vote;
+    private List<Member> members = [];
+    private Dictionary<Guid, VoteChoice> selectedChoices = [];
+    private (int Yes, int No, int Abstain) voteSummary;
+    private bool isLoading = true;
+    private bool showCloseVoteModal;
+    private string? successMessage;
+    private string? errorMessage;
+
+    [Parameter]
+    public Guid VoteId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVoteAsync();
+    }
+
+    private async Task LoadVoteAsync()
+    {
+        isLoading = true;
+        successMessage = null;
+        errorMessage = null;
+
+        vote = await VotingService.GetVoteByIdAsync(VoteId);
+        voteSummary = await VotingService.GetVoteSummaryAsync(VoteId);
+        members = [];
+        selectedChoices = [];
+
+        if (vote is not null)
+        {
+            var meeting = await MeetingService.GetMeetingByIdAsync(vote.MeetingId);
+            var tenantId = meeting?.TenantId ?? vote.Meeting.TenantId;
+            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(tenantId);
+
+            if (stokvel is not null)
+            {
+                members = await MemberService.GetMembersByStokvelIdAsync(stokvel.Id);
+            }
+
+            foreach (var member in members)
+            {
+                selectedChoices[member.Id] = GetCurrentChoice(member.Id) ?? VoteChoice.Abstain;
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SaveMemberVoteAsync(Guid memberId)
+    {
+        if (vote is null)
+        {
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+
+        var response = await VotingService.CastVoteAsync(
+            VoteId,
+            memberId,
+            GetSelectedChoice(memberId));
+
+        if (response is null)
+        {
+            errorMessage = "Vote could not be saved.";
+            return;
+        }
+
+        vote = await VotingService.GetVoteByIdAsync(VoteId);
+        voteSummary = await VotingService.GetVoteSummaryAsync(VoteId);
+
+        if (vote is not null)
+        {
+            selectedChoices[memberId] = GetCurrentChoice(memberId) ?? selectedChoices[memberId];
+        }
+
+        successMessage = "Vote saved.";
+    }
+
+    private void ShowCloseVoteModal()
+    {
+        showCloseVoteModal = true;
+    }
+
+    private void HideCloseVoteModal()
+    {
+        showCloseVoteModal = false;
+    }
+
+    private async Task ConfirmCloseVoteAsync()
+    {
+        showCloseVoteModal = false;
+        successMessage = null;
+        errorMessage = null;
+
+        var closedVote = await VotingService.CloseVoteAsync(VoteId);
+
+        if (closedVote is null)
+        {
+            errorMessage = "Vote could not be closed.";
+            return;
+        }
+
+        vote = await VotingService.GetVoteByIdAsync(VoteId);
+        voteSummary = await VotingService.GetVoteSummaryAsync(VoteId);
+        successMessage = "Vote closed.";
+    }
+
+    private VoteChoice? GetCurrentChoice(Guid memberId)
+    {
+        return vote?.Responses
+            .SingleOrDefault(response => response.MemberId == memberId)
+            ?.Choice;
+    }
+
+    private VoteChoice GetSelectedChoice(Guid memberId)
+    {
+        return selectedChoices.TryGetValue(memberId, out var choice)
+            ? choice
+            : VoteChoice.Abstain;
+    }
+
+    private void UpdateSelectedChoice(Guid memberId, object? value)
+    {
+        if (Enum.TryParse<VoteChoice>(value?.ToString(), out var choice))
+        {
+            selectedChoices[memberId] = choice;
+        }
+    }
+
+    private static string DisplayOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string FormatVotingMethod(VotingMethod votingMethod) =>
+        votingMethod switch
+        {
+            VotingMethod.SimpleMajority => "Simple majority",
+            VotingMethod.TwoThirdsMajority => "Two-thirds majority",
+            VotingMethod.Unanimous => "Unanimous",
+            _ => votingMethod.ToString()
+        };
+
+    private static string GetVoteStatusBadgeType(VoteStatus status) =>
+        status switch
+        {
+            VoteStatus.Open => "success",
+            VoteStatus.Closed => "secondary",
+            VoteStatus.Cancelled => "danger",
+            _ => "secondary"
+        };
+
+    private static string GetVoteResultBadgeType(VoteResult result) =>
+        result switch
+        {
+            VoteResult.Passed => "success",
+            VoteResult.Failed => "danger",
+            VoteResult.Cancelled => "secondary",
+            VoteResult.Pending => "warning",
+            _ => "secondary"
+        };
+
+    private static string GetChoiceBadgeType(VoteChoice choice) =>
+        choice switch
+        {
+            VoteChoice.Yes => "success",
+            VoteChoice.No => "danger",
+            VoteChoice.Abstain => "secondary",
+            _ => "secondary"
+        };
+}

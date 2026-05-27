@@ -32,9 +32,9 @@ else
         BackText="Back to Meetings"
         BackHref="@($"/meetings/{StokvelId}")" />
 
-    @if (saveFailed)
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
-        <AlertBanner Type="danger" Title="Unable to create meeting." Message="Please check the meeting details and try again." Icon="bi bi-x-circle-fill" />
+        <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
     }
 
     <div class="form-page form-page-sm">
@@ -84,7 +84,7 @@ else
     private Stokvel? stokvel;
     private CreateMeetingModel model = new();
     private bool isLoading = true;
-    private bool saveFailed;
+    private string? errorMessage;
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -103,7 +103,13 @@ else
 
     private async Task HandleValidSubmit()
     {
-        saveFailed = false;
+        errorMessage = null;
+
+        if (await MeetingService.HasMeetingOnDateAsync(StokvelId, model.MeetingDate))
+        {
+            errorMessage = "A meeting already exists for this stokvel on this date. Please choose another date.";
+            return;
+        }
 
         var meeting = await MeetingService.CreateMeetingAsync(
             StokvelId,
@@ -114,7 +120,7 @@ else
 
         if (meeting is null)
         {
-            saveFailed = true;
+            errorMessage = "Meeting could not be created. Please check the date and try again.";
             return;
         }
 
