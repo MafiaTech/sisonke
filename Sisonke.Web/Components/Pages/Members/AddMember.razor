@@ -14,10 +14,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading...
+        Loading…
     </div>
 }
 else if (stokvel is null)
@@ -39,10 +39,8 @@ else
 
     @if (!canAddMember)
     {
-        <div class="member-limit-warning" role="alert">
-            <div class="mlw-icon" aria-hidden="true">
-                <i class="bi bi-shield-exclamation"></i>
-            </div>
+        <div class="member-limit-warning">
+            <div class="mlw-icon"><i class="bi bi-shield-exclamation"></i></div>
             <div class="mlw-content">
                 <h2 class="mlw-title">Member Limit Reached</h2>
                 @if (!string.IsNullOrWhiteSpace(memberLimitMessage))
@@ -51,7 +49,7 @@ else
                 }
                 <p class="mlw-hint">Upgrade your subscription package to add more members to this stokvel.</p>
                 <div class="mlw-actions">
-                    <a class="btn btn-warning btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
+                    <a class="btn btn-accent btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
                         <i class="bi bi-arrow-up-circle me-2"></i>View Subscription Package
                     </a>
                     <a class="btn btn-outline-secondary btn-sm" href="@($"/members/{StokvelId}")">
@@ -67,38 +65,48 @@ else
     }
 
     <div class="form-page @(!canAddMember ? "form-faded" : "")">
-        <div class="card">
-            <div class="card-body p-4">
-                <EditForm FormName="AddMemberForm" Model="@newMember" OnValidSubmit="@HandleValidSubmit">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary class="alert alert-danger" />
+        <EditForm FormName="AddMemberForm" Model="@newMember" OnValidSubmit="@HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="alert alert-danger" />
 
+            <!-- Personal details -->
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <div class="form-section-title">Personal Details</div>
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
-                            <label class="form-label" for="full-name">Full name</label>
-                            <InputText id="full-name" class="form-control" @bind-Value="newMember.FullName" />
+                            <label class="form-label" for="full-name">Full name <span class="text-danger">*</span></label>
+                            <InputText id="full-name" class="form-control" placeholder="e.g. Thabo Nkosi" @bind-Value="newMember.FullName" />
                         </div>
 
                         <div class="col-12 col-md-6">
-                            <label class="form-label" for="cellphone-number">Cellphone number</label>
-                            <InputText id="cellphone-number" class="form-control" @bind-Value="newMember.CellphoneNumber" />
+                            <label class="form-label" for="cellphone-number">Cellphone number <span class="text-danger">*</span></label>
+                            <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="newMember.CellphoneNumber" />
                         </div>
 
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="email-address">Email address</label>
-                            <InputText id="email-address" class="form-control" @bind-Value="newMember.EmailAddress" />
+                            <InputText id="email-address" class="form-control" type="email" placeholder="optional" @bind-Value="newMember.EmailAddress" />
                         </div>
 
                         <div class="col-12 col-md-6">
-                            <label class="form-label" for="id-number">ID number</label>
-                            <InputText id="id-number" class="form-control" @bind-Value="newMember.IdNumber" />
+                            <label class="form-label" for="id-number">SA ID number</label>
+                            <InputText id="id-number" class="form-control" placeholder="13-digit SA ID" @bind-Value="newMember.IdNumber" />
                         </div>
 
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="residential-area">Residential area</label>
-                            <InputText id="residential-area" class="form-control" @bind-Value="newMember.ResidentialArea" />
+                            <InputText id="residential-area" class="form-control" placeholder="e.g. Soweto, Gauteng" @bind-Value="newMember.ResidentialArea" />
                         </div>
+                    </div>
+                </div>
+            </div>
 
+            <!-- Membership details -->
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <div class="form-section-title">Membership Details</div>
+                    <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="joining-date">Joining date</label>
                             <InputDate id="joining-date" class="form-control" @bind-Value="newMember.JoiningDate" />
@@ -115,7 +123,7 @@ else
                         </div>
 
                         <div class="col-12 col-md-6">
-                            <label class="form-label" for="status">Status</label>
+                            <label class="form-label" for="status">Member status</label>
                             <InputSelect id="status" class="form-select" @bind-Value="newMember.Status">
                                 @foreach (var status in Enum.GetValues<MemberStatus>())
                                 {
@@ -123,34 +131,50 @@ else
                                 }
                             </InputSelect>
                         </div>
-
-                        <div class="col-12">
-                            <div class="form-check">
-                                <InputCheckbox id="cooling-period" class="form-check-input" @bind-Value="newMember.IsInCoolingPeriod" />
-                                <label class="form-check-label" for="cooling-period">Is in cooling period</label>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="cooling-period-end-date">Cooling period end date</label>
-                            <InputDate id="cooling-period-end-date" class="form-control" @bind-Value="newMember.CoolingPeriodEndDate" />
-                        </div>
                     </div>
-
-                    <div class="mt-4 d-flex gap-2">
-                        @if (canAddMember)
-                        {
-                            <button class="btn btn-primary" type="submit">
-                                <i class="bi bi-person-check me-2"></i>Save Member
-                            </button>
-                        }
-                        <a class="btn btn-outline-secondary" href="@($"/members/{StokvelId}")">Cancel</a>
-                    </div>
-                </EditForm>
+                </div>
             </div>
-        </div>
+
+            <!-- Cooling period -->
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <div class="form-section-title">Cooling Period</div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="cooling-period" class="form-check-input" @bind-Value="newMember.IsInCoolingPeriod" />
+                                <label class="form-check-label fw-600" for="cooling-period">Member is in a cooling period</label>
+                            </div>
+                            <div class="form-text">A cooling period temporarily restricts the member from receiving payouts.</div>
+                        </div>
+
+                        @if (newMember.IsInCoolingPeriod)
+                        {
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="cooling-period-end-date">Cooling period end date</label>
+                                <InputDate id="cooling-period-end-date" class="form-control" @bind-Value="newMember.CoolingPeriodEndDate" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                @if (canAddMember)
+                {
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-person-check me-2"></i>Save Member
+                    </button>
+                }
+                <a class="btn btn-outline-secondary" href="@($"/members/{StokvelId}")">Cancel</a>
+            </div>
+        </EditForm>
     </div>
 }
+
+<style>
+    .fw-600 { font-weight: 600; }
+</style>
 
 @code {
     private Stokvel? stokvel;
@@ -179,15 +203,8 @@ else
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
-
         var savedMember = await MemberService.AddMemberAsync(StokvelId, newMember);
-
-        if (savedMember is null)
-        {
-            saveFailed = true;
-            return;
-        }
-
+        if (savedMember is null) { saveFailed = true; return; }
         NavigationManager.NavigateTo($"/members/{StokvelId}");
     }
 }

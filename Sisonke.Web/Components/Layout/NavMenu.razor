@@ -1,15 +1,16 @@
 @implements IDisposable
-
 @inject NavigationManager NavigationManager
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">
-            <i class="bi bi-piggy-bank-fill brand-icon" aria-hidden="true"></i>
-            <span class="brand-text">
-                Sisonke
-                <small class="brand-tagline">Stokvel Management</small>
-            </span>
+<div class="top-row navbar navbar-dark ps-0">
+    <div class="container-fluid p-0">
+        <a class="brand-link" href="">
+            <div class="brand-icon-wrap">
+                <i class="bi bi-piggy-bank-fill" aria-hidden="true"></i>
+            </div>
+            <div class="brand-text">
+                <span class="brand-name">Sisonke</span>
+                <span class="brand-tagline">Stokvel Management</span>
+            </div>
         </a>
     </div>
 </div>
@@ -19,54 +20,61 @@
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
 
-        <div class="nav-item px-3">
+        <div class="nav-item px-0">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <i class="bi bi-house-fill nav-icon" aria-hidden="true"></i> Home
+                <i class="bi bi-house-fill nav-icon" aria-hidden="true"></i>
+                <span>Home</span>
             </NavLink>
         </div>
 
         <div class="nav-section-label">Stokvels</div>
 
-        <div class="nav-item px-3">
+        <div class="nav-item px-0">
             <NavLink class="nav-link" href="my-stokvels">
-                <i class="bi bi-grid-fill nav-icon" aria-hidden="true"></i> My Stokvels
+                <i class="bi bi-grid-fill nav-icon" aria-hidden="true"></i>
+                <span>My Stokvels</span>
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
+        <div class="nav-item px-0">
             <NavLink class="nav-link" href="register-stokvel">
-                <i class="bi bi-plus-circle-fill nav-icon" aria-hidden="true"></i> Register Stokvel
+                <i class="bi bi-plus-circle-fill nav-icon" aria-hidden="true"></i>
+                <span>Register Stokvel</span>
             </NavLink>
         </div>
 
         <AuthorizeView>
             <Authorized>
                 <div class="nav-section-label">Account</div>
-                <div class="nav-item px-3">
+                <div class="nav-item px-0">
                     <NavLink class="nav-link" href="Account/Manage">
-                        <i class="bi bi-person-circle nav-icon" aria-hidden="true"></i> @context.User.Identity?.Name
+                        <i class="bi bi-person-circle nav-icon" aria-hidden="true"></i>
+                        <span>@context.User.Identity?.Name</span>
                     </NavLink>
                 </div>
-                <div class="nav-item px-3">
+                <div class="nav-item px-0">
                     <form action="Account/Logout" method="post">
                         <AntiforgeryToken />
                         <input type="hidden" name="ReturnUrl" value="@currentUrl" />
                         <button type="submit" class="nav-link">
-                            <i class="bi bi-box-arrow-left nav-icon" aria-hidden="true"></i> Sign Out
+                            <i class="bi bi-box-arrow-left nav-icon" aria-hidden="true"></i>
+                            <span>Sign Out</span>
                         </button>
                     </form>
                 </div>
             </Authorized>
             <NotAuthorized>
                 <div class="nav-section-label">Account</div>
-                <div class="nav-item px-3">
+                <div class="nav-item px-0">
                     <NavLink class="nav-link" href="Account/Register">
-                        <i class="bi bi-person-plus-fill nav-icon" aria-hidden="true"></i> Register
+                        <i class="bi bi-person-plus-fill nav-icon" aria-hidden="true"></i>
+                        <span>Register</span>
                     </NavLink>
                 </div>
-                <div class="nav-item px-3">
+                <div class="nav-item px-0">
                     <NavLink class="nav-link" href="Account/Login">
-                        <i class="bi bi-box-arrow-in-right nav-icon" aria-hidden="true"></i> Sign In
+                        <i class="bi bi-box-arrow-in-right nav-icon" aria-hidden="true"></i>
+                        <span>Sign In</span>
                     </NavLink>
                 </div>
             </NotAuthorized>

@@ -14,25 +14,24 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading dashboard...
+        Loading dashboard…
     </div>
 }
 else if (stokvel is null)
 {
     <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
-    <a class="back-nav" href="/my-stokvels">
-        <i class="bi bi-chevron-left"></i> Back to My Stokvels
-    </a>
+    <a class="back-nav" href="/my-stokvels"><i class="bi bi-chevron-left"></i>Back to My Stokvels</a>
 }
 else
 {
+    <!-- ── Page header ── -->
     <div class="page-header">
         <div class="page-header-text">
             <h1>@stokvel.Name</h1>
-            <p class="page-subtitle">
+            <p class="page-subtitle d-flex align-items-center gap-2 flex-wrap">
                 <StatusBadge Text="@stokvel.Type.ToString()" Type="secondary" />
                 @if (stokvel.IsActive)
                 {
@@ -42,134 +41,327 @@ else
                 {
                     <StatusBadge Text="Inactive" Type="secondary" />
                 }
+                @if (activeSubscription is not null)
+                {
+                    <span class="text-muted small">· @activeSubscription.SubscriptionPlan.Name</span>
+                }
             </p>
         </div>
         <a class="btn btn-outline-secondary btn-sm" href="/my-stokvels">
-            <i class="bi bi-chevron-left me-1"></i>My Stokvels
+            <i class="bi bi-grid me-1"></i>My Stokvels
         </a>
     </div>
 
     @if (!stokvel.IsSetupComplete)
     {
-        <AlertBanner Type="warning" Title="Setup incomplete." Message="Complete the setup questionnaire before accessing the full dashboard." Icon="bi bi-exclamation-triangle-fill" />
-        <a class="btn btn-primary" href="@($"/stokvel-questionnaire/{StokvelId}")">
-            <i class="bi bi-clipboard-check me-2"></i>Complete Setup Questionnaire
-        </a>
+        <!-- ── Setup incomplete banner ── -->
+        <div class="setup-incomplete-banner mb-4">
+            <div class="sib-icon">
+                <i class="bi bi-clipboard2-check-fill"></i>
+            </div>
+            <div class="sib-body">
+                <div class="sib-title">Complete your stokvel setup</div>
+                <div class="sib-text">Finish the quick setup questionnaire so Sisonke can configure this stokvel for day-to-day management.</div>
+            </div>
+            <a class="btn btn-accent btn-sm" href="@($"/stokvel-questionnaire/{StokvelId}")">
+                <i class="bi bi-arrow-right me-1"></i>Complete Setup
+            </a>
+        </div>
     }
     else
     {
-        <div class="d-flex gap-2 flex-wrap mb-4">
-            <a class="btn btn-primary" href="@($"/members/{StokvelId}")">
-                <i class="bi bi-people-fill me-2"></i>Manage Members
-            </a>
-            <a class="btn btn-outline-primary" href="@($"/contribution-rules/{StokvelId}")">
-                <i class="bi bi-sliders me-2"></i>Contribution Rules
-            </a>
-        </div>
+        <!-- ══ KPI row ════════════════════════════════════════════ -->
+        <div class="row g-3 mb-3">
 
-        <div class="row g-3">
-            <div class="col-12 col-md-6 col-xl-3">
+            <!-- Members -->
+            <div class="col-6 col-lg-3">
                 <div class="card stat-card stat-members h-100">
                     <div class="card-body">
-                        <i class="bi bi-people-fill stat-icon" aria-hidden="true"></i>
+                        <div class="stat-icon-wrap">
+                            <i class="bi bi-people-fill" aria-hidden="true"></i>
+                        </div>
                         <div class="stat-label">Members</div>
                         <p class="stat-value">@memberCount</p>
                         @if (!string.IsNullOrWhiteSpace(memberLimitMessage))
                         {
-                            <p class="small text-muted mb-2">@memberLimitMessage</p>
+                            <p class="stat-detail">@memberLimitMessage</p>
                         }
-                        @if (activeSubscription?.SubscriptionPlan.MaxMembers is int maxMembers)
+                        @if (activeSubscription?.SubscriptionPlan.MaxMembers is int maxM)
                         {
-                            <div class="progress" role="progressbar" aria-label="Member limit progress" aria-valuenow="@GetMemberLimitProgress(maxMembers)" aria-valuemin="0" aria-valuemax="100">
-                                <div class="progress-bar" style="@($"width: {GetMemberLimitProgress(maxMembers)}%")"></div>
+                            <div class="progress mt-2" role="progressbar" aria-label="Member limit" aria-valuenow="@GetMemberLimitProgress(maxM)" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar" style="width:@(GetMemberLimitProgress(maxM))%"></div>
                             </div>
                         }
                     </div>
                 </div>
             </div>
 
-            <div class="col-12 col-md-6 col-xl-3">
+            <!-- Monthly contributions -->
+            <div class="col-6 col-lg-3">
                 <div class="card stat-card stat-contributions h-100">
                     <div class="card-body">
-                        <i class="bi bi-cash-coin stat-icon" aria-hidden="true"></i>
+                        <div class="stat-icon-wrap">
+                            <i class="bi bi-cash-coin" aria-hidden="true"></i>
+                        </div>
                         <div class="stat-label">Monthly Contributions</div>
-                        <p class="stat-value">@expectedMonthlyContributions.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</p>
+                        <p class="stat-value">@FormatZAR(expectedMonthlyContributions)</p>
+                        <p class="stat-detail">Expected per cycle</p>
                     </div>
                 </div>
             </div>
 
-            <div class="col-12 col-md-6 col-xl-3">
+            <!-- Outstanding fines -->
+            <div class="col-6 col-lg-3">
                 <div class="card stat-card stat-fines h-100">
                     <div class="card-body">
-                        <i class="bi bi-exclamation-circle-fill stat-icon" aria-hidden="true"></i>
+                        <div class="stat-icon-wrap">
+                            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+                        </div>
                         <div class="stat-label">Outstanding Fines</div>
-                        <p class="stat-value">@outstandingFinesTotal.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</p>
+                        <p class="stat-value @(outstandingFinesTotal > 0 ? "text-danger" : "")">@FormatZAR(outstandingFinesTotal)</p>
+                        <p class="stat-detail">Total unpaid</p>
                     </div>
                 </div>
             </div>
 
-            <div class="col-12 col-md-6 col-xl-3">
-                <div class="card stat-card stat-meetings h-100">
+            <!-- Constitution -->
+            <div class="col-6 col-lg-3">
+                <div class="card stat-card stat-constitution h-100">
                     <div class="card-body">
-                        <i class="bi bi-calendar-event-fill stat-icon" aria-hidden="true"></i>
-                        <div class="stat-label">Upcoming Meetings</div>
-                        <p class="stat-value">0</p>
+                        <div class="stat-icon-wrap">
+                            <i class="bi bi-file-earmark-text-fill" aria-hidden="true"></i>
+                        </div>
+                        <div class="stat-label">Constitution</div>
+                        <div class="mt-1">
+                            <StatusBadge Text="@constitutionStatus" Type="@GetConstitutionStatusBadgeType(constitutionStatus)" />
+                        </div>
+                        <p class="stat-detail mt-1">
+                            @(constitutionStatus == "Approved" ? "Document approved" : constitutionStatus == "Draft" ? "Draft in progress" : "Not yet created")
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="row g-3 mt-1">
+        <!-- ══ Action row ═════════════════════════════════════════ -->
+        <div class="row g-3 mb-3">
+            <div class="col-12">
+                <div class="dashboard-action-bar">
+                    <a class="btn btn-primary btn-sm" href="@($"/members/{StokvelId}")">
+                        <i class="bi bi-people-fill me-2"></i>Manage Members
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm" href="@($"/contribution-rules/{StokvelId}")">
+                        <i class="bi bi-sliders me-2"></i>Contribution Rules
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm" href="@($"/constitution-builder/{StokvelId}")">
+                        <i class="bi bi-file-earmark-text me-2"></i>@GetConstitutionButtonText(constitutionStatus)
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ Main content row ═══════════════════════════════════ -->
+        <div class="row g-3">
+
+            <!-- Subscription package -->
             <div class="col-12 col-lg-6">
                 <div class="card h-100">
-                    <div class="card-body">
-                        <h2 class="h5 card-title">Subscription Package</h2>
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <div class="dash-card-icon-sm" style="background:#FEF3C7;color:#D97706">
+                                <i class="bi bi-patch-check-fill"></i>
+                            </div>
+                            <h2 class="h6 mb-0 fw-700">Subscription Package</h2>
+                        </div>
                         @if (activeSubscription is null)
                         {
-                            <p class="card-text mb-0 text-muted">No active subscription found.</p>
+                            <p class="text-muted small mb-0">No active subscription found.</p>
                         }
                         else
                         {
-                            <dl class="row mb-0">
-                                <dt class="col-sm-5">Package name</dt>
-                                <dd class="col-sm-7">@activeSubscription.SubscriptionPlan.Name</dd>
-
-                                <dt class="col-sm-5">Monthly price</dt>
-                                <dd class="col-sm-7">@activeSubscription.SubscriptionPlan.MonthlyPrice.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</dd>
-
-                                <dt class="col-sm-5">Member range</dt>
-                                <dd class="col-sm-7">@GetMemberRangeText(activeSubscription.SubscriptionPlan)</dd>
-
-                                <dt class="col-sm-5">Status</dt>
-                                <dd class="col-sm-7">@activeSubscription.Status</dd>
-                            </dl>
+                            <div class="sub-plan-display">
+                                <div class="sub-plan-name">@activeSubscription.SubscriptionPlan.Name</div>
+                                <StatusBadge Text="@activeSubscription.Status.ToString()" Type="success" />
+                            </div>
+                            <div class="row g-0 mt-3">
+                                <div class="col-6">
+                                    <div class="detail-mini-label">Monthly</div>
+                                    <div class="detail-mini-value">@FormatZAR(activeSubscription.SubscriptionPlan.MonthlyPrice)</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="detail-mini-label">Member Range</div>
+                                    <div class="detail-mini-value">@GetMemberRangeText(activeSubscription.SubscriptionPlan)</div>
+                                </div>
+                            </div>
                         }
                     </div>
                 </div>
             </div>
 
+            <!-- Constitution card -->
             <div class="col-12 col-lg-6">
                 <div class="card h-100">
-                    <div class="card-body">
-                        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
-                            <div>
-                                <h2 class="h5 card-title">Constitution</h2>
-                                <p class="card-text mb-0">
-                                    <strong>Status:</strong>
-                                    <StatusBadge Text="@constitutionStatus" Type="@GetConstitutionStatusBadgeType(constitutionStatus)" />
-                                </p>
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
+                                <i class="bi bi-file-earmark-ruled-fill"></i>
                             </div>
-                            <div class="d-flex flex-wrap gap-2 align-items-start">
-                                <a class="btn btn-primary" href="@($"/constitution-builder/{StokvelId}")">@GetConstitutionButtonText(constitutionStatus)</a>
-                                <a class="btn btn-outline-primary disabled" aria-disabled="true" href="#">Upload Existing Constitution</a>
-                            </div>
+                            <h2 class="h6 mb-0 fw-700">Constitution</h2>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <span class="text-muted small">Status:</span>
+                            <StatusBadge Text="@constitutionStatus" Type="@GetConstitutionStatusBadgeType(constitutionStatus)" />
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a class="btn btn-primary btn-sm" href="@($"/constitution-builder/{StokvelId}")">
+                                <i class="bi bi-pencil-square me-1"></i>@GetConstitutionButtonText(constitutionStatus)
+                            </a>
+                            <a class="btn btn-outline-secondary btn-sm disabled" aria-disabled="true">
+                                <i class="bi bi-upload me-1"></i>Upload Existing
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Coming soon: Group Balance / Wallet -->
+            <div class="col-12 col-lg-4">
+                <div class="card h-100 card-coming-soon">
+                    <span class="coming-soon-badge">Coming Soon</span>
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <div class="dash-card-icon-sm" style="background:#F0FDF4;color:#10B981">
+                                <i class="bi bi-wallet2"></i>
+                            </div>
+                            <h2 class="h6 mb-0 fw-700">Wallet &amp; Transactions</h2>
+                        </div>
+                        <p class="stat-value-lg">R 0.00</p>
+                        <p class="stat-detail">Group balance</p>
+                        <div class="mt-3">
+                            <div class="cs-row"><span>Last deposit</span><span>—</span></div>
+                            <div class="cs-row"><span>Last payout</span><span>—</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coming soon: Meetings -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 card-coming-soon">
+                    <span class="coming-soon-badge">Coming Soon</span>
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <div class="dash-card-icon-sm" style="background:#F3F0FF;color:#8B5CF6">
+                                <i class="bi bi-calendar-event-fill"></i>
+                            </div>
+                            <h2 class="h6 mb-0 fw-700">Meetings &amp; Agenda</h2>
+                        </div>
+                        <p class="stat-value">0</p>
+                        <p class="stat-detail">Upcoming meetings</p>
+                        <p class="text-muted small mt-3 mb-0">Schedule and manage stokvel meetings, set agendas and capture minutes.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coming soon: Voting -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 card-coming-soon">
+                    <span class="coming-soon-badge">Coming Soon</span>
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <div class="dash-card-icon-sm" style="background:#FFF7ED;color:#F97316">
+                                <i class="bi bi-check2-square"></i>
+                            </div>
+                            <h2 class="h6 mb-0 fw-700">Voting &amp; Decisions</h2>
+                        </div>
+                        <p class="stat-value">0</p>
+                        <p class="stat-detail">Open polls</p>
+                        <p class="text-muted small mt-3 mb-0">Create polls, record member votes and log stokvel decisions democratically.</p>
+                    </div>
+                </div>
+            </div>
+
         </div>
     }
 }
+
+<style>
+    .setup-incomplete-banner {
+        background: linear-gradient(135deg, var(--sk-green-800), var(--sk-green-700));
+        border-radius: var(--sk-radius);
+        padding: 1.5rem 1.75rem;
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        flex-wrap: wrap;
+        color: #fff;
+        box-shadow: var(--sk-shadow);
+    }
+    .sib-icon { font-size: 2rem; opacity: .85; flex-shrink: 0; }
+    .sib-body { flex: 1; min-width: 0; }
+    .sib-title { font-size: 1rem; font-weight: 700; margin-bottom: .25rem; }
+    .sib-text  { font-size: .875rem; opacity: .8; margin: 0; }
+
+    .dashboard-action-bar {
+        display: flex;
+        gap: .625rem;
+        flex-wrap: wrap;
+        background: var(--sk-card);
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        padding: .875rem 1.25rem;
+    }
+
+    .dash-card-icon-sm {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .875rem;
+        flex-shrink: 0;
+    }
+
+    .sub-plan-display {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+    }
+    .sub-plan-name {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--sk-text);
+    }
+    .detail-mini-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--sk-text-muted);
+        font-weight: 600;
+        margin-bottom: .15rem;
+    }
+    .detail-mini-value {
+        font-size: .9375rem;
+        font-weight: 600;
+        color: var(--sk-text);
+    }
+    .stat-value-lg {
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: -.02em;
+        color: var(--sk-text);
+        margin: 0;
+    }
+    .cs-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: .8125rem;
+        color: var(--sk-text-muted);
+        padding: .25rem 0;
+        border-top: 1px solid var(--sk-border);
+    }
+</style>
 
 @code {
     private Stokvel? stokvel;
@@ -196,11 +388,7 @@ else
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
 
-        if (stokvel is null)
-        {
-            isLoading = false;
-            return;
-        }
+        if (stokvel is null) { isLoading = false; return; }
 
         activeSubscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(StokvelId);
         memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
@@ -211,40 +399,20 @@ else
         isLoading = false;
     }
 
-    private static string GetMemberRangeText(SubscriptionPlan plan)
-    {
-        return plan.MaxMembers is null
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string GetMemberRangeText(SubscriptionPlan plan) =>
+        plan.MaxMembers is null
             ? $"{plan.MinMembers}+ members"
-            : $"{plan.MinMembers}-{plan.MaxMembers} members";
-    }
+            : $"{plan.MinMembers}–{plan.MaxMembers} members";
 
-    private int GetMemberLimitProgress(int maxMembers)
-    {
-        if (maxMembers <= 0)
-        {
-            return 0;
-        }
+    private int GetMemberLimitProgress(int maxMembers) =>
+        maxMembers <= 0 ? 0 : Math.Min(100, memberCount * 100 / maxMembers);
 
-        return Math.Min(100, memberCount * 100 / maxMembers);
-    }
+    private static string GetConstitutionButtonText(string status) =>
+        status switch { "Draft" => "Continue Constitution", "Approved" => "View Constitution", _ => "Create Constitution" };
 
-    private static string GetConstitutionButtonText(string status)
-    {
-        return status switch
-        {
-            "Draft" => "Continue Constitution",
-            "Approved" => "View Constitution",
-            _ => "Create Constitution"
-        };
-    }
-
-    private static string GetConstitutionStatusBadgeType(string status)
-    {
-        return status switch
-        {
-            "Draft" => "warning",
-            "Approved" => "success",
-            _ => "secondary"
-        };
-    }
+    private static string GetConstitutionStatusBadgeType(string status) =>
+        status switch { "Draft" => "warning", "Approved" => "success", _ => "secondary" };
 }

@@ -12,10 +12,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading...
+        Loading…
     </div>
 }
 else if (editNextOfKin is null)
@@ -35,19 +35,19 @@ else
         <AlertBanner Type="danger" Title="Unable to update next of kin record." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
-    <div class="form-page">
-        <div class="card">
-            <div class="card-body p-4">
-                <EditForm Model="@editNextOfKin" OnValidSubmit="@HandleValidSubmit" FormName="EditNextOfKinForm">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary class="alert alert-danger" />
+    <EditForm Model="@editNextOfKin" OnValidSubmit="@HandleValidSubmit" FormName="EditNextOfKinForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="alert alert-danger" />
 
+        <div class="form-page">
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <p class="form-section-title">Next of Kin Details</p>
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="full-name">Full name</label>
-                            <InputText id="full-name" class="form-control" @bind-Value="editNextOfKin.FullName" />
+                            <InputText id="full-name" class="form-control" placeholder="e.g. Sipho Nkosi" @bind-Value="editNextOfKin.FullName" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="relationship">Relationship</label>
                             <InputSelect id="relationship" class="form-select" @bind-Value="editNextOfKin.Relationship">
@@ -57,35 +57,33 @@ else
                                 }
                             </InputSelect>
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="cellphone-number">Cellphone number</label>
-                            <InputText id="cellphone-number" class="form-control" @bind-Value="editNextOfKin.CellphoneNumber" />
+                            <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="editNextOfKin.CellphoneNumber" />
                         </div>
-
                         <div class="col-12">
                             <label class="form-label" for="address">Address</label>
-                            <InputText id="address" class="form-control" @bind-Value="editNextOfKin.Address" />
+                            <InputText id="address" class="form-control" placeholder="e.g. 12 Main St, Soweto" @bind-Value="editNextOfKin.Address" />
                         </div>
-
                         <div class="col-12">
-                            <div class="form-check">
+                            <div class="form-check form-switch">
                                 <InputCheckbox id="is-primary" class="form-check-input" @bind-Value="editNextOfKin.IsPrimary" />
-                                <label class="form-check-label" for="is-primary">Primary next of kin</label>
+                                <label class="form-check-label fw-semibold" for="is-primary">Primary next of kin</label>
                             </div>
+                            <div class="form-text">The primary next of kin is the first contact in case of an emergency.</div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div class="mt-4 d-flex gap-2">
-                        <button class="btn btn-primary" type="submit">
-                            <i class="bi bi-floppy me-2"></i>Save Changes
-                        </button>
-                        <a class="btn btn-outline-secondary" href="@($"/member-profile/{editNextOfKin.MemberId}")">Cancel</a>
-                    </div>
-                </EditForm>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-floppy me-2"></i>Save Changes
+                </button>
+                <a class="btn btn-outline-secondary" href="@($"/member-profile/{editNextOfKin.MemberId}")">Cancel</a>
             </div>
         </div>
-    </div>
+    </EditForm>
 }
 
 @code {

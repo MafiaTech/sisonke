@@ -13,10 +13,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading constitution builder...
+        Loading constitution builder…
     </div>
 }
 else if (stokvel is null)
@@ -27,29 +27,39 @@ else
 {
     <PageHeader
         Title="Constitution Builder"
-        Subtitle="Create, review and approve a constitution for this stokvel."
+        Subtitle="Create, review and approve a governance constitution for this stokvel."
         BackText="Back to Dashboard"
         BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
-                <div>
-                    <h2 class="h5 mb-1">@stokvel.Name</h2>
-                    <p class="text-muted mb-0">@stokvel.Type</p>
-                </div>
-                <div>
-                    <div class="small text-muted mb-1">Constitution status</div>
-                    <StatusBadge Text="@constitutionStatus" Type="@GetStatusBadgeType(constitutionStatus)" />
-                </div>
-            </div>
+    <!-- ── Status bar ── -->
+    <div class="constitution-status-bar mb-4">
+        <div>
+            <div class="detail-mini-label">Stokvel</div>
+            <div class="fw-600">@stokvel.Name</div>
         </div>
+        <div>
+            <div class="detail-mini-label">Type</div>
+            <div class="text-muted small">@stokvel.Type</div>
+        </div>
+        <div>
+            <div class="detail-mini-label">Document status</div>
+            <StatusBadge Text="@constitutionStatus" Type="@GetStatusBadgeType(constitutionStatus)" />
+        </div>
+        @if (IsApproved)
+        {
+            <div class="ms-auto">
+                <span class="badge" style="background:var(--sk-success-bg);color:#065f46;border:1px solid #6ee7b7;font-size:.75rem;padding:.4rem .8rem">
+                    <i class="bi bi-shield-check me-1"></i>Approved & locked
+                </span>
+            </div>
+        }
     </div>
 
+    <!-- Feedback banners -->
     <AlertBanner
         Type="info"
         Title="Review before approval"
-        Message="This constitution is generated from the stokvel profile and quick setup answers. Please review it before approval."
+        Message="This constitution is generated from your stokvel profile and setup answers. Review every section carefully before approving."
         Icon="bi bi-info-circle-fill" />
 
     @if (!string.IsNullOrWhiteSpace(successMessage))
@@ -64,43 +74,51 @@ else
 
     @if (previewGenerationFailed)
     {
-        <div class="alert alert-danger" role="alert">
-            Could not generate constitution preview.
-        </div>
+        <AlertBanner Type="danger" Title="Could not generate constitution preview." Message="Ensure the stokvel setup questionnaire is complete." Icon="bi bi-x-circle-fill" />
     }
 
-    @if (IsApproved)
-    {
-        <AlertBanner Type="success" Title="This constitution has been approved." Message="" Icon="bi bi-check-circle-fill" />
-    }
+    <!-- ── Toolbar ── -->
+    <div class="constitution-toolbar">
+        <span class="small fw-600 me-1" style="color:var(--sk-green-800)">
+            <i class="bi bi-file-earmark-text me-1"></i>Document actions
+        </span>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="SaveDraftAsync">
+            <i class="bi bi-floppy me-2"></i>Save Draft
+        </button>
+        @if (!IsApproved)
+        {
+            <button type="button" class="btn btn-success btn-sm" @onclick="ShowApprovalConfirmation" disabled="@previewGenerationFailed">
+                <i class="bi bi-check-circle me-2"></i>Approve Constitution
+            </button>
+        }
+        <a class="btn btn-outline-secondary btn-sm ms-auto" href="@($"/stokvel-dashboard/{StokvelId}")">
+            <i class="bi bi-arrow-left me-1"></i>Dashboard
+        </a>
+    </div>
 
+    <!-- ── Document preview ── -->
     <div class="card mb-4">
-        <div class="card-body p-4">
+        <div class="card-body p-4 p-md-5">
+            @if (IsApproved)
+            {
+                <div class="approved-watermark-banner mb-4">
+                    <i class="bi bi-shield-fill-check me-2"></i>
+                    This constitution has been approved and is binding on all members.
+                </div>
+            }
             <div class="constitution-preview">
                 @((MarkupString)(previewContent ?? string.Empty))
             </div>
         </div>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <button type="button" class="btn btn-primary" @onclick="SaveDraftAsync">
-            <i class="bi bi-floppy me-2"></i>Save Draft
-        </button>
-        @if (!IsApproved)
-        {
-            <button type="button" class="btn btn-success" @onclick="ShowApprovalConfirmation" disabled="@previewGenerationFailed">
-                <i class="bi bi-check-circle me-2"></i>Approve Constitution
-            </button>
-        }
-        <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
-    </div>
-
+    <!-- Confirmation modal -->
     @if (!IsApproved)
     {
         <ConfirmationModal
             IsVisible="@showApprovalConfirmation"
             Title="Approve Constitution"
-            Message="You are about to approve this constitution. Please confirm that the content has been reviewed and accepted by the stokvel."
+            Message="You are about to approve this constitution. Please confirm that all content has been reviewed and accepted by the stokvel members."
             ConfirmButtonText="Confirm Approval"
             CancelButtonText="Cancel"
             ModalType="warning"
@@ -108,6 +126,27 @@ else
             OnCancel="@CancelApproval" />
     }
 }
+
+<style>
+    .fw-600 { font-weight: 600; }
+    .detail-mini-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--sk-text-muted);
+        font-weight: 600;
+        margin-bottom: .15rem;
+    }
+    .approved-watermark-banner {
+        background: var(--sk-success-bg);
+        border: 1px solid #6ee7b7;
+        border-radius: var(--sk-radius-sm);
+        color: #065f46;
+        font-size: .875rem;
+        font-weight: 600;
+        padding: .75rem 1rem;
+    }
+</style>
 
 @code {
     private Stokvel? stokvel;
@@ -135,7 +174,6 @@ else
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
         await LoadConstitutionAsync();
-
         isLoading = false;
     }
 
@@ -152,27 +190,14 @@ else
 
         var savedConstitution = await ConstitutionService.SaveDraftAsync(StokvelId, previewContent);
 
-        if (savedConstitution is null)
-        {
-            errorMessage = "Constitution draft could not be saved.";
-            return;
-        }
+        if (savedConstitution is null) { errorMessage = "Constitution draft could not be saved."; return; }
 
         await LoadConstitutionAsync();
         successMessage = "Constitution draft saved successfully.";
     }
 
-    private void ShowApprovalConfirmation()
-    {
-        successMessage = null;
-        errorMessage = null;
-        showApprovalConfirmation = true;
-    }
-
-    private void CancelApproval()
-    {
-        showApprovalConfirmation = false;
-    }
+    private void ShowApprovalConfirmation() { successMessage = null; errorMessage = null; showApprovalConfirmation = true; }
+    private void CancelApproval() => showApprovalConfirmation = false;
 
     private async Task ConfirmApprovalAsync()
     {
@@ -182,11 +207,7 @@ else
 
         latestConstitution = await ConstitutionService.ApproveLatestAsync(StokvelId);
 
-        if (latestConstitution is null)
-        {
-            errorMessage = "Constitution could not be approved.";
-            return;
-        }
+        if (latestConstitution is null) { errorMessage = "Constitution could not be approved."; return; }
 
         await LoadConstitutionAsync();
         successMessage = "Constitution approved successfully.";
@@ -208,14 +229,6 @@ else
         previewGenerationFailed = string.IsNullOrWhiteSpace(previewContent);
     }
 
-    private static string GetStatusBadgeType(string status)
-    {
-        return status switch
-        {
-            "Approved" => "success",
-            "Draft" => "warning",
-            "Not Created" => "secondary",
-            _ => "info"
-        };
-    }
+    private static string GetStatusBadgeType(string status) =>
+        status switch { "Approved" => "success", "Draft" => "warning", "Not Created" => "secondary", _ => "info" };
 }

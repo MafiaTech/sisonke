@@ -7,7 +7,9 @@
       "Bash(xargs ls -la)",
       "Bash(grep -v \"\\\\.cs$\")",
       "Bash(xargs -I {} basename {})",
-      "Read(//c/Users/mpshe/.claude/projects/c--Users-mpshe-Projects-Sisonke/memory/**)"
+      "Read(//c/Users/mpshe/.claude/projects/c--Users-mpshe-Projects-Sisonke/memory/**)",
+      "Bash(Select-String -Pattern \"error CS\")",
+      "Bash(Select-Object -First 10)"
     ],
     "additionalDirectories": [
       "c:\\Users\\mpshe\\.claude\\projects\\c--Users-mpshe-Projects-Sisonke\\memory"

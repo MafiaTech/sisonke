@@ -1,7 +1,7 @@
 @if (!string.IsNullOrWhiteSpace(BackText) && !string.IsNullOrWhiteSpace(BackHref))
 {
     <a class="back-nav" href="@BackHref">
-        <i class="bi bi-chevron-left"></i> @BackText
+        <i class="bi bi-chevron-left"></i>@BackText
     </a>
 }
 
@@ -9,20 +9,13 @@
     <h1>@Title</h1>
     @if (!string.IsNullOrWhiteSpace(Subtitle))
     {
-        <p class="text-muted mb-0">@Subtitle</p>
+        <p class="page-subtitle mb-0">@Subtitle</p>
     }
 </div>
 
 @code {
-    [Parameter]
-    public string Title { get; set; } = string.Empty;
-
-    [Parameter]
-    public string? Subtitle { get; set; }
-
-    [Parameter]
-    public string? BackText { get; set; }
-
-    [Parameter]
-    public string? BackHref { get; set; }
+    [Parameter] public string  Title     { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle  { get; set; }
+    [Parameter] public string? BackText  { get; set; }
+    [Parameter] public string? BackHref  { get; set; }
 }

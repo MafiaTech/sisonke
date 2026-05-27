@@ -15,10 +15,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading fine form...
+        Loading fine form…
     </div>
 }
 else if (member is null)
@@ -44,16 +44,18 @@ else
     }
     else
     {
-        <div class="form-page">
+        <div class="form-page form-page-sm">
             <div class="card">
                 <div class="card-body p-4">
                     <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="AddFineForm">
                         <DataAnnotationsValidator />
                         <ValidationSummary class="alert alert-danger" />
 
+                        <div class="form-section-title">Fine Details</div>
+
                         <div class="row g-3">
-                            <div class="col-12 col-md-6">
-                                <label class="form-label" for="fine-type">Fine type</label>
+                            <div class="col-12">
+                                <label class="form-label" for="fine-type">Fine type <span class="text-danger">*</span></label>
                                 <InputSelect id="fine-type" class="form-select" @bind-Value="model.FineTypeId">
                                     <option value="@Guid.Empty">— Select fine type —</option>
                                     @foreach (var fineType in fineTypes)
@@ -64,8 +66,12 @@ else
                             </div>
 
                             <div class="col-12 col-md-6">
-                                <label class="form-label" for="amount">Amount (R)</label>
-                                <InputNumber id="amount" class="form-control" @bind-Value="model.Amount" />
+                                <label class="form-label" for="amount">Amount (R) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R</span>
+                                    <InputNumber id="amount" class="form-control" @bind-Value="model.Amount" />
+                                </div>
+                                <div class="form-text">Override the default fine amount if needed.</div>
                             </div>
 
                             <div class="col-12 col-md-6">
@@ -74,14 +80,14 @@ else
                             </div>
 
                             <div class="col-12">
-                                <label class="form-label" for="reason">Reason</label>
-                                <InputTextArea id="reason" class="form-control" rows="3" @bind-Value="model.Reason" />
+                                <label class="form-label" for="reason">Reason <span class="text-danger">*</span></label>
+                                <InputTextArea id="reason" class="form-control" rows="3" placeholder="Briefly describe the reason for this fine." @bind-Value="model.Reason" />
                             </div>
                         </div>
 
                         <div class="mt-4 d-flex gap-2">
                             <button class="btn btn-primary" type="submit">
-                                <i class="bi bi-check-lg me-2"></i>Save Fine
+                                <i class="bi bi-check-circle me-2"></i>Save Fine
                             </button>
                             <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
                         </div>
@@ -109,10 +115,15 @@ else
         if (member is not null)
         {
             var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
-
             if (stokvel is not null)
             {
                 fineTypes = await FineService.GetFineTypesByStokvelIdAsync(stokvel.Id);
+
+                if (fineTypes.Count == 0)
+                {
+                    await FineService.EnsureDefaultFineTypesForStokvelAsync(stokvel.Id);
+                    fineTypes = await FineService.GetFineTypesByStokvelIdAsync(stokvel.Id);
+                }
             }
         }
 
@@ -122,20 +133,8 @@ else
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
-
-        var savedFine = await FineService.AddMemberFineAsync(
-            MemberId,
-            model.FineTypeId,
-            model.Amount,
-            model.Reason,
-            model.FineDate);
-
-        if (savedFine is null)
-        {
-            saveFailed = true;
-            return;
-        }
-
+        var savedFine = await FineService.AddMemberFineAsync(MemberId, model.FineTypeId, model.Amount, model.Reason, model.FineDate);
+        if (savedFine is null) { saveFailed = true; return; }
         NavigationManager.NavigateTo($"/member-profile/{MemberId}");
     }
 
@@ -147,8 +146,7 @@ else
         [Range(0.01, 100000)]
         public decimal Amount { get; set; }
 
-        [Required]
-        [MaxLength(250)]
+        [Required][MaxLength(250)]
         public string Reason { get; set; } = string.Empty;
 
         public DateTime FineDate { get; set; } = DateTime.Today;

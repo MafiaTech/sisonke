@@ -4,7 +4,7 @@ using Sisonke.Web.Data.Entities;
 
 namespace Sisonke.Web.Services;
 
-public class QuestionnaireService(ApplicationDbContext context)
+public class QuestionnaireService(ApplicationDbContext context, FineService fineService)
 {
     public async Task<List<QuestionnaireSection>> GetActiveQuestionnaireAsync()
     {
@@ -152,6 +152,7 @@ public class QuestionnaireService(ApplicationDbContext context)
         stokvel.SetupCompletedAt = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
+        await fineService.EnsureDefaultFineTypesForStokvelAsync(stokvelId);
 
         return true;
     }

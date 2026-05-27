@@ -12,10 +12,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading...
+        Loading…
     </div>
 }
 else if (member is null)
@@ -42,37 +42,40 @@ else
                     <DataAnnotationsValidator />
                     <ValidationSummary class="alert alert-danger" />
 
+                    <div class="form-section-title">Next of Kin Details</div>
+
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
-                            <label class="form-label" for="full-name">Full name</label>
-                            <InputText id="full-name" class="form-control" @bind-Value="newNextOfKin.FullName" />
+                            <label class="form-label" for="full-name">Full name <span class="text-danger">*</span></label>
+                            <InputText id="full-name" class="form-control" placeholder="e.g. Zanele Nkosi" @bind-Value="newNextOfKin.FullName" />
                         </div>
 
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="relationship">Relationship</label>
                             <InputSelect id="relationship" class="form-select" @bind-Value="newNextOfKin.Relationship">
-                                @foreach (var relationship in relationshipOptions)
+                                @foreach (var rel in relationshipOptions)
                                 {
-                                    <option value="@relationship">@relationship</option>
+                                    <option value="@rel">@rel</option>
                                 }
                             </InputSelect>
                         </div>
 
                         <div class="col-12 col-md-6">
-                            <label class="form-label" for="cellphone-number">Cellphone number</label>
-                            <InputText id="cellphone-number" class="form-control" @bind-Value="newNextOfKin.CellphoneNumber" />
+                            <label class="form-label" for="cellphone-number">Cellphone number <span class="text-danger">*</span></label>
+                            <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="newNextOfKin.CellphoneNumber" />
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-12 col-md-6">
                             <label class="form-label" for="address">Address</label>
-                            <InputText id="address" class="form-control" @bind-Value="newNextOfKin.Address" />
+                            <InputText id="address" class="form-control" placeholder="Residential address" @bind-Value="newNextOfKin.Address" />
                         </div>
 
                         <div class="col-12">
-                            <div class="form-check">
+                            <div class="form-check form-switch">
                                 <InputCheckbox id="is-primary" class="form-check-input" @bind-Value="newNextOfKin.IsPrimary" />
-                                <label class="form-check-label" for="is-primary">Primary next of kin</label>
+                                <label class="form-check-label fw-600" for="is-primary">Primary next of kin</label>
                             </div>
+                            <div class="form-text">The primary contact will be notified first in case of an emergency or claim.</div>
                         </div>
                     </div>
 
@@ -88,26 +91,19 @@ else
     </div>
 }
 
+<style>
+    .fw-600 { font-weight: 600; }
+</style>
+
 @code {
     private static readonly string[] relationshipOptions =
     [
-        "Spouse",
-        "Child",
-        "Parent",
-        "Sibling",
-        "Grandparent",
-        "Grandchild",
-        "Aunt/Uncle",
-        "Cousin",
-        "Friend",
-        "Other"
+        "Spouse", "Child", "Parent", "Sibling", "Grandparent",
+        "Grandchild", "Aunt/Uncle", "Cousin", "Friend", "Other"
     ];
 
     private Member? member;
-    private NextOfKin newNextOfKin = new()
-    {
-        Relationship = "Spouse"
-    };
+    private NextOfKin newNextOfKin = new() { Relationship = "Spouse" };
     private bool isLoading = true;
     private bool saveFailed;
 
@@ -123,15 +119,8 @@ else
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
-
         var savedNextOfKin = await MemberService.AddNextOfKinAsync(MemberId, newNextOfKin);
-
-        if (savedNextOfKin is null)
-        {
-            saveFailed = true;
-            return;
-        }
-
+        if (savedNextOfKin is null) { saveFailed = true; return; }
         NavigationManager.NavigateTo($"/member-profile/{MemberId}");
     }
 }

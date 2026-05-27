@@ -14,7 +14,7 @@
 
 <PageHeader
     Title="Register New Stokvel"
-    Subtitle="After registration you will complete the setup questionnaire so Sisonke can understand how your stokvel operates."
+    Subtitle="After registration you'll complete the setup questionnaire so Sisonke can configure your stokvel."
     BackText="Back to My Stokvels"
     BackHref="/my-stokvels" />
 
@@ -29,20 +29,24 @@
 }
 
 <div class="form-page">
-    <div class="card">
-        <div class="card-body p-4">
-            <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="alert alert-danger" />
+    <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="alert alert-danger" />
 
+        <!-- ── Section: Stokvel identity ── -->
+        <div class="card mb-3">
+            <div class="card-body p-4">
+                <div class="form-section-title">Stokvel Identity</div>
                 <div class="row g-3">
                     <div class="col-12 col-md-6">
-                        <label class="form-label" for="stokvel-name">Name <span class="text-danger">*</span></label>
-                        <InputText id="stokvel-name" class="form-control" @bind-Value="model.Name" />
+                        <label class="form-label" for="stokvel-name">
+                            Stokvel name <span class="text-danger">*</span>
+                        </label>
+                        <InputText id="stokvel-name" class="form-control" placeholder="e.g. Mahlalela Burial Society" @bind-Value="model.Name" />
                     </div>
 
                     <div class="col-12 col-md-6">
-                        <label class="form-label" for="stokvel-type">Type</label>
+                        <label class="form-label" for="stokvel-type">Stokvel type</label>
                         <InputSelect id="stokvel-type" class="form-select" @bind-Value="model.Type">
                             @foreach (var stokvelType in Enum.GetValues<StokvelType>())
                             {
@@ -52,53 +56,17 @@
                     </div>
 
                     <div class="col-12 col-md-6">
-                        <label class="form-label" for="expected-member-count">Total Number of Members</label>
+                        <label class="form-label" for="expected-member-count">Expected total members</label>
                         <InputNumber id="expected-member-count" class="form-control" TValue="int?"
                             Value="@model.ExpectedMemberCount"
-                            ValueChanged="@((int? value) => OnExpectedMemberCountChangedAsync(value))"
+                            ValueChanged="@((int? v) => OnExpectedMemberCountChangedAsync(v))"
                             ValueExpression="@(() => model.ExpectedMemberCount)" />
-                        <div class="form-text">This helps Sisonke recommend the right package and track member capture progress.</div>
+                        <div class="form-text">Helps Sisonke recommend the right package and track member capture progress.</div>
                     </div>
 
-                    <div class="col-12">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h2 class="h5 mb-0">Subscription package</h2>
-                            @if (model.SubscriptionPlanId is null)
-                            {
-                                <span class="text-danger small">Please select a subscription package.</span>
-                            }
-                        </div>
-                        <div class="row g-3">
-                            @foreach (var plan in subscriptionPlans)
-                            {
-                                var isSelected = model.SubscriptionPlanId == plan.Id;
-                                var isRecommended = recommendedPlanId == plan.Id;
-
-                                <div class="col-12 col-md-4">
-                                    <div class="@GetSubscriptionPlanCardClass(isSelected, isRecommended)">
-                                        <div class="card-body d-flex flex-column">
-                                            <div class="d-flex justify-content-between gap-2 mb-2">
-                                                <h3 class="h5 card-title mb-0">@plan.Name</h3>
-                                                @if (isRecommended)
-                                                {
-                                                    <StatusBadge Text="Recommended" Type="success" />
-                                                }
-                                            </div>
-                                            <p class="card-text text-muted mb-2">@GetMemberRangeText(plan)</p>
-                                            <p class="card-text mb-1"><strong>Monthly:</strong> @FormatCurrency(plan.MonthlyPrice)</p>
-                                            <p class="card-text"><strong>Annual:</strong> @FormatCurrency(plan.AnnualPrice)</p>
-                                            <button type="button" class="btn @(isSelected ? "btn-primary" : "btn-outline-primary") mt-auto" @onclick="@(() => SelectSubscriptionPlan(plan.Id))">
-                                                @(isSelected ? "Selected" : "Select Package")
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
-                        </div>
-                        @if (model.SubscriptionPlanId is null)
-                        {
-                            <div class="form-text mt-2">Please select a subscription package.</div>
-                        }
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="established-date">Established date</label>
+                        <InputDate id="established-date" class="form-control" @bind-Value="model.EstablishedDate" />
                     </div>
 
                     <div class="col-12 col-md-6">
@@ -123,26 +91,70 @@
                         </select>
                     </div>
 
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="established-date">Established date</label>
-                        <InputDate id="established-date" class="form-control" @bind-Value="model.EstablishedDate" />
-                    </div>
-
                     <div class="col-12">
-                        <label class="form-label" for="description">Description</label>
-                        <InputTextArea id="description" class="form-control" rows="3" @bind-Value="model.Description" />
+                        <label class="form-label" for="description">Description <span class="text-muted fw-normal">(optional)</span></label>
+                        <InputTextArea id="description" class="form-control" rows="3" placeholder="Brief description of the stokvel's purpose and goals." @bind-Value="model.Description" />
                     </div>
                 </div>
-
-                <div class="mt-4 d-flex gap-2">
-                    <button class="btn btn-primary" type="submit">
-                        <i class="bi bi-check-lg me-2"></i>Register Stokvel
-                    </button>
-                    <a class="btn btn-outline-secondary" href="/my-stokvels">Cancel</a>
-                </div>
-            </EditForm>
+            </div>
         </div>
-    </div>
+
+        <!-- ── Section: Subscription package ── -->
+        <div class="card mb-3">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <div class="form-section-title mb-0">Subscription Package</div>
+                    @if (model.SubscriptionPlanId is null)
+                    {
+                        <span class="text-danger small fw-semibold">Selection required</span>
+                    }
+                </div>
+                <p class="text-muted small mb-3">Choose a plan that fits your expected membership size. Enter the member count above for a recommendation.</p>
+
+                <div class="row g-3">
+                    @foreach (var plan in subscriptionPlans)
+                    {
+                        var isSelected    = model.SubscriptionPlanId == plan.Id;
+                        var isRecommended = recommendedPlanId == plan.Id;
+
+                        <div class="col-12 col-md-4">
+                            <div class="plan-card @(isSelected ? "plan-selected" : "") @(isRecommended ? "plan-recommended" : "") h-100"
+                                 @onclick="@(() => SelectSubscriptionPlan(plan.Id))" style="cursor:pointer;">
+                                <div class="card-body d-flex flex-column p-3">
+                                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                        <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
+                                        @if (isRecommended && !isSelected)
+                                        {
+                                            <StatusBadge Text="Recommended" Type="success" />
+                                        }
+                                        @if (isSelected)
+                                        {
+                                            <span class="badge" style="background:var(--sk-green-800)">
+                                                <i class="bi bi-check2 me-1"></i>Selected
+                                            </span>
+                                        }
+                                    </div>
+                                    <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
+                                    <div class="mt-auto">
+                                        <div class="plan-price">@FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span></div>
+                                        <div class="text-muted small">Annual: @FormatCurrency(plan.AnnualPrice)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Submit ── -->
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-check-circle me-2"></i>Register Stokvel
+            </button>
+            <a class="btn btn-outline-secondary" href="/my-stokvels">Cancel</a>
+        </div>
+    </EditForm>
 </div>
 
 @code {
@@ -171,7 +183,6 @@
         model.ExpectedMemberCount = expectedMemberCount;
         var recommendedPlan = await StokvelService.GetRecommendedSubscriptionPlanAsync(model.ExpectedMemberCount);
         recommendedPlanId = recommendedPlan?.Id;
-
         if (recommendedPlan is not null)
         {
             model.SubscriptionPlanId = recommendedPlan.Id;
@@ -190,76 +201,33 @@
         saveFailed = false;
         packageSelectionFailed = false;
 
-        if (model.SubscriptionPlanId is null)
-        {
-            packageSelectionFailed = true;
-            return;
-        }
+        if (model.SubscriptionPlanId is null) { packageSelectionFailed = true; return; }
 
         var createdStokvel = await StokvelService.RegisterStokvelAsync(
-            model.Name,
-            model.Type,
-            model.Province,
-            model.TownOrArea,
-            model.EstablishedDate,
-            model.ExpectedMemberCount,
-            model.SubscriptionPlanId.Value,
-            model.Description);
+            model.Name, model.Type, model.Province, model.TownOrArea,
+            model.EstablishedDate, model.ExpectedMemberCount,
+            model.SubscriptionPlanId.Value, model.Description);
 
-        if (createdStokvel is null)
-        {
-            saveFailed = true;
-            return;
-        }
+        if (createdStokvel is null) { saveFailed = true; return; }
 
         NavigationManager.NavigateTo($"/stokvel-questionnaire/{createdStokvel.Id}");
     }
 
     private sealed class RegisterStokvelFormModel
     {
-        [Required]
-        [MaxLength(150)]
-        public string Name { get; set; } = string.Empty;
-
+        [Required][MaxLength(150)] public string Name { get; set; } = string.Empty;
         public StokvelType Type { get; set; } = StokvelType.BurialSociety;
-
-        [MaxLength(100)]
-        public string? Province { get; set; }
-
-        [MaxLength(100)]
-        public string? TownOrArea { get; set; }
-
+        [MaxLength(100)] public string? Province { get; set; }
+        [MaxLength(100)] public string? TownOrArea { get; set; }
         public DateTime? EstablishedDate { get; set; }
-
         public int? ExpectedMemberCount { get; set; }
-
         public Guid? SubscriptionPlanId { get; set; }
-
-        [MaxLength(500)]
-        public string? Description { get; set; }
+        [MaxLength(500)] public string? Description { get; set; }
     }
 
-    private static string FormatCurrency(decimal amount)
-    {
-        return amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
-    }
+    private static string FormatCurrency(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
 
-    private static string GetMemberRangeText(SubscriptionPlan plan)
-    {
-        return plan.MaxMembers is null
-            ? $"{plan.MinMembers}+ members"
-            : $"{plan.MinMembers}-{plan.MaxMembers} members";
-    }
-
-    private static string GetSubscriptionPlanCardClass(bool isSelected, bool isRecommended)
-    {
-        if (isSelected)
-        {
-            return "card h-100 border-primary shadow-sm";
-        }
-
-        return isRecommended
-            ? "card h-100 border-success shadow-sm"
-            : "card h-100";
-    }
+    private static string GetMemberRangeText(SubscriptionPlan plan) =>
+        plan.MaxMembers is null ? $"{plan.MinMembers}+ members" : $"{plan.MinMembers}–{plan.MaxMembers} members";
 }

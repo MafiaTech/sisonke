@@ -14,10 +14,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading fine details...
+        Loading fine details…
     </div>
 }
 else if (memberFine is null)
@@ -46,37 +46,25 @@ else
         <AlertBanner Type="danger" Title="Could not mark fine as paid." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
-    <div class="form-page">
+    <div class="form-page form-page-sm">
         <div class="card">
             <div class="card-body p-4">
-                <h3 class="h6 text-muted text-uppercase mb-3" style="letter-spacing: .05em; font-size: .7rem;">Fine Details</h3>
-                <dl class="row mb-0">
-                    <dt class="col-sm-4 fw-normal text-muted small">Member</dt>
-                    <dd class="col-sm-8 fw-medium">@memberFine.Member.FullName</dd>
-
-                    <dt class="col-sm-4 fw-normal text-muted small">Fine type</dt>
-                    <dd class="col-sm-8">@memberFine.FineType.Name</dd>
-
-                    <dt class="col-sm-4 fw-normal text-muted small">Amount</dt>
-                    <dd class="col-sm-8 fw-semibold">@memberFine.Amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</dd>
-
-                    <dt class="col-sm-4 fw-normal text-muted small">Reason</dt>
-                    <dd class="col-sm-8">@memberFine.Reason</dd>
-
-                    <dt class="col-sm-4 fw-normal text-muted small">Fine date</dt>
-                    <dd class="col-sm-8">@memberFine.FineDate.ToString("dd MMM yyyy")</dd>
-
-                    <dt class="col-sm-4 fw-normal text-muted small">Current status</dt>
-                    <dd class="col-sm-8">
-                        @if (memberFine.Status == FineStatus.Paid)
-                        {
-                            <StatusBadge Text="Paid" Type="success" />
-                        }
-                        else
-                        {
-                            <StatusBadge Text="Unpaid" Type="danger" />
-                        }
-                    </dd>
+                <div class="form-section-title">Fine Details</div>
+                <dl class="profile-dl">
+                    <div class="pdl-row"><dt>Member</dt><dd class="fw-600">@memberFine.Member.FullName</dd></div>
+                    <div class="pdl-row"><dt>Fine type</dt><dd>@memberFine.FineType.Name</dd></div>
+                    <div class="pdl-row">
+                        <dt>Amount</dt>
+                        <dd class="fw-600" style="font-size:1.125rem">@memberFine.Amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))</dd>
+                    </div>
+                    <div class="pdl-row"><dt>Reason</dt><dd>@memberFine.Reason</dd></div>
+                    <div class="pdl-row"><dt>Fine date</dt><dd>@memberFine.FineDate.ToString("dd MMM yyyy")</dd></div>
+                    <div class="pdl-row last">
+                        <dt>Current status</dt>
+                        <dd>
+                            <StatusBadge Text="@memberFine.Status.ToString()" Type="@(memberFine.Status == FineStatus.Paid ? "success" : "danger")" />
+                        </dd>
+                    </div>
                 </dl>
             </div>
         </div>
@@ -92,6 +80,21 @@ else
         OnConfirm="@ConfirmPaymentAsync"
         OnCancel="@CancelPayment" />
 }
+
+<style>
+    .fw-600 { font-weight: 600; }
+    .profile-dl { margin: 0; }
+    .pdl-row {
+        display: flex;
+        padding: .625rem 0;
+        border-bottom: 1px solid var(--sk-border);
+        gap: 1rem;
+        font-size: .9rem;
+    }
+    .pdl-row.last { border-bottom: none; }
+    .pdl-row dt { flex: 0 0 40%; font-weight: 400; color: var(--sk-text-muted); font-size: .875rem; }
+    .pdl-row dd { flex: 1; margin: 0; font-weight: 500; color: var(--sk-text); }
+</style>
 
 @code {
     private MemberFine? memberFine;
@@ -113,7 +116,6 @@ else
     private async Task ConfirmPaymentAsync()
     {
         updateFailed = false;
-
         var updatedFine = await FineService.MarkFineAsPaidAsync(MemberFineId);
 
         if (updatedFine is null)
@@ -131,10 +133,7 @@ else
     private void CancelPayment()
     {
         showPaymentConfirmation = false;
-
         if (memberFine is not null)
-        {
             NavigationManager.NavigateTo($"/member-profile/{memberFine.MemberId}");
-        }
     }
 }

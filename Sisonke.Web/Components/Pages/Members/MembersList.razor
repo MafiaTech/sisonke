@@ -11,10 +11,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading members...
+        Loading members…
     </div>
 }
 else if (stokvel is null)
@@ -23,83 +23,105 @@ else if (stokvel is null)
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
-        <PageHeader Title="Members" Subtitle="@stokvel.Name" />
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Members</h1>
+            <p class="page-subtitle">@stokvel.Name · @members.Count member@(members.Count == 1 ? "" : "s") captured</p>
+        </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
             <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
-                <i class="bi bi-chevron-left me-1"></i>Dashboard
+                <i class="bi bi-speedometer2 me-1"></i>Dashboard
             </a>
-            <a class="btn btn-primary" href="@($"/add-member/{StokvelId}")">
-                <i class="bi bi-person-plus-fill me-2"></i>Add Member
+            <a class="btn btn-primary btn-sm" href="@($"/add-member/{StokvelId}")">
+                <i class="bi bi-person-plus-fill me-1"></i>Add Member
             </a>
         </div>
     </div>
 
     @if (members.Count == 0)
     {
-        <AlertBanner Type="info" Title="No members yet" Message="Add your first member to start capturing profiles, next of kin, beneficiaries and fines." Icon="bi bi-info-circle-fill" />
+        <div class="ms-empty-state">
+            <div class="ms-empty-icon-ring">
+                <i class="bi bi-people" aria-hidden="true"></i>
+            </div>
+            <h2 class="ms-empty-title">No members yet</h2>
+            <p class="ms-empty-text">Add your first member to start capturing profiles, next of kin, beneficiaries and fines.</p>
+            <a class="btn btn-primary" href="@($"/add-member/{StokvelId}")">
+                <i class="bi bi-person-plus-fill me-2"></i>Add First Member
+            </a>
+        </div>
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th>Member #</th>
-                        <th>Full Name</th>
-                        <th>Cellphone</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Joined</th>
-                        <th>Cooling Period</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var member in members)
-                    {
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
                         <tr>
-                            <td class="text-muted small">@member.MemberNumber</td>
-                            <td class="fw-medium">@member.FullName</td>
-                            <td>@member.CellphoneNumber</td>
-                            <td><StatusBadge Text="@member.DefaultRole.ToString()" Type="secondary" /></td>
-                            <td>
-                                @if (member.Status.ToString() == "Active")
-                                {
-                                    <StatusBadge Text="Active" Type="success" />
-                                }
-                                else if (member.Status.ToString() == "Suspended")
-                                {
-                                    <StatusBadge Text="@member.Status.ToString()" Type="warning" />
-                                }
-                                else
-                                {
-                                    <StatusBadge Text="@member.Status.ToString()" Type="secondary" />
-                                }
-                            </td>
-                            <td class="text-muted small">@member.JoiningDate.ToString("dd MMM yyyy")</td>
-                            <td>
-                                @if (member.IsInCoolingPeriod)
-                                {
-                                    <StatusBadge Text="Cooling" Type="info" />
-                                }
-                                else
-                                {
-                                    <span class="text-muted small">—</span>
-                                }
-                            </td>
-                            <td>
-                                <a class="btn btn-sm btn-outline-primary" href="@($"/member-profile/{member.Id}")">
-                                    View
-                                </a>
-                            </td>
+                            <th style="width:2.5rem"></th>
+                            <th>Member</th>
+                            <th>Cellphone</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Joined</th>
+                            <th>Cooling</th>
+                            <th style="width:5rem"></th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var member in members)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="member-avatar" style="width:2.25rem;height:2.25rem;font-size:.75rem" aria-hidden="true">
+                                        @GetInitials(member.FullName)
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-600">@member.FullName</div>
+                                    <div class="text-muted" style="font-size:.75rem">@member.MemberNumber</div>
+                                </td>
+                                <td class="text-muted small">@member.CellphoneNumber</td>
+                                <td><StatusBadge Text="@member.DefaultRole.ToString()" Type="secondary" /></td>
+                                <td>
+                                    @{
+                                        var statusType = member.Status.ToString() switch
+                                        {
+                                            "Active"    => "success",
+                                            "Suspended" => "warning",
+                                            _           => "secondary"
+                                        };
+                                    }
+                                    <StatusBadge Text="@member.Status.ToString()" Type="@statusType" />
+                                </td>
+                                <td class="text-muted small">@member.JoiningDate.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    @if (member.IsInCoolingPeriod)
+                                    {
+                                        <StatusBadge Text="Cooling" Type="info" />
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    <a class="btn btn-sm btn-outline-primary" href="@($"/member-profile/{member.Id}")">
+                                        View
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
     }
 }
+
+<style>
+    .fw-600 { font-weight: 600; }
+</style>
 
 @code {
     private Stokvel? stokvel;
@@ -112,12 +134,16 @@ else
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
-
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
-        members = stokvel is null
-            ? []
-            : await MemberService.GetMembersByStokvelIdAsync(StokvelId);
-
+        members = stokvel is null ? [] : await MemberService.GetMembersByStokvelIdAsync(StokvelId);
         isLoading = false;
+    }
+
+    private static string GetInitials(string fullName)
+    {
+        var parts = fullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[^1][0]}".ToUpperInvariant()
+            : fullName.Length > 0 ? fullName[0].ToString().ToUpperInvariant() : "?";
     }
 }

@@ -12,10 +12,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading...
+        Loading…
     </div>
 }
 else if (editBeneficiary is null)
@@ -35,19 +35,19 @@ else
         <AlertBanner Type="danger" Title="Unable to update beneficiary record." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
-    <div class="form-page">
-        <div class="card">
-            <div class="card-body p-4">
-                <EditForm Model="@editBeneficiary" OnValidSubmit="@HandleValidSubmit" FormName="EditBeneficiaryForm">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary class="alert alert-danger" />
+    <EditForm Model="@editBeneficiary" OnValidSubmit="@HandleValidSubmit" FormName="EditBeneficiaryForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="alert alert-danger" />
 
+        <div class="form-page">
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <p class="form-section-title">Beneficiary Details</p>
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="full-name">Full name</label>
-                            <InputText id="full-name" class="form-control" @bind-Value="editBeneficiary.FullName" />
+                            <InputText id="full-name" class="form-control" placeholder="e.g. Lindiwe Dlamini" @bind-Value="editBeneficiary.FullName" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="relationship">Relationship</label>
                             <InputSelect id="relationship" class="form-select" @bind-Value="editBeneficiary.Relationship">
@@ -57,40 +57,37 @@ else
                                 }
                             </InputSelect>
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="id-number">ID number</label>
-                            <InputText id="id-number" class="form-control" @bind-Value="editBeneficiary.IdNumber" />
+                            <InputText id="id-number" class="form-control" placeholder="13-digit SA ID number" @bind-Value="editBeneficiary.IdNumber" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="cellphone-number">Cellphone number</label>
-                            <InputText id="cellphone-number" class="form-control" @bind-Value="editBeneficiary.CellphoneNumber" />
+                            <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="editBeneficiary.CellphoneNumber" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="date-of-birth">Date of birth</label>
                             <InputDate id="date-of-birth" class="form-control" @bind-Value="editBeneficiary.DateOfBirth" />
                         </div>
-
                         <div class="col-12">
-                            <div class="form-check">
+                            <div class="form-check form-switch">
                                 <InputCheckbox id="is-active" class="form-check-input" @bind-Value="editBeneficiary.IsActive" />
-                                <label class="form-check-label" for="is-active">Active beneficiary</label>
+                                <label class="form-check-label fw-semibold" for="is-active">Active beneficiary</label>
                             </div>
+                            <div class="form-text">Inactive beneficiaries are excluded from payout distributions.</div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div class="mt-4 d-flex gap-2">
-                        <button class="btn btn-primary" type="submit">
-                            <i class="bi bi-floppy me-2"></i>Save Changes
-                        </button>
-                        <a class="btn btn-outline-secondary" href="@($"/member-profile/{editBeneficiary.MemberId}")">Cancel</a>
-                    </div>
-                </EditForm>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-floppy me-2"></i>Save Changes
+                </button>
+                <a class="btn btn-outline-secondary" href="@($"/member-profile/{editBeneficiary.MemberId}")">Cancel</a>
             </div>
         </div>
-    </div>
+    </EditForm>
 }
 
 @code {

@@ -102,6 +102,75 @@ public class FineService(ApplicationDbContext context)
         return memberFine;
     }
 
+    public async Task EnsureDefaultFineTypesForStokvelAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return;
+        }
+
+        var tenantAlreadyHasFineTypes = await context.FineTypes
+            .AnyAsync(fineType => fineType.TenantId == stokvel.TenantId);
+
+        if (tenantAlreadyHasFineTypes)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+
+        var defaults = stokvel.Type switch
+        {
+            StokvelType.BurialSociety => new[]
+            {
+                ("Late Coming Fine",       50m),
+                ("Late Apology Fine",       0m),
+                ("No Apology Fine",         0m),
+                ("Food Contribution Fine",  0m),
+                ("Misconduct Fine",         0m),
+                ("Custom Fine",             0m),
+            },
+            StokvelType.SavingsStokvel => new[]
+            {
+                ("Late Payment Fine",  50m),
+                ("Late Coming Fine",   50m),
+                ("Late Apology Fine",   0m),
+                ("No Apology Fine",     0m),
+                ("Misconduct Fine",   200m),
+                ("Custom Fine",         0m),
+            },
+            _ => new[]
+            {
+                ("Late Payment Fine", 50m),
+                ("Late Coming Fine",  50m),
+                ("Misconduct Fine",  200m),
+                ("Custom Fine",        0m),
+            }
+        };
+
+        var fineTypes = defaults.Select(defaultFineType =>
+        {
+            var (name, defaultAmount) = defaultFineType;
+
+            return new FineType
+            {
+                Id = Guid.NewGuid(),
+                TenantId = stokvel.TenantId,
+                Name = name,
+                DefaultAmount = defaultAmount,
+                IsActive = true,
+                CreatedAt = now
+            };
+        });
+
+        context.FineTypes.AddRange(fineTypes);
+
+        await context.SaveChangesAsync();
+    }
+
     public async Task<decimal> GetOutstandingFinesTotalByStokvelIdAsync(Guid stokvelId)
     {
         var stokvel = await context.Stokvels

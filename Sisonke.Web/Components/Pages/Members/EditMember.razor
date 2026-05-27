@@ -13,10 +13,10 @@
 @if (isLoading)
 {
     <div class="loading-state">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading member details...
+        Loading member details…
     </div>
 }
 else if (editMember is null)
@@ -36,44 +36,48 @@ else
         <AlertBanner Type="danger" Title="Unable to update member." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
-    <div class="form-page">
-        <div class="card">
-            <div class="card-body p-4">
-                <EditForm Model="@editMember" OnValidSubmit="@HandleValidSubmit" FormName="EditMemberForm">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary class="alert alert-danger" />
+    <EditForm Model="@editMember" OnValidSubmit="@HandleValidSubmit" FormName="EditMemberForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="alert alert-danger" />
 
+        <div class="form-page">
+
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <p class="form-section-title">Personal Details</p>
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="full-name">Full name</label>
-                            <InputText id="full-name" class="form-control" @bind-Value="editMember.FullName" />
+                            <InputText id="full-name" class="form-control" placeholder="e.g. Thandi Nkosi" @bind-Value="editMember.FullName" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="cellphone-number">Cellphone number</label>
-                            <InputText id="cellphone-number" class="form-control" @bind-Value="editMember.CellphoneNumber" />
+                            <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="editMember.CellphoneNumber" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="email-address">Email address</label>
-                            <InputText id="email-address" class="form-control" @bind-Value="editMember.EmailAddress" />
+                            <InputText id="email-address" class="form-control" placeholder="e.g. thandi@email.com" @bind-Value="editMember.EmailAddress" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="id-number">ID number</label>
-                            <InputText id="id-number" class="form-control" @bind-Value="editMember.IdNumber" />
+                            <InputText id="id-number" class="form-control" placeholder="13-digit SA ID number" @bind-Value="editMember.IdNumber" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="residential-area">Residential area</label>
-                            <InputText id="residential-area" class="form-control" @bind-Value="editMember.ResidentialArea" />
+                            <InputText id="residential-area" class="form-control" placeholder="e.g. Soweto, Gauteng" @bind-Value="editMember.ResidentialArea" />
                         </div>
+                    </div>
+                </div>
+            </div>
 
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <p class="form-section-title">Membership Details</p>
+                    <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="joining-date">Joining date</label>
                             <InputDate id="joining-date" class="form-control" @bind-Value="editMember.JoiningDate" />
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="default-role">Default role</label>
                             <InputSelect id="default-role" class="form-select" @bind-Value="editMember.DefaultRole">
@@ -83,7 +87,6 @@ else
                                 }
                             </InputSelect>
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="status">Status</label>
                             <InputSelect id="status" class="form-select" @bind-Value="editMember.Status">
@@ -93,30 +96,41 @@ else
                                 }
                             </InputSelect>
                         </div>
-
-                        <div class="col-12">
-                            <div class="form-check">
-                                <InputCheckbox id="cooling-period" class="form-check-input" @bind-Value="editMember.IsInCoolingPeriod" />
-                                <label class="form-check-label" for="cooling-period">Is in cooling period</label>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="cooling-period-end-date">Cooling period end date</label>
-                            <InputDate id="cooling-period-end-date" class="form-control" @bind-Value="editMember.CoolingPeriodEndDate" />
-                        </div>
                     </div>
-
-                    <div class="mt-4 d-flex gap-2">
-                        <button class="btn btn-primary" type="submit">
-                            <i class="bi bi-check-lg me-2"></i>Save Changes
-                        </button>
-                        <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
-                    </div>
-                </EditForm>
+                </div>
             </div>
+
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <p class="form-section-title">Cooling Period</p>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="cooling-period" class="form-check-input" @bind-Value="editMember.IsInCoolingPeriod" />
+                                <label class="form-check-label fw-semibold" for="cooling-period">Member is in cooling period</label>
+                            </div>
+                            <div class="form-text">A cooling period restricts the member from accessing certain stokvel benefits.</div>
+                        </div>
+                        @if (editMember.IsInCoolingPeriod)
+                        {
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="cooling-period-end-date">Cooling period end date</label>
+                                <InputDate id="cooling-period-end-date" class="form-control" @bind-Value="editMember.CoolingPeriodEndDate" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-check-lg me-2"></i>Save Changes
+                </button>
+                <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
+            </div>
+
         </div>
-    </div>
+    </EditForm>
 }
 
 @code {

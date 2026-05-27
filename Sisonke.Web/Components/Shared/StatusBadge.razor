@@ -12,11 +12,12 @@
 
     private string BadgeClass => Type.ToLowerInvariant() switch
     {
-        "success" => "bg-success",
-        "warning" => "bg-warning text-dark",
-        "danger" => "bg-danger",
-        "info" => "bg-info text-dark",
+        "success"   => "bg-success",
+        "warning"   => "bg-warning text-dark",
+        "danger"    => "bg-danger",
+        "info"      => "bg-info text-dark",
         "secondary" => "bg-secondary",
-        _ => "bg-secondary"
+        "primary"   => "bg-primary",
+        _           => "bg-secondary"
     };
 }
