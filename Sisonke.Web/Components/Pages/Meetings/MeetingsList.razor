@@ -1,0 +1,176 @@
+@page "/meetings/{StokvelId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject MeetingService MeetingService
+
+<PageTitle>Meetings</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading meetings...
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Meetings"
+        Subtitle="Plan and manage meetings for this stokvel."
+        BackText="Back to Dashboard"
+        BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
+
+    <div class="meetings-toolbar mb-4">
+        <div>
+            <div class="detail-mini-label">Stokvel</div>
+            <div class="fw-600">@stokvel.Name</div>
+        </div>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+            <a class="btn btn-primary btn-sm" href="@($"/create-meeting/{StokvelId}")">
+                <i class="bi bi-plus-circle me-2"></i>Create Meeting
+            </a>
+            <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
+                <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    @if (meetings.Count == 0)
+    {
+        <AlertBanner Type="info" Title="No meetings have been created yet." Message="" Icon="bi bi-info-circle-fill" />
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 meetings-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Meeting date</th>
+                                <th>Venue</th>
+                                <th>Status</th>
+                                <th>Agenda items</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var meeting in meetings)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-600">@meeting.Title</div>
+                                        @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
+                                        {
+                                            <div class="text-muted small">@meeting.Purpose</div>
+                                        }
+                                    </td>
+                                    <td>@meeting.MeetingDate.ToString("dd MMM yyyy")</td>
+                                    <td>@DisplayOrDash(meeting.Venue)</td>
+                                    <td>
+                                        <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
+                                    </td>
+                                    <td>@meeting.AgendaItems.Count</td>
+                                    <td class="text-end">
+                                        <a class="btn btn-outline-primary btn-sm" href="@($"/meeting/{meeting.Id}")">
+                                            View
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<style>
+    .fw-600 { font-weight: 600; }
+    .detail-mini-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--sk-text-muted);
+        font-weight: 600;
+        margin-bottom: .15rem;
+    }
+    .meetings-toolbar {
+        align-items: center;
+        background: var(--sk-card);
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+    }
+    .meetings-table th {
+        color: var(--sk-text-muted);
+        font-size: .75rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .meetings-table td,
+    .meetings-table th {
+        padding: 1rem;
+    }
+    @@media (max-width: 768px) {
+        .meetings-toolbar {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .meetings-toolbar .ms-auto {
+            margin-left: 0 !important;
+        }
+    }
+</style>
+
+@code {
+    private Stokvel? stokvel;
+    private List<Meeting> meetings = [];
+    private bool isLoading = true;
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        if (stokvel is not null)
+        {
+            meetings = await MeetingService.GetMeetingsByStokvelIdAsync(StokvelId);
+        }
+
+        isLoading = false;
+    }
+
+    private static string DisplayOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string GetStatusBadgeType(string status) =>
+        status switch
+        {
+            "Completed" => "success",
+            "InProgress" => "warning",
+            "Cancelled" => "danger",
+            "Planned" => "info",
+            "Scheduled" => "info",
+            _ => "secondary"
+        };
+}

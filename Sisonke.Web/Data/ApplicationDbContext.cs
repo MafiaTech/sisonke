@@ -19,6 +19,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ContributionCycle> ContributionCycles => Set<ContributionCycle>();
     public DbSet<MemberContribution> MemberContributions => Set<MemberContribution>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Meeting> Meetings => Set<Meeting>();
+    public DbSet<MeetingAgendaItem> MeetingAgendaItems => Set<MeetingAgendaItem>();
+    public DbSet<MeetingAttendance> MeetingAttendances => Set<MeetingAttendance>();
     public DbSet<QuestionnaireSection> QuestionnaireSections => Set<QuestionnaireSection>();
     public DbSet<QuestionnaireQuestion> QuestionnaireQuestions => Set<QuestionnaireQuestion>();
     public DbSet<QuestionnaireOption> QuestionnaireOptions => Set<QuestionnaireOption>();
@@ -151,6 +154,34 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(p => p.MemberId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Meeting>()
+            .HasOne(m => m.Tenant)
+            .WithMany()
+            .HasForeignKey(m => m.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MeetingAgendaItem>()
+            .HasOne(a => a.Meeting)
+            .WithMany(m => m.AgendaItems)
+            .HasForeignKey(a => a.MeetingId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MeetingAttendance>()
+            .HasOne(a => a.Meeting)
+            .WithMany()
+            .HasForeignKey(a => a.MeetingId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MeetingAttendance>()
+            .HasOne(a => a.Member)
+            .WithMany()
+            .HasForeignKey(a => a.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MeetingAttendance>()
+            .HasIndex(a => new { a.MeetingId, a.MemberId })
+            .IsUnique();
 
         builder.Entity<QuestionnaireQuestion>()
             .HasOne(q => q.QuestionnaireSection)

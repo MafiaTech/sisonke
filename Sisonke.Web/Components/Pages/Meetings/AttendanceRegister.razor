@@ -1,0 +1,255 @@
+@page "/meeting-attendance/{MeetingId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject MeetingService MeetingService
+@inject StokvelService StokvelService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Attendance Register</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading attendance register...
+    </div>
+}
+else if (meeting is null)
+{
+    <AlertBanner Type="danger" Title="Meeting not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Attendance Register"
+        Subtitle="Mark attendance for this meeting."
+        BackText="Back to Meeting"
+        BackHref="@($"/meeting/{MeetingId}")" />
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
+    }
+
+    <div class="card mb-4">
+        <div class="card-body p-4">
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <div class="detail-mini-label">Meeting</div>
+                    <div class="fw-600">@meeting.Title</div>
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="detail-mini-label">Date</div>
+                    <div>@meeting.MeetingDate.ToString("dd MMM yyyy")</div>
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="detail-mini-label">Status</div>
+                    <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Present</div>
+                    <div class="summary-value">@attendanceSummary.Present</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Absent</div>
+                    <div class="summary-value">@attendanceSummary.Absent</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Apologies</div>
+                    <div class="summary-value">@attendanceSummary.Apologies</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Late</div>
+                    <div class="summary-value">@attendanceSummary.Late</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0 attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Member name</th>
+                            <th>Status</th>
+                            <th>Late</th>
+                            <th>Left early</th>
+                            <th>Notes</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var attendance in attendanceRecords)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-600">@attendance.Member.FullName</div>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm" @bind="attendance.Status">
+                                        <option value="@AttendanceStatus.Present">Present</option>
+                                        <option value="@AttendanceStatus.Absent">Absent</option>
+                                        <option value="@AttendanceStatus.Apology">Apology</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input class="form-check-input" type="checkbox" @bind="attendance.IsLate" />
+                                </td>
+                                <td>
+                                    <input class="form-check-input" type="checkbox" @bind="attendance.LeftEarly" />
+                                </td>
+                                <td>
+                                    <input class="form-control form-control-sm" @bind="attendance.Notes" />
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => SaveAttendanceAsync(attendance)">
+                                        Save
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a class="btn btn-outline-secondary" href="@($"/meeting/{MeetingId}")">
+            <i class="bi bi-arrow-left me-2"></i>Back to Meeting
+        </a>
+    </div>
+}
+
+<style>
+    .fw-600 { font-weight: 600; }
+    .detail-mini-label,
+    .summary-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--sk-text-muted);
+        font-weight: 600;
+        margin-bottom: .15rem;
+    }
+    .summary-value {
+        color: var(--sk-text);
+        font-size: 1.75rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .summary-card {
+        border-left: 4px solid var(--sk-green-700);
+    }
+    .attendance-table th {
+        color: var(--sk-text-muted);
+        font-size: .75rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .attendance-table td,
+    .attendance-table th {
+        padding: 1rem;
+    }
+</style>
+
+@code {
+    private Meeting? meeting;
+    private List<MeetingAttendance> attendanceRecords = [];
+    private (int Present, int Absent, int Apologies, int Late) attendanceSummary;
+    private bool isLoading = true;
+    private string? successMessage;
+    private string? errorMessage;
+
+    [Parameter]
+    public Guid MeetingId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAttendanceAsync();
+    }
+
+    private async Task LoadAttendanceAsync()
+    {
+        isLoading = true;
+        successMessage = null;
+        errorMessage = null;
+
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+
+        if (meeting is not null)
+        {
+            await MeetingService.InitializeAttendanceRegisterAsync(MeetingId);
+            attendanceRecords = await MeetingService.GetAttendanceByMeetingIdAsync(MeetingId);
+            attendanceSummary = await MeetingService.GetAttendanceSummaryAsync(MeetingId);
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SaveAttendanceAsync(MeetingAttendance attendance)
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        var updatedAttendance = await MeetingService.UpdateAttendanceAsync(
+            attendance.Id,
+            attendance.Status,
+            attendance.IsLate,
+            attendance.LeftEarly,
+            attendance.Notes);
+
+        if (updatedAttendance is null)
+        {
+            errorMessage = "Attendance could not be updated.";
+            return;
+        }
+
+        attendanceSummary = await MeetingService.GetAttendanceSummaryAsync(MeetingId);
+        successMessage = "Attendance updated.";
+    }
+
+    private static string GetStatusBadgeType(string status) =>
+        status switch
+        {
+            "Completed" => "success",
+            "InProgress" => "warning",
+            "Cancelled" => "danger",
+            "Planned" => "info",
+            "Scheduled" => "info",
+            _ => "secondary"
+        };
+}

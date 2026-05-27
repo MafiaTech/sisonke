@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sisonke.Web.Data;
 
@@ -10,9 +11,11 @@ using Sisonke.Web.Data;
 namespace Sisonke.Web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260527175258_AddMeetingEntities")]
+    partial class AddMeetingEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.8");
@@ -530,44 +533,6 @@ namespace Sisonke.Web.Migrations
                     b.HasIndex("MeetingId");
 
                     b.ToTable("MeetingAgendaItems");
-                });
-
-            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingAttendance", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsLate")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("LeftEarly")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("MarkedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("MeetingId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("MemberId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MemberId");
-
-                    b.HasIndex("MeetingId", "MemberId")
-                        .IsUnique();
-
-                    b.ToTable("MeetingAttendances");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Member", b =>
@@ -1278,25 +1243,6 @@ namespace Sisonke.Web.Migrations
                         .IsRequired();
 
                     b.Navigation("Meeting");
-                });
-
-            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingAttendance", b =>
-                {
-                    b.HasOne("Sisonke.Web.Data.Entities.Meeting", "Meeting")
-                        .WithMany()
-                        .HasForeignKey("MeetingId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
-                        .WithMany()
-                        .HasForeignKey("MemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Meeting");
-
-                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Member", b =>

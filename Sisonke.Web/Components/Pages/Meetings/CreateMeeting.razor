@@ -1,0 +1,138 @@
+@page "/create-meeting/{StokvelId:guid}"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject MeetingService MeetingService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create Meeting</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading meeting form...
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Create Meeting"
+        Subtitle="@stokvel.Name"
+        BackText="Back to Meetings"
+        BackHref="@($"/meetings/{StokvelId}")" />
+
+    @if (saveFailed)
+    {
+        <AlertBanner Type="danger" Title="Unable to create meeting." Message="Please check the meeting details and try again." Icon="bi bi-x-circle-fill" />
+    }
+
+    <div class="form-page form-page-sm">
+        <div class="card">
+            <div class="card-body p-4">
+                <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="CreateMeetingForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
+
+                    <div class="form-section-title">Meeting Details</div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="title">Title <span class="text-danger">*</span></label>
+                            <InputText id="title" class="form-control" @bind-Value="model.Title" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="meeting-date">Meeting date</label>
+                            <InputDate id="meeting-date" class="form-control" @bind-Value="model.MeetingDate" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="venue">Venue</label>
+                            <InputText id="venue" class="form-control" @bind-Value="model.Venue" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="purpose">Purpose</label>
+                            <InputTextArea id="purpose" class="form-control" rows="4" @bind-Value="model.Purpose" />
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-check-circle me-2"></i>Create Meeting
+                        </button>
+                        <a class="btn btn-outline-secondary" href="@($"/meetings/{StokvelId}")">Back to Meetings</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Stokvel? stokvel;
+    private CreateMeetingModel model = new();
+    private bool isLoading = true;
+    private bool saveFailed;
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        if (stokvel is not null)
+        {
+            model.Title = $"{stokvel.Name} Meeting";
+        }
+
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        saveFailed = false;
+
+        var meeting = await MeetingService.CreateMeetingAsync(
+            StokvelId,
+            model.Title,
+            model.MeetingDate,
+            model.Venue,
+            model.Purpose);
+
+        if (meeting is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/meeting/{meeting.Id}");
+    }
+
+    private class CreateMeetingModel
+    {
+        [Required]
+        [MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        public DateTime MeetingDate { get; set; } = DateTime.Today;
+
+        [MaxLength(150)]
+        public string? Venue { get; set; }
+
+        [MaxLength(500)]
+        public string? Purpose { get; set; }
+    }
+}
