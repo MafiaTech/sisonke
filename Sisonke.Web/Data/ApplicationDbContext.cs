@@ -24,6 +24,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<QuestionnaireOption> QuestionnaireOptions => Set<QuestionnaireOption>();
     public DbSet<StokvelQuestionnaireAnswer> StokvelQuestionnaireAnswers => Set<StokvelQuestionnaireAnswer>();
     public DbSet<ConstitutionDocument> ConstitutionDocuments => Set<ConstitutionDocument>();
+    public DbSet<ConstitutionWizardAnswer> ConstitutionWizardAnswers => Set<ConstitutionWizardAnswer>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -184,5 +185,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(c => c.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ConstitutionWizardAnswer>()
+            .HasOne(a => a.Tenant)
+            .WithMany()
+            .HasForeignKey(a => a.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ConstitutionWizardAnswer>()
+            .HasIndex(a => new { a.TenantId, a.QuestionKey })
+            .IsUnique();
     }
 }
