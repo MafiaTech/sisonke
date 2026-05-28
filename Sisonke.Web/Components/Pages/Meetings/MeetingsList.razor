@@ -1,6 +1,7 @@
 @page "/meetings/{StokvelId:guid}"
 @rendermode InteractiveServer
 
+@using System.Linq
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
@@ -36,8 +37,8 @@ else
             <div class="fw-600">@stokvel.Name</div>
         </div>
         <div class="ms-auto d-flex gap-2 flex-wrap">
-            <a class="btn btn-primary btn-sm" href="@($"/create-meeting/{StokvelId}")">
-                <i class="bi bi-plus-circle me-2"></i>Create Meeting
+            <a class="btn btn-purple btn-sm" href="@($"/create-meeting/{StokvelId}")">
+                <i class="bi bi-plus-circle me-2"></i>Schedule Meeting
             </a>
             <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
                 <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
@@ -65,8 +66,8 @@ else
                         <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ShowNextMonth">
                             Next Month<i class="bi bi-chevron-right ms-1"></i>
                         </button>
-                        <a class="btn btn-primary btn-sm" href="@($"/create-meeting/{StokvelId}")">
-                            <i class="bi bi-plus-circle me-2"></i>Create Meeting
+                        <a class="btn btn-purple btn-sm" href="@($"/create-meeting/{StokvelId}")">
+                            <i class="bi bi-plus-circle me-2"></i>Schedule Meeting
                         </a>
                     </div>
                 </div>
@@ -91,49 +92,48 @@ else
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0 meetings-table">
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Meeting date</th>
-                                <th>Venue</th>
-                                <th>Status</th>
-                                <th>Agenda items</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var meeting in meetings)
+        <div class="section-label mb-3">All Meetings</div>
+        @foreach (var meeting in meetings.OrderByDescending(m => m.MeetingDate))
+        {
+            <div class="meeting-card">
+                <div class="meeting-card-bar @GetStatusBarClass(meeting.Status.ToString())"></div>
+                <div class="meeting-card-body">
+                    <div class="meeting-card-date @(meeting.Status.ToString() == "Completed" ? "dim" : "")">
+                        <div class="meeting-card-day">@meeting.MeetingDate.Day.ToString("00")</div>
+                        <div class="meeting-card-month">@meeting.MeetingDate.ToString("MMM")</div>
+                    </div>
+                    <div class="meeting-card-info">
+                        <div class="meeting-card-title-row">
+                            <span class="meeting-card-title">@meeting.Title</span>
+                            <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
+                        </div>
+                        <div class="meeting-card-meta">
+                            <span class="meeting-card-meta-item">
+                                <i class="bi bi-calendar3"></i>@meeting.MeetingDate.ToString("dd MMM yyyy")
+                            </span>
+                            @if (!string.IsNullOrWhiteSpace(meeting.Venue))
                             {
-                                <tr>
-                                    <td>
-                                        <div class="fw-600">@meeting.Title</div>
-                                        @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
-                                        {
-                                            <div class="text-muted small">@meeting.Purpose</div>
-                                        }
-                                    </td>
-                                    <td>@meeting.MeetingDate.ToString("dd MMM yyyy")</td>
-                                    <td>@DisplayOrDash(meeting.Venue)</td>
-                                    <td>
-                                        <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
-                                    </td>
-                                    <td>@meeting.AgendaItems.Count</td>
-                                    <td class="text-end">
-                                        <a class="btn btn-outline-primary btn-sm" href="@($"/meeting/{meeting.Id}")">
-                                            View
-                                        </a>
-                                    </td>
-                                </tr>
+                                <span class="meeting-card-meta-item">
+                                    <i class="bi bi-geo-alt"></i>@meeting.Venue
+                                </span>
                             }
-                        </tbody>
-                    </table>
+                            <span class="meeting-card-meta-item">
+                                <i class="bi bi-list-ul"></i>@meeting.AgendaItems.Count agenda @(meeting.AgendaItems.Count == 1 ? "item" : "items")
+                            </span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
+                        {
+                            <div class="meeting-card-purpose">@meeting.Purpose</div>
+                        }
+                    </div>
+                    <div class="meeting-card-aside">
+                        <a class="btn btn-purple btn-sm" href="@($"/meeting/{meeting.Id}")">
+                            <i class="bi bi-eye me-1"></i>View
+                        </a>
+                    </div>
                 </div>
             </div>
-        </div>
+        }
     }
 }
 
@@ -155,17 +155,6 @@ else
         display: flex;
         gap: 1rem;
         padding: 1rem 1.25rem;
-    }
-    .meetings-table th {
-        color: var(--sk-text-muted);
-        font-size: .75rem;
-        font-weight: 700;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-    }
-    .meetings-table td,
-    .meetings-table th {
-        padding: 1rem;
     }
     .meeting-calendar {
         display: grid;
@@ -317,5 +306,16 @@ else
             "Planned" => "info",
             "Scheduled" => "info",
             _ => "secondary"
+        };
+
+    private static string GetStatusBarClass(string status) =>
+        status switch
+        {
+            "Completed"  => "bar-completed",
+            "InProgress" => "bar-inprogress",
+            "Cancelled"  => "bar-cancelled",
+            "Planned"    => "bar-planned",
+            "Scheduled"  => "bar-scheduled",
+            _ => "bar-planned"
         };
 }

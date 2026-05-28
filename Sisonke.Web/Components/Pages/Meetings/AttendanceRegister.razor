@@ -63,34 +63,34 @@ else
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-lg-3">
-            <div class="card summary-card h-100">
+            <div class="card summary-card present h-100">
                 <div class="card-body">
                     <div class="summary-label">Present</div>
-                    <div class="summary-value">@attendanceSummary.Present</div>
+                    <div class="summary-value" style="color:var(--sk-success)">@attendanceSummary.Present</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="card summary-card h-100">
+            <div class="card summary-card absent h-100">
                 <div class="card-body">
                     <div class="summary-label">Absent</div>
-                    <div class="summary-value">@attendanceSummary.Absent</div>
+                    <div class="summary-value" style="color:var(--sk-danger)">@attendanceSummary.Absent</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="card summary-card h-100">
+            <div class="card summary-card apology h-100">
                 <div class="card-body">
                     <div class="summary-label">Apologies</div>
-                    <div class="summary-value">@attendanceSummary.Apologies</div>
+                    <div class="summary-value" style="color:var(--sk-gold-dark)">@attendanceSummary.Apologies</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="card summary-card h-100">
+            <div class="card summary-card late h-100">
                 <div class="card-body">
                     <div class="summary-label">Late</div>
-                    <div class="summary-value">@attendanceSummary.Late</div>
+                    <div class="summary-value" style="color:var(--sk-info)">@attendanceSummary.Late</div>
                 </div>
             </div>
         </div>
@@ -171,7 +171,7 @@ else
         line-height: 1.1;
     }
     .summary-card {
-        border-left: 4px solid var(--sk-green-700);
+        border-left: 4px solid var(--sk-border);
     }
     .attendance-table th {
         color: var(--sk-text-muted);

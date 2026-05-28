@@ -346,7 +346,6 @@ C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\bin\Debug\net10.0\artifacts\verify-b
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\bin\Debug\net10.0\artifacts\verify-build\Sisonke.Web.runtimeconfig.json
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\bin\Debug\net10.0\artifacts\verify-build\Sisonke.Web.staticwebassets.endpoints.json
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\bin\Debug\net10.0\artifacts\verify-build\Sisonke.Web.staticwebassets.runtime.json
-C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\nhy6tht084-{0}-aiqd0ann0m-aiqd0ann0m.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\xa414wal04-{0}-ddqkbqp4xz-ddqkbqp4xz.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\b8qlot7hwn-{0}-ddqkbqp4xz-ddqkbqp4xz.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\CodexVerify\appsettings.Development.json
@@ -614,3 +613,4 @@ C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\verify-build\runtimes\win-arm\na
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\verify-build\runtimes\win-arm64\native\e_sqlite3.dll
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\verify-build\runtimes\win-x64\native\e_sqlite3.dll
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\verify-build\runtimes\win-x86\native\e_sqlite3.dll
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\nhy6tht084-{0}-u8a5b16bor-u8a5b16bor.gz

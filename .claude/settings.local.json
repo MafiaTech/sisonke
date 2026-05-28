@@ -9,10 +9,22 @@
       "Bash(xargs -I {} basename {})",
       "Read(//c/Users/mpshe/.claude/projects/c--Users-mpshe-Projects-Sisonke/memory/**)",
       "Bash(Select-String -Pattern \"error CS\")",
-      "Bash(Select-Object -First 10)"
+      "Bash(Select-Object -First 10)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke\" -Recurse -File | Select-Object -First 30 | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke\" -Directory | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke\\\\Sisonke.Web\" -Directory | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke\\\\Sisonke.Web\\\\Components\" -Recurse -File | ForEach-Object { $_.FullName })",
+      "Bash(ls \"C:\\\\Users\\\\mpshe\\\\Projects\" 2>&1)",
+      "Read(//c/Users/mpshe/Projects/**)",
+      "Bash(npm --version)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npx tailwindcss *)",
+      "Bash(npm run *)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\mpshe\\.claude\\projects\\c--Users-mpshe-Projects-Sisonke\\memory"
+      "c:\\Users\\mpshe\\.claude\\projects\\c--Users-mpshe-Projects-Sisonke\\memory",
+      "C:\\Users\\mpshe\\Projects\\aganang-dashboard"
     ]
   }
 }

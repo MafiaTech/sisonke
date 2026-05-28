@@ -254,36 +254,42 @@ else
                 <div class="card h-100">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center gap-2 mb-3">
-                            <div class="dash-card-icon-sm" style="background:#F3F0FF;color:#8B5CF6">
+                            <div class="dash-card-icon-sm" style="background:var(--sk-purple-light);color:var(--sk-purple)">
                                 <i class="bi bi-calendar-event-fill"></i>
                             </div>
-                            <h2 class="h6 mb-0 fw-700">Meetings &amp; Calendar</h2>
+                            <h2 class="h6 mb-0 fw-700">Meetings &amp; Agenda</h2>
                         </div>
                         <p class="stat-value">@upcomingMeetingCount</p>
                         <p class="stat-detail">Upcoming meetings</p>
-                        <p class="text-muted small mt-3 mb-0">Schedule meetings, view the calendar, generate agendas and capture attendance.</p>
-                        <a class="btn btn-outline-primary btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
-                            <i class="bi bi-calendar-event me-1"></i>Open Calendar
+                        <p class="text-muted small mt-3 mb-0">Manage meetings, set agendas, vote on items and log all decisions in one place.</p>
+                        <a class="btn btn-purple btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
+                            <i class="bi bi-calendar-event me-1"></i>Open Meetings
                         </a>
                     </div>
                 </div>
             </div>
 
-            <!-- Voting -->
+            <!-- Voting (inside meetings) -->
             <div class="col-12 col-md-6 col-lg-4">
-                <div class="card h-100">
+                <div class="card h-100" style="background:linear-gradient(135deg,#f6f4ff,var(--sk-purple-light));border-color:rgba(124,111,224,.2);">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center gap-2 mb-3">
-                            <div class="dash-card-icon-sm" style="background:#FFF7ED;color:#F97316">
+                            <div class="dash-card-icon-sm" style="background:white;color:var(--sk-purple)">
                                 <i class="bi bi-check2-square"></i>
                             </div>
                             <h2 class="h6 mb-0 fw-700">Voting &amp; Decisions</h2>
+                            <span class="ms-auto" style="font-size:.68rem;font-weight:700;color:var(--sk-purple);background:white;padding:3px 10px;border-radius:20px;letter-spacing:.03em;white-space:nowrap;">Inside Meetings</span>
                         </div>
-                        <p class="stat-value">@openVoteCount</p>
-                        <p class="stat-detail">Open polls</p>
-                        <p class="text-muted small mt-3 mb-0">Voting is managed inside each meeting.</p>
-                        <a class="btn btn-outline-primary btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
-                            <i class="bi bi-check2-square me-1"></i>Open Voting
+                        @if (openVoteCount > 0)
+                        {
+                            <p class="stat-value mb-1">@openVoteCount</p>
+                            <p class="stat-detail">Open polls</p>
+                        }
+                        <p class="text-muted small mb-0 @(openVoteCount > 0 ? "mt-2" : "")" style="line-height:1.65;">
+                            Votes and decisions are tied directly to meeting agenda items — so every resolution is recorded in context, with a full audit trail.
+                        </p>
+                        <a class="btn btn-purple btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
+                            <i class="bi bi-check2-square me-1"></i>Open Meetings
                         </a>
                     </div>
                 </div>

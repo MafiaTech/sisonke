@@ -37,7 +37,7 @@ else
             <div class="text-muted small">@meeting.MeetingDate.ToString("dd MMM yyyy")</div>
         </div>
         <div class="ms-auto d-flex gap-2 flex-wrap">
-            <a class="btn btn-primary btn-sm" href="@($"/create-vote/{MeetingId}")">
+            <a class="btn btn-purple btn-sm" href="@($"/create-vote/{MeetingId}")">
                 <i class="bi bi-plus-circle me-2"></i>Create Vote
             </a>
             <a class="btn btn-outline-secondary btn-sm" href="@($"/meeting/{MeetingId}")">
@@ -52,51 +52,32 @@ else
     }
     else
     {
-        <div class="card">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0 votes-table">
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Voting method</th>
-                                <th>Status</th>
-                                <th>Result</th>
-                                <th>Responses</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var vote in votes)
-                            {
-                                <tr>
-                                    <td>
-                                        <div class="fw-600">@vote.Title</div>
-                                        @if (!string.IsNullOrWhiteSpace(vote.Description))
-                                        {
-                                            <div class="text-muted small">@vote.Description</div>
-                                        }
-                                    </td>
-                                    <td>@FormatVotingMethod(vote.VotingMethod)</td>
-                                    <td>
-                                        <StatusBadge Text="@vote.Status.ToString()" Type="@GetVoteStatusBadgeType(vote.Status.ToString())" />
-                                    </td>
-                                    <td>
-                                        <StatusBadge Text="@vote.Result.ToString()" Type="@GetVoteResultBadgeType(vote.Result.ToString())" />
-                                    </td>
-                                    <td>@vote.Responses.Count</td>
-                                    <td class="text-end">
-                                        <a class="btn btn-outline-primary btn-sm" href="@($"/vote/{vote.Id}")">
-                                            View
-                                        </a>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+        @foreach (var vote in votes)
+        {
+            <div class="vote-card">
+                <div class="vote-card-icon @GetVoteIconClass(vote.Status.ToString(), vote.Result.ToString())">
+                    <i class="bi @GetVoteIcon(vote.Status.ToString(), vote.Result.ToString())"></i>
+                </div>
+                <div class="vote-card-body">
+                    <div class="vote-card-title">@vote.Title</div>
+                    @if (!string.IsNullOrWhiteSpace(vote.Description))
+                    {
+                        <p class="vote-card-desc">@vote.Description</p>
+                    }
+                    <div class="vote-card-meta">
+                        <span class="vote-card-method">@FormatVotingMethod(vote.VotingMethod)</span>
+                        <StatusBadge Text="@vote.Status.ToString()" Type="@GetVoteStatusBadgeType(vote.Status.ToString())" />
+                        <StatusBadge Text="@vote.Result.ToString()" Type="@GetVoteResultBadgeType(vote.Result.ToString())" />
+                        <span class="text-muted" style="font-size:.78rem;"><i class="bi bi-people me-1"></i>@vote.Responses.Count @(vote.Responses.Count == 1 ? "response" : "responses")</span>
+                    </div>
+                </div>
+                <div class="vote-card-actions">
+                    <a class="btn btn-purple btn-sm" href="@($"/vote/{vote.Id}")">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
                 </div>
             </div>
-        </div>
+        }
     }
 }
 
@@ -118,17 +99,6 @@ else
         display: flex;
         gap: 1rem;
         padding: 1rem 1.25rem;
-    }
-    .votes-table th {
-        color: var(--sk-text-muted);
-        font-size: .75rem;
-        font-weight: 700;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-    }
-    .votes-table td,
-    .votes-table th {
-        padding: 1rem;
     }
     @@media (max-width: 768px) {
         .votes-toolbar {
@@ -187,5 +157,23 @@ else
             "Cancelled" => "secondary",
             "Pending" => "warning",
             _ => "secondary"
+        };
+
+    private static string GetVoteIconClass(string status, string result) =>
+        (status, result) switch
+        {
+            ("Open", _)      => "open",
+            (_, "Passed")    => "passed",
+            (_, "Failed")    => "failed",
+            _                => "closed"
+        };
+
+    private static string GetVoteIcon(string status, string result) =>
+        (status, result) switch
+        {
+            ("Open", _)      => "bi-hourglass-split",
+            (_, "Passed")    => "bi-check-circle-fill",
+            (_, "Failed")    => "bi-x-circle-fill",
+            _                => "bi-lock-fill"
         };
 }

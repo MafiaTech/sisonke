@@ -30,36 +30,36 @@ else
         BackText="Back to Meetings"
         BackHref="@backToMeetingsHref" />
 
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <a class="btn btn-success" href="@($"/meeting-attendance/{MeetingId}")">
-            <i class="bi bi-person-check me-2"></i>Attendance Register
-        </a>
-        <a class="btn btn-primary" href="@($"/meeting-votes/{MeetingId}")">
-            <i class="bi bi-check2-square me-2"></i>Voting and Decisions
-        </a>
-        <a class="btn btn-outline-secondary" href="@backToMeetingsHref">
-            <i class="bi bi-arrow-left me-2"></i>Back to Meetings
-        </a>
-    </div>
-
     <div class="card mb-4">
         <div class="card-body p-4">
-            <div class="row g-3">
-                <div class="col-12 col-md-3">
-                    <div class="detail-mini-label">Meeting date</div>
-                    <div class="fw-600">@meeting.MeetingDate.ToString("dd MMM yyyy")</div>
+            <div class="meeting-detail-header">
+                <div class="meeting-detail-date-block">
+                    <div class="meeting-detail-date-day">@meeting.MeetingDate.Day.ToString("00")</div>
+                    <div class="meeting-detail-date-month">@meeting.MeetingDate.ToString("MMM yyyy")</div>
                 </div>
-                <div class="col-12 col-md-3">
-                    <div class="detail-mini-label">Venue</div>
-                    <div>@DisplayOrDash(meeting.Venue)</div>
-                </div>
-                <div class="col-12 col-md-3">
-                    <div class="detail-mini-label">Status</div>
-                    <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
-                </div>
-                <div class="col-12">
-                    <div class="detail-mini-label">Purpose</div>
-                    <div>@DisplayOrDash(meeting.Purpose)</div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
+                        @if (!string.IsNullOrWhiteSpace(meeting.Venue))
+                        {
+                            <span class="text-muted small"><i class="bi bi-geo-alt me-1"></i>@meeting.Venue</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
+                    {
+                        <p class="text-muted small mb-3" style="line-height:1.6;">@meeting.Purpose</p>
+                    }
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-success btn-sm" href="@($"/meeting-attendance/{MeetingId}")">
+                            <i class="bi bi-person-check me-1"></i>Attendance Register
+                        </a>
+                        <a class="btn btn-purple btn-sm" href="@($"/meeting-votes/{MeetingId}")">
+                            <i class="bi bi-check2-square me-1"></i>Voting and Decisions
+                        </a>
+                        <a class="btn btn-outline-secondary btn-sm" href="@backToMeetingsHref">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Meetings
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -67,19 +67,10 @@ else
 
     <div class="card">
         <div class="card-body p-4">
-            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
                 <div>
                     <h2 class="h5 mb-1">Generated Agenda</h2>
-                    <p class="text-muted small mb-0">Use Voting and Decisions to record formal approvals and meeting resolutions.</p>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <a class="btn btn-success btn-sm" href="@($"/meeting-attendance/{MeetingId}")">
-                        <i class="bi bi-person-check me-1"></i>Attendance Register
-                    </a>
-                    <a class="btn btn-primary btn-sm" href="@($"/meeting-votes/{MeetingId}")">
-                        <i class="bi bi-check2-square me-1"></i>Voting and Decisions
-                    </a>
-                    <a class="btn btn-outline-secondary btn-sm" href="@backToMeetingsHref">Back to Meetings</a>
+                    <p class="text-muted small mb-0">@meeting.AgendaItems.Count @(meeting.AgendaItems.Count == 1 ? "item" : "items") · use Voting &amp; Decisions to log formal resolutions.</p>
                 </div>
             </div>
 
@@ -89,22 +80,29 @@ else
             }
             else
             {
-                <div class="list-group agenda-list">
+                <div class="agenda-items-list">
                     @foreach (var agendaItem in meeting.AgendaItems.OrderBy(item => item.DisplayOrder))
                     {
-                        <div class="list-group-item">
-                            <div class="d-flex align-items-start gap-3">
-                                <span class="agenda-order">@agendaItem.DisplayOrder</span>
-                                <div class="flex-grow-1">
-                                    <div class="d-flex align-items-center justify-content-between gap-3">
-                                        <div class="fw-600">@agendaItem.Title</div>
-                                        <StatusBadge Text="@(agendaItem.IsCompleted ? "Completed" : "Open")" Type="@(agendaItem.IsCompleted ? "success" : "secondary")" />
-                                    </div>
-                                    @if (!string.IsNullOrWhiteSpace(agendaItem.Description))
-                                    {
-                                        <div class="text-muted small mt-1">@agendaItem.Description</div>
-                                    }
-                                </div>
+                        <div class="agenda-item">
+                            <span class="agenda-num @(agendaItem.IsCompleted ? "done" : "open")">
+                                @if (agendaItem.IsCompleted)
+                                {
+                                    <i class="bi bi-check"></i>
+                                }
+                                else
+                                {
+                                    @agendaItem.DisplayOrder
+                                }
+                            </span>
+                            <div>
+                                <div class="agenda-item-title">@agendaItem.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(agendaItem.Description))
+                                {
+                                    <p class="agenda-item-desc">@agendaItem.Description</p>
+                                }
+                            </div>
+                            <div>
+                                <StatusBadge Text="@(agendaItem.IsCompleted ? "Completed" : "Open")" Type="@(agendaItem.IsCompleted ? "success" : "secondary")" />
                             </div>
                         </div>
                     }
@@ -123,23 +121,6 @@ else
         color: var(--sk-text-muted);
         font-weight: 600;
         margin-bottom: .15rem;
-    }
-    .agenda-list .list-group-item {
-        border-color: #e5e7eb;
-        padding: 1rem;
-    }
-    .agenda-order {
-        align-items: center;
-        background: var(--sk-green-50);
-        border-radius: 999px;
-        color: var(--sk-green-800);
-        display: inline-flex;
-        flex: 0 0 auto;
-        font-size: .875rem;
-        font-weight: 700;
-        height: 2rem;
-        justify-content: center;
-        width: 2rem;
     }
 </style>
 

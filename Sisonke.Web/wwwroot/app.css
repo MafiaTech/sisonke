@@ -50,6 +50,11 @@
     --sk-radius-sm:   0.5rem;
     --sk-radius-lg:   1.125rem;
 
+    /* Purple (meetings / voting accent) */
+    --sk-purple:      #7c6fe0;
+    --sk-purple-dark: #6658c9;
+    --sk-purple-light: #f0effe;
+
     /* Shadows */
     --sk-shadow-sm:   0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
     --sk-shadow:      0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
@@ -289,7 +294,7 @@ a, .btn-link { color: var(--sk-green-700); }
 .stat-card.stat-members::before    { background: var(--sk-info); }
 .stat-card.stat-contributions::before { background: var(--sk-success); }
 .stat-card.stat-fines::before      { background: var(--sk-danger); }
-.stat-card.stat-meetings::before   { background: #8B5CF6; }
+.stat-card.stat-meetings::before   { background: var(--sk-purple); }
 .stat-card.stat-balance::before    { background: var(--sk-gold); }
 .stat-card.stat-constitution::before { background: var(--sk-green-700); }
 
@@ -310,7 +315,7 @@ a, .btn-link { color: var(--sk-green-700); }
 .stat-card.stat-members    .stat-icon-wrap { background: #EFF6FF; color: var(--sk-info); }
 .stat-card.stat-contributions .stat-icon-wrap { background: var(--sk-success-bg); color: var(--sk-success); }
 .stat-card.stat-fines      .stat-icon-wrap { background: var(--sk-danger-bg); color: var(--sk-danger); }
-.stat-card.stat-meetings   .stat-icon-wrap { background: #F3F0FF; color: #8B5CF6; }
+.stat-card.stat-meetings   .stat-icon-wrap { background: var(--sk-purple-light); color: var(--sk-purple); }
 .stat-card.stat-balance    .stat-icon-wrap { background: var(--sk-gold-light); color: var(--sk-gold-dark); }
 .stat-card.stat-constitution .stat-icon-wrap { background: var(--sk-green-50); color: var(--sk-green-700); }
 
@@ -1019,3 +1024,338 @@ a, .btn-link { color: var(--sk-green-700); }
 }
 
 #blazor-error-ui a { color: #991b1b; }
+
+/* ═══════════════════════════════════════════════════════════
+   MEETINGS & AGENDA — Purple accent design system
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Purple buttons ─────────────────────────────────────── */
+.btn-purple {
+    background-color: var(--sk-purple);
+    border-color: var(--sk-purple);
+    color: #fff;
+}
+.btn-purple:hover, .btn-purple:focus, .btn-purple:active {
+    background-color: var(--sk-purple-dark);
+    border-color: var(--sk-purple-dark);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(124,111,224,.35);
+}
+.btn-outline-purple {
+    color: var(--sk-purple);
+    border-color: var(--sk-purple);
+    background: transparent;
+}
+.btn-outline-purple:hover {
+    background-color: var(--sk-purple);
+    border-color: var(--sk-purple);
+    color: #fff;
+}
+
+/* ── Purple badge variant ───────────────────────────────── */
+.badge.bg-purple {
+    background-color: var(--sk-purple) !important;
+    color: #fff !important;
+}
+.badge.bg-purple-soft {
+    background-color: var(--sk-purple-light) !important;
+    color: var(--sk-purple) !important;
+}
+
+/* ── Meeting cards ──────────────────────────────────────── */
+.meeting-card {
+    background: var(--sk-card);
+    border-radius: var(--sk-radius);
+    border: 1px solid var(--sk-border);
+    box-shadow: var(--sk-shadow-sm);
+    overflow: hidden;
+    margin-bottom: 0.875rem;
+    transition: box-shadow .2s, transform .2s;
+}
+.meeting-card:hover { box-shadow: var(--sk-shadow-md); transform: translateY(-1px); }
+.meeting-card:last-child { margin-bottom: 0; }
+
+.meeting-card-bar { height: 3px; }
+.meeting-card-bar.bar-planned   { background: linear-gradient(90deg, var(--sk-purple), #a899f5); }
+.meeting-card-bar.bar-scheduled { background: linear-gradient(90deg, var(--sk-purple), #a899f5); }
+.meeting-card-bar.bar-inprogress{ background: linear-gradient(90deg, var(--sk-gold), #fbbf24); }
+.meeting-card-bar.bar-completed { background: linear-gradient(90deg, #c4c4d4, #dddde8); }
+.meeting-card-bar.bar-cancelled { background: linear-gradient(90deg, var(--sk-danger), #f87171); }
+
+.meeting-card-body {
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+}
+
+.meeting-card-date {
+    padding: 1.25rem 0.75rem;
+    text-align: center;
+    background: var(--sk-bg);
+    border-right: 1px solid var(--sk-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.meeting-card-date.dim { opacity: .4; }
+
+.meeting-card-day {
+    font-size: 1.875rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--sk-text);
+    letter-spacing: -0.03em;
+}
+
+.meeting-card-month {
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--sk-text-muted);
+    margin-top: 0.2rem;
+}
+
+.meeting-card-info {
+    padding: 1rem 1.25rem;
+    min-width: 0;
+}
+
+.meeting-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.meeting-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--sk-text);
+    letter-spacing: -0.01em;
+}
+
+.meeting-card-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+}
+
+.meeting-card-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: var(--sk-text-muted);
+}
+
+.meeting-card-purpose {
+    font-size: 0.78rem;
+    color: var(--sk-text-muted);
+    margin-top: 0.5rem;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.meeting-card-aside {
+    padding: 1rem 1.25rem;
+    border-left: 1px solid var(--sk-border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 0.5rem;
+    min-width: 110px;
+}
+
+/* ── Agenda items ───────────────────────────────────────── */
+.agenda-items-list { padding: 0.5rem 0; }
+
+.agenda-item {
+    display: grid;
+    grid-template-columns: 2rem 1fr auto;
+    gap: 0.875rem;
+    padding: 0.875rem 0;
+    border-bottom: 1px solid var(--sk-border);
+    align-items: start;
+}
+.agenda-item:last-child { border-bottom: none; }
+
+.agenda-num {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+.agenda-num.open { background: var(--sk-purple-light); color: var(--sk-purple); }
+.agenda-num.done { background: var(--sk-success-bg); color: var(--sk-success); }
+
+.agenda-item-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--sk-text);
+    margin-bottom: 0.2rem;
+    line-height: 1.35;
+}
+
+.agenda-item-desc {
+    font-size: 0.8rem;
+    color: var(--sk-text-muted);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ── Vote progress bar ──────────────────────────────────── */
+.vote-bar-wrap { margin-top: 0.625rem; }
+
+.vote-bar-track {
+    height: 6px;
+    background: var(--sk-border);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.vote-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width .5s ease;
+}
+.vote-bar-fill.fill-yes { background: var(--sk-success); }
+.vote-bar-fill.fill-no  { background: var(--sk-danger); }
+
+.vote-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--sk-text-muted);
+    margin-top: 0.3rem;
+}
+
+/* ── Summary card color variants ────────────────────────── */
+.summary-card.present  { border-left-color: var(--sk-success) !important; }
+.summary-card.absent   { border-left-color: var(--sk-danger)  !important; }
+.summary-card.apology  { border-left-color: var(--sk-gold)    !important; }
+.summary-card.late     { border-left-color: var(--sk-info)    !important; }
+.summary-card.yes-vote { border-left-color: var(--sk-success) !important; }
+.summary-card.no-vote  { border-left-color: var(--sk-danger)  !important; }
+.summary-card.abstain  { border-left-color: var(--sk-text-muted) !important; }
+
+/* ── Vote cards (voting list) ───────────────────────────── */
+.vote-card {
+    background: var(--sk-card);
+    border-radius: var(--sk-radius);
+    border: 1px solid var(--sk-border);
+    box-shadow: var(--sk-shadow-sm);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    transition: box-shadow .2s, transform .2s;
+    flex-wrap: wrap;
+}
+.vote-card:hover { box-shadow: var(--sk-shadow-md); transform: translateY(-1px); }
+.vote-card:last-child { margin-bottom: 0; }
+
+.vote-card-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--sk-radius-sm);
+    background: var(--sk-purple-light);
+    color: var(--sk-purple);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.vote-card-icon.open   { background: var(--sk-purple-light); color: var(--sk-purple); }
+.vote-card-icon.closed { background: var(--sk-bg); color: var(--sk-text-muted); }
+.vote-card-icon.passed { background: var(--sk-success-bg); color: var(--sk-success); }
+.vote-card-icon.failed { background: var(--sk-danger-bg); color: var(--sk-danger); }
+
+.vote-card-body { flex: 1; min-width: 0; }
+.vote-card-title { font-size: 0.9375rem; font-weight: 600; color: var(--sk-text); margin-bottom: 0.25rem; }
+.vote-card-desc  { font-size: 0.8rem; color: var(--sk-text-muted); margin: 0; }
+.vote-card-meta  {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+.vote-card-method {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--sk-text-muted);
+    background: var(--sk-bg);
+    border: 1px solid var(--sk-border);
+    border-radius: 99px;
+    padding: 0.15rem 0.6rem;
+}
+.vote-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* ── Meeting detail date block ───────────────────────────── */
+.meeting-detail-header {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.meeting-detail-date-block {
+    background: var(--sk-purple-light);
+    border-radius: var(--sk-radius-sm);
+    padding: 1rem 1.25rem;
+    text-align: center;
+    min-width: 80px;
+    flex-shrink: 0;
+}
+
+.meeting-detail-date-day {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--sk-purple);
+    letter-spacing: -0.03em;
+}
+
+.meeting-detail-date-month {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--sk-purple);
+    margin-top: 0.2rem;
+}
+
+/* ── Responsive meeting cards ───────────────────────────── */
+@media (max-width: 768px) {
+    .meeting-card-body { grid-template-columns: 70px 1fr; }
+    .meeting-card-aside { display: none; }
+    .meeting-card-info { padding-bottom: 1rem; }
+    .meeting-detail-header { grid-template-columns: 1fr; }
+    .meeting-detail-date-block { display: none; }
+}
+
+@media (max-width: 480px) {
+    .meeting-card-body { grid-template-columns: 1fr; }
+    .meeting-card-date { display: none; }
+}

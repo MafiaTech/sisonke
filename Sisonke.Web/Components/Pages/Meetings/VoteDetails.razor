@@ -53,7 +53,7 @@ else
         <div class="ms-auto d-flex gap-2 flex-wrap">
             @if (vote.Status == VoteStatus.Open)
             {
-                <button type="button" class="btn btn-warning btn-sm" @onclick="ShowCloseVoteModal">
+                <button type="button" class="btn btn-outline-purple btn-sm" @onclick="ShowCloseVoteModal">
                     <i class="bi bi-lock me-2"></i>Close Vote
                 </button>
             }
@@ -88,30 +88,48 @@ else
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-lg-4">
-            <div class="card summary-card h-100">
+            <div class="card summary-card yes-vote h-100">
                 <div class="card-body">
                     <div class="summary-label">Yes</div>
-                    <div class="summary-value">@voteSummary.Yes</div>
+                    <div class="summary-value" style="color:var(--sk-success)">@voteSummary.Yes</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-lg-4">
-            <div class="card summary-card h-100">
+            <div class="card summary-card no-vote h-100">
                 <div class="card-body">
                     <div class="summary-label">No</div>
-                    <div class="summary-value">@voteSummary.No</div>
+                    <div class="summary-value" style="color:var(--sk-danger)">@voteSummary.No</div>
                 </div>
             </div>
         </div>
         <div class="col-12 col-lg-4">
-            <div class="card summary-card h-100">
+            <div class="card summary-card abstain h-100">
                 <div class="card-body">
                     <div class="summary-label">Abstain</div>
-                    <div class="summary-value">@voteSummary.Abstain</div>
+                    <div class="summary-value" style="color:var(--sk-text-muted)">@voteSummary.Abstain</div>
                 </div>
             </div>
         </div>
     </div>
+
+    @if (TotalVotes > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-body p-4">
+                <div class="section-label mb-2">Vote Breakdown</div>
+                <div class="vote-bar-wrap">
+                    <div class="vote-bar-track">
+                        <div class="vote-bar-fill fill-yes" style="width:@(YesPercentage)%"></div>
+                    </div>
+                    <div class="vote-bar-labels">
+                        <span>Yes · @voteSummary.Yes (@(YesPercentage)%)</span>
+                        <span>No · @voteSummary.No · Abstain · @voteSummary.Abstain</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 
     @if (vote.Status == VoteStatus.Open)
     {
@@ -230,7 +248,7 @@ else
         line-height: 1.1;
     }
     .summary-card {
-        border-left: 4px solid var(--sk-green-700);
+        border-left: 4px solid var(--sk-border);
     }
     .vote-toolbar {
         align-items: center;
@@ -275,6 +293,9 @@ else
     private bool showCloseVoteModal;
     private string? successMessage;
     private string? errorMessage;
+
+    private int TotalVotes => voteSummary.Yes + voteSummary.No + voteSummary.Abstain;
+    private int YesPercentage => TotalVotes > 0 ? (voteSummary.Yes * 100 / TotalVotes) : 0;
 
     [Parameter]
     public Guid VoteId { get; set; }
