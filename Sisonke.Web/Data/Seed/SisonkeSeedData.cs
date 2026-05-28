@@ -364,6 +364,15 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            membershipRules,
+            "What is the maximum number of dependents allowed per member?",
+            QuestionType.Number,
+            true,
+            7,
+            "This applies mainly to burial societies where members may register covered dependents.");
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
             contributionsAndFines,
             "How much must each member contribute?",
             QuestionType.Currency,
@@ -519,7 +528,8 @@ public static class SisonkeSeedData
         string questionText,
         QuestionType questionType,
         bool isRequired,
-        int displayOrder)
+        int displayOrder,
+        string? helpText = null)
     {
         var question = await context.QuestionnaireQuestions
             .SingleOrDefaultAsync(existingQuestion =>
@@ -537,6 +547,7 @@ public static class SisonkeSeedData
             QuestionnaireSectionId = section.Id,
             QuestionnaireSection = section,
             QuestionText = questionText,
+            HelpText = helpText,
             QuestionType = questionType,
             IsRequired = isRequired,
             DisplayOrder = displayOrder,

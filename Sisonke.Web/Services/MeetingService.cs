@@ -82,6 +82,60 @@ public class MeetingService(ApplicationDbContext context)
         return meeting;
     }
 
+    public async Task<Meeting?> UpdateMeetingAsync(
+        Guid meetingId,
+        string title,
+        DateTime meetingDate,
+        string? venue,
+        string? purpose)
+    {
+        var meeting = await context.Meetings
+            .SingleOrDefaultAsync(existingMeeting => existingMeeting.Id == meetingId);
+
+        if (meeting is null)
+        {
+            return null;
+        }
+
+        var hasAnotherMeetingOnDate = await context.Meetings
+            .AnyAsync(existingMeeting =>
+                existingMeeting.TenantId == meeting.TenantId &&
+                existingMeeting.Id != meetingId &&
+                existingMeeting.MeetingDate.Date == meetingDate.Date &&
+                existingMeeting.Status != MeetingStatus.Cancelled);
+
+        if (hasAnotherMeetingOnDate)
+        {
+            return null;
+        }
+
+        meeting.Title = title;
+        meeting.MeetingDate = meetingDate;
+        meeting.Venue = venue;
+        meeting.Purpose = purpose;
+
+        await context.SaveChangesAsync();
+
+        return meeting;
+    }
+
+    public async Task<bool> DeleteMeetingAsync(Guid meetingId)
+    {
+        var meeting = await context.Meetings
+            .Include(existingMeeting => existingMeeting.AgendaItems)
+            .SingleOrDefaultAsync(existingMeeting => existingMeeting.Id == meetingId);
+
+        if (meeting is null)
+        {
+            return false;
+        }
+
+        context.Meetings.Remove(meeting);
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
     public async Task<bool> HasMeetingOnDateAsync(Guid stokvelId, DateTime meetingDate)
     {
         var stokvel = await context.Stokvels
@@ -114,6 +168,137 @@ public class MeetingService(ApplicationDbContext context)
                 meeting.TenantId == stokvel.TenantId &&
                 meeting.MeetingDate >= DateTime.Today &&
                 (meeting.Status == MeetingStatus.Planned || meeting.Status == MeetingStatus.InProgress));
+    }
+
+    public async Task<MeetingAgendaItem?> AddAgendaItemAsync(Guid meetingId, string title, string? description)
+    {
+        var meeting = await context.Meetings
+            .SingleOrDefaultAsync(existingMeeting => existingMeeting.Id == meetingId);
+
+        if (meeting is null)
+        {
+            return null;
+        }
+
+        var maxDisplayOrder = await context.MeetingAgendaItems
+            .Where(agendaItem => agendaItem.MeetingId == meetingId)
+            .MaxAsync(agendaItem => (int?)agendaItem.DisplayOrder) ?? 0;
+
+        var item = new MeetingAgendaItem
+        {
+            Id = Guid.NewGuid(),
+            MeetingId = meetingId,
+            Title = title,
+            Description = description,
+            DisplayOrder = maxDisplayOrder + 1,
+            IsCompleted = false
+        };
+
+        context.MeetingAgendaItems.Add(item);
+        await context.SaveChangesAsync();
+
+        return item;
+    }
+
+    public async Task<MeetingAgendaItem?> UpdateAgendaItemAsync(
+        Guid agendaItemId,
+        string title,
+        string? description,
+        string? notes,
+        bool isCompleted)
+    {
+        var item = await context.MeetingAgendaItems
+            .SingleOrDefaultAsync(existingAgendaItem => existingAgendaItem.Id == agendaItemId);
+
+        if (item is null)
+        {
+            return null;
+        }
+
+        item.Title = title;
+        item.Description = description;
+        item.Notes = notes;
+        item.IsCompleted = isCompleted;
+
+        await context.SaveChangesAsync();
+
+        return item;
+    }
+
+    public async Task<bool> DeleteAgendaItemAsync(Guid agendaItemId)
+    {
+        var item = await context.MeetingAgendaItems
+            .SingleOrDefaultAsync(existingAgendaItem => existingAgendaItem.Id == agendaItemId);
+
+        if (item is null)
+        {
+            return false;
+        }
+
+        var meetingId = item.MeetingId;
+
+        context.MeetingAgendaItems.Remove(item);
+        await context.SaveChangesAsync();
+
+        await ReorderAgendaItemsAsync(meetingId);
+
+        return true;
+    }
+
+    public async Task<bool> MoveAgendaItemUpAsync(Guid agendaItemId)
+    {
+        var item = await context.MeetingAgendaItems
+            .SingleOrDefaultAsync(existingAgendaItem => existingAgendaItem.Id == agendaItemId);
+
+        if (item is null)
+        {
+            return false;
+        }
+
+        var previousItem = await context.MeetingAgendaItems
+            .Where(agendaItem =>
+                agendaItem.MeetingId == item.MeetingId &&
+                agendaItem.DisplayOrder < item.DisplayOrder)
+            .OrderByDescending(agendaItem => agendaItem.DisplayOrder)
+            .FirstOrDefaultAsync();
+
+        if (previousItem is null)
+        {
+            return false;
+        }
+
+        (item.DisplayOrder, previousItem.DisplayOrder) = (previousItem.DisplayOrder, item.DisplayOrder);
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<bool> MoveAgendaItemDownAsync(Guid agendaItemId)
+    {
+        var item = await context.MeetingAgendaItems
+            .SingleOrDefaultAsync(existingAgendaItem => existingAgendaItem.Id == agendaItemId);
+
+        if (item is null)
+        {
+            return false;
+        }
+
+        var nextItem = await context.MeetingAgendaItems
+            .Where(agendaItem =>
+                agendaItem.MeetingId == item.MeetingId &&
+                agendaItem.DisplayOrder > item.DisplayOrder)
+            .OrderBy(agendaItem => agendaItem.DisplayOrder)
+            .FirstOrDefaultAsync();
+
+        if (nextItem is null)
+        {
+            return false;
+        }
+
+        (item.DisplayOrder, nextItem.DisplayOrder) = (nextItem.DisplayOrder, item.DisplayOrder);
+        await context.SaveChangesAsync();
+
+        return true;
     }
 
     public async Task<List<MeetingAttendance>> GetAttendanceByMeetingIdAsync(Guid meetingId)
@@ -209,6 +394,21 @@ public class MeetingService(ApplicationDbContext context)
             attendanceRecords.Count(attendance => attendance.Status == AttendanceStatus.Absent),
             attendanceRecords.Count(attendance => attendance.Status == AttendanceStatus.Apology),
             attendanceRecords.Count(attendance => attendance.IsLate));
+    }
+
+    private async Task ReorderAgendaItemsAsync(Guid meetingId)
+    {
+        var agendaItems = await context.MeetingAgendaItems
+            .Where(agendaItem => agendaItem.MeetingId == meetingId)
+            .OrderBy(agendaItem => agendaItem.DisplayOrder)
+            .ToListAsync();
+
+        for (var index = 0; index < agendaItems.Count; index++)
+        {
+            agendaItems[index].DisplayOrder = index + 1;
+        }
+
+        await context.SaveChangesAsync();
     }
 
     private static List<MeetingAgendaItem> BuildDefaultAgendaItems(StokvelType stokvelType)

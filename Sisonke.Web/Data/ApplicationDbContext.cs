@@ -13,6 +13,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Member> Members => Set<Member>();
     public DbSet<NextOfKin> NextOfKinRecords => Set<NextOfKin>();
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
+    public DbSet<MemberDependent> MemberDependents => Set<MemberDependent>();
     public DbSet<FineType> FineTypes => Set<FineType>();
     public DbSet<MemberFine> MemberFines => Set<MemberFine>();
     public DbSet<ContributionRule> ContributionRules => Set<ContributionRule>();
@@ -83,6 +84,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(b => b.Member)
             .WithMany(m => m.Beneficiaries)
             .HasForeignKey(b => b.MemberId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MemberDependent>()
+            .HasOne(d => d.Member)
+            .WithMany()
+            .HasForeignKey(d => d.MemberId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<FineType>()

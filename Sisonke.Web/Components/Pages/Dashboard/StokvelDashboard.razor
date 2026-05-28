@@ -93,6 +93,9 @@ else
                                 <div class="progress-bar" style="width:@(GetMemberLimitProgress(maxM))%"></div>
                             </div>
                         }
+                        <a class="btn btn-primary btn-sm mt-3" href="@($"/members/{StokvelId}")">
+                            <i class="bi bi-people-fill me-1"></i>Manage Members
+                        </a>
                     </div>
                 </div>
             </div>
@@ -107,6 +110,9 @@ else
                         <div class="stat-label">Monthly Contributions</div>
                         <p class="stat-value">@FormatZAR(expectedMonthlyContributions)</p>
                         <p class="stat-detail">Expected per cycle</p>
+                        <a class="btn btn-outline-primary btn-sm mt-3" href="@($"/contribution-rules/{StokvelId}")">
+                            <i class="bi bi-sliders me-1"></i>Contribution Rules
+                        </a>
                     </div>
                 </div>
             </div>
@@ -137,29 +143,12 @@ else
                             <StatusBadge Text="@constitutionStatus" Type="@GetConstitutionStatusBadgeType(constitutionStatus)" />
                         </div>
                         <p class="stat-detail mt-1">
-                            @(constitutionStatus == "Approved" ? "Document approved" : constitutionStatus == "Draft" ? "Draft in progress" : "Not yet created")
+                            @(constitutionStatus == "Approved" ? "Document approved" : constitutionStatus == "Uploaded" ? "Uploaded for review" : constitutionStatus == "Draft" ? "Draft in progress" : "Not yet created")
                         </p>
+                        <a class="btn btn-outline-primary btn-sm mt-3" href="@($"/constitution-builder/{StokvelId}")">
+                            <i class="bi bi-file-earmark-text me-1"></i>@GetConstitutionButtonText(constitutionStatus)
+                        </a>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ══ Action row ═════════════════════════════════════════ -->
-        <div class="row g-3 mb-3">
-            <div class="col-12">
-                <div class="dashboard-action-bar">
-                    <a class="btn btn-primary btn-sm" href="@($"/members/{StokvelId}")">
-                        <i class="bi bi-people-fill me-2"></i>Manage Members
-                    </a>
-                    <a class="btn btn-outline-primary btn-sm" href="@($"/contribution-rules/{StokvelId}")">
-                        <i class="bi bi-sliders me-2"></i>Contribution Rules
-                    </a>
-                    <a class="btn btn-outline-primary btn-sm" href="@($"/constitution-builder/{StokvelId}")">
-                        <i class="bi bi-file-earmark-text me-2"></i>@GetConstitutionButtonText(constitutionStatus)
-                    </a>
-                    <a class="btn btn-outline-primary btn-sm" href="@($"/meetings/{StokvelId}")">
-                        <i class="bi bi-calendar-event me-2"></i>Meetings
-                    </a>
                 </div>
             </div>
         </div>
@@ -220,7 +209,7 @@ else
                             <a class="btn btn-primary btn-sm" href="@($"/constitution-builder/{StokvelId}")">
                                 <i class="bi bi-pencil-square me-1"></i>@GetConstitutionButtonText(constitutionStatus)
                             </a>
-                            <a class="btn btn-outline-secondary btn-sm disabled" aria-disabled="true">
+                            <a class="btn btn-outline-secondary btn-sm" href="@($"/upload-constitution/{StokvelId}")">
                                 <i class="bi bi-upload me-1"></i>Upload Existing
                             </a>
                         </div>
@@ -286,7 +275,7 @@ else
                             <p class="stat-detail">Open polls</p>
                         }
                         <p class="text-muted small mb-0 @(openVoteCount > 0 ? "mt-2" : "")" style="line-height:1.65;">
-                            Votes and decisions are tied directly to meeting agenda items — so every resolution is recorded in context, with a full audit trail.
+                            Votes and decisions are managed inside each meeting agenda.
                         </p>
                         <a class="btn btn-purple btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
                             <i class="bi bi-check2-square me-1"></i>Open Meetings
@@ -315,16 +304,6 @@ else
     .sib-body { flex: 1; min-width: 0; }
     .sib-title { font-size: 1rem; font-weight: 700; margin-bottom: .25rem; }
     .sib-text  { font-size: .875rem; opacity: .8; margin: 0; }
-
-    .dashboard-action-bar {
-        display: flex;
-        gap: .625rem;
-        flex-wrap: wrap;
-        background: var(--sk-card);
-        border: 1px solid var(--sk-border);
-        border-radius: var(--sk-radius-sm);
-        padding: .875rem 1.25rem;
-    }
 
     .dash-card-icon-sm {
         width: 2rem;
@@ -431,8 +410,14 @@ else
         maxMembers <= 0 ? 0 : Math.Min(100, memberCount * 100 / maxMembers);
 
     private static string GetConstitutionButtonText(string status) =>
-        status switch { "Draft" => "Continue Constitution", "Approved" => "View Constitution", _ => "Create Constitution" };
+        status switch
+        {
+            "Draft" => "Continue Constitution",
+            "Uploaded" => "Review Uploaded Constitution",
+            "Approved" => "View Constitution",
+            _ => "Create Constitution"
+        };
 
     private static string GetConstitutionStatusBadgeType(string status) =>
-        status switch { "Draft" => "warning", "Approved" => "success", _ => "secondary" };
+        status switch { "Draft" => "warning", "Uploaded" => "info", "Approved" => "success", _ => "secondary" };
 }

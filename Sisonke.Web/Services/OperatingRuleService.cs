@@ -45,6 +45,17 @@ public class OperatingRuleService(ApplicationDbContext context)
             : 1;
     }
 
+    public async Task<int> GetMaxDependentsAsync(Guid stokvelId)
+    {
+        var answer = await GetAnswerByQuestionTextAsync(
+            stokvelId,
+            "What is the maximum number of dependents allowed per member?");
+
+        return int.TryParse(answer, out var maxDependents)
+            ? maxDependents
+            : 0;
+    }
+
     public async Task<decimal> GetContributionAmountAsync(Guid stokvelId)
     {
         var answer = await GetAnswerByQuestionTextAsync(

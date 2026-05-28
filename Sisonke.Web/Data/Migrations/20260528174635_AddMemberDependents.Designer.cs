@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sisonke.Web.Data;
 
@@ -10,9 +11,11 @@ using Sisonke.Web.Data;
 namespace Sisonke.Web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260528174635_AddMemberDependents")]
+    partial class AddMemberDependents
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.8");
@@ -284,29 +287,11 @@ namespace Sisonke.Web.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ContentType")
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<long?>("FileSizeBytes")
-                        .HasColumnType("INTEGER");
-
                     b.Property<bool>("IsApproved")
                         .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsUploadedDocument")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("OriginalFileName")
-                        .HasMaxLength(300)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("StoredFilePath")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("TEXT");
@@ -673,12 +658,6 @@ namespace Sisonke.Web.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("DeathReportedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("DeceasedDate")
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("DefaultRole")
                         .HasColumnType("INTEGER");
 
@@ -694,9 +673,6 @@ namespace Sisonke.Web.Migrations
                     b.Property<string>("IdNumber")
                         .HasMaxLength(30)
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsDeceased")
-                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsInCoolingPeriod")
                         .HasColumnType("INTEGER");
@@ -768,58 +744,6 @@ namespace Sisonke.Web.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("MemberContributions");
-                });
-
-            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberDependent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CellphoneNumber")
-                        .HasMaxLength(30)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("DateOfBirth")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("DeathReportedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("DeceasedDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("IdNumber")
-                        .HasMaxLength(30)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDeceased")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("MemberId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Relationship")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MemberId");
-
-                    b.ToTable("MemberDependents");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberFine", b =>
@@ -1512,17 +1436,6 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("Member");
 
                     b.Navigation("Tenant");
-                });
-
-            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberDependent", b =>
-                {
-                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
-                        .WithMany()
-                        .HasForeignKey("MemberId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberFine", b =>

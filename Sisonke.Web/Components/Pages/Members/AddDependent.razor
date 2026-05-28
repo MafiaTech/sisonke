@@ -1,0 +1,137 @@
+@page "/add-dependent/{MemberId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject MemberService MemberService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Add Dependent</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading...
+    </div>
+}
+else if (member is null)
+{
+    <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Add Dependent"
+        Subtitle="@member.FullName"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{MemberId}")" />
+
+    @if (saveFailed)
+    {
+        <AlertBanner
+            Type="warning"
+            Title="Dependent could not be added."
+            Message="The maximum dependent limit may have been reached."
+            Icon="bi bi-exclamation-triangle-fill" />
+    }
+
+    <div class="form-page">
+        <div class="card">
+            <div class="card-body p-4">
+                <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="AddDependentForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
+
+                    <div class="form-section-title">Dependent Details</div>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="full-name">Full name <span class="text-danger">*</span></label>
+                            <InputText id="full-name" class="form-control" placeholder="e.g. Zanele Nkosi" @bind-Value="model.FullName" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="relationship">Relationship</label>
+                            <InputSelect id="relationship" class="form-select" @bind-Value="model.Relationship">
+                                @foreach (var relationship in relationshipOptions)
+                                {
+                                    <option value="@relationship">@relationship</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="date-of-birth">Date of birth</label>
+                            <InputDate id="date-of-birth" class="form-control" @bind-Value="model.DateOfBirth" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="id-number">ID number</label>
+                            <InputText id="id-number" class="form-control" placeholder="13-digit SA ID number" @bind-Value="model.IdNumber" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="cellphone-number">Cellphone number</label>
+                            <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="model.CellphoneNumber" />
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-person-check me-2"></i>Save Dependent
+                        </button>
+                        <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly string[] relationshipOptions =
+    [
+        "Spouse",
+        "Child",
+        "Parent",
+        "Sibling",
+        "Extended Family",
+        "Other"
+    ];
+
+    private Member? member;
+    private MemberDependent model = new()
+    {
+        Relationship = "Child"
+    };
+    private bool isLoading = true;
+    private bool saveFailed;
+
+    [Parameter]
+    public Guid MemberId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        saveFailed = false;
+
+        var savedDependent = await MemberService.AddDependentAsync(MemberId, model);
+
+        if (savedDependent is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/member-profile/{MemberId}");
+    }
+}

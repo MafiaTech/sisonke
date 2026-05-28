@@ -84,7 +84,21 @@ else
                         <div class="pdl-row"><dt>Cellphone</dt><dd>@member.CellphoneNumber</dd></div>
                         <div class="pdl-row"><dt>Email</dt><dd>@(member.EmailAddress ?? "—")</dd></div>
                         <div class="pdl-row"><dt>ID number</dt><dd>@(member.IdNumber ?? "—")</dd></div>
-                        <div class="pdl-row last"><dt>Residential area</dt><dd>@(member.ResidentialArea ?? "—")</dd></div>
+                        <div class="pdl-row"><dt>Residential area</dt><dd>@(member.ResidentialArea ?? "—")</dd></div>
+                        <div class="pdl-row"><dt>Deceased</dt><dd>@(member.IsDeceased ? "Yes" : "No")</dd></div>
+                        @if (member.IsDeceased)
+                        {
+                            <div class="pdl-row"><dt>Deceased date</dt><dd>@(member.DeceasedDate?.ToString("dd MMM yyyy") ?? "—")</dd></div>
+                            <div class="pdl-row"><dt>Death reported at</dt><dd>@(member.DeathReportedAt?.ToString("dd MMM yyyy") ?? "—")</dd></div>
+                        }
+                        <div class="pdl-row last">
+                            <dt></dt>
+                            <dd>
+                                <a class="btn btn-sm btn-outline-danger" href="@($"/edit-member/{MemberId}")">
+                                    Mark as Deceased
+                                </a>
+                            </dd>
+                        </div>
                     </dl>
                 </div>
             </div>
@@ -214,6 +228,86 @@ else
             </div>
         </div>
 
+        <!-- Dependents / covered lives -->
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <div class="card-section-title mb-1">Dependents / Covered Lives</div>
+                            <div class="text-muted small">Dependents captured: @dependents.Count of @maxDependents</div>
+                        </div>
+                        @if (maxDependents > 0 && dependents.Count < maxDependents)
+                        {
+                            <a class="btn btn-sm btn-primary" href="@($"/add-dependent/{MemberId}")">
+                                <i class="bi bi-plus me-1"></i>Add Dependent
+                            </a>
+                        }
+                    </div>
+
+                    @if (maxDependents <= 0)
+                    {
+                        <div class="alert alert-info mb-0" role="alert">
+                            Dependents are not enabled for this stokvel. Update the stokvel setup rules if dependents should be allowed.
+                        </div>
+                    }
+                    else if (dependents.Count >= maxDependents)
+                    {
+                        <div class="alert alert-warning" role="alert">
+                            Maximum number of dependents reached.
+                        </div>
+                    }
+
+                    @if (dependents.Count == 0)
+                    {
+                        <p class="text-muted small mb-0">No dependents captured yet.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Full name</th>
+                                        <th>Relationship</th>
+                                        <th>Date of birth</th>
+                                        <th>ID number</th>
+                                        <th>Cellphone</th>
+                                        <th>Status</th>
+                                        <th>Deceased</th>
+                                        <th>Deceased date</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var dependent in dependents)
+                                    {
+                                        <tr>
+                                            <td class="fw-500">@dependent.FullName</td>
+                                            <td class="text-muted small">@dependent.Relationship</td>
+                                            <td class="text-muted small">@(dependent.DateOfBirth?.ToString("dd MMM yyyy") ?? "—")</td>
+                                            <td class="text-muted small">@(dependent.IdNumber ?? "—")</td>
+                                            <td class="text-muted small">@(dependent.CellphoneNumber ?? "—")</td>
+                                            <td>
+                                                <StatusBadge Text="@(dependent.IsActive ? "Active" : "Inactive")" Type="@(dependent.IsActive ? "success" : "secondary")" />
+                                            </td>
+                                            <td>
+                                                <StatusBadge Text="@(dependent.IsDeceased ? "Yes" : "No")" Type="@(dependent.IsDeceased ? "danger" : "secondary")" />
+                                            </td>
+                                            <td class="text-muted small">
+                                                @(dependent.IsDeceased ? dependent.DeceasedDate?.ToString("dd MMM yyyy") ?? "—" : "—")
+                                            </td>
+                                            <td><a class="btn btn-sm btn-outline-secondary" href="@($"/edit-dependent/{dependent.Id}")">Edit</a></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
         <!-- Fines -->
         <div class="col-12">
             <div class="card">
@@ -293,10 +387,12 @@ else
 
 @code {
     private Member? member;
+    private List<MemberDependent> dependents = [];
     private List<MemberFine> memberFines = [];
     private Stokvel? stokvel;
     private int maxNextOfKin;
     private int maxBeneficiaries;
+    private int maxDependents;
     private bool isLoading = true;
 
     [Parameter]
@@ -309,6 +405,8 @@ else
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
         maxNextOfKin = stokvel is null ? 0 : await OperatingRuleService.GetMaxNextOfKinAsync(stokvel.Id);
         maxBeneficiaries = stokvel is null ? 0 : await OperatingRuleService.GetMaxBeneficiariesAsync(stokvel.Id);
+        maxDependents = stokvel is null ? 0 : await OperatingRuleService.GetMaxDependentsAsync(stokvel.Id);
+        dependents = member is null ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
         memberFines = member is null ? [] : await FineService.GetMemberFinesAsync(MemberId);
         isLoading = false;
     }

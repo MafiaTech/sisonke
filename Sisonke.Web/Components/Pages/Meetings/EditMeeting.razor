@@ -1,0 +1,146 @@
+@page "/edit-meeting/{MeetingId:guid}"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject MeetingService MeetingService
+@inject StokvelService StokvelService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Meeting</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading meeting...
+    </div>
+}
+else if (meeting is null)
+{
+    <AlertBanner Type="danger" Title="Meeting not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Edit Meeting"
+        Subtitle="@(stokvel?.Name ?? meeting.Title)"
+        BackText="Back to Meeting"
+        BackHref="@($"/meeting/{MeetingId}")" />
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
+    }
+
+    <div class="form-page form-page-sm">
+        <div class="card">
+            <div class="card-body p-4">
+                <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="EditMeetingForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
+
+                    <div class="form-section-title">Meeting Details</div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="title">Title <span class="text-danger">*</span></label>
+                            <InputText id="title" class="form-control" @bind-Value="model.Title" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="meeting-date">Meeting date</label>
+                            <InputDate id="meeting-date" class="form-control" @bind-Value="model.MeetingDate" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="venue">Venue</label>
+                            <InputText id="venue" class="form-control" @bind-Value="model.Venue" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="purpose">Purpose</label>
+                            <InputTextArea id="purpose" class="form-control" rows="4" @bind-Value="model.Purpose" />
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2 flex-wrap">
+                        <button class="btn btn-purple" type="submit">
+                            <i class="bi bi-check2-circle me-2"></i>Save Meeting
+                        </button>
+                        <a class="btn btn-outline-secondary" href="@($"/meeting/{MeetingId}")">Cancel</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Meeting? meeting;
+    private Stokvel? stokvel;
+    private EditMeetingModel model = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    [Parameter]
+    public Guid MeetingId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+
+        if (meeting is not null)
+        {
+            stokvel = await StokvelService.GetStokvelByTenantIdAsync(meeting.TenantId);
+            model = new EditMeetingModel
+            {
+                Title = meeting.Title,
+                MeetingDate = meeting.MeetingDate,
+                Venue = meeting.Venue,
+                Purpose = meeting.Purpose
+            };
+        }
+
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        errorMessage = null;
+
+        var updatedMeeting = await MeetingService.UpdateMeetingAsync(
+            MeetingId,
+            model.Title,
+            model.MeetingDate,
+            model.Venue,
+            model.Purpose);
+
+        if (updatedMeeting is null)
+        {
+            errorMessage = "Meeting could not be updated. Another meeting may already exist on the selected date.";
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/meeting/{MeetingId}");
+    }
+
+    private class EditMeetingModel
+    {
+        [Required]
+        [MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        public DateTime MeetingDate { get; set; } = DateTime.Today;
+
+        [MaxLength(150)]
+        public string? Venue { get; set; }
+
+        [MaxLength(500)]
+        public string? Purpose { get; set; }
+    }
+}

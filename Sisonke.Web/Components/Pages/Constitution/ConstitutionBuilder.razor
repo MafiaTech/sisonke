@@ -64,49 +64,111 @@ else
         <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
     }
 
-    <div class="card mb-4">
-        <div class="card-body p-4">
-            <div class="wizard-steps mb-4">
-                @for (var step = 1; step <= stepTitles.Length; step++)
-                {
-                    var localStep = step;
-                    <button type="button"
-                            class="wizard-step @(currentStep == localStep ? "active" : string.Empty)"
-                            @onclick="() => GoToStep(localStep)">
-                        <span>@localStep</span>
-                        @stepTitles[localStep - 1]
-                    </button>
-                }
-            </div>
+    @if (HasUploadedConstitution)
+    {
+        <div class="card mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
+                        <i class="bi bi-file-earmark-arrow-up-fill"></i>
+                    </div>
+                    <h2 class="h6 mb-0 fw-700">Uploaded Constitution</h2>
+                </div>
 
-            @if (currentStep == 1)
-            {
-                <div class="form-section-title">Basics</div>
-                <div class="row g-3">
-                    <div class="col-12">
-                        <label class="form-label" for="group-purpose">What is the primary purpose of this group?</label>
-                        <select id="group-purpose" class="form-select" value="@GetAnswer("groupPurpose")" @onchange='e => SetAnswer("groupPurpose", e.Value?.ToString())'>
-                            <option value="">Select purpose</option>
-                            @foreach (var option in GroupPurposeOptions)
-                            {
-                                <option value="@option">@option</option>
-                            }
-                        </select>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-6">
+                        <div class="detail-mini-label">Original file name</div>
+                        <div class="fw-600">@latestConstitution?.OriginalFileName</div>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="chairperson">Chairperson Name</label>
-                        <input id="chairperson" class="form-control" value="@GetAnswer("executiveChairperson")" @oninput='e => SetAnswer("executiveChairperson", e.Value?.ToString())' />
+                    <div class="col-12 col-md-6">
+                        <div class="detail-mini-label">File size</div>
+                        <div class="text-muted small">@FormatFileSize(latestConstitution?.FileSizeBytes)</div>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="secretary">Secretary Name</label>
-                        <input id="secretary" class="form-control" value="@GetAnswer("executiveSecretary")" @oninput='e => SetAnswer("executiveSecretary", e.Value?.ToString())' />
+                    <div class="col-12 col-md-6">
+                        <div class="detail-mini-label">Uploaded status</div>
+                        <StatusBadge Text="Uploaded" Type="info" />
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="treasurer">Treasurer Name</label>
-                        <input id="treasurer" class="form-control" value="@GetAnswer("executiveTreasurer")" @oninput='e => SetAnswer("executiveTreasurer", e.Value?.ToString())' />
+                    <div class="col-12 col-md-6">
+                        <div class="detail-mini-label">Approved status</div>
+                        <StatusBadge Text="@(IsApproved ? "Approved" : "Not Approved")" Type="@(IsApproved ? "success" : "warning")" />
                     </div>
                 </div>
-            }
+
+                <div class="d-flex gap-2 flex-wrap">
+                    @if (!string.IsNullOrWhiteSpace(latestConstitution?.StoredFilePath))
+                    {
+                        <a class="btn btn-primary" href="@latestConstitution.StoredFilePath" target="_blank" rel="noopener noreferrer">
+                            <i class="bi bi-box-arrow-up-right me-2"></i>Open Uploaded Document
+                        </a>
+                    }
+                    @if (!IsApproved)
+                    {
+                        <button type="button" class="btn btn-success" @onclick="ShowApprovalConfirmation">
+                            <i class="bi bi-check-circle me-2"></i>Approve Constitution
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (!IsApproved)
+        {
+            <ConfirmationModal
+                IsVisible="@showApprovalConfirmation"
+                Title="Approve Constitution"
+                Message="You are about to approve this uploaded constitution. Please confirm that the uploaded document has been reviewed and accepted by the stokvel members."
+                ConfirmButtonText="Confirm Approval"
+                CancelButtonText="Cancel"
+                ModalType="warning"
+                OnConfirm="@ConfirmApprovalAsync"
+                OnCancel="@CancelApproval" />
+        }
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-body p-4">
+                <div class="wizard-steps mb-4">
+                    @for (var step = 1; step <= stepTitles.Length; step++)
+                    {
+                        var localStep = step;
+                        <button type="button"
+                                class="wizard-step @(currentStep == localStep ? "active" : string.Empty)"
+                                @onclick="() => GoToStep(localStep)">
+                            <span>@localStep</span>
+                            @stepTitles[localStep - 1]
+                        </button>
+                    }
+                </div>
+
+                @if (currentStep == 1)
+                {
+                    <div class="form-section-title">Basics</div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="group-purpose">What is the primary purpose of this group?</label>
+                            <select id="group-purpose" class="form-select" value="@GetAnswer("groupPurpose")" @onchange='e => SetAnswer("groupPurpose", e.Value?.ToString())'>
+                                <option value="">Select purpose</option>
+                                @foreach (var option in GroupPurposeOptions)
+                                {
+                                    <option value="@option">@option</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="chairperson">Chairperson Name</label>
+                            <input id="chairperson" class="form-control" value="@GetAnswer("executiveChairperson")" @oninput='e => SetAnswer("executiveChairperson", e.Value?.ToString())' />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="secretary">Secretary Name</label>
+                            <input id="secretary" class="form-control" value="@GetAnswer("executiveSecretary")" @oninput='e => SetAnswer("executiveSecretary", e.Value?.ToString())' />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="treasurer">Treasurer Name</label>
+                            <input id="treasurer" class="form-control" value="@GetAnswer("executiveTreasurer")" @oninput='e => SetAnswer("executiveTreasurer", e.Value?.ToString())' />
+                        </div>
+                    </div>
+                }
             else if (currentStep == 2)
             {
                 <div class="form-section-title">Money</div>
@@ -331,10 +393,22 @@ else
             OnConfirm="@ConfirmApprovalAsync"
             OnCancel="@CancelApproval" />
     }
+    }
 }
 
 <style>
     .fw-600 { font-weight: 600; }
+    .fw-700 { font-weight: 700; }
+    .dash-card-icon-sm {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .875rem;
+        flex-shrink: 0;
+    }
     .detail-mini-label {
         font-size: .6875rem;
         text-transform: uppercase;
@@ -436,6 +510,7 @@ else
     private string? errorMessage;
 
     private bool IsApproved => string.Equals(constitutionStatus, "Approved", StringComparison.OrdinalIgnoreCase);
+    private bool HasUploadedConstitution => latestConstitution?.IsUploadedDocument == true;
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -451,7 +526,7 @@ else
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         wizardAnswers = await ConstitutionService.GetWizardAnswersAsync(StokvelId);
         latestConstitution = await ConstitutionService.GetLatestConstitutionAsync(StokvelId);
-        previewContent = latestConstitution?.Content;
+        previewContent = latestConstitution?.IsUploadedDocument == true ? null : latestConstitution?.Content;
 
         isLoading = false;
     }
@@ -568,6 +643,22 @@ else
         errorMessage = null;
         showApprovalConfirmation = false;
 
+        if (HasUploadedConstitution)
+        {
+            latestConstitution = await ConstitutionService.ApproveUploadedConstitutionAsync(StokvelId);
+
+            if (latestConstitution is null)
+            {
+                errorMessage = "Constitution could not be approved.";
+                return;
+            }
+
+            await ReloadStatusAsync();
+            previewContent = null;
+            successMessage = "Constitution approved successfully.";
+            return;
+        }
+
         var generatedContent = await SaveAndGenerateContentAsync();
 
         if (string.IsNullOrWhiteSpace(generatedContent))
@@ -620,6 +711,20 @@ else
     {
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         latestConstitution = await ConstitutionService.GetLatestConstitutionAsync(StokvelId);
+    }
+
+    private static string FormatFileSize(long? bytes)
+    {
+        if (bytes is null)
+        {
+            return "—";
+        }
+
+        const decimal oneMegabyte = 1024 * 1024;
+
+        return bytes >= oneMegabyte
+            ? $"{bytes.Value / oneMegabyte:0.##} MB"
+            : $"{bytes.Value / 1024m:0.##} KB";
     }
 
     private static string GetStatusBadgeType(string status) =>

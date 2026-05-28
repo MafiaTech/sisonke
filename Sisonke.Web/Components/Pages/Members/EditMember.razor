@@ -122,6 +122,28 @@ else
                 </div>
             </div>
 
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <p class="form-section-title">Deceased Tracking</p>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="is-deceased" class="form-check-input" @bind-Value="editMember.IsDeceased" />
+                                <label class="form-check-label fw-semibold" for="is-deceased">Member is deceased</label>
+                            </div>
+                            <div class="form-text">Use this for burial society claims and future deceased-member reporting.</div>
+                        </div>
+                        @if (editMember.IsDeceased)
+                        {
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="deceased-date">Deceased date</label>
+                                <InputDate id="deceased-date" class="form-control" @bind-Value="editMember.DeceasedDate" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button class="btn btn-primary" type="submit">
                     <i class="bi bi-check-lg me-2"></i>Save Changes
@@ -155,6 +177,11 @@ else
         }
 
         saveFailed = false;
+
+        if (editMember.IsDeceased && editMember.DeathReportedAt is null)
+        {
+            editMember.DeathReportedAt = DateTime.UtcNow;
+        }
 
         var updatedMember = await MemberService.UpdateMemberAsync(editMember);
 

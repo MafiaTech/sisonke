@@ -6,6 +6,7 @@
 
 @inject MeetingService MeetingService
 @inject StokvelService StokvelService
+@inject NavigationManager NavigationManager
 
 <PageTitle>@(meeting?.Title ?? "Meeting")</PageTitle>
 
@@ -24,38 +25,49 @@ else if (meeting is null)
 }
 else
 {
-    <PageHeader
-        Title="@meeting.Title"
-        Subtitle="Meeting governance record"
-        BackText="Back to Meetings"
-        BackHref="@backToMeetingsHref" />
+    <div class="meeting-detail-page-header">
+        <a class="back-nav" href="@backToMeetingsHref">
+            <i class="bi bi-chevron-left"></i>Back to Meetings
+        </a>
+    </div>
 
-    <div class="card mb-4">
+    <div class="card meeting-detail-summary-card mb-4">
         <div class="card-body p-4">
             <div class="meeting-detail-header">
                 <div class="meeting-detail-date-block">
                     <div class="meeting-detail-date-day">@meeting.MeetingDate.Day.ToString("00")</div>
                     <div class="meeting-detail-date-month">@meeting.MeetingDate.ToString("MMM yyyy")</div>
                 </div>
-                <div>
-                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                <div class="meeting-detail-main">
+                    <div class="meeting-detail-title-row">
+                        <h1 class="meeting-detail-title">@meeting.Title</h1>
                         <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
-                        @if (!string.IsNullOrWhiteSpace(meeting.Venue))
-                        {
-                            <span class="text-muted small"><i class="bi bi-geo-alt me-1"></i>@meeting.Venue</span>
-                        }
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
-                    {
-                        <p class="text-muted small mb-3" style="line-height:1.6;">@meeting.Purpose</p>
-                    }
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="meeting-detail-meta">
+                        <span class="meeting-detail-meta-item">
+                            <i class="bi bi-calendar3"></i>@meeting.MeetingDate.ToString("dd MMM yyyy, HH:mm")
+                        </span>
+                        <span class="meeting-detail-meta-item">
+                            <i class="bi bi-geo-alt"></i>@DisplayOrDash(meeting.Venue)
+                        </span>
+                    </div>
+                    <p class="meeting-detail-purpose">
+                        <span class="meeting-detail-purpose-label">Purpose</span>
+                        @DisplayOrDash(meeting.Purpose)
+                    </p>
+                    <div class="meeting-detail-actions">
                         <a class="btn btn-success btn-sm" href="@($"/meeting-attendance/{MeetingId}")">
                             <i class="bi bi-person-check me-1"></i>Attendance Register
                         </a>
                         <a class="btn btn-purple btn-sm" href="@($"/meeting-votes/{MeetingId}")">
                             <i class="bi bi-check2-square me-1"></i>Voting and Decisions
                         </a>
+                        <a class="btn btn-outline-primary btn-sm" href="@($"/edit-meeting/{MeetingId}")">
+                            <i class="bi bi-pencil-square me-1"></i>Edit Meeting
+                        </a>
+                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ShowDeleteMeetingConfirmation">
+                            <i class="bi bi-trash me-1"></i>Delete Meeting
+                        </button>
                         <a class="btn btn-outline-secondary btn-sm" href="@backToMeetingsHref">
                             <i class="bi bi-arrow-left me-1"></i>Back to Meetings
                         </a>
@@ -65,14 +77,52 @@ else
         </div>
     </div>
 
-    <div class="card">
+    <div class="card agenda-card">
         <div class="card-body p-4">
-            <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
+            <div class="agenda-card-header">
                 <div>
-                    <h2 class="h5 mb-1">Generated Agenda</h2>
-                    <p class="text-muted small mb-0">@meeting.AgendaItems.Count @(meeting.AgendaItems.Count == 1 ? "item" : "items") · use Voting &amp; Decisions to log formal resolutions.</p>
+                    <h2 class="agenda-card-title">Generated Agenda</h2>
+                    <p class="agenda-card-subtitle">@meeting.AgendaItems.Count @(meeting.AgendaItems.Count == 1 ? "item" : "items") · use Voting &amp; Decisions to log formal resolutions.</p>
                 </div>
+                <button type="button" class="btn btn-purple btn-sm" @onclick="ShowAddAgendaItemForm">
+                    <i class="bi bi-plus-circle me-1"></i>Add Agenda Item
+                </button>
             </div>
+
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
+            }
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
+            }
+
+            @if (isAddingAgendaItem)
+            {
+                <div class="agenda-management-form mb-3">
+                    <div class="agenda-form-title">Add Agenda Item</div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="new-agenda-title">Title</label>
+                            <input id="new-agenda-title" class="form-control" @bind="newAgendaTitle" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="new-agenda-description">Description</label>
+                            <textarea id="new-agenda-description" class="form-control" rows="3" @bind="newAgendaDescription"></textarea>
+                        </div>
+                    </div>
+                    <div class="agenda-form-actions">
+                        <button type="button" class="btn btn-primary btn-sm" @onclick="SaveNewAgendaItemAsync" disabled="@string.IsNullOrWhiteSpace(newAgendaTitle)">
+                            <i class="bi bi-check2 me-1"></i>Save
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelAddAgendaItem">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            }
 
             @if (meeting.AgendaItems.Count == 0)
             {
@@ -94,45 +144,124 @@ else
                                     @agendaItem.DisplayOrder
                                 }
                             </span>
-                            <div>
-                                <div class="agenda-item-title">@agendaItem.Title</div>
-                                @if (!string.IsNullOrWhiteSpace(agendaItem.Description))
-                                {
-                                    <p class="agenda-item-desc">@agendaItem.Description</p>
-                                }
-                            </div>
-                            <div>
-                                <StatusBadge Text="@(agendaItem.IsCompleted ? "Completed" : "Open")" Type="@(agendaItem.IsCompleted ? "success" : "secondary")" />
-                            </div>
+                            @if (editingAgendaItemId == agendaItem.Id)
+                            {
+                                <div class="agenda-edit-form">
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label class="form-label" for="@($"edit-title-{agendaItem.Id}")">Title</label>
+                                            <input id="@($"edit-title-{agendaItem.Id}")" class="form-control" @bind="editAgendaTitle" />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label" for="@($"edit-description-{agendaItem.Id}")">Description</label>
+                                            <textarea id="@($"edit-description-{agendaItem.Id}")" class="form-control" rows="3" @bind="editAgendaDescription"></textarea>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label" for="@($"edit-notes-{agendaItem.Id}")">Notes</label>
+                                            <textarea id="@($"edit-notes-{agendaItem.Id}")" class="form-control" rows="3" @bind="editAgendaNotes"></textarea>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="form-check">
+                                                <input id="@($"edit-completed-{agendaItem.Id}")" class="form-check-input" type="checkbox" @bind="editAgendaIsCompleted" />
+                                                <label class="form-check-label" for="@($"edit-completed-{agendaItem.Id}")">IsCompleted</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="agenda-form-actions">
+                                        <button type="button" class="btn btn-primary btn-sm" @onclick="SaveAgendaItemEditAsync" disabled="@string.IsNullOrWhiteSpace(editAgendaTitle)">
+                                            <i class="bi bi-check2 me-1"></i>Save
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEditAgendaItem">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div>
+                                    <div class="agenda-item-title">@agendaItem.Title</div>
+                                    @if (!string.IsNullOrWhiteSpace(agendaItem.Description))
+                                    {
+                                        <p class="agenda-item-desc">@agendaItem.Description</p>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(agendaItem.Notes))
+                                    {
+                                        <p class="agenda-item-notes">@agendaItem.Notes</p>
+                                    }
+                                </div>
+                                <div class="agenda-row-actions">
+                                    <StatusBadge Text="@(agendaItem.IsCompleted ? "Completed" : "Open")" Type="@(agendaItem.IsCompleted ? "success" : "secondary")" />
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => MoveAgendaItemUpAsync(agendaItem.Id))">
+                                        <i class="bi bi-arrow-up me-1"></i>Move Up
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => MoveAgendaItemDownAsync(agendaItem.Id))">
+                                        <i class="bi bi-arrow-down me-1"></i>Move Down
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="@(() => ShowEditAgendaItemForm(agendaItem))">
+                                        <i class="bi bi-pencil-square me-1"></i>Edit
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="@(() => ShowDeleteAgendaItemConfirmation(agendaItem.Id))">
+                                        <i class="bi bi-trash me-1"></i>Delete
+                                    </button>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
             }
         </div>
     </div>
-}
 
-<style>
-    .fw-600 { font-weight: 600; }
-    .detail-mini-label {
-        font-size: .6875rem;
-        text-transform: uppercase;
-        letter-spacing: .05em;
-        color: var(--sk-text-muted);
-        font-weight: 600;
-        margin-bottom: .15rem;
-    }
-</style>
+    <ConfirmationModal
+        IsVisible="@showDeleteAgendaItemConfirmation"
+        Title="Delete Agenda Item"
+        Message="Are you sure you want to delete this agenda item? This action cannot be undone."
+        ConfirmButtonText="Delete"
+        CancelButtonText="Cancel"
+        ModalType="danger"
+        OnConfirm="ConfirmDeleteAgendaItemAsync"
+        OnCancel="CancelDeleteAgendaItem" />
+
+    <ConfirmationModal
+        IsVisible="@showDeleteMeetingConfirmation"
+        Title="Delete Meeting"
+        Message="Are you sure you want to delete this meeting? This will also remove its agenda items. This action cannot be undone."
+        ConfirmButtonText="Delete Meeting"
+        CancelButtonText="Cancel"
+        ModalType="danger"
+        OnConfirm="ConfirmDeleteMeetingAsync"
+        OnCancel="CancelDeleteMeeting" />
+}
 
 @code {
     private Meeting? meeting;
     private string backToMeetingsHref = "/my-stokvels";
+    private string? successMessage;
+    private string? errorMessage;
     private bool isLoading = true;
+    private bool isAddingAgendaItem;
+    private string newAgendaTitle = string.Empty;
+    private string? newAgendaDescription;
+    private Guid? editingAgendaItemId;
+    private string editAgendaTitle = string.Empty;
+    private string? editAgendaDescription;
+    private string? editAgendaNotes;
+    private bool editAgendaIsCompleted;
+    private bool showDeleteAgendaItemConfirmation;
+    private Guid? selectedAgendaItemId;
+    private bool showDeleteMeetingConfirmation;
 
     [Parameter]
     public Guid MeetingId { get; set; }
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadMeetingAsync();
+        isLoading = false;
+    }
+
+    private async Task LoadMeetingAsync()
     {
         meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
 
@@ -143,8 +272,156 @@ else
                 ? "/my-stokvels"
                 : $"/meetings/{stokvel.Id}";
         }
+    }
 
-        isLoading = false;
+    private void ShowAddAgendaItemForm()
+    {
+        successMessage = null;
+        errorMessage = null;
+        editingAgendaItemId = null;
+        isAddingAgendaItem = true;
+        newAgendaTitle = string.Empty;
+        newAgendaDescription = null;
+    }
+
+    private void CancelAddAgendaItem()
+    {
+        isAddingAgendaItem = false;
+        newAgendaTitle = string.Empty;
+        newAgendaDescription = null;
+    }
+
+    private async Task SaveNewAgendaItemAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newAgendaTitle))
+        {
+            return;
+        }
+
+        var item = await MeetingService.AddAgendaItemAsync(MeetingId, newAgendaTitle.Trim(), newAgendaDescription);
+
+        if (item is not null)
+        {
+            await LoadMeetingAsync();
+            CancelAddAgendaItem();
+            successMessage = "Agenda item added.";
+        }
+    }
+
+    private async Task MoveAgendaItemUpAsync(Guid agendaItemId)
+    {
+        successMessage = null;
+        errorMessage = null;
+        await MeetingService.MoveAgendaItemUpAsync(agendaItemId);
+        await LoadMeetingAsync();
+    }
+
+    private async Task MoveAgendaItemDownAsync(Guid agendaItemId)
+    {
+        successMessage = null;
+        errorMessage = null;
+        await MeetingService.MoveAgendaItemDownAsync(agendaItemId);
+        await LoadMeetingAsync();
+    }
+
+    private void ShowEditAgendaItemForm(MeetingAgendaItem agendaItem)
+    {
+        successMessage = null;
+        errorMessage = null;
+        isAddingAgendaItem = false;
+        editingAgendaItemId = agendaItem.Id;
+        editAgendaTitle = agendaItem.Title;
+        editAgendaDescription = agendaItem.Description;
+        editAgendaNotes = agendaItem.Notes;
+        editAgendaIsCompleted = agendaItem.IsCompleted;
+    }
+
+    private void CancelEditAgendaItem()
+    {
+        editingAgendaItemId = null;
+        editAgendaTitle = string.Empty;
+        editAgendaDescription = null;
+        editAgendaNotes = null;
+        editAgendaIsCompleted = false;
+    }
+
+    private async Task SaveAgendaItemEditAsync()
+    {
+        if (editingAgendaItemId is null || string.IsNullOrWhiteSpace(editAgendaTitle))
+        {
+            return;
+        }
+
+        var item = await MeetingService.UpdateAgendaItemAsync(
+            editingAgendaItemId.Value,
+            editAgendaTitle.Trim(),
+            editAgendaDescription,
+            editAgendaNotes,
+            editAgendaIsCompleted);
+
+        if (item is not null)
+        {
+            await LoadMeetingAsync();
+            CancelEditAgendaItem();
+            successMessage = "Agenda item updated.";
+        }
+    }
+
+    private void ShowDeleteAgendaItemConfirmation(Guid agendaItemId)
+    {
+        successMessage = null;
+        errorMessage = null;
+        selectedAgendaItemId = agendaItemId;
+        showDeleteAgendaItemConfirmation = true;
+    }
+
+    private void CancelDeleteAgendaItem()
+    {
+        selectedAgendaItemId = null;
+        showDeleteAgendaItemConfirmation = false;
+    }
+
+    private async Task ConfirmDeleteAgendaItemAsync()
+    {
+        if (selectedAgendaItemId is null)
+        {
+            return;
+        }
+
+        var deleted = await MeetingService.DeleteAgendaItemAsync(selectedAgendaItemId.Value);
+        CancelDeleteAgendaItem();
+
+        if (deleted)
+        {
+            await LoadMeetingAsync();
+            successMessage = "Agenda item deleted.";
+        }
+    }
+
+    private void ShowDeleteMeetingConfirmation()
+    {
+        successMessage = null;
+        errorMessage = null;
+        showDeleteMeetingConfirmation = true;
+    }
+
+    private void CancelDeleteMeeting()
+    {
+        showDeleteMeetingConfirmation = false;
+    }
+
+    private async Task ConfirmDeleteMeetingAsync()
+    {
+        var deleted = await MeetingService.DeleteMeetingAsync(MeetingId);
+        showDeleteMeetingConfirmation = false;
+
+        if (deleted)
+        {
+            NavigationManager.NavigateTo(backToMeetingsHref);
+            return;
+        }
+
+        errorMessage = "Meeting could not be deleted.";
     }
 
     private static string DisplayOrDash(string? value)

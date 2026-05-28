@@ -1,0 +1,243 @@
+@page "/edit-dependent/{DependentId:guid}"
+@rendermode InteractiveServer
+
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject MemberService MemberService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Dependent</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading...
+    </div>
+}
+else if (dependent is null)
+{
+    <AlertBanner Type="danger" Title="Dependent not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Edit Dependent"
+        Subtitle="@dependent.Member.FullName"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{dependent.MemberId}")" />
+
+    @if (saveFailed)
+    {
+        <AlertBanner Type="danger" Title="Unable to update dependent." Message="Please try again." Icon="bi bi-x-circle-fill" />
+    }
+
+    @if (deleteFailed)
+    {
+        <AlertBanner Type="danger" Title="Unable to delete dependent." Message="Please try again." Icon="bi bi-x-circle-fill" />
+    }
+
+    <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="EditDependentForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="alert alert-danger" />
+
+        <div class="form-page">
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <p class="form-section-title">Dependent Details</p>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="full-name">Full name <span class="text-danger">*</span></label>
+                            <InputText id="full-name" class="form-control" placeholder="e.g. Zanele Nkosi" @bind-Value="model.FullName" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="relationship">Relationship</label>
+                            <InputSelect id="relationship" class="form-select" @bind-Value="model.Relationship">
+                                @foreach (var relationship in relationshipOptions)
+                                {
+                                    <option value="@relationship">@relationship</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="date-of-birth">Date of birth</label>
+                            <InputDate id="date-of-birth" class="form-control" @bind-Value="model.DateOfBirth" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="id-number">ID number</label>
+                            <InputText id="id-number" class="form-control" placeholder="13-digit SA ID number" @bind-Value="model.IdNumber" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="cellphone-number">Cellphone number</label>
+                            <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="model.CellphoneNumber" />
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="is-active" class="form-check-input" @bind-Value="model.IsActive" />
+                                <label class="form-check-label fw-semibold" for="is-active">Active dependent</label>
+                            </div>
+                            <div class="form-text">Inactive dependents remain on record but are excluded from active covered lives.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="is-deceased" class="form-check-input" @bind-Value="model.IsDeceased" />
+                                <label class="form-check-label fw-semibold" for="is-deceased">Dependent is deceased</label>
+                            </div>
+                            <div class="form-text">Use this for burial society claims and future deceased-dependent reporting.</div>
+                        </div>
+
+                        @if (model.IsDeceased)
+                        {
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="deceased-date">Deceased date</label>
+                                <InputDate id="deceased-date" class="form-control" @bind-Value="model.DeceasedDate" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between gap-2 flex-wrap">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-floppy me-2"></i>Save Changes
+                    </button>
+                    <a class="btn btn-outline-secondary" href="@($"/member-profile/{dependent.MemberId}")">Cancel</a>
+                </div>
+
+                <button class="btn btn-outline-danger" type="button" @onclick="ShowDeleteConfirmation">
+                    <i class="bi bi-trash me-2"></i>Delete
+                </button>
+            </div>
+        </div>
+    </EditForm>
+
+    <ConfirmationModal
+        IsVisible="@showDeleteConfirmation"
+        Title="Delete Dependent"
+        Message="Are you sure you want to delete this dependent? This action cannot be undone."
+        ConfirmButtonText="Delete"
+        CancelButtonText="Cancel"
+        ModalType="danger"
+        OnConfirm="@HandleConfirmDelete"
+        OnCancel="@HideDeleteConfirmation" />
+}
+
+@code {
+    private static readonly string[] relationshipOptions =
+    [
+        "Spouse",
+        "Child",
+        "Parent",
+        "Sibling",
+        "Extended Family",
+        "Other"
+    ];
+
+    private MemberDependent? dependent;
+    private MemberDependent model = new();
+    private bool isLoading = true;
+    private bool saveFailed;
+    private bool deleteFailed;
+    private bool showDeleteConfirmation;
+
+    [Parameter]
+    public Guid DependentId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        dependent = await MemberService.GetDependentByIdAsync(DependentId);
+
+        if (dependent is not null)
+        {
+            model = new MemberDependent
+            {
+                Id = dependent.Id,
+                MemberId = dependent.MemberId,
+                Member = dependent.Member,
+                FullName = dependent.FullName,
+                Relationship = dependent.Relationship,
+                DateOfBirth = dependent.DateOfBirth,
+                IdNumber = dependent.IdNumber,
+                CellphoneNumber = dependent.CellphoneNumber,
+                IsActive = dependent.IsActive,
+                IsDeceased = dependent.IsDeceased,
+                DeceasedDate = dependent.DeceasedDate,
+                DeathReportedAt = dependent.DeathReportedAt,
+                CreatedAt = dependent.CreatedAt
+            };
+        }
+
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (dependent is null)
+        {
+            return;
+        }
+
+        saveFailed = false;
+
+        if (model.IsDeceased && model.DeathReportedAt is null)
+        {
+            model.DeathReportedAt = DateTime.UtcNow;
+        }
+
+        dependent.IsDeceased = model.IsDeceased;
+        dependent.DeceasedDate = model.DeceasedDate;
+        dependent.DeathReportedAt = model.DeathReportedAt;
+
+        var updatedDependent = await MemberService.UpdateDependentAsync(DependentId, model);
+
+        if (updatedDependent is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/member-profile/{dependent.MemberId}");
+    }
+
+    private void ShowDeleteConfirmation()
+    {
+        deleteFailed = false;
+        showDeleteConfirmation = true;
+    }
+
+    private void HideDeleteConfirmation()
+    {
+        showDeleteConfirmation = false;
+    }
+
+    private async Task HandleConfirmDelete()
+    {
+        if (dependent is null)
+        {
+            return;
+        }
+
+        var memberId = dependent.MemberId;
+        var deleted = await MemberService.DeleteDependentAsync(DependentId);
+
+        if (!deleted)
+        {
+            showDeleteConfirmation = false;
+            deleteFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/member-profile/{memberId}");
+    }
+}

@@ -15,6 +15,19 @@ public class ConstitutionDocument
 
     public string Content { get; set; } = string.Empty;
 
+    public bool IsUploadedDocument { get; set; }
+
+    [MaxLength(300)]
+    public string? OriginalFileName { get; set; }
+
+    [MaxLength(500)]
+    public string? StoredFilePath { get; set; }
+
+    [MaxLength(100)]
+    public string? ContentType { get; set; }
+
+    public long? FileSizeBytes { get; set; }
+
     public int VersionNumber { get; set; } = 1;
 
     public bool IsApproved { get; set; }

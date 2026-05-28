@@ -25,23 +25,17 @@ else if (stokvel is null)
 }
 else
 {
-    <PageHeader
-        Title="Meetings"
-        Subtitle="Plan and manage meetings for this stokvel."
-        BackText="Back to Dashboard"
-        BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
-
-    <div class="meetings-toolbar mb-4">
-        <div>
-            <div class="detail-mini-label">Stokvel</div>
-            <div class="fw-600">@stokvel.Name</div>
+    <div class="page-header meetings-page-header">
+        <div class="page-header-text">
+            <h1>Meetings &amp; Agenda</h1>
+            <p class="page-subtitle">@stokvel.Name · agenda items, votes &amp; decisions all in one place</p>
         </div>
-        <div class="ms-auto d-flex gap-2 flex-wrap">
-            <a class="btn btn-purple btn-sm" href="@($"/create-meeting/{StokvelId}")">
-                <i class="bi bi-plus-circle me-2"></i>Schedule Meeting
-            </a>
+        <div class="meetings-header-actions">
             <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
-                <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+            </a>
+            <a class="btn btn-purple btn-sm" href="@($"/create-meeting/{StokvelId}")">
+                <i class="bi bi-plus-circle me-1"></i>Schedule Meeting
             </a>
         </div>
     </div>
@@ -52,7 +46,99 @@ else
     }
     else
     {
-        <div class="card mb-4">
+        <div class="meetings-tabs mb-4" role="tablist" aria-label="Meeting views">
+            <button type="button" class="meetings-tab @(activeTab == "Upcoming" ? "active" : "")" role="tab" aria-selected="@(activeTab == "Upcoming")" @onclick="@(() => activeTab = "Upcoming")">
+                Upcoming
+            </button>
+            <button type="button" class="meetings-tab @(activeTab == "Past" ? "active" : "")" role="tab" aria-selected="@(activeTab == "Past")" @onclick="@(() => activeTab = "Past")">
+                Past
+            </button>
+            <button type="button" class="meetings-tab @(activeTab == "Minutes" ? "active" : "")" role="tab" aria-selected="@(activeTab == "Minutes")" @onclick="@(() => activeTab = "Minutes")">
+                Minutes
+            </button>
+        </div>
+
+        @if (activeTab == "Minutes")
+        {
+            <div class="meetings-empty-state mb-4">
+                <div class="meetings-empty-icon">
+                    <i class="bi bi-journal-text"></i>
+                </div>
+                <div>
+                    <div class="meetings-empty-title">No minutes yet</div>
+                    <p class="meetings-empty-text">Minutes will appear here once meetings are completed.</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            var visibleMeetings = activeTab == "Upcoming" ? UpcomingMeetings : PastMeetings;
+
+            @if (!visibleMeetings.Any())
+            {
+                <div class="meetings-empty-state mb-4">
+                    <div class="meetings-empty-icon">
+                        <i class="bi bi-calendar2-week"></i>
+                    </div>
+                    <div>
+                        <div class="meetings-empty-title">No @activeTab.ToLowerInvariant() meetings</div>
+                        <p class="meetings-empty-text">Meetings matching this view will appear here.</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="meetings-list mb-4">
+                    @foreach (var meeting in visibleMeetings)
+                    {
+                        <div class="meeting-card">
+                            <div class="meeting-card-bar @GetStatusBarClass(meeting.Status.ToString())"></div>
+                            <div class="meeting-card-body">
+                                <div class="meeting-card-date @(meeting.Status.ToString() == "Completed" ? "dim" : "")">
+                                    <div class="meeting-card-day">@meeting.MeetingDate.Day.ToString("00")</div>
+                                    <div class="meeting-card-month">@meeting.MeetingDate.ToString("MMM")</div>
+                                </div>
+                                <div class="meeting-card-info">
+                                    <div class="meeting-card-title-row">
+                                        <span class="meeting-card-title">@meeting.Title</span>
+                                        <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
+                                    </div>
+                                    <div class="meeting-card-meta">
+                                        <span class="meeting-card-meta-item">
+                                            <i class="bi bi-calendar3"></i>@meeting.MeetingDate.ToString("dd MMM yyyy, HH:mm")
+                                        </span>
+                                        <span class="meeting-card-meta-item">
+                                            <i class="bi bi-geo-alt"></i>@DisplayOrDash(meeting.Venue)
+                                        </span>
+                                        <span class="meeting-card-meta-item">
+                                            <i class="bi bi-list-ul"></i>@meeting.AgendaItems.Count agenda @(meeting.AgendaItems.Count == 1 ? "item" : "items")
+                                        </span>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
+                                    {
+                                        <div class="meeting-card-purpose">@meeting.Purpose</div>
+                                    }
+                                </div>
+                                <div class="meeting-card-aside">
+                                    <a class="btn btn-purple btn-sm" href="@($"/meeting/{meeting.Id}")">
+                                        <i class="bi bi-eye me-1"></i>View
+                                    </a>
+                                    <a class="btn btn-outline-primary btn-sm" href="@($"/edit-meeting/{meeting.Id}")">
+                                        <i class="bi bi-pencil-square me-1"></i>Edit
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="meeting-card-agenda-row">
+                                <i class="bi bi-check2-square"></i>
+                                <span>Agenda — @meeting.AgendaItems.Count @(meeting.AgendaItems.Count == 1 ? "item" : "items")</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        <div class="card mb-4 meetings-calendar-card">
             <div class="card-body p-4">
                 <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
                     <div>
@@ -91,151 +177,14 @@ else
                 </div>
             </div>
         </div>
-
-        <div class="section-label mb-3">All Meetings</div>
-        @foreach (var meeting in meetings.OrderByDescending(m => m.MeetingDate))
-        {
-            <div class="meeting-card">
-                <div class="meeting-card-bar @GetStatusBarClass(meeting.Status.ToString())"></div>
-                <div class="meeting-card-body">
-                    <div class="meeting-card-date @(meeting.Status.ToString() == "Completed" ? "dim" : "")">
-                        <div class="meeting-card-day">@meeting.MeetingDate.Day.ToString("00")</div>
-                        <div class="meeting-card-month">@meeting.MeetingDate.ToString("MMM")</div>
-                    </div>
-                    <div class="meeting-card-info">
-                        <div class="meeting-card-title-row">
-                            <span class="meeting-card-title">@meeting.Title</span>
-                            <StatusBadge Text="@meeting.Status.ToString()" Type="@GetStatusBadgeType(meeting.Status.ToString())" />
-                        </div>
-                        <div class="meeting-card-meta">
-                            <span class="meeting-card-meta-item">
-                                <i class="bi bi-calendar3"></i>@meeting.MeetingDate.ToString("dd MMM yyyy")
-                            </span>
-                            @if (!string.IsNullOrWhiteSpace(meeting.Venue))
-                            {
-                                <span class="meeting-card-meta-item">
-                                    <i class="bi bi-geo-alt"></i>@meeting.Venue
-                                </span>
-                            }
-                            <span class="meeting-card-meta-item">
-                                <i class="bi bi-list-ul"></i>@meeting.AgendaItems.Count agenda @(meeting.AgendaItems.Count == 1 ? "item" : "items")
-                            </span>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
-                        {
-                            <div class="meeting-card-purpose">@meeting.Purpose</div>
-                        }
-                    </div>
-                    <div class="meeting-card-aside">
-                        <a class="btn btn-purple btn-sm" href="@($"/meeting/{meeting.Id}")">
-                            <i class="bi bi-eye me-1"></i>View
-                        </a>
-                    </div>
-                </div>
-            </div>
-        }
     }
 }
-
-<style>
-    .fw-600 { font-weight: 600; }
-    .detail-mini-label {
-        font-size: .6875rem;
-        text-transform: uppercase;
-        letter-spacing: .05em;
-        color: var(--sk-text-muted);
-        font-weight: 600;
-        margin-bottom: .15rem;
-    }
-    .meetings-toolbar {
-        align-items: center;
-        background: var(--sk-card);
-        border: 1px solid var(--sk-border);
-        border-radius: var(--sk-radius-sm);
-        display: flex;
-        gap: 1rem;
-        padding: 1rem 1.25rem;
-    }
-    .meeting-calendar {
-        display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
-        overflow: hidden;
-        border: 1px solid var(--sk-border);
-        border-radius: var(--sk-radius-sm);
-        background: var(--sk-border);
-        gap: 1px;
-    }
-    .calendar-weekday {
-        background: var(--sk-green-50);
-        color: var(--sk-green-800);
-        font-size: .75rem;
-        font-weight: 700;
-        padding: .65rem .5rem;
-        text-align: center;
-    }
-    .calendar-day {
-        background: var(--sk-card);
-        min-height: 6.5rem;
-        padding: .65rem;
-    }
-    .calendar-day-muted {
-        background: #f8fafc;
-        color: var(--sk-text-muted);
-    }
-    .calendar-day-number {
-        color: var(--sk-text);
-        font-size: .875rem;
-        font-weight: 700;
-        margin-bottom: .4rem;
-    }
-    .calendar-meeting-badge {
-        background: var(--sk-green-50);
-        border: 1px solid #bbf7d0;
-        border-radius: 999px;
-        color: var(--sk-green-800);
-        display: block;
-        font-size: .75rem;
-        font-weight: 600;
-        line-height: 1.2;
-        margin-top: .3rem;
-        overflow: hidden;
-        padding: .25rem .45rem;
-        text-decoration: none;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .calendar-meeting-badge:hover {
-        background: #dcfce7;
-        color: var(--sk-green-900);
-    }
-    @@media (max-width: 768px) {
-        .meetings-toolbar {
-            align-items: flex-start;
-            flex-direction: column;
-        }
-        .meetings-toolbar .ms-auto {
-            margin-left: 0 !important;
-        }
-        .calendar-weekday {
-            font-size: .65rem;
-            padding: .5rem .2rem;
-        }
-        .calendar-day {
-            min-height: 5rem;
-            padding: .45rem;
-        }
-        .calendar-meeting-badge {
-            border-radius: 6px;
-            font-size: .6875rem;
-            white-space: normal;
-        }
-    }
-</style>
 
 @code {
     private Stokvel? stokvel;
     private List<Meeting> meetings = [];
     private DateTime visibleMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private string activeTab = "Upcoming";
     private bool isLoading = true;
     private static readonly string[] CalendarDayNames =
     [
@@ -266,6 +215,30 @@ else
     private static string DisplayOrDash(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private IEnumerable<Meeting> UpcomingMeetings =>
+        meetings
+            .Where(IsUpcomingMeeting)
+            .OrderBy(meeting => meeting.MeetingDate);
+
+    private IEnumerable<Meeting> PastMeetings =>
+        meetings
+            .Where(IsPastMeeting)
+            .OrderByDescending(meeting => meeting.MeetingDate);
+
+    private static bool IsUpcomingMeeting(Meeting meeting)
+    {
+        var status = meeting.Status.ToString();
+        return meeting.MeetingDate.Date >= DateTime.Today
+            && status != "Completed"
+            && status != "Cancelled";
+    }
+
+    private static bool IsPastMeeting(Meeting meeting)
+    {
+        var status = meeting.Status.ToString();
+        return meeting.MeetingDate.Date < DateTime.Today || status == "Completed";
     }
 
     private void ShowPreviousMonth()

@@ -229,6 +229,108 @@ public class MemberService(
         return beneficiary;
     }
 
+    public async Task<List<MemberDependent>> GetDependentsByMemberIdAsync(Guid memberId)
+    {
+        return await context.MemberDependents
+            .Where(dependent => dependent.MemberId == memberId)
+            .OrderBy(dependent => dependent.FullName)
+            .ToListAsync();
+    }
+
+    public async Task<bool> CanAddDependentAsync(Guid memberId)
+    {
+        var member = await context.Members
+            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+
+        if (member is null)
+        {
+            return false;
+        }
+
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.TenantId == member.TenantId);
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var maxDependents = await operatingRuleService.GetMaxDependentsAsync(stokvel.Id);
+
+        if (maxDependents <= 0)
+        {
+            return false;
+        }
+
+        var dependentCount = await context.MemberDependents
+            .CountAsync(dependent => dependent.MemberId == memberId && dependent.IsActive);
+
+        return dependentCount < maxDependents;
+    }
+
+    public async Task<MemberDependent?> AddDependentAsync(Guid memberId, MemberDependent dependent)
+    {
+        if (!await CanAddDependentAsync(memberId))
+        {
+            return null;
+        }
+
+        dependent.Id = Guid.NewGuid();
+        dependent.MemberId = memberId;
+        dependent.IsActive = true;
+        dependent.CreatedAt = DateTime.UtcNow;
+
+        context.MemberDependents.Add(dependent);
+        await context.SaveChangesAsync();
+
+        return dependent;
+    }
+
+    public async Task<MemberDependent?> GetDependentByIdAsync(Guid dependentId)
+    {
+        return await context.MemberDependents
+            .Include(dependent => dependent.Member)
+            .SingleOrDefaultAsync(dependent => dependent.Id == dependentId);
+    }
+
+    public async Task<MemberDependent?> UpdateDependentAsync(Guid dependentId, MemberDependent updatedDependent)
+    {
+        var dependent = await context.MemberDependents
+            .SingleOrDefaultAsync(existingDependent => existingDependent.Id == dependentId);
+
+        if (dependent is null)
+        {
+            return null;
+        }
+
+        dependent.FullName = updatedDependent.FullName;
+        dependent.Relationship = updatedDependent.Relationship;
+        dependent.DateOfBirth = updatedDependent.DateOfBirth;
+        dependent.IdNumber = updatedDependent.IdNumber;
+        dependent.CellphoneNumber = updatedDependent.CellphoneNumber;
+        dependent.IsActive = updatedDependent.IsActive;
+
+        await context.SaveChangesAsync();
+
+        return dependent;
+    }
+
+    public async Task<bool> DeleteDependentAsync(Guid dependentId)
+    {
+        var dependent = await context.MemberDependents
+            .SingleOrDefaultAsync(existingDependent => existingDependent.Id == dependentId);
+
+        if (dependent is null)
+        {
+            return false;
+        }
+
+        context.MemberDependents.Remove(dependent);
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
     public async Task<bool> CanAddNextOfKinAsync(Guid memberId)
     {
         var member = await context.Members

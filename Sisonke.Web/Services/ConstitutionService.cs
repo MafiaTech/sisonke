@@ -1,13 +1,16 @@
 using System.Net;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 
 namespace Sisonke.Web.Services;
 
-public class ConstitutionService(ApplicationDbContext context)
+public class ConstitutionService(ApplicationDbContext context, IWebHostEnvironment webHostEnvironment)
 {
     private const string ToBeConfirmed = "To be confirmed by the stokvel.";
+    private const long MaxConstitutionUploadSize = 10 * 1024 * 1024;
+    private static readonly string[] AllowedConstitutionExtensions = [".pdf", ".doc", ".docx"];
 
     public async Task<ConstitutionDocument?> GetLatestConstitutionAsync(Guid stokvelId)
     {
@@ -298,6 +301,67 @@ public class ConstitutionService(ApplicationDbContext context)
         return document;
     }
 
+    public async Task<ConstitutionDocument?> UploadExistingConstitutionAsync(
+        Guid stokvelId,
+        IBrowserFile file)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null || file is null)
+        {
+            return null;
+        }
+
+        var originalFileName = Path.GetFileName(file.Name);
+        var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
+
+        if (!AllowedConstitutionExtensions.Contains(extension) || file.Size > MaxConstitutionUploadSize)
+        {
+            return null;
+        }
+
+        var tenantFolderName = stokvel.TenantId.ToString("D");
+        var webRootPath = webHostEnvironment.WebRootPath
+            ?? Path.Combine(webHostEnvironment.ContentRootPath, "wwwroot");
+        var uploadFolder = Path.Combine(webRootPath, "uploads", "constitutions", tenantFolderName);
+
+        Directory.CreateDirectory(uploadFolder);
+
+        var storedFileName = $"{Guid.NewGuid()}_{GetSafeFileName(originalFileName)}";
+        var storedFilePath = Path.Combine(uploadFolder, storedFileName);
+
+        await using (var fileStream = File.Create(storedFilePath))
+        await using (var uploadStream = file.OpenReadStream(maxAllowedSize: MaxConstitutionUploadSize))
+        {
+            await uploadStream.CopyToAsync(fileStream);
+        }
+
+        var latestConstitution = await GetLatestConstitutionAsync(stokvelId);
+        var version = (latestConstitution?.VersionNumber ?? 0) + 1;
+
+        var document = new ConstitutionDocument
+        {
+            Id = Guid.NewGuid(),
+            TenantId = stokvel.TenantId,
+            Title = $"{stokvel.Name} Uploaded Constitution",
+            Content = "Uploaded constitution document.",
+            VersionNumber = version,
+            IsApproved = false,
+            IsUploadedDocument = true,
+            OriginalFileName = file.Name,
+            StoredFilePath = $"/uploads/constitutions/{tenantFolderName}/{storedFileName}",
+            ContentType = file.ContentType,
+            FileSizeBytes = file.Size,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.ConstitutionDocuments.Add(document);
+        await context.SaveChangesAsync();
+
+        return document;
+    }
+
     public async Task<ConstitutionDocument?> ApproveLatestAsync(Guid stokvelId)
     {
         var document = await GetLatestConstitutionAsync(stokvelId);
@@ -327,6 +391,23 @@ public class ConstitutionService(ApplicationDbContext context)
         return document;
     }
 
+    public async Task<ConstitutionDocument?> ApproveUploadedConstitutionAsync(Guid stokvelId)
+    {
+        var document = await GetLatestConstitutionAsync(stokvelId);
+
+        if (document is null)
+        {
+            return null;
+        }
+
+        document.IsApproved = true;
+        document.ApprovedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+
+        return document;
+    }
+
     public async Task<string> GetConstitutionStatusAsync(Guid stokvelId)
     {
         var latestConstitution = await GetLatestConstitutionAsync(stokvelId);
@@ -336,9 +417,17 @@ public class ConstitutionService(ApplicationDbContext context)
             return "Not Created";
         }
 
-        return latestConstitution.IsApproved
-            ? "Approved"
-            : "Draft";
+        if (latestConstitution.IsUploadedDocument && !latestConstitution.IsApproved)
+        {
+            return "Uploaded";
+        }
+
+        if (!latestConstitution.IsApproved)
+        {
+            return "Draft";
+        }
+
+        return "Approved";
     }
 
     private async Task<Dictionary<string, string>> GetAnswersByQuestionTextAsync(Guid tenantId)
@@ -444,6 +533,18 @@ public class ConstitutionService(ApplicationDbContext context)
     private static string Encode(string value)
     {
         return WebUtility.HtmlEncode(value);
+    }
+
+    private static string GetSafeFileName(string fileName)
+    {
+        var safeFileName = Path.GetFileName(fileName);
+
+        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
+        {
+            safeFileName = safeFileName.Replace(invalidCharacter, '_');
+        }
+
+        return safeFileName;
     }
 
     private static string GetExistingConstitutionNote(string existingConstitutionAnswer)

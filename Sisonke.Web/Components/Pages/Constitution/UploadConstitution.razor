@@ -1,0 +1,202 @@
+@page "/upload-constitution/{StokvelId:guid}"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Forms
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject ConstitutionService ConstitutionService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Upload Existing Constitution</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading upload page...
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Upload Existing Constitution"
+        Subtitle="Upload the constitution document already approved or used by this stokvel."
+        BackText="Back to Dashboard"
+        BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
+
+    <AlertBanner
+        Type="info"
+        Title="Accepted formats: PDF, DOC, DOCX."
+        Message="Maximum file size: 10MB."
+        Icon="bi bi-info-circle-fill" />
+
+    @if (uploadSucceeded)
+    {
+        <AlertBanner
+            Type="success"
+            Title="Constitution uploaded successfully."
+            Message=""
+            Icon="bi bi-check-circle-fill" />
+
+        <div class="d-flex gap-2 flex-wrap mb-4">
+            <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">
+                <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            <a class="btn btn-primary" href="@($"/constitution-builder/{StokvelId}")">
+                <i class="bi bi-file-earmark-text me-2"></i>View Constitution
+            </a>
+        </div>
+    }
+
+    @if (uploadFailed)
+    {
+        <AlertBanner
+            Type="danger"
+            Title="Could not upload constitution."
+            Message="Please check the file type and size."
+            Icon="bi bi-x-circle-fill" />
+    }
+
+    <div class="form-page">
+        <div class="card">
+            <div class="card-body p-4">
+                <div class="form-section-title">Constitution Document</div>
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="constitution-file">Select document</label>
+                        <InputFile id="constitution-file" class="form-control" OnChange="HandleFileSelected" />
+                    </div>
+
+                    @if (selectedFile is not null)
+                    {
+                        <div class="col-12">
+                            <div class="selected-file-panel">
+                                <div>
+                                    <div class="detail-mini-label">Selected file</div>
+                                    <div class="fw-600">@selectedFile.Name</div>
+                                </div>
+                                <div>
+                                    <div class="detail-mini-label">File size</div>
+                                    <div class="text-muted small">@FormatFileSize(selectedFile.Size)</div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-4 d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary" type="button" disabled="@(selectedFile is null || isUploading)" @onclick="UploadAsync">
+                        @if (isUploading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                            <span>Uploading...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-cloud-arrow-up me-2"></i>
+                            <span>Upload</span>
+                        }
+                    </button>
+                    <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .fw-600 { font-weight: 600; }
+    .detail-mini-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--sk-text-muted);
+        font-weight: 600;
+        margin-bottom: .15rem;
+    }
+    .selected-file-panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        align-items: center;
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        background: var(--sk-green-50);
+        padding: 1rem;
+    }
+</style>
+
+@code {
+    private Stokvel? stokvel;
+    private IBrowserFile? selectedFile;
+    private bool isLoading = true;
+    private bool isUploading;
+    private bool uploadSucceeded;
+    private bool uploadFailed;
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        selectedFile = null;
+        uploadSucceeded = false;
+        uploadFailed = false;
+
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        isLoading = false;
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs args)
+    {
+        selectedFile = args.File;
+        uploadSucceeded = false;
+        uploadFailed = false;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (selectedFile is null)
+        {
+            return;
+        }
+
+        isUploading = true;
+        uploadSucceeded = false;
+        uploadFailed = false;
+
+        var uploadedDocument = await ConstitutionService.UploadExistingConstitutionAsync(StokvelId, selectedFile);
+
+        isUploading = false;
+
+        if (uploadedDocument is null)
+        {
+            uploadFailed = true;
+            return;
+        }
+
+        uploadSucceeded = true;
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        const decimal oneMegabyte = 1024 * 1024;
+
+        return bytes >= oneMegabyte
+            ? $"{bytes / oneMegabyte:0.##} MB"
+            : $"{bytes / 1024m:0.##} KB";
+    }
+}

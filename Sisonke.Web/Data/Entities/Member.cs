@@ -40,6 +40,12 @@ public class Member
 
     public DateTime? CoolingPeriodEndDate { get; set; }
 
+    public bool IsDeceased { get; set; }
+
+    public DateTime? DeceasedDate { get; set; }
+
+    public DateTime? DeathReportedAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<NextOfKin> NextOfKinRecords { get; set; } = new List<NextOfKin>();
