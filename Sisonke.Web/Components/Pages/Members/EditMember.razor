@@ -136,8 +136,9 @@ else
                         @if (editMember.IsDeceased)
                         {
                             <div class="col-12 col-md-6">
-                                <label class="form-label" for="deceased-date">Deceased date</label>
+                                <label class="form-label" for="deceased-date">Deceased date <span class="text-danger">*</span></label>
                                 <InputDate id="deceased-date" class="form-control" @bind-Value="editMember.DeceasedDate" />
+                                <div class="form-text">Required when the member is marked as deceased.</div>
                             </div>
                         }
                     </div>

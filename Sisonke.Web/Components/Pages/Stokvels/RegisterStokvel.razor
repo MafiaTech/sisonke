@@ -1,7 +1,12 @@
 @page "/register-stokvel"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Helpers
@@ -9,29 +14,51 @@
 
 @inject StokvelService StokvelService
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject MemberAccountLinkingService MemberAccountLinkingService
+@inject MemberService MemberService
 
 <PageTitle>Register New Stokvel</PageTitle>
 
-<PageHeader
-    Title="Register New Stokvel"
-    Subtitle="After registration you'll complete the setup questionnaire so Sisonke can configure your stokvel."
-    BackText="Back to My Stokvels"
-    BackHref="/my-stokvels" />
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading stokvel registration...
+    </div>
+}
+else if (currentUser is null)
+{
+    <AlertBanner Type="warning" Title="Please sign in to register a stokvel." Message="" Icon="bi bi-exclamation-triangle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Register New Stokvel"
+        Subtitle="After registration you'll complete the setup questionnaire so Sisonke can configure your stokvel."
+        BackText="Back to Workspace"
+        BackHref="/my-workspace" />
+}
 
-@if (saveFailed)
+@if (!isLoading && currentUser is not null && saveFailed)
 {
     <AlertBanner Type="danger" Title="Unable to register stokvel." Message="Please check the details and try again." Icon="bi bi-x-circle-fill" />
 }
 
-@if (packageSelectionFailed)
+@if (!isLoading && currentUser is not null && packageSelectionFailed)
 {
     <AlertBanner Type="danger" Title="Please select a subscription package." Message="" Icon="bi bi-x-circle-fill" />
 }
 
-<div class="form-page">
-    <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
-        <DataAnnotationsValidator />
-        <ValidationSummary class="alert alert-danger" />
+@if (!isLoading && currentUser is not null)
+{
+    <div class="form-page">
+        <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="alert alert-danger" />
 
         <!-- ── Section: Stokvel identity ── -->
         <div class="card mb-3">
@@ -99,76 +126,123 @@
             </div>
         </div>
 
-        <!-- ── Section: Subscription package ── -->
-        <div class="card mb-3">
-            <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <div class="form-section-title mb-0">Subscription Package</div>
-                    @if (model.SubscriptionPlanId is null)
-                    {
-                        <span class="text-danger small fw-semibold">Selection required</span>
-                    }
+            <!-- ── Section: Creator details ── -->
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <div class="form-section-title">First Office Bearer</div>
+                    <p class="text-muted small mb-3">You will be linked to this stokvel as the first chairperson so you can complete setup and manage the organisation.</p>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="creator-full-name">Full name <span class="text-danger">*</span></label>
+                            <InputText id="creator-full-name" class="form-control" @bind-Value="model.CreatorFullName" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="creator-cellphone">Cellphone number <span class="text-danger">*</span></label>
+                            <InputText id="creator-cellphone" class="form-control" placeholder="e.g. 0821234567" @bind-Value="model.CreatorCellphoneNumber" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="creator-email">Email address</label>
+                            <InputText id="creator-email" class="form-control" @bind-Value="model.CreatorEmail" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="creator-id-number">SA ID number</label>
+                            <InputText id="creator-id-number" class="form-control" placeholder="13-digit SA ID" @bind-Value="model.CreatorIdNumber" />
+                            <div class="form-text">Used to link this office bearer record to your login account.</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="creator-area">Residential area</label>
+                            <InputText id="creator-area" class="form-control" placeholder="e.g. Soweto, Gauteng" @bind-Value="model.CreatorResidentialArea" />
+                        </div>
+                    </div>
                 </div>
-                <p class="text-muted small mb-3">Choose a plan that fits your expected membership size. Enter the member count above for a recommendation.</p>
+            </div>
 
-                <div class="row g-3">
-                    @foreach (var plan in subscriptionPlans)
-                    {
-                        var isSelected    = model.SubscriptionPlanId == plan.Id;
-                        var isRecommended = recommendedPlanId == plan.Id;
+            <!-- ── Section: Subscription package ── -->
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="form-section-title mb-0">Subscription Package</div>
+                        @if (model.SubscriptionPlanId is null)
+                        {
+                            <span class="text-danger small fw-semibold">Selection required</span>
+                        }
+                    </div>
+                    <p class="text-muted small mb-3">Choose a plan that fits your expected membership size. Enter the member count above for a recommendation.</p>
 
-                        <div class="col-12 col-md-4">
-                            <div class="plan-card @(isSelected ? "plan-selected" : "") @(isRecommended ? "plan-recommended" : "") h-100"
-                                 @onclick="@(() => SelectSubscriptionPlan(plan.Id))" style="cursor:pointer;">
-                                <div class="card-body d-flex flex-column p-3">
-                                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                                        <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
-                                        @if (isRecommended && !isSelected)
-                                        {
-                                            <StatusBadge Text="Recommended" Type="success" />
-                                        }
-                                        @if (isSelected)
-                                        {
-                                            <span class="badge" style="background:var(--sk-green-800)">
-                                                <i class="bi bi-check2 me-1"></i>Selected
-                                            </span>
-                                        }
-                                    </div>
-                                    <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
-                                    <div class="mt-auto">
-                                        <div class="plan-price">@FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span></div>
-                                        <div class="text-muted small">Annual: @FormatCurrency(plan.AnnualPrice)</div>
+                    <div class="row g-3">
+                        @foreach (var plan in subscriptionPlans)
+                        {
+                            var isSelected    = model.SubscriptionPlanId == plan.Id;
+                            var isRecommended = recommendedPlanId == plan.Id;
+
+                            <div class="col-12 col-md-4">
+                                <div class="plan-card @(isSelected ? "plan-selected" : "") @(isRecommended ? "plan-recommended" : "") h-100"
+                                     @onclick="@(() => SelectSubscriptionPlan(plan.Id))" style="cursor:pointer;">
+                                    <div class="card-body d-flex flex-column p-3">
+                                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                            <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
+                                            @if (isRecommended && !isSelected)
+                                            {
+                                                <StatusBadge Text="Recommended" Type="success" />
+                                            }
+                                            @if (isSelected)
+                                            {
+                                                <span class="badge" style="background:var(--sk-green-800)">
+                                                    <i class="bi bi-check2 me-1"></i>Selected
+                                                </span>
+                                            }
+                                        </div>
+                                        <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
+                                        <div class="mt-auto">
+                                            <div class="plan-price">@FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span></div>
+                                            <div class="text-muted small">Annual: @FormatCurrency(plan.AnnualPrice)</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    }
+                        }
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- ── Submit ── -->
-        <div class="d-flex gap-2">
-            <button class="btn btn-primary" type="submit">
-                <i class="bi bi-check-circle me-2"></i>Register Stokvel
-            </button>
-            <a class="btn btn-outline-secondary" href="/my-stokvels">Cancel</a>
-        </div>
-    </EditForm>
-</div>
+            <!-- ── Submit ── -->
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-check-circle me-2"></i>Register Stokvel
+                </button>
+                <a class="btn btn-outline-secondary" href="/my-workspace">Cancel</a>
+            </div>
+        </EditForm>
+    </div>
+}
 
 @code {
     private readonly RegisterStokvelFormModel model = new();
     private List<string> provinces = SouthAfricanLocations.GetProvinces();
     private List<string> towns = new();
     private List<SubscriptionPlan> subscriptionPlans = [];
+    private ApplicationUser? currentUser;
     private Guid? recommendedPlanId;
     private bool saveFailed;
     private bool packageSelectionFailed;
+    private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = await UserManager.GetUserAsync(authState.User);
+
+        if (currentUser is not null)
+        {
+            model.CreatorFullName = currentUser.FullName ?? string.Empty;
+            model.CreatorCellphoneNumber = currentUser.CellphoneNumber ?? string.Empty;
+            model.CreatorEmail = currentUser.Email;
+            model.CreatorIdNumber = currentUser.IdNumber;
+            model.CreatorResidentialArea = currentUser.ResidentialArea;
+        }
+
         subscriptionPlans = await StokvelService.GetPublicSubscriptionPlansAsync();
+        isLoading = false;
     }
 
     private void OnProvinceChanged(ChangeEventArgs args)
@@ -201,6 +275,8 @@
         saveFailed = false;
         packageSelectionFailed = false;
 
+        if (currentUser is null) { saveFailed = true; return; }
+
         if (model.SubscriptionPlanId is null) { packageSelectionFailed = true; return; }
 
         var createdStokvel = await StokvelService.RegisterStokvelAsync(
@@ -210,6 +286,22 @@
 
         if (createdStokvel is null) { saveFailed = true; return; }
 
+        var creatorMember = await MemberService.EnsureCreatorMemberForStokvelAsync(
+            createdStokvel.Id,
+            currentUser.Id,
+            model.CreatorFullName,
+            model.CreatorEmail ?? currentUser.Email,
+            model.CreatorCellphoneNumber,
+            model.CreatorIdNumber,
+            model.CreatorResidentialArea);
+
+        if (creatorMember is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(currentUser.Id, model.CreatorIdNumber);
         NavigationManager.NavigateTo($"/stokvel-questionnaire/{createdStokvel.Id}");
     }
 
@@ -223,6 +315,11 @@
         public int? ExpectedMemberCount { get; set; }
         public Guid? SubscriptionPlanId { get; set; }
         [MaxLength(500)] public string? Description { get; set; }
+        [Required][MaxLength(150)] public string CreatorFullName { get; set; } = string.Empty;
+        [Required][MaxLength(30)] public string CreatorCellphoneNumber { get; set; } = string.Empty;
+        [EmailAddress][MaxLength(150)] public string? CreatorEmail { get; set; }
+        [MaxLength(30)] public string? CreatorIdNumber { get; set; }
+        [MaxLength(150)] public string? CreatorResidentialArea { get; set; }
     }
 
     private static string FormatCurrency(decimal amount) =>

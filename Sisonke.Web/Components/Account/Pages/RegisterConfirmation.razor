@@ -16,6 +16,10 @@
 
 <StatusMessage Message="@statusMessage" />
 
+<p>
+    Your account has been created. Please confirm your account if required, then continue to view your linked stokvel memberships.
+</p>
+
 @if (emailConfirmationLink is not null)
 {
     <p>
@@ -27,6 +31,10 @@ else
 {
     <p role="alert">Please check your email to confirm your account.</p>
 }
+
+<p>
+    <a class="btn btn-primary" href="/Account/Login?returnUrl=/my-workspace">Sign in to view My Workspace</a>
+</p>
 
 @code {
     private string? emailConfirmationLink;

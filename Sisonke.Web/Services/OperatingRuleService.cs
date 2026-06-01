@@ -56,6 +56,17 @@ public class OperatingRuleService(ApplicationDbContext context)
             : 0;
     }
 
+    public async Task<int> GetWaitingPeriodMonthsAsync(Guid stokvelId)
+    {
+        var answer = await GetAnswerByQuestionTextAsync(
+            stokvelId,
+            "What is the waiting period in months before a new member or dependent can claim?");
+
+        return int.TryParse(answer, out var waitingPeriodMonths)
+            ? waitingPeriodMonths
+            : 6;
+    }
+
     public async Task<decimal> GetContributionAmountAsync(Guid stokvelId)
     {
         var answer = await GetAnswerByQuestionTextAsync(

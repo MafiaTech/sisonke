@@ -1,0 +1,233 @@
+@page "/member-portal/apology/{MemberId:guid}/{MeetingId:guid}"
+@layout MemberPortalLayout
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@inject MemberService MemberService
+@inject MemberAccessService MemberAccessService
+@inject MeetingService MeetingService
+@inject StokvelService StokvelService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Send Apology — Sisonke</PageTitle>
+
+@if (isLoading)
+{
+    <div class="sm-page">
+        <div class="sm-loading">
+            <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sm-forest)"></div>
+            Loading meeting details…
+        </div>
+    </div>
+}
+else if (!isAuthorized)
+{
+    <div class="sm-page">
+        <div class="sm-error-state">
+            <i class="bi bi-shield-exclamation me-2"></i>
+            You don't have access to this page.
+            <a href="/my-memberships" class="sm-btn-link ms-2">Go to My Memberships</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sm-page" style="max-width:560px;">
+
+        <div style="margin-bottom:20px;">
+            <a href="/member-portal/dashboard/@MemberId" class="sm-btn-link">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+
+        @if (submitted)
+        {
+            <div class="sm-card" style="text-align:center;padding:40px 24px;">
+                <div style="font-size:48px;margin-bottom:16px;">✅</div>
+                <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:var(--sm-forest);margin-bottom:8px;">Apology Sent</h2>
+                <p style="color:var(--sm-muted);font-size:14px;margin-bottom:24px;">
+                    Your apology for <strong>@meeting?.Title</strong> has been recorded.
+                </p>
+                <a href="/member-portal/dashboard/@MemberId" class="sm-btn-primary">
+                    <i class="bi bi-house"></i> Back to Dashboard
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="sm-card">
+                <div class="sm-card-head">
+                    <h1 class="sm-card-title" style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;">
+                        Send an Apology
+                    </h1>
+                </div>
+
+                @if (meeting is not null)
+                {
+                    <div style="padding:16px 20px;border-bottom:1px solid var(--sm-border);background:#fdfaf6;">
+                        <div class="sm-meeting-date">@meeting.MeetingDate.ToString("dddd, d MMMM yyyy")</div>
+                        <div class="sm-meeting-title">@meeting.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(meeting.Venue))
+                        {
+                            <div class="sm-meeting-venue"><i class="bi bi-geo-alt me-1"></i>@meeting.Venue</div>
+                        }
+                    </div>
+                }
+
+                <div class="sm-card-body">
+
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="sm-error-state">@errorMessage</div>
+                    }
+
+                    @if (attendanceRecord is null && !isLoading)
+                    {
+                        <div class="sm-error-state">
+                            <i class="bi bi-info-circle me-2"></i>
+                            The attendance register for this meeting has not been set up yet.
+                            Please contact your stokvel secretary to record your apology.
+                        </div>
+                        <div style="margin-top:16px;">
+                            <a href="/member-portal/dashboard/@MemberId" class="sm-btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to Dashboard
+                            </a>
+                        </div>
+                    }
+                    else if (alreadySentApology)
+                    {
+                        <div style="text-align:center;padding:20px 0;">
+                            <div style="font-size:36px;margin-bottom:12px;">✓</div>
+                            <p style="color:var(--sm-sage);font-size:15px;font-weight:600;margin-bottom:20px;">
+                                Your apology has already been recorded for this meeting.
+                            </p>
+                            <a href="/member-portal/dashboard/@MemberId" class="sm-btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to Dashboard
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="sm-form-group">
+                            <label class="sm-form-label" for="apologyReason">Reason for absence</label>
+                            <textarea id="apologyReason"
+                                      class="sm-form-control"
+                                      rows="4"
+                                      placeholder="Briefly explain why you cannot attend this meeting…"
+                                      @bind="apologyReason"
+                                      maxlength="500"></textarea>
+                            <div class="sm-form-help">Optional — up to 500 characters.</div>
+                        </div>
+
+                        <div style="display:flex;gap:10px;margin-top:8px;">
+                            <a href="/member-portal/dashboard/@MemberId" class="sm-btn-secondary">Cancel</a>
+                            <button class="sm-btn-primary"
+                                    type="button"
+                                    @onclick="SubmitApologyAsync"
+                                    disabled="@isSubmitting"
+                                    style="flex:1;justify-content:center;">
+                                @if (isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-send"></i>
+                                }
+                                Submit Apology
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid MemberId { get; set; }
+    [Parameter] public Guid MeetingId { get; set; }
+
+    private bool isLoading = true;
+    private bool isAuthorized;
+    private bool isSubmitting;
+    private bool submitted;
+
+    private Member? member;
+    private Meeting? meeting;
+    private MeetingAttendance? attendanceRecord;
+    private bool alreadySentApology;
+
+    private string apologyReason = "";
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/Account/Login", replace: true);
+            return;
+        }
+
+        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var canView = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+        if (!canView)
+        {
+            NavigationManager.NavigateTo("/my-memberships", replace: true);
+            return;
+        }
+
+        isAuthorized = true;
+
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+
+        if (meeting is not null)
+        {
+            var attendances = await MeetingService.GetAttendanceByMeetingIdAsync(MeetingId);
+            attendanceRecord = attendances.FirstOrDefault(a => a.MemberId == MemberId);
+            alreadySentApology = attendanceRecord?.Status == AttendanceStatus.Apology;
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SubmitApologyAsync()
+    {
+        if (attendanceRecord is null) return;
+
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            await MeetingService.UpdateAttendanceAsync(
+                attendanceRecord.Id,
+                AttendanceStatus.Apology,
+                false,
+                false,
+                apologyReason);
+
+            submitted = true;
+        }
+        catch
+        {
+            errorMessage = "An error occurred. Please try again or contact your stokvel secretary.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

@@ -1,0 +1,66 @@
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+<HeadContent>
+    <link rel="stylesheet" href="css/sisonke-member.css" />
+</HeadContent>
+
+<div class="sm-portal-wrap">
+
+    <nav class="sm-topbar">
+        <div class="sm-topbar-brand">
+            <div class="sm-topbar-logo-mark">S</div>
+            <span class="sm-topbar-name">Sisonke</span>
+            <span class="sm-topbar-pill">Member Portal</span>
+        </div>
+
+        <div class="sm-topbar-actions">
+            <button class="sm-notif-btn" aria-label="Notifications" title="Notifications">
+                <i class="bi bi-bell"></i>
+            </button>
+            <AuthorizeView>
+                <Authorized>
+                    <a href="/my-memberships" class="sm-avatar sm-avatar-btn" title="My Memberships">
+                        @GetInitials(context.User.Identity?.Name)
+                    </a>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </nav>
+
+    <main class="sm-main">
+        @Body
+    </main>
+
+    <nav class="sm-mobile-nav" aria-label="Mobile navigation">
+        <a href="/my-memberships" class="sm-mobile-nav-item">
+            <i class="bi bi-house-fill"></i>
+            <span>Home</span>
+        </a>
+        <a href="#finances" class="sm-mobile-nav-item">
+            <i class="bi bi-cash-coin"></i>
+            <span>Payments</span>
+        </a>
+        <a href="#meetings" class="sm-mobile-nav-item">
+            <i class="bi bi-calendar3"></i>
+            <span>Meetings</span>
+        </a>
+        <a href="#profile" class="sm-mobile-nav-item">
+            <i class="bi bi-person-fill"></i>
+            <span>Profile</span>
+        </a>
+    </nav>
+
+</div>
+
+@code {
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[^1][0]}".ToUpper()
+            : name[0].ToString().ToUpper();
+    }
+}

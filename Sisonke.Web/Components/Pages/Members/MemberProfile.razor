@@ -1,14 +1,19 @@
 @page "/member-profile/{MemberId:guid}"
 @rendermode InteractiveServer
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
 @inject FineService FineService
+@inject FuneralClaimService FuneralClaimService
 @inject MemberService MemberService
 @inject OperatingRuleService OperatingRuleService
 @inject StokvelService StokvelService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 
 <PageTitle>Member Profile</PageTitle>
 
@@ -27,32 +32,14 @@ else if (member is null)
 }
 else
 {
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
+    }
+
     <!-- ── Back nav + action bar ── -->
-    <div class="page-header">
-        <div class="d-flex align-items-center gap-3">
-            <div class="member-avatar member-avatar-lg" aria-hidden="true">
-                @GetInitials(member.FullName)
-            </div>
-            <div>
-                <h1 class="page-header-text mb-0">
-                    <span style="font-size:1.625rem;font-weight:700;color:var(--sk-text);letter-spacing:-.02em">@member.FullName</span>
-                </h1>
-                <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
-                    <StatusBadge Text="@member.DefaultRole.ToString()" Type="secondary" />
-                    @{
-                        var statusType = member.Status.ToString() switch
-                        {
-                            "Active"    => "success",
-                            "Suspended" => "warning",
-                            _           => "secondary"
-                        };
-                    }
-                    <StatusBadge Text="@member.Status.ToString()" Type="@statusType" />
-                    <span class="text-muted small">@member.MemberNumber</span>
-                </div>
-            </div>
-        </div>
-        <div class="d-flex gap-2 align-items-start flex-wrap">
+    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+        <div>
             @if (stokvel is not null)
             {
                 <a class="btn btn-outline-secondary btn-sm" href="@($"/members/{stokvel.Id}")">
@@ -65,11 +52,64 @@ else
                     <i class="bi bi-chevron-left me-1"></i>My Stokvels
                 </a>
             }
-            <a class="btn btn-primary btn-sm" href="@($"/edit-member/{MemberId}")">
-                <i class="bi bi-pencil me-1"></i>Edit Member
-            </a>
         </div>
+        <a class="btn btn-primary btn-sm" href="@($"/edit-member/{MemberId}")">
+            <i class="bi bi-pencil me-1"></i>Edit Member
+        </a>
     </div>
+
+    <!-- ── Modern profile header ── -->
+    <section class="member-profile-hero">
+        <div class="member-profile-hero-main">
+            <div class="member-profile-avatar" aria-hidden="true">
+                @GetInitials(member.FullName)
+            </div>
+            <div class="member-profile-identity">
+                <h1>@member.FullName</h1>
+                <div class="member-profile-contact">
+                    <span><i class="bi bi-phone me-1"></i>@member.CellphoneNumber</span>
+                    <span><i class="bi bi-envelope me-1"></i>@(member.EmailAddress ?? "No email")</span>
+                    <span><i class="bi bi-geo-alt me-1"></i>@(member.ResidentialArea ?? "No area captured")</span>
+                </div>
+                <div class="member-profile-badges">
+                    <span class="profile-chip">@member.MemberNumber</span>
+                    <StatusBadge Text="@member.DefaultRole.ToString()" Type="secondary" />
+                    <span class="profile-chip">@GetStokvelDisplayName()</span>
+                    <StatusBadge Text="@member.GovernanceStatus.ToString()" Type="@GetGovernanceStatusBadgeType(member.GovernanceStatus)" />
+                    <StatusBadge Text="@GetAccountLinkStatusText()" Type="@GetAccountLinkStatusBadgeType()" />
+                </div>
+            </div>
+        </div>
+        <div class="member-profile-since">
+            <div class="member-profile-since-label">Member since</div>
+            <div class="member-profile-since-date">@member.JoiningDate.ToString("dd MMM yyyy")</div>
+        </div>
+    </section>
+
+    @if (member.GovernanceStatus == MemberGovernanceStatus.Suspended)
+    {
+        <AlertBanner
+            Type="warning"
+            Title="This member is currently suspended."
+            Message="Any claim linked to this member or their dependents should be placed on hold until the disciplinary committee outcome is completed."
+            Icon="bi bi-exclamation-triangle-fill" />
+    }
+    else if (member.GovernanceStatus == MemberGovernanceStatus.Expelled)
+    {
+        <AlertBanner
+            Type="danger"
+            Title="This member is expelled."
+            Message="Claims linked to this member or their dependents may be placed on hold unless reversed by a disciplinary decision."
+            Icon="bi bi-x-circle-fill" />
+    }
+    else if (member.GovernanceStatus == MemberGovernanceStatus.Warning)
+    {
+        <AlertBanner
+            Type="warning"
+            Title="This member is under warning."
+            Message="Monitor attendance and conduct before approving sensitive actions."
+            Icon="bi bi-exclamation-triangle-fill" />
+    }
 
     <!-- ── Detail cards ── -->
     <div class="row g-3">
@@ -85,21 +125,44 @@ else
                         <div class="pdl-row"><dt>Email</dt><dd>@(member.EmailAddress ?? "—")</dd></div>
                         <div class="pdl-row"><dt>ID number</dt><dd>@(member.IdNumber ?? "—")</dd></div>
                         <div class="pdl-row"><dt>Residential area</dt><dd>@(member.ResidentialArea ?? "—")</dd></div>
-                        <div class="pdl-row"><dt>Deceased</dt><dd>@(member.IsDeceased ? "Yes" : "No")</dd></div>
+                        <div class="pdl-row">
+                            <dt>Deceased</dt>
+                            <dd>
+                                <StatusBadge Text="@(member.IsDeceased ? "Yes" : "No")" Type="@(member.IsDeceased ? "danger" : "secondary")" />
+                            </dd>
+                        </div>
                         @if (member.IsDeceased)
                         {
                             <div class="pdl-row"><dt>Deceased date</dt><dd>@(member.DeceasedDate?.ToString("dd MMM yyyy") ?? "—")</dd></div>
                             <div class="pdl-row"><dt>Death reported at</dt><dd>@(member.DeathReportedAt?.ToString("dd MMM yyyy") ?? "—")</dd></div>
                         }
-                        <div class="pdl-row last">
-                            <dt></dt>
-                            <dd>
-                                <a class="btn btn-sm btn-outline-danger" href="@($"/edit-member/{MemberId}")">
-                                    Mark as Deceased
-                                </a>
-                            </dd>
-                        </div>
                     </dl>
+
+                    <div class="member-status-control">
+                        <div class="card-section-title">Member Status Control</div>
+
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label" for="governance-status">Member Status</label>
+                                <InputSelect id="governance-status" class="form-select" @bind-Value="selectedGovernanceStatus">
+                                    @foreach (var governanceStatus in Enum.GetValues<MemberGovernanceStatus>())
+                                    {
+                                        <option value="@governanceStatus">@governanceStatus</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="governance-reason">Reason</label>
+                                <InputTextArea id="governance-reason" class="form-control" rows="3" @bind-Value="governanceStatusReason" />
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button class="btn btn-primary" type="button" @onclick="ShowGovernanceStatusConfirmation">
+                                <i class="bi bi-shield-check me-2"></i>Update Status
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -114,6 +177,23 @@ else
                         <div class="pdl-row"><dt>Joining date</dt><dd>@member.JoiningDate.ToString("dd MMM yyyy")</dd></div>
                         <div class="pdl-row"><dt>Default role</dt><dd>@member.DefaultRole</dd></div>
                         <div class="pdl-row"><dt>Tenant</dt><dd>@member.Tenant.Name</dd></div>
+                        <div class="pdl-row">
+                            <dt>Account Linked</dt>
+                            <dd>
+                                <StatusBadge Text="@GetAccountLinkStatusText()" Type="@GetAccountLinkStatusBadgeType()" />
+                            </dd>
+                        </div>
+                        <div class="pdl-row">
+                            <dt>Member Status</dt>
+                            <dd>
+                                <StatusBadge Text="@member.GovernanceStatus.ToString()" Type="@GetGovernanceStatusBadgeType(member.GovernanceStatus)" />
+                            </dd>
+                        </div>
+                        <div class="pdl-row"><dt>Member Status Reason</dt><dd>@(member.GovernanceStatusReason ?? "—")</dd></div>
+                        <div class="pdl-row"><dt>Member Status Changed At</dt><dd>@(member.GovernanceStatusChangedAt?.ToString("dd MMM yyyy") ?? "—")</dd></div>
+                        <div class="pdl-row"><dt>Last Warning Issued At</dt><dd>@(member.LastWarningIssuedAt?.ToString("dd MMM yyyy") ?? "—")</dd></div>
+                        <div class="pdl-row"><dt>Suspended At</dt><dd>@(member.SuspendedAt?.ToString("dd MMM yyyy") ?? "—")</dd></div>
+                        <div class="pdl-row"><dt>Expelled At</dt><dd>@(member.ExpelledAt?.ToString("dd MMM yyyy") ?? "—")</dd></div>
                         <div class="pdl-row last">
                             <dt>Cooling period</dt>
                             <dd>
@@ -274,14 +354,15 @@ else
                                         <th>ID number</th>
                                         <th>Cellphone</th>
                                         <th>Status</th>
-                                        <th>Deceased</th>
                                         <th>Deceased date</th>
-                                        <th></th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var dependent in dependents)
                                     {
+                                        var hasActiveClaim = activeDependentClaims.ContainsKey(dependent.Id);
+                                        var activeClaim = hasActiveClaim ? activeDependentClaims[dependent.Id] : null;
                                         <tr>
                                             <td class="fw-500">@dependent.FullName</td>
                                             <td class="text-muted small">@dependent.Relationship</td>
@@ -289,15 +370,105 @@ else
                                             <td class="text-muted small">@(dependent.IdNumber ?? "—")</td>
                                             <td class="text-muted small">@(dependent.CellphoneNumber ?? "—")</td>
                                             <td>
-                                                <StatusBadge Text="@(dependent.IsActive ? "Active" : "Inactive")" Type="@(dependent.IsActive ? "success" : "secondary")" />
-                                            </td>
-                                            <td>
-                                                <StatusBadge Text="@(dependent.IsDeceased ? "Yes" : "No")" Type="@(dependent.IsDeceased ? "danger" : "secondary")" />
+                                                <div class="d-flex flex-column gap-1 align-items-start">
+                                                    <StatusBadge Text="@GetDependentStatusText(dependent, hasActiveClaim)" Type="@GetDependentStatusBadgeType(dependent, hasActiveClaim)" />
+                                                    @if (activeClaim is not null)
+                                                    {
+                                                        <span class="small text-muted">Claim: @activeClaim.Status</span>
+                                                    }
+                                                </div>
                                             </td>
                                             <td class="text-muted small">
-                                                @(dependent.IsDeceased ? dependent.DeceasedDate?.ToString("dd MMM yyyy") ?? "—" : "—")
+                                                @(dependent.IsDeceased ? dependent.DeceasedDate?.ToString("dd MMM yyyy") ?? "-" : "-")
                                             </td>
-                                            <td><a class="btn btn-sm btn-outline-secondary" href="@($"/edit-dependent/{dependent.Id}")">Edit</a></td>
+                                            <td>
+                                                <div class="d-flex gap-2 flex-wrap">
+                                                    @if (activeClaim is not null)
+                                                    {
+                                                        <button
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            type="button"
+                                                            title="Dependent cannot be edited while a claim is active."
+                                                            disabled>
+                                                            Edit locked
+                                                        </button>
+                                                        <a class="btn btn-sm btn-primary" href="@($"/claim/{activeClaim.Id}")">View Claim</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <a class="btn btn-sm btn-outline-secondary" href="@($"/edit-dependent/{dependent.Id}")">Edit</a>
+                                                        <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}?dependentId={dependent.Id}")">Create Claim</a>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Claims -->
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                        <div class="card-section-title mb-0">Claims</div>
+                        <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}")">
+                            <i class="bi bi-plus me-1"></i>Create Member Claim
+                        </a>
+                    </div>
+
+                    @if (member.GovernanceStatus is MemberGovernanceStatus.Suspended or MemberGovernanceStatus.Expelled)
+                    {
+                        <div class="alert alert-warning" role="alert">
+                            This member's governance status means new claims may be placed on hold.
+                        </div>
+                    }
+
+                    @if (funeralClaims.Count == 0)
+                    {
+                        <p class="text-muted small mb-0">No funeral claims captured yet.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Deceased</th>
+                                        <th>Subject</th>
+                                        <th>Date of death</th>
+                                        <th>Status</th>
+                                        <th>Waiting period</th>
+                                        <th>Member eligible</th>
+                                        <th>Documents</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var claim in funeralClaims)
+                                    {
+                                        <tr>
+                                            <td class="fw-500">@claim.DeceasedFullName</td>
+                                            <td class="text-muted small">@claim.SubjectType</td>
+                                            <td class="text-muted small">@(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "—")</td>
+                                            <td>
+                                                <StatusBadge Text="@claim.Status.ToString()" Type="@GetClaimStatusBadgeType(claim.Status)" />
+                                            </td>
+                                            <td>
+                                                <StatusBadge Text="@(claim.IsWaitingPeriodSatisfied ? "Yes" : "No")" Type="@(claim.IsWaitingPeriodSatisfied ? "success" : "warning")" />
+                                            </td>
+                                            <td>
+                                                <StatusBadge Text="@(claim.IsMemberStatusEligible ? "Yes" : "No")" Type="@(claim.IsMemberStatusEligible ? "success" : "warning")" />
+                                            </td>
+                                            <td class="text-muted small">@claim.Documents.Count</td>
+                                            <td>
+                                                <a class="btn btn-sm btn-outline-secondary" href="@($"/claim/{claim.Id}")">View</a>
+                                            </td>
                                         </tr>
                                     }
                                 </tbody>
@@ -314,12 +485,19 @@ else
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="card-section-title mb-0">Fines</div>
-                        <a class="btn btn-sm btn-primary" href="@($"/add-fine/{MemberId}")">
-                            <i class="bi bi-plus me-1"></i>Add Fine
-                        </a>
+                        @if (canManageStokvel)
+                        {
+                            <a class="btn btn-sm btn-primary" href="@($"/add-fine/{MemberId}")">
+                                <i class="bi bi-plus me-1"></i>Add Fine
+                            </a>
+                        }
                     </div>
 
-                    @if (memberFines.Count == 0)
+                    @if (!canViewFines)
+                    {
+                        <AlertBanner Type="warning" Title="Access restricted." Message="You do not have access to view these fines." Icon="bi bi-exclamation-triangle-fill" />
+                    }
+                    else if (memberFines.Count == 0)
                     {
                         <p class="text-muted small mb-0">No fines captured yet.</p>
                     }
@@ -351,7 +529,7 @@ else
                                             </td>
                                             <td class="text-muted small">@(fine.PaidDate?.ToString("dd MMM yyyy") ?? "—")</td>
                                             <td>
-                                                @if (fine.Status == FineStatus.Unpaid)
+                                                @if (canManageStokvel && fine.Status == FineStatus.Unpaid)
                                                 {
                                                     <a class="btn btn-sm btn-success" href="@($"/mark-fine-paid/{fine.Id}")">Mark Paid</a>
                                                 }
@@ -367,12 +545,121 @@ else
         </div>
 
     </div>
+
+    <ConfirmationModal
+        IsVisible="@showGovernanceStatusConfirmation"
+        Title="Update Member Status"
+        Message="Are you sure you want to update this member's status?"
+        ConfirmButtonText="Update Status"
+        CancelButtonText="Cancel"
+        ModalType="warning"
+        OnConfirm="@ConfirmGovernanceStatusUpdateAsync"
+        OnCancel="@CancelGovernanceStatusUpdate" />
 }
 
 <style>
     .fw-500 { font-weight: 500; }
     .fw-600 { font-weight: 600; }
+    .member-profile-hero {
+        display: flex;
+        justify-content: space-between;
+        gap: 1.5rem;
+        align-items: stretch;
+        margin-bottom: 1rem;
+        padding: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, .12);
+        border-radius: 1rem;
+        background:
+            linear-gradient(135deg, rgba(27, 67, 50, .96), rgba(15, 23, 42, .98)),
+            #0f172a;
+        color: #fff;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, .18);
+    }
+    .member-profile-hero-main {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        min-width: 0;
+    }
+    .member-profile-avatar {
+        width: 5rem;
+        height: 5rem;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        border: 1px solid rgba(255, 255, 255, .2);
+        background: rgba(255, 255, 255, .12);
+        color: #fff;
+        font-size: 1.55rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+    }
+    .member-profile-identity {
+        min-width: 0;
+    }
+    .member-profile-identity h1 {
+        margin: 0;
+        color: #fff;
+        font-size: 1.75rem;
+        font-weight: 800;
+        line-height: 1.15;
+    }
+    .member-profile-contact,
+    .member-profile-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem .85rem;
+        align-items: center;
+        margin-top: .65rem;
+    }
+    .member-profile-contact {
+        color: rgba(255, 255, 255, .78);
+        font-size: .875rem;
+    }
+    .profile-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 1.5rem;
+        padding: .2rem .6rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .12);
+        border: 1px solid rgba(255, 255, 255, .16);
+        color: #fff;
+        font-size: .75rem;
+        font-weight: 700;
+    }
+    .member-profile-since {
+        min-width: 11rem;
+        border-radius: .85rem;
+        padding: 1rem;
+        background: rgba(255, 255, 255, .1);
+        border: 1px solid rgba(255, 255, 255, .14);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: right;
+    }
+    .member-profile-since-label {
+        color: rgba(255, 255, 255, .68);
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+    .member-profile-since-date {
+        margin-top: .3rem;
+        color: #fff;
+        font-size: 1.15rem;
+        font-weight: 800;
+    }
     .profile-dl { margin: 0; }
+    .member-status-control {
+        border-top: 1px solid var(--sk-border);
+        margin-top: 1.25rem;
+        padding-top: 1.25rem;
+    }
     .pdl-row {
         display: flex;
         padding: .625rem 0;
@@ -383,17 +670,44 @@ else
     .pdl-row.last { border-bottom: none; }
     .pdl-row dt { flex: 0 0 45%; font-weight: 400; color: var(--sk-text-muted); font-size: .875rem; }
     .pdl-row dd { flex: 1; margin: 0; font-weight: 500; color: var(--sk-text); }
+    @@media (max-width: 768px) {
+        .member-profile-hero,
+        .member-profile-hero-main {
+            flex-direction: column;
+        }
+        .member-profile-since {
+            min-width: 0;
+            text-align: left;
+        }
+        .member-profile-avatar {
+            width: 4.25rem;
+            height: 4.25rem;
+            border-radius: .85rem;
+        }
+        .member-profile-identity h1 {
+            font-size: 1.45rem;
+        }
+    }
 </style>
 
 @code {
     private Member? member;
     private List<MemberDependent> dependents = [];
     private List<MemberFine> memberFines = [];
+    private List<FuneralClaim> funeralClaims = [];
+    private Dictionary<Guid, FuneralClaim> activeDependentClaims = new();
     private Stokvel? stokvel;
     private int maxNextOfKin;
     private int maxBeneficiaries;
     private int maxDependents;
     private bool isLoading = true;
+    private bool showGovernanceStatusConfirmation;
+    private MemberGovernanceStatus selectedGovernanceStatus = MemberGovernanceStatus.Active;
+    private string? governanceStatusReason;
+    private string? successMessage;
+    private bool canManageStokvel;
+    private bool isOwnMemberProfile;
+    private bool canViewFines;
 
     [Parameter]
     public Guid MemberId { get; set; }
@@ -401,13 +715,39 @@ else
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
+        canManageStokvel = false;
+        isOwnMemberProfile = false;
+        canViewFines = false;
         member = await MemberService.GetMemberByIdAsync(MemberId);
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+
+        if (member is not null && stokvel is not null)
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                canManageStokvel = await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
+                isOwnMemberProfile = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+                canViewFines = canManageStokvel || isOwnMemberProfile;
+            }
+        }
+
         maxNextOfKin = stokvel is null ? 0 : await OperatingRuleService.GetMaxNextOfKinAsync(stokvel.Id);
         maxBeneficiaries = stokvel is null ? 0 : await OperatingRuleService.GetMaxBeneficiariesAsync(stokvel.Id);
         maxDependents = stokvel is null ? 0 : await OperatingRuleService.GetMaxDependentsAsync(stokvel.Id);
         dependents = member is null ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
-        memberFines = member is null ? [] : await FineService.GetMemberFinesAsync(MemberId);
+        activeDependentClaims = member is null ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
+        memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
+        funeralClaims = member is null ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
+
+        if (member is not null)
+        {
+            selectedGovernanceStatus = member.GovernanceStatus;
+            governanceStatusReason = member.GovernanceStatusReason;
+        }
+
         isLoading = false;
     }
 
@@ -416,6 +756,117 @@ else
         var parts = fullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return parts.Length >= 2
             ? $"{parts[0][0]}{parts[^1][0]}".ToUpperInvariant()
-            : fullName.Length > 0 ? fullName[0].ToString().ToUpperInvariant() : "?";
+            : parts.Length == 1 ? parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant() : "M";
     }
+
+    private string GetStokvelDisplayName()
+    {
+        return stokvel?.Name ?? member?.Tenant.Name ?? "Stokvel";
+    }
+
+    private string GetAccountLinkStatusText()
+    {
+        return string.IsNullOrWhiteSpace(member?.ApplicationUserId)
+            ? "No Login Account"
+            : "Account Linked";
+    }
+
+    private string GetAccountLinkStatusBadgeType()
+    {
+        return string.IsNullOrWhiteSpace(member?.ApplicationUserId)
+            ? "secondary"
+            : "success";
+    }
+
+    private void ShowGovernanceStatusConfirmation()
+    {
+        successMessage = null;
+        showGovernanceStatusConfirmation = true;
+    }
+
+    private void CancelGovernanceStatusUpdate()
+    {
+        showGovernanceStatusConfirmation = false;
+    }
+
+    private async Task ConfirmGovernanceStatusUpdateAsync()
+    {
+        showGovernanceStatusConfirmation = false;
+
+        var updatedMember = await MemberService.UpdateMemberGovernanceStatusAsync(
+            MemberId,
+            selectedGovernanceStatus,
+            governanceStatusReason);
+
+        if (updatedMember is null)
+        {
+            return;
+        }
+
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+
+        if (member is not null)
+        {
+            selectedGovernanceStatus = member.GovernanceStatus;
+            governanceStatusReason = member.GovernanceStatusReason;
+        }
+
+        successMessage = "Member governance status updated.";
+    }
+
+    private static string GetGovernanceStatusBadgeType(MemberGovernanceStatus governanceStatus) =>
+        governanceStatus switch
+        {
+            MemberGovernanceStatus.Active => "success",
+            MemberGovernanceStatus.Warning => "warning",
+            MemberGovernanceStatus.Suspended => "danger",
+            MemberGovernanceStatus.Expelled => "secondary",
+            MemberGovernanceStatus.Deceased => "danger",
+            _ => "secondary"
+        };
+
+    private static string GetDependentStatusText(MemberDependent dependent, bool hasActiveClaim)
+    {
+        if (hasActiveClaim)
+        {
+            return "Claim Logged";
+        }
+
+        if (dependent.IsDeceased)
+        {
+            return "Deceased";
+        }
+
+        return dependent.IsActive ? "Active" : "Inactive";
+    }
+
+    private static string GetDependentStatusBadgeType(MemberDependent dependent, bool hasActiveClaim)
+    {
+        if (hasActiveClaim)
+        {
+            return "warning";
+        }
+
+        if (dependent.IsDeceased)
+        {
+            return "danger";
+        }
+
+        return dependent.IsActive ? "success" : "secondary";
+    }
+
+    private static string GetClaimStatusBadgeType(FuneralClaimStatus status) =>
+        status switch
+        {
+            FuneralClaimStatus.Draft => "secondary",
+            FuneralClaimStatus.Submitted => "info",
+            FuneralClaimStatus.UnderReview => "info",
+            FuneralClaimStatus.OnHold => "warning",
+            FuneralClaimStatus.Approved => "success",
+            FuneralClaimStatus.Rejected => "danger",
+            FuneralClaimStatus.Paid => "success",
+            FuneralClaimStatus.Cancelled => "secondary",
+            _ => "secondary"
+        };
 }

@@ -1,10 +1,16 @@
 @page "/members/{StokvelId:guid}"
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
 @inject MemberService MemberService
 @inject StokvelService StokvelService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 
 <PageTitle>Members</PageTitle>
 
@@ -20,6 +26,20 @@
 else if (stokvel is null)
 {
     <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canManageMembers)
+{
+    <div class="d-flex flex-column gap-3">
+        <AlertBanner Type="warning"
+                     Title="Access restricted."
+                     Message="Only office bearers can manage members."
+                     Icon="bi bi-exclamation-triangle-fill" />
+        <div>
+            <a class="btn btn-outline-secondary" href="/my-memberships">
+                <i class="bi bi-grid me-1"></i>Back to My Memberships
+            </a>
+        </div>
+    </div>
 }
 else
 {
@@ -127,6 +147,7 @@ else
     private Stokvel? stokvel;
     private List<Member> members = [];
     private bool isLoading = true;
+    private bool canManageMembers;
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -134,8 +155,33 @@ else
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
+        canManageMembers = false;
+        members = [];
+
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
-        members = stokvel is null ? [] : await MemberService.GetMembersByStokvelIdAsync(StokvelId);
+
+        if (stokvel is null)
+        {
+            isLoading = false;
+            return;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        canManageMembers = await MemberAccessService.CanManageMembersAsync(userId, StokvelId);
+
+        if (canManageMembers)
+        {
+            members = await MemberService.GetMembersByStokvelIdAsync(StokvelId);
+        }
+
         isLoading = false;
     }
 

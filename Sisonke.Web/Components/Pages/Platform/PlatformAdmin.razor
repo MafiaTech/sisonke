@@ -1,0 +1,54 @@
+@page "/platform-admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "PlatformAdmin")]
+
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Platform Administration</PageTitle>
+
+<PageHeader
+    Title="Platform Administration"
+    Subtitle="Platform-wide tools and operational oversight for Sisonke."
+    BackText="Back to Workspace"
+    BackHref="/my-workspace" />
+
+<div class="platform-card-grid">
+    @foreach (var card in placeholderCards)
+    {
+        <section class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
+                        <i class="bi @card.Icon"></i>
+                    </div>
+                    <div>
+                        <h2 class="h6 fw-700 mb-1">@card.Title</h2>
+                        <p class="text-muted small mb-0">Coming soon.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+</div>
+
+<style>
+    .platform-card-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    }
+</style>
+
+@code {
+    private readonly List<PlaceholderCardModel> placeholderCards =
+    [
+        new("Total Stokvels", "bi-diagram-3"),
+        new("Total Users", "bi-people"),
+        new("Total Members", "bi-person-vcard"),
+        new("Open Claims", "bi-file-earmark-medical"),
+        new("Subscription Management", "bi-credit-card"),
+        new("Audit Logs", "bi-list-check")
+    ];
+
+    private sealed record PlaceholderCardModel(string Title, string Icon);
+}

@@ -1,0 +1,369 @@
+@page "/my-workspace"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject MemberAccountLinkingService MemberAccountLinkingService
+@inject MemberAccessService MemberAccessService
+@inject NavigationManager NavigationManager
+@inject StokvelService StokvelService
+
+<PageTitle>My Workspace</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading your workspace...
+    </div>
+}
+else if (currentUser is null)
+{
+    <AlertBanner
+        Type="warning"
+        Title="Please sign in to view your workspace."
+        Message=""
+        Icon="bi bi-exclamation-triangle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="My Workspace"
+        Subtitle="Your Sisonke home for member access, stokvel management and support tools."
+        BackText="Home"
+        BackHref="/" />
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
+    }
+
+    <section class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-4">
+            <div class="card-section-title">User Summary</div>
+            <div class="workspace-user-grid">
+                <div>
+                    <div class="workspace-detail-label">Full Name</div>
+                    <div class="workspace-detail-value">@(currentUser.FullName ?? "-")</div>
+                </div>
+                <div>
+                    <div class="workspace-detail-label">Email</div>
+                    <div class="workspace-detail-value">@(currentUser.Email ?? "-")</div>
+                </div>
+                <div>
+                    <div class="workspace-detail-label">ID Number</div>
+                    <div class="workspace-detail-value">@(currentUser.IdNumber ?? "-")</div>
+                </div>
+                <div>
+                    <div class="workspace-detail-label">Cellphone Number</div>
+                    <div class="workspace-detail-value">@(currentUser.CellphoneNumber ?? "-")</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="d-flex justify-content-end mb-3">
+        <button class="btn btn-primary btn-sm" type="button" @onclick="RefreshLinkedMembershipsAsync">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh Linked Memberships
+        </button>
+    </div>
+
+    @if (memberships.Count == 0)
+    {
+        <AlertBanner
+            Type="info"
+            Title="No memberships are linked to your account yet."
+            Message="Make sure your SA ID number matches the one captured by your stokvel secretary."
+            Icon="bi bi-info-circle-fill" />
+    }
+
+    <div class="workspace-card-grid">
+        <section class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="workspace-card-icon">
+                    <i class="bi bi-person-vcard"></i>
+                </div>
+                <h2 class="workspace-card-title">My Member Portal</h2>
+                <p class="workspace-card-text">View your memberships, contributions, claims, fines and meeting schedules.</p>
+                <a class="btn btn-primary btn-sm" href="/my-memberships">Open My Memberships</a>
+            </div>
+        </section>
+
+        @if (managedMemberships.Count > 0)
+        {
+            <section class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="workspace-card-icon">
+                        <i class="bi bi-speedometer2"></i>
+                    </div>
+                    <h2 class="workspace-card-title">Stokvels I Manage</h2>
+                    <div class="d-flex flex-column gap-3 mt-3">
+                        @foreach (var member in managedMemberships)
+                        {
+                            var stokvel = GetStokvelForMember(member);
+                            <div class="workspace-managed-row">
+                                <div>
+                                    <div class="workspace-detail-value">@(stokvel?.Name ?? member.Tenant.Name)</div>
+                                    <div class="workspace-detail-label">@member.DefaultRole</div>
+                                </div>
+                                @if (stokvel is not null)
+                                {
+                                    <a class="btn btn-sm btn-primary" href="@($"/stokvel-dashboard/{stokvel.Id}")">
+                                        Open Executive Dashboard
+                                    </a>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </section>
+        }
+
+        <section class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="workspace-card-icon">
+                    <i class="bi bi-plus-circle"></i>
+                </div>
+                <h2 class="workspace-card-title">Register New Stokvel</h2>
+                <p class="workspace-card-text">Create a new stokvel and become the first office bearer.</p>
+                <a class="btn btn-primary btn-sm" href="/register-stokvel">Register Stokvel</a>
+            </div>
+        </section>
+
+        @if (isPlatformAdmin)
+        {
+            <section class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="workspace-card-icon">
+                        <i class="bi bi-shield-lock"></i>
+                    </div>
+                    <h2 class="workspace-card-title">Platform Administration</h2>
+                    <p class="workspace-card-text">Manage platform-level settings and administrative workflows.</p>
+                    <a class="btn btn-primary btn-sm" href="/platform-admin">Open Platform Admin</a>
+                </div>
+            </section>
+        }
+
+        @if (isPlatformSupport || isPlatformAdmin)
+        {
+            <section class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="workspace-card-icon">
+                        <i class="bi bi-life-preserver"></i>
+                    </div>
+                    <h2 class="workspace-card-title">Support Console</h2>
+                    <p class="workspace-card-text">Assist users and review support-related stokvel activity.</p>
+                    <a class="btn btn-primary btn-sm" href="/platform-support">Open Support Console</a>
+                </div>
+            </section>
+        }
+    </div>
+}
+
+<style>
+    .workspace-user-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .workspace-card-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    }
+
+    .workspace-card-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: .75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        background: var(--sk-green-50);
+        color: var(--sk-green-700);
+        font-size: 1.1rem;
+    }
+
+    .workspace-card-title {
+        color: var(--sk-text);
+        font-size: 1.1rem;
+        font-weight: 800;
+        margin-bottom: .5rem;
+    }
+
+    .workspace-card-text {
+        color: var(--sk-text-muted);
+        font-size: .925rem;
+        line-height: 1.55;
+    }
+
+    .workspace-detail-label {
+        color: var(--sk-text-muted);
+        font-size: .7rem;
+        font-weight: 800;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+    }
+
+    .workspace-detail-value {
+        color: var(--sk-text);
+        font-size: .925rem;
+        font-weight: 650;
+        margin-top: .2rem;
+        overflow-wrap: anywhere;
+    }
+
+    .workspace-managed-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-bottom: .85rem;
+        border-bottom: 1px solid var(--sk-border);
+    }
+
+    .workspace-managed-row:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+    }
+
+    @@media (max-width: 900px) {
+        .workspace-user-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @@media (max-width: 640px) {
+        .workspace-user-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .workspace-managed-row {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>
+
+@code {
+    private ApplicationUser? currentUser;
+    private List<Member> memberships = [];
+    private List<Member> managedMemberships = [];
+    private List<Member> ordinaryMemberships = [];
+    private Dictionary<Guid, Stokvel> stokvelsByTenantId = new();
+    private string? userId;
+    private string? successMessage;
+    private bool isLoading = true;
+    private bool isPlatformAdmin;
+    private bool isPlatformSupport;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var principal = authState.User;
+
+        userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        currentUser = await UserManager.GetUserAsync(principal);
+        isPlatformAdmin = principal.IsInRole("PlatformAdmin");
+        isPlatformSupport = principal.IsInRole("PlatformSupport");
+
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            await LoadMembershipsAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task RefreshLinkedMembershipsAsync()
+    {
+        successMessage = null;
+
+        if (string.IsNullOrWhiteSpace(userId) || currentUser is null)
+        {
+            return;
+        }
+
+        await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(userId, currentUser.IdNumber);
+        await LoadMembershipsAsync();
+        successMessage = "Membership links refreshed.";
+    }
+
+    private async Task LoadMembershipsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            memberships = [];
+            managedMemberships = [];
+            ordinaryMemberships = [];
+            stokvelsByTenantId = new();
+            return;
+        }
+
+        memberships = await MemberAccountLinkingService.GetMembershipsForUserAsync(userId);
+        await LoadStokvelsAsync();
+        await SplitMembershipsByAccessAsync();
+    }
+
+    private async Task LoadStokvelsAsync()
+    {
+        stokvelsByTenantId = new();
+
+        foreach (var tenantId in memberships.Select(member => member.TenantId).Distinct())
+        {
+            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(tenantId);
+
+            if (stokvel is not null)
+            {
+                stokvelsByTenantId[tenantId] = stokvel;
+            }
+        }
+    }
+
+    private async Task SplitMembershipsByAccessAsync()
+    {
+        managedMemberships = [];
+        ordinaryMemberships = [];
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        foreach (var member in memberships)
+        {
+            var stokvel = GetStokvelForMember(member);
+
+            if (stokvel is not null && await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id))
+            {
+                managedMemberships.Add(member);
+            }
+            else
+            {
+                ordinaryMemberships.Add(member);
+            }
+        }
+    }
+
+    private Stokvel? GetStokvelForMember(Member member)
+    {
+        return stokvelsByTenantId.TryGetValue(member.TenantId, out var stokvel)
+            ? stokvel
+            : null;
+    }
+}

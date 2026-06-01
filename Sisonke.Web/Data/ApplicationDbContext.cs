@@ -14,6 +14,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<NextOfKin> NextOfKinRecords => Set<NextOfKin>();
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
     public DbSet<MemberDependent> MemberDependents => Set<MemberDependent>();
+    public DbSet<FuneralClaim> FuneralClaims => Set<FuneralClaim>();
+    public DbSet<FuneralClaimDocument> FuneralClaimDocuments => Set<FuneralClaimDocument>();
     public DbSet<FineType> FineTypes => Set<FineType>();
     public DbSet<MemberFine> MemberFines => Set<MemberFine>();
     public DbSet<ContributionRule> ContributionRules => Set<ContributionRule>();
@@ -74,6 +76,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(m => m.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Entity<Member>()
+            .HasIndex(m => m.IdNumber);
+
+        builder.Entity<Member>()
+            .HasIndex(m => m.ApplicationUserId);
+
         builder.Entity<NextOfKin>()
             .HasOne(n => n.Member)
             .WithMany(m => m.NextOfKinRecords)
@@ -90,6 +98,30 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(d => d.Member)
             .WithMany()
             .HasForeignKey(d => d.MemberId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<FuneralClaim>()
+            .HasOne(c => c.Tenant)
+            .WithMany()
+            .HasForeignKey(c => c.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<FuneralClaim>()
+            .HasOne(c => c.Member)
+            .WithMany()
+            .HasForeignKey(c => c.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<FuneralClaim>()
+            .HasOne(c => c.Dependent)
+            .WithMany()
+            .HasForeignKey(c => c.DependentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<FuneralClaimDocument>()
+            .HasOne(d => d.FuneralClaim)
+            .WithMany(c => c.Documents)
+            .HasForeignKey(d => d.FuneralClaimId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<FineType>()

@@ -1,0 +1,168 @@
+@page "/create-claim/{MemberId:guid}"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject MemberService MemberService
+@inject FuneralClaimService FuneralClaimService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create Funeral Claim</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading claim form...
+    </div>
+}
+else if (member is null)
+{
+    <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else
+{
+    <PageHeader
+        Title="Create Funeral Claim"
+        Subtitle="@member.FullName"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{MemberId}")" />
+
+    @if (saveFailed)
+    {
+        <AlertBanner
+            Type="danger"
+            Title="Could not create claim."
+            Message="Please check the claim details."
+            Icon="bi bi-x-circle-fill" />
+    }
+
+    <div class="form-page">
+        <div class="card">
+            <div class="card-body p-4">
+                <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="CreateFuneralClaimForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
+
+                    <div class="form-section-title">Claim Details</div>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="subject-type">Subject Type</label>
+                            <InputSelect id="subject-type" class="form-select" @bind-Value="model.SubjectType">
+                                <option value="@FuneralClaimSubjectType.Member">Member</option>
+                                <option value="@FuneralClaimSubjectType.Dependent">Dependent</option>
+                            </InputSelect>
+                        </div>
+
+                        @if (model.SubjectType == FuneralClaimSubjectType.Dependent)
+                        {
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="dependent">Dependent</label>
+                                <InputSelect id="dependent" class="form-select" @bind-Value="model.SelectedDependentId">
+                                    <option value="">Select dependent</option>
+                                    @foreach (var dependent in dependents)
+                                    {
+                                        <option value="@dependent.Id">@dependent.FullName</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        }
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="date-of-death">Date of Death</label>
+                            <InputDate id="date-of-death" class="form-control" @bind-Value="model.DateOfDeath" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="claim-reason">Claim Reason</label>
+                            <InputTextArea id="claim-reason" class="form-control" rows="4" @bind-Value="model.ClaimReason" />
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-file-earmark-plus me-2"></i>Create Claim
+                        </button>
+                        <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Member? member;
+    private List<MemberDependent> dependents = [];
+    private CreateClaimModel model = new();
+    private bool isLoading = true;
+    private bool saveFailed;
+    private bool hasAppliedRouteState;
+
+    [Parameter]
+    public Guid MemberId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public Guid? DependentId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        dependents = member is null ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
+
+        if (!hasAppliedRouteState)
+        {
+            model.SubjectType = DependentId.HasValue
+                ? FuneralClaimSubjectType.Dependent
+                : FuneralClaimSubjectType.Member;
+            model.SelectedDependentId = DependentId;
+            hasAppliedRouteState = true;
+        }
+
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        saveFailed = false;
+
+        var selectedDependentId = model.SubjectType == FuneralClaimSubjectType.Dependent
+            ? model.SelectedDependentId
+            : null;
+
+        var claim = await FuneralClaimService.CreateClaimAsync(
+            MemberId,
+            model.SubjectType,
+            selectedDependentId,
+            model.DateOfDeath,
+            model.ClaimReason);
+
+        if (claim is null)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/claim/{claim.Id}");
+    }
+
+    private sealed class CreateClaimModel
+    {
+        [Required]
+        public FuneralClaimSubjectType SubjectType { get; set; } = FuneralClaimSubjectType.Member;
+
+        public Guid? SelectedDependentId { get; set; }
+
+        public DateTime? DateOfDeath { get; set; }
+
+        [MaxLength(1000)]
+        public string? ClaimReason { get; set; }
+    }
+}

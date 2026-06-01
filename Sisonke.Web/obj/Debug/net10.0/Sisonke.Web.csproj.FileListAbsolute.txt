@@ -203,7 +203,6 @@ C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\refint\Sisonke.Web
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.pdb
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\Sisonke.Web.genruntimeconfig.cache
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\ref\Sisonke.Web.dll
-C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\bin\Debug\net10.0\Data\app.db
 C:\Users\mpshe\Projects\Sisonke\build-check\appsettings.Development.json
 C:\Users\mpshe\Projects\Sisonke\build-check\appsettings.json
 C:\Users\mpshe\Projects\Sisonke\build-check\Sisonke.Web.staticwebassets.runtime.json
@@ -613,7 +612,6 @@ C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\verify-build\runtimes\win-arm\na
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\verify-build\runtimes\win-arm64\native\e_sqlite3.dll
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\verify-build\runtimes\win-x64\native\e_sqlite3.dll
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\verify-build\runtimes\win-x86\native\e_sqlite3.dll
-C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\nhy6tht084-{0}-kju12vaiju-kju12vaiju.gz
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\codex-build\appsettings.Development.json
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\codex-build\appsettings.json
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\codex-build\artifacts\verify-build\appsettings.Development.json
@@ -746,3 +744,7 @@ C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\codex-build\runtimes\win-arm\native\
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\codex-build\runtimes\win-arm64\native\e_sqlite3.dll
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\codex-build\runtimes\win-x64\native\e_sqlite3.dll
 C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\codex-build\runtimes\win-x86\native\e_sqlite3.dll
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\bin\Debug\net10.0\Data\app.db
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\5ta0pd6ebx-{0}-aw3lan5i3c-aw3lan5i3c.gz
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\nhy6tht084-{0}-j4lf9f3qpq-j4lf9f3qpq.gz
+C:\Users\mpshe\Projects\Sisonke\Sisonke.Web\obj\Debug\net10.0\compressed\foj6yifms5-{0}-je3itjymla-je3itjymla.gz

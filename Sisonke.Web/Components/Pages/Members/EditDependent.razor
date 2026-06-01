@@ -4,6 +4,7 @@
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
+@inject FuneralClaimService FuneralClaimService
 @inject MemberService MemberService
 @inject NavigationManager NavigationManager
 
@@ -15,7 +16,7 @@
         <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading...
+        Loading dependent...
     </div>
 }
 else if (dependent is null)
@@ -26,7 +27,7 @@ else
 {
     <PageHeader
         Title="Edit Dependent"
-        Subtitle="@dependent.Member.FullName"
+        Subtitle="Update covered life details."
         BackText="Back to Member Profile"
         BackHref="@($"/member-profile/{dependent.MemberId}")" />
 
@@ -40,6 +41,21 @@ else
         <AlertBanner Type="danger" Title="Unable to delete dependent." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
+    @if (activeClaim is not null)
+    {
+        <AlertBanner
+            Type="warning"
+            Title="This dependent cannot be edited because there is an active claim linked to them."
+            Message=""
+            Icon="bi bi-exclamation-triangle-fill" />
+
+        <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-primary" href="@($"/claim/{activeClaim.Id}")">View Claim</a>
+            <a class="btn btn-outline-secondary" href="@($"/member-profile/{dependent.MemberId}")">Back to Member Profile</a>
+        </div>
+    }
+    else
+    {
     <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="EditDependentForm">
         <DataAnnotationsValidator />
         <ValidationSummary class="alert alert-danger" />
@@ -80,20 +96,23 @@ else
                             <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="model.CellphoneNumber" />
                         </div>
 
-                        <div class="col-12">
-                            <div class="form-check form-switch">
-                                <InputCheckbox id="is-active" class="form-check-input" @bind-Value="model.IsActive" />
-                                <label class="form-check-label fw-semibold" for="is-active">Active dependent</label>
+                        @if (!model.IsDeceased)
+                        {
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <InputCheckbox id="is-active" class="form-check-input" @bind-Value="model.IsActive" />
+                                    <label class="form-check-label fw-semibold" for="is-active">Active dependent</label>
+                                </div>
+                                <div class="form-text">Inactive dependents remain on record but are excluded from active covered lives.</div>
                             </div>
-                            <div class="form-text">Inactive dependents remain on record but are excluded from active covered lives.</div>
-                        </div>
+                        }
 
                         <div class="col-12">
                             <div class="form-check form-switch">
                                 <InputCheckbox id="is-deceased" class="form-check-input" @bind-Value="model.IsDeceased" />
                                 <label class="form-check-label fw-semibold" for="is-deceased">Dependent is deceased</label>
                             </div>
-                            <div class="form-text">Use this for burial society claims and future deceased-dependent reporting.</div>
+                            <div class="form-text">Deceased dependents are automatically marked inactive.</div>
                         </div>
 
                         @if (model.IsDeceased)
@@ -131,6 +150,7 @@ else
         ModalType="danger"
         OnConfirm="@HandleConfirmDelete"
         OnCancel="@HideDeleteConfirmation" />
+    }
 }
 
 @code {
@@ -146,6 +166,7 @@ else
 
     private MemberDependent? dependent;
     private MemberDependent model = new();
+    private FuneralClaim? activeClaim;
     private bool isLoading = true;
     private bool saveFailed;
     private bool deleteFailed;
@@ -157,6 +178,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         dependent = await MemberService.GetDependentByIdAsync(DependentId);
+        activeClaim = await FuneralClaimService.GetActiveClaimForDependentAsync(DependentId);
 
         if (dependent is not null)
         {
@@ -190,12 +212,18 @@ else
 
         saveFailed = false;
 
-        if (model.IsDeceased && model.DeathReportedAt is null)
+        if (model.IsDeceased)
         {
-            model.DeathReportedAt = DateTime.UtcNow;
+            model.IsActive = false;
+
+            if (model.DeathReportedAt is null)
+            {
+                model.DeathReportedAt = DateTime.UtcNow;
+            }
         }
 
         dependent.IsDeceased = model.IsDeceased;
+        dependent.IsActive = model.IsActive;
         dependent.DeceasedDate = model.DeceasedDate;
         dependent.DeathReportedAt = model.DeathReportedAt;
 

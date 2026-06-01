@@ -1,5 +1,9 @@
 @page "/stokvel-dashboard/{StokvelId:guid}"
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
@@ -9,6 +13,9 @@
 @inject ContributionService ContributionService
 @inject ConstitutionService ConstitutionService
 @inject MeetingService MeetingService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -25,6 +32,27 @@ else if (stokvel is null)
 {
     <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
     <a class="back-nav" href="/my-stokvels"><i class="bi bi-chevron-left"></i>Back to My Stokvels</a>
+}
+else if (!canViewFullDashboard)
+{
+    <div class="d-flex flex-column gap-3">
+        <AlertBanner Type="warning"
+                     Title="Access restricted."
+                     Message="You do not have access to the management dashboard for this stokvel."
+                     Icon="bi bi-exclamation-triangle-fill" />
+
+        <div class="d-flex flex-wrap gap-2">
+            @if (linkedMember is not null)
+            {
+                <a class="btn btn-primary" href="@($"/member-home/{linkedMember.Id}")">
+                    <i class="bi bi-person-circle me-1"></i>Go to My Member View
+                </a>
+            }
+            <a class="btn btn-outline-secondary" href="/my-memberships">
+                <i class="bi bi-grid me-1"></i>Back to My Memberships
+            </a>
+        </div>
+    </div>
 }
 else
 {
@@ -364,9 +392,11 @@ else
     private int upcomingMeetingCount;
     private int openVoteCount;
     private TenantSubscription? activeSubscription;
+    private Member? linkedMember;
     private string memberLimitMessage = string.Empty;
     private string constitutionStatus = "Not Created";
     private bool isLoading = true;
+    private bool canViewFullDashboard;
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -380,12 +410,32 @@ else
         upcomingMeetingCount = 0;
         openVoteCount = 0;
         activeSubscription = null;
+        linkedMember = null;
         memberLimitMessage = string.Empty;
         constitutionStatus = "Not Created";
+        canViewFullDashboard = false;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
 
         if (stokvel is null) { isLoading = false; return; }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        canViewFullDashboard = await MemberAccessService.CanViewFullDashboardAsync(userId, StokvelId);
+
+        if (!canViewFullDashboard)
+        {
+            linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
+            isLoading = false;
+            return;
+        }
 
         activeSubscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(StokvelId);
         memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);

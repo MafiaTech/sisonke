@@ -174,6 +174,10 @@ namespace Sisonke.Web.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("CellphoneNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("TEXT");
@@ -184,6 +188,14 @@ namespace Sisonke.Web.Migrations
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("FullName")
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IdNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("INTEGER");
@@ -208,6 +220,10 @@ namespace Sisonke.Web.Migrations
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ResidentialArea")
+                        .HasMaxLength(250)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("TEXT");
@@ -477,6 +493,140 @@ namespace Sisonke.Web.Migrations
                     b.ToTable("FineTypes");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.FuneralClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ChairpersonDecisionAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChairpersonDecisionByName")
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChairpersonDecisionNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClaimReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DateOfDeath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeceasedFullName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DependentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsMemberStatusEligible")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsWaitingPeriodSatisfied")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool?>("SecretaryRecommendedApproval")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SecretaryReviewNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SecretaryReviewedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SecretaryReviewedByName")
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SubjectType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubmittedByName")
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DependentId");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("FuneralClaims");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.FuneralClaimDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("FuneralClaimId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StoredFilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FuneralClaimId");
+
+                    b.ToTable("FuneralClaimDocuments");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Meeting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -662,6 +812,10 @@ namespace Sisonke.Web.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ApplicationUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CellphoneNumber")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -686,9 +840,22 @@ namespace Sisonke.Web.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("ExpelledAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("GovernanceStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("GovernanceStatusChangedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GovernanceStatusReason")
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("IdNumber")
@@ -704,6 +871,9 @@ namespace Sisonke.Web.Migrations
                     b.Property<DateTime>("JoiningDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("LastWarningIssuedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("MemberNumber")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -716,10 +886,17 @@ namespace Sisonke.Web.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("SuspendedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ApplicationUserId");
+
+                    b.HasIndex("IdNumber");
 
                     b.HasIndex("TenantId");
 
@@ -1405,6 +1582,43 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.FuneralClaim", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.MemberDependent", "Dependent")
+                        .WithMany()
+                        .HasForeignKey("DependentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Dependent");
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.FuneralClaimDocument", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.FuneralClaim", "FuneralClaim")
+                        .WithMany("Documents")
+                        .HasForeignKey("FuneralClaimId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FuneralClaim");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Meeting", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.Tenant", "Tenant")
@@ -1659,6 +1873,11 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("SubscriptionPlan");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.FuneralClaim", b =>
+                {
+                    b.Navigation("Documents");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Meeting", b =>

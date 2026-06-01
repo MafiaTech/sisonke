@@ -20,7 +20,9 @@
       "Bash(npm create *)",
       "Bash(npm install *)",
       "Bash(npx tailwindcss *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke\" -Directory)",
+      "Bash(Select-Object Name)"
     ],
     "additionalDirectories": [
       "c:\\Users\\mpshe\\.claude\\projects\\c--Users-mpshe-Projects-Sisonke\\memory",

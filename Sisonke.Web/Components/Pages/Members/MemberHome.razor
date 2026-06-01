@@ -1,0 +1,294 @@
+@page "/member-home/{MemberId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject MemberService MemberService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject FineService FineService
+@inject FuneralClaimService FuneralClaimService
+@inject MeetingService MeetingService
+@inject StokvelService StokvelService
+
+<PageTitle>My Member Dashboard</PageTitle>
+
+@if (isLoading)
+{
+    <div class="alert alert-info">Loading your member dashboard...</div>
+}
+else if (!isAllowed)
+{
+    <AlertBanner Type="warning" Message="You do not have access to this member view." />
+}
+else if (member is null)
+{
+    <AlertBanner Type="danger" Message="Member profile not found." />
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        <PageHeader Title="My Member Dashboard"
+                    Subtitle="@($"Your member view for {stokvel?.Name ?? member.Tenant?.Name ?? "this stokvel"}.")" />
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+                    <div>
+                        <p class="text-uppercase text-muted small fw-semibold mb-1">Member</p>
+                        <h2 class="h4 mb-2">@member.FullName</h2>
+                        <div class="d-flex flex-wrap gap-2">
+                            <StatusBadge Text="@member.Status.ToString()" Variant="@GetMemberStatusVariant(member.Status)" />
+                            <span class="badge text-bg-light border">@member.DefaultRole</span>
+                        </div>
+                    </div>
+                    <div class="text-lg-end">
+                        <p class="text-uppercase text-muted small fw-semibold mb-1">Stokvel</p>
+                        <h3 class="h5 mb-1">@((stokvel?.Name) ?? member.Tenant?.Name ?? "Not available")</h3>
+                        <div class="text-muted small">Member no. @Display(member.MemberNumber)</div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-3">
+                    <div class="col-md-4">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="text-muted small">Member status</div>
+                            <div class="fw-semibold">@member.Status</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="text-muted small">Default role</div>
+                            <div class="fw-semibold">@member.DefaultRole</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="text-muted small">Joining date</div>
+                            <div class="fw-semibold">@member.JoiningDate.ToString("dd MMM yyyy")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="row g-3">
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">My Contribution Status</h3>
+                    <p class="text-muted mb-0">Contribution tracking coming soon.</p>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">My Fines</h3>
+                    @if (memberFines.Count == 0)
+                    {
+                        <p class="text-muted mb-0">Your fines will appear here.</p>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-2">
+                            @foreach (var fine in memberFines.Take(3))
+                            {
+                                <div class="border rounded-3 p-2">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <span class="fw-semibold">@fine.FineType.Name</span>
+                                        <span>@fine.Amount.ToString("C")</span>
+                                    </div>
+                                    <div class="small text-muted">@fine.FineDate.ToString("dd MMM yyyy") · @fine.Status</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">My Payout / Host Turn</h3>
+                    <p class="text-muted mb-0">Payout and host rotation coming soon.</p>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">Meeting Schedule</h3>
+                    @if (upcomingMeetings.Count == 0)
+                    {
+                        <p class="text-muted">No upcoming meetings found.</p>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-2 mb-3">
+                            @foreach (var meeting in upcomingMeetings.Take(2))
+                            {
+                                <div class="border rounded-3 p-2">
+                                    <div class="fw-semibold">@meeting.Title</div>
+                                    <div class="small text-muted">@meeting.MeetingDate.ToString("dd MMM yyyy HH:mm")</div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (stokvel is not null)
+                    {
+                        <a class="btn btn-outline-primary btn-sm" href="/meetings/@stokvel.Id">View Meetings</a>
+                    }
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">Submit Apology</h3>
+                    <p class="text-muted">Apology submission coming soon.</p>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Submit Apology</button>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">My Documents</h3>
+                    <p class="text-muted mb-0">Your documents will appear here.</p>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">My Profile</h3>
+                    <p class="text-muted">View your captured member profile and covered lives.</p>
+                    <a class="btn btn-primary btn-sm" href="/member-profile/@MemberId">View My Profile</a>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">Claims</h3>
+                    <p class="text-muted">Create a funeral claim for yourself or a covered dependent.</p>
+                    <a class="btn btn-primary btn-sm" href="/create-claim/@MemberId">Create Claim</a>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="h6 mb-3">Constitution</h3>
+                    <p class="text-muted">View the stokvel constitution. Ordinary member view-only mode will be enforced later.</p>
+                    @if (stokvel is not null)
+                    {
+                        <a class="btn btn-outline-primary btn-sm" href="/constitution-builder/@stokvel.Id">View Constitution</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>View Constitution</button>
+                    }
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid MemberId { get; set; }
+
+    private Member? member;
+    private Stokvel? stokvel;
+    private List<MemberFine> memberFines = [];
+    private List<Meeting> upcomingMeetings = [];
+    private bool isLoading = true;
+    private bool isAllowed;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        isAllowed = false;
+        member = null;
+        stokvel = null;
+        memberFines = [];
+        upcomingMeetings = [];
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        isAllowed = await MemberAccessService.CanViewMemberProfileAsync(userId, MemberId);
+
+        if (!isAllowed)
+        {
+            isLoading = false;
+            return;
+        }
+
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+
+        if (member is not null)
+        {
+            stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+            memberFines = await FineService.GetMemberFinesAsync(MemberId);
+
+            if (stokvel is not null)
+            {
+                var meetings = await MeetingService.GetMeetingsByStokvelIdAsync(stokvel.Id);
+                upcomingMeetings = meetings
+                    .Where(meeting =>
+                        meeting.MeetingDate >= DateTime.Today &&
+                        (meeting.Status == MeetingStatus.Planned || meeting.Status == MeetingStatus.InProgress))
+                    .OrderBy(meeting => meeting.MeetingDate)
+                    .ToList();
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
+    }
+
+    private static string GetMemberStatusVariant(MemberStatus status)
+    {
+        return status switch
+        {
+            MemberStatus.Active => "success",
+            MemberStatus.Pending => "warning",
+            MemberStatus.CoolingPeriod => "warning",
+            MemberStatus.Suspended => "warning",
+            MemberStatus.Deceased => "danger",
+            MemberStatus.Resigned => "secondary",
+            MemberStatus.Removed => "secondary",
+            _ => "secondary"
+        };
+    }
+}

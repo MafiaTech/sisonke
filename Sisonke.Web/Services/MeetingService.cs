@@ -380,7 +380,116 @@ public class MeetingService(ApplicationDbContext context)
 
         await context.SaveChangesAsync();
 
+        await EvaluateMemberAttendanceGovernanceAsync(attendance.MemberId);
+
         return attendance;
+    }
+
+    public async Task<int> GetConsecutiveMissedMeetingsAsync(Guid memberId)
+    {
+        var member = await context.Members
+            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+
+        if (member is null)
+        {
+            return 0;
+        }
+
+        var meetings = await context.Meetings
+            .Where(meeting =>
+                meeting.TenantId == member.TenantId &&
+                meeting.Status != MeetingStatus.Cancelled &&
+                (meeting.Status == MeetingStatus.Completed || meeting.MeetingDate.Date < DateTime.Today))
+            .OrderByDescending(meeting => meeting.MeetingDate)
+            .Select(meeting => new
+            {
+                meeting.Id,
+                AttendanceStatus = context.MeetingAttendances
+                    .Where(attendance =>
+                        attendance.MeetingId == meeting.Id &&
+                        attendance.MemberId == memberId)
+                    .Select(attendance => (AttendanceStatus?)attendance.Status)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var missedMeetings = 0;
+
+        foreach (var meeting in meetings)
+        {
+            var attendanceStatus = meeting.AttendanceStatus ?? AttendanceStatus.Absent;
+
+            if (attendanceStatus == AttendanceStatus.Absent)
+            {
+                missedMeetings++;
+                continue;
+            }
+
+            if (attendanceStatus == AttendanceStatus.Apology)
+            {
+                continue;
+            }
+
+            return missedMeetings;
+        }
+
+        return missedMeetings;
+    }
+
+    public async Task<bool> EvaluateMemberAttendanceGovernanceAsync(Guid memberId)
+    {
+        var member = await context.Members
+            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+
+        if (member is null)
+        {
+            return false;
+        }
+
+        var consecutiveMissedMeetings = await GetConsecutiveMissedMeetingsAsync(memberId);
+        var now = DateTime.UtcNow;
+
+        if (consecutiveMissedMeetings >= 4)
+        {
+            member.GovernanceStatus = MemberGovernanceStatus.Suspended;
+            member.SuspendedAt ??= now;
+            member.GovernanceStatusChangedAt = now;
+            member.GovernanceStatusReason = "Member missed 4 consecutive meetings.";
+        }
+        else if (consecutiveMissedMeetings >= 3)
+        {
+            member.GovernanceStatus = MemberGovernanceStatus.Warning;
+            member.LastWarningIssuedAt ??= now;
+            member.GovernanceStatusChangedAt = now;
+            member.GovernanceStatusReason = "Member missed 3 consecutive meetings.";
+        }
+        else if (
+            member.GovernanceStatus == MemberGovernanceStatus.Warning &&
+            member.GovernanceStatusReason == "Member missed 3 consecutive meetings.")
+        {
+            member.GovernanceStatus = MemberGovernanceStatus.Active;
+            member.GovernanceStatusChangedAt = now;
+            member.GovernanceStatusReason = null;
+        }
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task EvaluateAttendanceGovernanceForMeetingAsync(Guid meetingId)
+    {
+        var attendanceRecords = await context.MeetingAttendances
+            .Include(attendance => attendance.Member)
+            .Where(attendance => attendance.MeetingId == meetingId)
+            .ToListAsync();
+
+        foreach (var attendance in attendanceRecords)
+        {
+            await EvaluateMemberAttendanceGovernanceAsync(attendance.Member.Id);
+        }
+
+        await context.SaveChangesAsync();
     }
 
     public async Task<(int Present, int Absent, int Apologies, int Late)> GetAttendanceSummaryAsync(Guid meetingId)

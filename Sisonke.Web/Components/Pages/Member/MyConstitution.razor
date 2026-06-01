@@ -1,0 +1,254 @@
+@page "/member-portal/constitution/{MemberId:guid}"
+@layout MemberPortalLayout
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@inject MemberService MemberService
+@inject MemberAccessService MemberAccessService
+@inject StokvelService StokvelService
+@inject ConstitutionService ConstitutionService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Constitution — Sisonke</PageTitle>
+
+@if (isLoading)
+{
+    <div class="sm-page">
+        <div class="sm-loading">
+            <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sm-forest)"></div>
+            Loading constitution…
+        </div>
+    </div>
+}
+else if (!isAuthorized)
+{
+    <div class="sm-page">
+        <div class="sm-error-state">
+            <i class="bi bi-shield-exclamation me-2"></i>
+            You don't have access to this page.
+            <a href="/my-memberships" class="sm-btn-link ms-2">Go to My Memberships</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sm-page" style="max-width:760px;">
+
+        <div style="margin-bottom:20px;">
+            <a href="/member-portal/dashboard/@MemberId" class="sm-btn-link">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+
+        <!-- Header -->
+        <div class="sm-hero sm-fade-up" style="margin-bottom:24px;">
+            <div class="sm-hero-body">
+                <div>
+                    <p class="sm-hero-greeting">@(stokvel?.Name ?? "Stokvel")</p>
+                    <h1 class="sm-hero-name" style="font-size:26px;margin-bottom:12px;">Constitution</h1>
+                    <div class="sm-hero-badges">
+                        <span class="sm-badge @GetStatusBadgeClass(constitutionStatus)">@constitutionStatus</span>
+                        @if (constitution?.VersionNumber is not null)
+                        {
+                            <span class="sm-badge sm-badge-hero">Version @constitution.VersionNumber</span>
+                        }
+                        @if (constitution?.ApprovedAt is not null)
+                        {
+                            <span class="sm-badge sm-badge-hero">Approved @constitution.ApprovedAt.Value.ToString("d MMM yyyy")</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (constitution is null)
+        {
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-body" style="text-align:center;padding:48px 24px;">
+                    <div style="font-size:48px;margin-bottom:16px;opacity:0.4;">📜</div>
+                    <h2 style="font-family:'Playfair Display',serif;font-size:20px;color:var(--sm-forest);margin-bottom:8px;">
+                        No Constitution Yet
+                    </h2>
+                    <p style="color:var(--sm-muted);font-size:14px;max-width:380px;margin:0 auto;">
+                        Your stokvel's constitution has not been created yet.
+                        Contact your chairperson or secretary to set one up.
+                    </p>
+                </div>
+            </div>
+        }
+        else if (constitution.IsUploadedDocument)
+        {
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-blue"><i class="bi bi-file-earmark-pdf"></i></div>
+                        @constitution.Title
+                    </h2>
+                </div>
+                <div class="sm-card-body">
+                    <div class="sm-profile-detail-row">
+                        <span class="sm-profile-detail-label">File</span>
+                        <span class="sm-profile-detail-value">@(constitution.OriginalFileName ?? "Uploaded document")</span>
+                    </div>
+                    @if (constitution.FileSizeBytes is not null)
+                    {
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">Size</span>
+                            <span class="sm-profile-detail-value">@((constitution.FileSizeBytes.Value / 1024.0 / 1024.0).ToString("F2")) MB</span>
+                        </div>
+                    }
+                    <div class="sm-profile-detail-row">
+                        <span class="sm-profile-detail-label">Status</span>
+                        <span class="sm-profile-detail-value">
+                            <span class="sm-badge @GetStatusBadgeClass(constitutionStatus)">@constitutionStatus</span>
+                        </span>
+                    </div>
+                    <div class="sm-profile-detail-row">
+                        <span class="sm-profile-detail-label">Created</span>
+                        <span class="sm-profile-detail-value">@constitution.CreatedAt.ToString("d MMMM yyyy")</span>
+                    </div>
+
+                    <div style="margin-top:20px;">
+                        @if (!string.IsNullOrWhiteSpace(constitution.StoredFilePath))
+                        {
+                            <a href="@constitution.StoredFilePath"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="sm-btn-primary">
+                                <i class="bi bi-download"></i> Download Constitution
+                            </a>
+                        }
+                        else
+                        {
+                            <!-- TODO: wire to IDocumentService.GetDownloadUrl() -->
+                            <button class="sm-btn-primary" type="button" onclick="alert('Document download coming soon. Contact your secretary for a copy.')">
+                                <i class="bi bi-download"></i> Download Constitution
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Text-based constitution -->
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head" style="flex-wrap:wrap;gap:10px;">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-green"><i class="bi bi-journal-text"></i></div>
+                        @constitution.Title
+                    </h2>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span class="sm-badge @GetStatusBadgeClass(constitutionStatus)">@constitutionStatus</span>
+                        <button class="sm-btn-secondary" style="padding:6px 14px;font-size:12px;"
+                                onclick="window.print()">
+                            <i class="bi bi-printer"></i> Print
+                        </button>
+                    </div>
+                </div>
+                <div class="sm-card-body" style="padding:28px 32px;">
+                    <div class="sm-constitution-content" style="
+                        font-family:'DM Sans',sans-serif;
+                        font-size:14px;
+                        line-height:1.75;
+                        color:var(--sm-text);
+                        max-width:640px;">
+                        @((MarkupString)constitution.Content)
+                    </div>
+                </div>
+                <div style="padding:16px 32px;border-top:1px solid var(--sm-border);background:#fdfaf6;font-size:12px;color:var(--sm-muted);">
+                    Version @constitution.VersionNumber
+                    · Created @constitution.CreatedAt.ToString("d MMMM yyyy")
+                    @if (constitution.IsApproved && constitution.ApprovedAt is not null)
+                    {
+                        <span> · Approved @constitution.ApprovedAt.Value.ToString("d MMMM yyyy")</span>
+                    }
+                </div>
+            </div>
+        }
+
+    </div>
+}
+
+<style>
+    @@media print {
+        .sm-topbar, .sm-mobile-nav, .sm-btn-secondary, .sm-btn-link, .sm-hero { display: none !important; }
+        .sm-page { padding: 0 !important; max-width: 100% !important; }
+        .sm-card { border: none !important; box-shadow: none !important; }
+    }
+    .sm-constitution-content h2 {
+        font-family: 'Playfair Display', serif;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--sm-forest);
+        margin-top: 28px;
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--sm-border);
+    }
+    .sm-constitution-content h2:first-child { margin-top: 0; }
+    .sm-constitution-content p { margin-bottom: 10px; }
+    .sm-constitution-content strong { color: var(--sm-text); }
+</style>
+
+@code {
+    [Parameter] public Guid MemberId { get; set; }
+
+    private bool isLoading = true;
+    private bool isAuthorized;
+
+    private Member? member;
+    private Stokvel? stokvel;
+    private ConstitutionDocument? constitution;
+    private string constitutionStatus = "Not Created";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/Account/Login", replace: true);
+            return;
+        }
+
+        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var canView = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+        if (!canView)
+        {
+            NavigationManager.NavigateTo("/my-memberships", replace: true);
+            return;
+        }
+
+        isAuthorized = true;
+
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        if (member is not null)
+        {
+            stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+            if (stokvel is not null)
+            {
+                constitution = await ConstitutionService.GetLatestConstitutionAsync(stokvel.Id);
+                constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(stokvel.Id);
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private static string GetStatusBadgeClass(string status) => status switch
+    {
+        "Approved"  => "sm-badge-green",
+        "Draft"     => "sm-badge-gold",
+        "Uploaded"  => "sm-badge-blue",
+        _           => "sm-badge-gray"
+    };
+}

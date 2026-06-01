@@ -1,12 +1,18 @@
 @page "/constitution-builder/{StokvelId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
 @inject StokvelService StokvelService
 @inject ConstitutionService ConstitutionService
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 
 <PageTitle>Constitution Builder</PageTitle>
 
@@ -22,6 +28,10 @@
 else if (stokvel is null)
 {
     <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canViewStokvel)
+{
+    <AlertBanner Type="warning" Title="Access restricted." Message="You do not have access to this constitution." Icon="bi bi-exclamation-triangle-fill" />
 }
 else
 {
@@ -64,7 +74,60 @@ else
         <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
     }
 
-    @if (HasUploadedConstitution)
+    @if (!canManageConstitution)
+    {
+        <AlertBanner Type="info" Title="Read-only mode." Message="You are viewing the constitution in read-only mode." Icon="bi bi-info-circle-fill" />
+
+        <div class="card mb-4">
+            <div class="card-body p-4 p-md-5">
+                @if (HasUploadedConstitution)
+                {
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
+                            <i class="bi bi-file-earmark-arrow-up-fill"></i>
+                        </div>
+                        <h2 class="h6 mb-0 fw-700">Uploaded Constitution</h2>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6">
+                            <div class="detail-mini-label">Original file name</div>
+                            <div class="fw-600">@latestConstitution?.OriginalFileName</div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="detail-mini-label">File size</div>
+                            <div class="text-muted small">@FormatFileSize(latestConstitution?.FileSizeBytes)</div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(latestConstitution?.StoredFilePath))
+                    {
+                        <a class="btn btn-primary" href="@latestConstitution.StoredFilePath" target="_blank" rel="noopener noreferrer">
+                            <i class="bi bi-box-arrow-up-right me-2"></i>Open Uploaded Document
+                        </a>
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(previewContent))
+                {
+                    @if (IsApproved)
+                    {
+                        <div class="approved-watermark-banner mb-4">
+                            <i class="bi bi-shield-fill-check me-2"></i>
+                            This constitution has been approved and is binding on all members.
+                        </div>
+                    }
+                    <div class="constitution-preview">
+                        @((MarkupString)previewContent)
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">No constitution content is available yet.</p>
+                }
+            </div>
+        </div>
+    }
+    else if (HasUploadedConstitution)
     {
         <div class="card mb-4">
             <div class="card-body p-4">
@@ -508,6 +571,8 @@ else
     private bool showApprovalConfirmation;
     private string? successMessage;
     private string? errorMessage;
+    private bool canViewStokvel;
+    private bool canManageConstitution;
 
     private bool IsApproved => string.Equals(constitutionStatus, "Approved", StringComparison.OrdinalIgnoreCase);
     private bool HasUploadedConstitution => latestConstitution?.IsUploadedDocument == true;
@@ -521,8 +586,35 @@ else
         successMessage = null;
         errorMessage = null;
         showApprovalConfirmation = false;
+        canViewStokvel = false;
+        canManageConstitution = false;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        if (stokvel is null)
+        {
+            isLoading = false;
+            return;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        canViewStokvel = await MemberAccessService.CanViewStokvelAsync(userId, StokvelId);
+
+        if (!canViewStokvel)
+        {
+            isLoading = false;
+            return;
+        }
+
+        canManageConstitution = await MemberAccessService.CanManageConstitutionAsync(userId, StokvelId);
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         wizardAnswers = await ConstitutionService.GetWizardAnswersAsync(StokvelId);
         latestConstitution = await ConstitutionService.GetLatestConstitutionAsync(StokvelId);
@@ -540,6 +632,11 @@ else
 
     private void SetAnswer(string key, string? value)
     {
+        if (!canManageConstitution)
+        {
+            return;
+        }
+
         wizardAnswers[key] = value ?? string.Empty;
         successMessage = null;
         errorMessage = null;
@@ -552,6 +649,11 @@ else
 
     private void GoToStep(int step)
     {
+        if (!canManageConstitution)
+        {
+            return;
+        }
+
         currentStep = Math.Clamp(step, 1, 4);
     }
 
@@ -567,6 +669,11 @@ else
 
     private async Task SaveProgressAsync()
     {
+        if (!canManageConstitution)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
 
@@ -583,6 +690,11 @@ else
 
     private async Task GeneratePreviewAsync()
     {
+        if (!canManageConstitution)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
 
@@ -605,6 +717,11 @@ else
 
     private async Task SaveDraftAsync()
     {
+        if (!canManageConstitution)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
 
@@ -630,6 +747,11 @@ else
 
     private void ShowApprovalConfirmation()
     {
+        if (!canManageConstitution)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
         showApprovalConfirmation = true;
@@ -639,6 +761,11 @@ else
 
     private async Task ConfirmApprovalAsync()
     {
+        if (!canManageConstitution)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
         showApprovalConfirmation = false;

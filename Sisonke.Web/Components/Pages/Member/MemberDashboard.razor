@@ -1,0 +1,623 @@
+@page "/member-portal/dashboard/{MemberId:guid}"
+@layout MemberPortalLayout
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@inject MemberService MemberService
+@inject MemberAccessService MemberAccessService
+@inject MemberAccountLinkingService MemberAccountLinkingService
+@inject FineService FineService
+@inject MeetingService MeetingService
+@inject StokvelService StokvelService
+@inject ContributionService ContributionService
+@inject ConstitutionService ConstitutionService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>My Dashboard — Sisonke</PageTitle>
+
+@if (isLoading)
+{
+    <div class="sm-page">
+        <div class="sm-loading">
+            <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sm-forest)"></div>
+            Loading your dashboard…
+        </div>
+    </div>
+}
+else if (!isAuthorized || member is null)
+{
+    <div class="sm-page">
+        <div class="sm-error-state">
+            <i class="bi bi-shield-exclamation me-2"></i>
+            You don't have access to this member view.
+            <a href="/my-memberships" class="sm-btn-link ms-2">Go to My Memberships</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sm-page">
+
+        <!-- ══ HERO ════════════════════════════════════════════ -->
+        <div class="sm-hero sm-fade-up">
+            <div class="sm-hero-body">
+                <div>
+                    <p class="sm-hero-greeting" id="sm-greeting">Good day,</p>
+                    <h1 class="sm-hero-name">@member.FullName</h1>
+                    <div class="sm-hero-badges">
+                        <span class="sm-badge sm-badge-hero">
+                            <span class="sm-badge-dot"></span>
+                            @member.Status
+                        </span>
+                        <span class="sm-badge sm-badge-hero">Since @member.JoiningDate.ToString("MMM yyyy")</span>
+                        <span class="sm-badge sm-badge-hero">@member.MemberNumber</span>
+                        @if (stokvel is not null)
+                        {
+                            <span class="sm-badge sm-badge-hero">@stokvel.Name</span>
+                        }
+                    </div>
+                </div>
+                <div class="sm-hero-stats">
+                    @if (contributionRule is not null)
+                    {
+                        <span class="sm-hero-stat-value">R @contributionRule.Amount.ToString("N0")</span>
+                        <span class="sm-hero-stat-label">Monthly Contribution</span>
+                    }
+                    else
+                    {
+                        <span class="sm-hero-stat-value">—</span>
+                        <span class="sm-hero-stat-label">No rule set</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ QUICK ACTIONS ══════════════════════════════════ -->
+        <div class="sm-quick-actions sm-fade-up">
+            <button class="sm-quick-btn"
+                    @onclick='() => OpenApologyModal(upcomingMeetings.FirstOrDefault()?.Id ?? Guid.Empty, upcomingMeetings.FirstOrDefault()?.Title ?? "")'>
+                <div class="sm-quick-btn-icon"><i class="bi bi-megaphone"></i></div>
+                <span class="sm-quick-btn-label">Send Apology</span>
+            </button>
+            <a href="/member-portal/constitution/@MemberId" class="sm-quick-btn">
+                <div class="sm-quick-btn-icon"><i class="bi bi-journal-text"></i></div>
+                <span class="sm-quick-btn-label">Constitution</span>
+            </a>
+            <a href="#meetings" class="sm-quick-btn">
+                <div class="sm-quick-btn-icon"><i class="bi bi-calendar-event"></i></div>
+                <span class="sm-quick-btn-label">Meetings</span>
+            </a>
+            <a href="/member-portal/my-profile/@MemberId" class="sm-quick-btn">
+                <div class="sm-quick-btn-icon"><i class="bi bi-person-circle"></i></div>
+                <span class="sm-quick-btn-label">My Profile</span>
+            </a>
+        </div>
+
+        <!-- ══ CONSTITUTION BANNER ════════════════════════════ -->
+        <a href="/member-portal/constitution/@MemberId" class="sm-constitution-banner sm-fade-up">
+            <div class="sm-constitution-banner-left">
+                <div class="sm-constitution-banner-icon">📜</div>
+                <div>
+                    <div class="sm-constitution-banner-title">
+                        @(stokvel?.Name ?? "Stokvel") Constitution
+                    </div>
+                    <div class="sm-constitution-banner-sub">
+                        Status: @constitutionStatus
+                        @if (constitution?.ApprovedAt is not null)
+                        {
+                            <span> · Approved @constitution.ApprovedAt.Value.ToString("d MMM yyyy")</span>
+                        }
+                    </div>
+                </div>
+            </div>
+            <i class="bi bi-chevron-right" style="color:rgba(255,255,255,0.35);font-size:18px;"></i>
+        </a>
+
+        <!-- ══ MY FINANCES ════════════════════════════════════ -->
+        <div class="sm-section-header">
+            <span class="sm-section-title">My Finances</span>
+        </div>
+        <div class="sm-grid-2" id="finances">
+
+            <!-- Card: My Contribution -->
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-green"><i class="bi bi-cash-stack"></i></div>
+                        My Contribution
+                    </h2>
+                    @if (contributionRule is not null)
+                    {
+                        <span class="sm-badge sm-badge-green">Active Rule</span>
+                    }
+                </div>
+                <div class="sm-card-body">
+                    @if (contributionRule is not null)
+                    {
+                        <div class="sm-stat-row">
+                            <div class="sm-stat-mini">
+                                <div class="sm-stat-mini-value">R @contributionRule.Amount.ToString("N0")</div>
+                                <div class="sm-stat-mini-label">Amount Due</div>
+                            </div>
+                            <div class="sm-stat-mini">
+                                <div class="sm-stat-mini-value">@contributionRule.Frequency</div>
+                                <div class="sm-stat-mini-label">Frequency</div>
+                            </div>
+                        </div>
+                        <div class="sm-divider"></div>
+                    }
+                    else
+                    {
+                        <div class="sm-empty">
+                            <span class="sm-empty-icon">💳</span>
+                            <p class="sm-empty-text">No active contribution rule has been configured yet.</p>
+                        </div>
+                    }
+
+                    <!-- TODO: wire to per-member contribution history when ContributionService.GetMemberContributionsAsync is available -->
+                    <p class="sm-section-label" style="margin-top:12px;">Payment History</p>
+                    <div class="sm-empty" style="padding:16px 0;">
+                        <span class="sm-empty-icon" style="font-size:20px;">📊</span>
+                        <p class="sm-empty-text" style="font-size:12px;">Payment history coming soon.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Host Rotation (stub) -->
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-gold"><i class="bi bi-arrow-repeat"></i></div>
+                        Host Rotation
+                    </h2>
+                </div>
+                <div class="sm-card-body">
+                    <!-- TODO: wire to IRotationService when available -->
+                    <div class="sm-empty">
+                        <span class="sm-empty-icon">🔄</span>
+                        <p class="sm-empty-text">Rotation schedule not configured yet.<br />Contact your stokvel secretary.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ MEETINGS & COMMS ═══════════════════════════════ -->
+        <div class="sm-section-header">
+            <span class="sm-section-title">Meetings &amp; Communication</span>
+        </div>
+        <div class="sm-grid-2" id="meetings">
+
+            <!-- Card: Upcoming Meetings -->
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-blue"><i class="bi bi-calendar-check"></i></div>
+                        Upcoming Meetings
+                    </h2>
+                    <span class="sm-badge sm-badge-blue">@upcomingMeetings.Count upcoming</span>
+                </div>
+                <div class="sm-card-body">
+                    @if (upcomingMeetings.Count == 0)
+                    {
+                        <div class="sm-empty">
+                            <span class="sm-empty-icon">📅</span>
+                            <p class="sm-empty-text">No upcoming meetings scheduled.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var meeting in upcomingMeetings)
+                        {
+                            var attendanceStatus = myAttendanceByMeeting.GetValueOrDefault(meeting.Id);
+                            var alreadySentApology = attendanceStatus == AttendanceStatus.Apology;
+
+                            <div class="sm-meeting-item">
+                                <div class="sm-meeting-date">@meeting.MeetingDate.ToString("ddd d MMM yyyy")</div>
+                                <div class="sm-meeting-title">@meeting.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(meeting.Venue))
+                                {
+                                    <div class="sm-meeting-venue"><i class="bi bi-geo-alt me-1"></i>@meeting.Venue</div>
+                                }
+                                @if (alreadySentApology)
+                                {
+                                    <span class="sm-apology-sent"><i class="bi bi-check-circle-fill"></i> Apology Sent</span>
+                                }
+                                else
+                                {
+                                    <button class="sm-apology-btn" @onclick="() => OpenApologyModal(meeting.Id, meeting.Title)">
+                                        <i class="bi bi-megaphone"></i> Send Apology
+                                    </button>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <!-- Card: Announcements (stub) -->
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-purple"><i class="bi bi-megaphone-fill"></i></div>
+                        Announcements
+                    </h2>
+                </div>
+                <div class="sm-card-body">
+                    <!-- TODO: wire to IAnnouncementService.GetUnreadCount() and GetAnnouncementsAsync() -->
+                    <div class="sm-empty">
+                        <span class="sm-empty-icon">📢</span>
+                        <p class="sm-empty-text">No announcements yet.<br />Check back after your next meeting.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ MY ACCOUNT ══════════════════════════════════════ -->
+        <div class="sm-section-header">
+            <span class="sm-section-title">My Account</span>
+        </div>
+        <div class="sm-grid-3" id="profile">
+
+            <!-- Card: My Fines -->
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-red"><i class="bi bi-exclamation-triangle"></i></div>
+                        My Fines
+                    </h2>
+                    @if (OutstandingFines > 0)
+                    {
+                        <span class="sm-badge sm-badge-red">R @OutstandingFines.ToString("N0") due</span>
+                    }
+                    else
+                    {
+                        <span class="sm-badge sm-badge-green">All clear</span>
+                    }
+                </div>
+                <div class="sm-card-body">
+                    @if (OutstandingFines > 0)
+                    {
+                        <div style="margin-bottom:16px;">
+                            <div class="sm-value-md" style="color:var(--sm-red);">R @OutstandingFines.ToString("N2")</div>
+                            <div class="sm-value-label">Outstanding Balance</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="sm-empty" style="padding:12px 0;">
+                            <span class="sm-empty-icon" style="font-size:24px;">✅</span>
+                            <p class="sm-empty-text">No outstanding fines.</p>
+                        </div>
+                    }
+
+                    @if (fines.Count > 0)
+                    {
+                        <div class="sm-divider"></div>
+                        @foreach (var fine in fines.Take(4))
+                        {
+                            <div class="sm-fine-item">
+                                <div class="sm-fine-icon @(fine.Status == FineStatus.Paid ? "sm-fine-icon-paid" : "")">
+                                    @if (fine.Status == FineStatus.Paid)
+                                    {
+                                        <i class="bi bi-check-lg"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-exclamation-lg"></i>
+                                    }
+                                </div>
+                                <div class="sm-fine-info">
+                                    <div class="sm-fine-reason">@fine.Reason</div>
+                                    <div class="sm-fine-date">@fine.FineDate.ToString("d MMM yyyy")</div>
+                                </div>
+                                <div>
+                                    <div class="sm-fine-amount">R @fine.Amount.ToString("N0")</div>
+                                    @if (fine.Status == FineStatus.Paid)
+                                    {
+                                        <div style="text-align:right;"><span class="sm-badge sm-badge-green" style="font-size:10px;">Paid</span></div>
+                                    }
+                                    else
+                                    {
+                                        <div style="text-align:right;"><span class="sm-badge sm-badge-red" style="font-size:10px;">Unpaid</span></div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <!-- Card: My Profile Summary -->
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-green"><i class="bi bi-person-badge"></i></div>
+                        My Profile
+                    </h2>
+                    <a href="/member-portal/my-profile/@MemberId" class="sm-btn-link">Edit</a>
+                </div>
+                <div class="sm-card-body">
+                    <div class="sm-profile-summary">
+                        <div class="sm-avatar-lg">@GetInitials(member.FullName)</div>
+                        <div>
+                            <div class="sm-profile-name">@member.FullName</div>
+                            <div class="sm-profile-number">@member.MemberNumber</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">Phone</span>
+                            <span class="sm-profile-detail-value">@(member.CellphoneNumber ?? "—")</span>
+                        </div>
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">Email</span>
+                            <span class="sm-profile-detail-value">@(member.EmailAddress ?? "—")</span>
+                        </div>
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">ID Number</span>
+                            <span class="sm-profile-detail-value">@(member.IdNumber ?? "—")</span>
+                        </div>
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">Joined</span>
+                            <span class="sm-profile-detail-value">@member.JoiningDate.ToString("d MMM yyyy")</span>
+                        </div>
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">Next of Kin</span>
+                            <span class="sm-profile-detail-value">
+                                @(member.NextOfKinRecords.FirstOrDefault()?.FullName ?? "Not captured")
+                            </span>
+                        </div>
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">Beneficiary</span>
+                            <span class="sm-profile-detail-value">
+                                @(member.Beneficiaries.FirstOrDefault(b => b.IsActive)?.FullName ?? "Not captured")
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Documents (stub) -->
+            <div class="sm-card sm-fade-up">
+                <div class="sm-card-head">
+                    <h2 class="sm-card-title">
+                        <div class="sm-card-icon sm-card-icon-blue"><i class="bi bi-folder2-open"></i></div>
+                        My Documents
+                    </h2>
+                </div>
+                <div class="sm-card-body">
+                    <!-- TODO: wire to IDocumentService.GetMemberDocumentsAsync(memberId) -->
+                    <div class="sm-empty">
+                        <span class="sm-empty-icon">📁</span>
+                        <p class="sm-empty-text">Document management is coming soon.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ══ APOLOGY MODAL ══════════════════════════════════════ -->
+    @if (showApologyModal)
+    {
+        <div class="sm-modal-overlay" @onclick="CloseApologyModal">
+            <div class="sm-modal" @onclick:stopPropagation>
+                <div class="sm-modal-handle"></div>
+                <div class="sm-modal-title">Send an Apology</div>
+                <div class="sm-modal-sub">@selectedMeetingTitle</div>
+
+                @if (!string.IsNullOrWhiteSpace(apologyFeedback))
+                {
+                    <div class="sm-error-state">@apologyFeedback</div>
+                }
+
+                <div class="sm-form-group">
+                    <label class="sm-form-label">Reason for absence</label>
+                    <textarea class="sm-form-control"
+                              rows="3"
+                              placeholder="Briefly explain why you cannot attend…"
+                              @bind="apologyReason"></textarea>
+                </div>
+
+                <div class="sm-modal-actions">
+                    <button class="sm-btn-secondary" type="button" @onclick="CloseApologyModal">Cancel</button>
+                    <button class="sm-btn-primary" type="button" @onclick="SubmitApologyAsync" disabled="@apologySubmitting">
+                        @if (apologySubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-send"></i>
+                        }
+                        Send Apology
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ══ TOAST ══════════════════════════════════════════════ -->
+    @if (!string.IsNullOrWhiteSpace(toastMessage))
+    {
+        <div class="sm-toast">
+            <i class="bi bi-check-circle-fill"></i>
+            @toastMessage
+        </div>
+    }
+}
+
+<script>
+(function () {
+    var h = new Date().getHours();
+    var greeting = h >= 5 && h < 12 ? 'Good morning' :
+                   h >= 12 && h < 18 ? 'Good afternoon' : 'Good evening';
+    var el = document.getElementById('sm-greeting');
+    if (el) el.textContent = greeting + ',';
+
+    var path = window.location.pathname;
+    document.querySelectorAll('.sm-mobile-nav-item').forEach(function (item) {
+        var href = item.getAttribute('href');
+        if (href && href !== '#' && path.startsWith(href)) {
+            item.classList.add('active');
+        }
+    });
+}());
+</script>
+
+@code {
+    [Parameter] public Guid MemberId { get; set; }
+
+    private bool isLoading = true;
+    private bool isAuthorized;
+
+    private Member? member;
+    private Stokvel? stokvel;
+    private ContributionRule? contributionRule;
+    private List<MemberFine> fines = [];
+    private List<Meeting> upcomingMeetings = [];
+    private Dictionary<Guid, AttendanceStatus?> myAttendanceByMeeting = new();
+    private ConstitutionDocument? constitution;
+    private string constitutionStatus = "Not Created";
+
+    private bool showApologyModal;
+    private Guid selectedMeetingId;
+    private string selectedMeetingTitle = "";
+    private string apologyReason = "";
+    private bool apologySubmitting;
+    private string? apologyFeedback;
+    private string? toastMessage;
+
+    private decimal OutstandingFines =>
+        fines.Where(f => f.Status == FineStatus.Unpaid).Sum(f => f.Amount);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/Account/Login", replace: true);
+            return;
+        }
+
+        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var canView = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+        if (!canView)
+        {
+            NavigationManager.NavigateTo("/my-memberships", replace: true);
+            return;
+        }
+
+        isAuthorized = true;
+
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        if (member is null)
+        {
+            isLoading = false;
+            return;
+        }
+
+        stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+
+        if (stokvel is not null)
+        {
+            contributionRule = await ContributionService.GetActiveContributionRuleByStokvelIdAsync(stokvel.Id);
+
+            fines = await FineService.GetMemberFinesAsync(MemberId);
+
+            var allMeetings = await MeetingService.GetMeetingsByStokvelIdAsync(stokvel.Id);
+            upcomingMeetings = allMeetings
+                .Where(m => m.MeetingDate >= DateTime.Today &&
+                            (m.Status == MeetingStatus.Planned || m.Status == MeetingStatus.InProgress))
+                .OrderBy(m => m.MeetingDate)
+                .Take(3)
+                .ToList();
+
+            foreach (var meeting in upcomingMeetings)
+            {
+                var attendances = await MeetingService.GetAttendanceByMeetingIdAsync(meeting.Id);
+                var mine = attendances.FirstOrDefault(a => a.MemberId == MemberId);
+                myAttendanceByMeeting[meeting.Id] = mine?.Status;
+            }
+
+            constitution = await ConstitutionService.GetLatestConstitutionAsync(stokvel.Id);
+            constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(stokvel.Id);
+        }
+
+        isLoading = false;
+    }
+
+    private void OpenApologyModal(Guid meetingId, string meetingTitle)
+    {
+        if (meetingId == Guid.Empty)
+        {
+            ShowToast("No upcoming meeting selected.");
+            return;
+        }
+        selectedMeetingId = meetingId;
+        selectedMeetingTitle = meetingTitle;
+        apologyReason = "";
+        apologyFeedback = null;
+        showApologyModal = true;
+    }
+
+    private void CloseApologyModal()
+    {
+        showApologyModal = false;
+    }
+
+    private async Task SubmitApologyAsync()
+    {
+        if (selectedMeetingId == Guid.Empty) return;
+        apologySubmitting = true;
+        apologyFeedback = null;
+
+        var attendances = await MeetingService.GetAttendanceByMeetingIdAsync(selectedMeetingId);
+        var mine = attendances.FirstOrDefault(a => a.MemberId == MemberId);
+
+        if (mine is null)
+        {
+            apologyFeedback = "Attendance register not yet set up for this meeting. Contact your stokvel secretary.";
+            apologySubmitting = false;
+            return;
+        }
+
+        await MeetingService.UpdateAttendanceAsync(mine.Id, AttendanceStatus.Apology, false, false, apologyReason);
+        myAttendanceByMeeting[selectedMeetingId] = AttendanceStatus.Apology;
+
+        apologySubmitting = false;
+        showApologyModal = false;
+        ShowToast("Apology sent successfully.");
+    }
+
+    private void ShowToast(string message)
+    {
+        toastMessage = message;
+        _ = DismissToastAfterDelayAsync();
+    }
+
+    private async Task DismissToastAfterDelayAsync()
+    {
+        await Task.Delay(3000);
+        toastMessage = null;
+        StateHasChanged();
+    }
+
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[^1][0]}".ToUpper()
+            : name[0].ToString().ToUpper();
+    }
+}

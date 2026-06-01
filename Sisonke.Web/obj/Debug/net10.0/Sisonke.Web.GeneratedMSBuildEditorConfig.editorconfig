@@ -195,8 +195,24 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBcHAucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Layout/AuthLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcQXV0aExheW91dC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Layout/MemberPortalLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTWVtYmVyUG9ydGFsTGF5b3V0LnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Auth.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdXRoLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Claims/ClaimDetails.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDbGFpbXNcQ2xhaW1EZXRhaWxzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Claims/CreateClaim.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDbGFpbXNcQ3JlYXRlQ2xhaW0ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Constitution/ConstitutionBuilder.razor]
@@ -295,6 +311,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXEVkaXROZXh0T2ZLaW4ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Members/MemberHome.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXE1lbWJlckhvbWUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Members/MemberProfile.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXE1lbWJlclByb2ZpbGUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
@@ -303,8 +323,40 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXE1lbWJlcnNMaXN0LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Members/MyMemberships.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJzXE15TWVtYmVyc2hpcHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Member/MemberDashboard.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJcTWVtYmVyRGFzaGJvYXJkLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Member/MyConstitution.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJcTXlDb25zdGl0dXRpb24ucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Member/MyProfile.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJcTXlQcm9maWxlLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Member/SendApology.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJcU2VuZEFwb2xvZ3kucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Member/_Imports.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZW1iZXJcX0ltcG9ydHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/NotFound.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xOb3RGb3VuZC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Platform/PlatformAdmin.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQbGF0Zm9ybVxQbGF0Zm9ybUFkbWluLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Platform/PlatformSupport.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQbGF0Zm9ybVxQbGF0Zm9ybVN1cHBvcnQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Stokvels/RegisterStokvel.razor]
@@ -317,6 +369,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Weather.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXZWF0aGVyLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Workspace/MyWorkspace.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXb3Jrc3BhY2VcTXlXb3Jrc3BhY2UucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Routes.razor]

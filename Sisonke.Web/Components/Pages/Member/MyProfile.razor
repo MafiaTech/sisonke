@@ -1,0 +1,371 @@
+@page "/member-portal/my-profile/{MemberId:guid}"
+@layout MemberPortalLayout
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@inject MemberService MemberService
+@inject MemberAccessService MemberAccessService
+@inject StokvelService StokvelService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>My Profile — Sisonke</PageTitle>
+
+@if (isLoading)
+{
+    <div class="sm-page">
+        <div class="sm-loading">
+            <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sm-forest)"></div>
+            Loading profile…
+        </div>
+    </div>
+}
+else if (!isAuthorized || member is null)
+{
+    <div class="sm-page">
+        <div class="sm-error-state">
+            <i class="bi bi-shield-exclamation me-2"></i>
+            You don't have access to this profile.
+            <a href="/my-memberships" class="sm-btn-link ms-2">Go to My Memberships</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sm-page" style="max-width:680px;">
+
+        <div style="margin-bottom:20px;">
+            <a href="/member-portal/dashboard/@MemberId" class="sm-btn-link">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+
+        <!-- Profile header -->
+        <div class="sm-hero sm-fade-up" style="margin-bottom:24px;">
+            <div class="sm-hero-body" style="align-items:center;">
+                <div style="display:flex;align-items:center;gap:20px;">
+                    <div class="sm-avatar-lg" style="width:64px;height:64px;font-size:24px;">@GetInitials(member.FullName)</div>
+                    <div>
+                        <p class="sm-hero-greeting" style="margin-bottom:2px;">Member Profile</p>
+                        <h1 class="sm-hero-name" style="font-size:24px;margin-bottom:8px;">@member.FullName</h1>
+                        <div class="sm-hero-badges">
+                            <span class="sm-badge sm-badge-hero">@member.MemberNumber</span>
+                            <span class="sm-badge sm-badge-hero">@member.DefaultRole</span>
+                            <span class="sm-badge sm-badge-hero">@member.Status</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="sm-card" style="padding:14px 20px;margin-bottom:16px;background:var(--sm-sage-pale);border-color:var(--sm-forest-light);">
+                <span style="color:var(--sm-forest-light);font-weight:600;font-size:14px;">
+                    <i class="bi bi-check-circle-fill me-2"></i>@successMessage
+                </span>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="sm-error-state">@errorMessage</div>
+        }
+
+        <!-- ── Read-only identity details ── -->
+        <div class="sm-section-header sm-fade-up">
+            <span class="sm-section-title">Identity Details</span>
+            <span class="sm-badge sm-badge-gray">Read-only</span>
+        </div>
+        <div class="sm-card sm-fade-up sm-mb-20">
+            <div class="sm-card-body">
+                <div class="sm-profile-detail-row">
+                    <span class="sm-profile-detail-label">Full Name</span>
+                    <span class="sm-profile-detail-value">@member.FullName</span>
+                </div>
+                <div class="sm-profile-detail-row">
+                    <span class="sm-profile-detail-label">ID Number</span>
+                    <span class="sm-profile-detail-value">@(member.IdNumber ?? "—")</span>
+                </div>
+                <div class="sm-profile-detail-row">
+                    <span class="sm-profile-detail-label">Member No.</span>
+                    <span class="sm-profile-detail-value" style="font-family:'DM Mono',monospace;">@member.MemberNumber</span>
+                </div>
+                <div class="sm-profile-detail-row">
+                    <span class="sm-profile-detail-label">Joined</span>
+                    <span class="sm-profile-detail-value">@member.JoiningDate.ToString("d MMMM yyyy")</span>
+                </div>
+                <div class="sm-profile-detail-row">
+                    <span class="sm-profile-detail-label">Role</span>
+                    <span class="sm-profile-detail-value">@member.DefaultRole</span>
+                </div>
+                <div class="sm-profile-detail-row">
+                    <span class="sm-profile-detail-label">Status</span>
+                    <span class="sm-profile-detail-value">
+                        <span class="sm-badge @(member.Status == MemberStatus.Active ? "sm-badge-green" : "sm-badge-red")">@member.Status</span>
+                    </span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(member.ResidentialArea))
+                {
+                    <div class="sm-profile-detail-row">
+                        <span class="sm-profile-detail-label">Area</span>
+                        <span class="sm-profile-detail-value">@member.ResidentialArea</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- ── Editable contact details ── -->
+        <div class="sm-section-header sm-fade-up">
+            <span class="sm-section-title">Contact Details</span>
+            @if (!isEditing)
+            {
+                <button class="sm-btn-link" @onclick="() => isEditing = true">
+                    <i class="bi bi-pencil me-1"></i>Edit
+                </button>
+            }
+        </div>
+        <div class="sm-card sm-fade-up sm-mb-20">
+            <div class="sm-card-body">
+                @if (!isEditing)
+                {
+                    <div class="sm-profile-detail-row">
+                        <span class="sm-profile-detail-label">Cellphone</span>
+                        <span class="sm-profile-detail-value">@(member.CellphoneNumber ?? "—")</span>
+                    </div>
+                    <div class="sm-profile-detail-row">
+                        <span class="sm-profile-detail-label">Email</span>
+                        <span class="sm-profile-detail-value">@(member.EmailAddress ?? "—")</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="sm-form-group">
+                        <label class="sm-form-label" for="cellphone">Cellphone Number</label>
+                        <input id="cellphone"
+                               type="tel"
+                               class="sm-form-control"
+                               @bind="editCellphone"
+                               placeholder="e.g. 071 234 5678"
+                               maxlength="30" />
+                    </div>
+                    <div class="sm-form-group">
+                        <label class="sm-form-label" for="email">Email Address</label>
+                        <input id="email"
+                               type="email"
+                               class="sm-form-control"
+                               @bind="editEmail"
+                               placeholder="e.g. you@example.com"
+                               maxlength="150" />
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:8px;">
+                        <button class="sm-btn-secondary" type="button" @onclick="CancelEdit">Cancel</button>
+                        <button class="sm-btn-primary" type="button" @onclick="SaveContactAsync" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-lg"></i>
+                            }
+                            Save Changes
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- ── Next of Kin ── -->
+        <div class="sm-section-header sm-fade-up">
+            <span class="sm-section-title">Next of Kin</span>
+        </div>
+        <div class="sm-card sm-fade-up sm-mb-20">
+            <div class="sm-card-body">
+                @if (!member.NextOfKinRecords.Any())
+                {
+                    <div class="sm-empty" style="padding:16px 0;">
+                        <span class="sm-empty-icon" style="font-size:22px;">👤</span>
+                        <p class="sm-empty-text">No next of kin recorded. Contact your secretary to update.</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var nok in member.NextOfKinRecords)
+                    {
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">@nok.Relationship</span>
+                            <span class="sm-profile-detail-value">
+                                @nok.FullName
+                                @if (!string.IsNullOrWhiteSpace(nok.CellphoneNumber))
+                                {
+                                    <span style="color:var(--sm-muted);margin-left:8px;">@nok.CellphoneNumber</span>
+                                }
+                            </span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- ── Beneficiaries ── -->
+        <div class="sm-section-header sm-fade-up">
+            <span class="sm-section-title">Beneficiaries</span>
+        </div>
+        <div class="sm-card sm-fade-up sm-mb-20">
+            <div class="sm-card-body">
+                @if (!member.Beneficiaries.Any(b => b.IsActive))
+                {
+                    <div class="sm-empty" style="padding:16px 0;">
+                        <span class="sm-empty-icon" style="font-size:22px;">📋</span>
+                        <p class="sm-empty-text">No beneficiaries recorded. Contact your secretary to update.</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var ben in member.Beneficiaries.Where(b => b.IsActive))
+                    {
+                        <div class="sm-profile-detail-row">
+                            <span class="sm-profile-detail-label">@ben.Relationship</span>
+                            <span class="sm-profile-detail-value">
+                                @ben.FullName
+                                @if (!string.IsNullOrWhiteSpace(ben.IdNumber))
+                                {
+                                    <span style="color:var(--sm-muted);margin-left:8px;font-family:'DM Mono',monospace;font-size:12px;">@ben.IdNumber</span>
+                                }
+                            </span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- ── Coming Soon fields ── -->
+        <div class="sm-section-header sm-fade-up">
+            <span class="sm-section-title">Account Details</span>
+            <span class="sm-badge sm-badge-gray">Coming Soon</span>
+        </div>
+        <div class="sm-card sm-fade-up sm-mb-20">
+            <div class="sm-card-body">
+                <div class="sm-profile-detail-row">
+                    <span class="sm-profile-detail-label">FICA Status</span>
+                    <span class="sm-profile-detail-value">
+                        <span class="sm-badge sm-badge-gray">Coming Soon</span>
+                        <!-- TODO: wire to FICA verification service -->
+                    </span>
+                </div>
+                <div class="sm-profile-detail-row">
+                    <span class="sm-profile-detail-label">Bank Account</span>
+                    <span class="sm-profile-detail-value">
+                        <span class="sm-badge sm-badge-gray">Coming Soon</span>
+                        <!-- TODO: wire to bank detail management -->
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid MemberId { get; set; }
+
+    private bool isLoading = true;
+    private bool isAuthorized;
+    private bool isEditing;
+    private bool isSaving;
+
+    private Member? member;
+
+    private string editCellphone = "";
+    private string editEmail = "";
+
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/Account/Login", replace: true);
+            return;
+        }
+
+        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var canView = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+        if (!canView)
+        {
+            NavigationManager.NavigateTo("/my-memberships", replace: true);
+            return;
+        }
+
+        isAuthorized = true;
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+
+        isLoading = false;
+    }
+
+    private void CancelEdit()
+    {
+        if (member is null) return;
+        editCellphone = member.CellphoneNumber ?? "";
+        editEmail = member.EmailAddress ?? "";
+        isEditing = false;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private async Task SaveContactAsync()
+    {
+        if (member is null) return;
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            member.CellphoneNumber = editCellphone.Trim();
+            member.EmailAddress = string.IsNullOrWhiteSpace(editEmail) ? null : editEmail.Trim();
+
+            await MemberService.UpdateMemberAsync(member);
+
+            member = await MemberService.GetMemberByIdAsync(MemberId);
+            successMessage = "Contact details updated successfully.";
+            isEditing = false;
+        }
+        catch
+        {
+            errorMessage = "Could not save changes. Please try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (member is not null)
+        {
+            editCellphone = member.CellphoneNumber ?? "";
+            editEmail = member.EmailAddress ?? "";
+        }
+    }
+
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[^1][0]}".ToUpper()
+            : name[0].ToString().ToUpper();
+    }
+}

@@ -10,6 +10,9 @@ public class Member
     public Guid TenantId { get; set; }
     public Tenant Tenant { get; set; } = default!;
 
+    [MaxLength(450)]
+    public string? ApplicationUserId { get; set; }
+
     [MaxLength(50)]
     public string MemberNumber { get; set; } = string.Empty;
 
@@ -30,6 +33,19 @@ public class Member
     public DateTime JoiningDate { get; set; }
 
     public MemberStatus Status { get; set; } = MemberStatus.Active;
+
+    public MemberGovernanceStatus GovernanceStatus { get; set; } = MemberGovernanceStatus.Active;
+
+    public DateTime? GovernanceStatusChangedAt { get; set; }
+
+    [MaxLength(500)]
+    public string? GovernanceStatusReason { get; set; }
+
+    public DateTime? LastWarningIssuedAt { get; set; }
+
+    public DateTime? SuspendedAt { get; set; }
+
+    public DateTime? ExpelledAt { get; set; }
 
     public SisonkeRole DefaultRole { get; set; } = SisonkeRole.Member;
 

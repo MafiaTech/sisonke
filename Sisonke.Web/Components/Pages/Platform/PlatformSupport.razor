@@ -1,0 +1,64 @@
+@page "/platform-support"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "PlatformAdmin,PlatformSupport")]
+
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Support Console</PageTitle>
+
+<PageHeader
+    Title="Support Console"
+    Subtitle="Support tools for finding users, members and stokvel records."
+    BackText="Back to Workspace"
+    BackHref="/my-workspace" />
+
+<section class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
+                <i class="bi bi-search"></i>
+            </div>
+            <div>
+                <h2 class="h6 fw-700 mb-1">Search by</h2>
+                <p class="text-muted small mb-0">Search is coming soon.</p>
+            </div>
+        </div>
+
+        <div class="platform-support-grid">
+            <div class="support-search-field">
+                <label class="form-label" for="support-email">Email</label>
+                <input id="support-email" class="form-control" placeholder="name@example.com" disabled />
+            </div>
+            <div class="support-search-field">
+                <label class="form-label" for="support-id-number">SA ID Number</label>
+                <input id="support-id-number" class="form-control" placeholder="13-digit SA ID" disabled />
+            </div>
+            <div class="support-search-field">
+                <label class="form-label" for="support-stokvel-name">Stokvel Name</label>
+                <input id="support-stokvel-name" class="form-control" placeholder="Stokvel name" disabled />
+            </div>
+            <div class="support-search-field">
+                <label class="form-label" for="support-member-number">Member Number</label>
+                <input id="support-member-number" class="form-control" placeholder="Member number" disabled />
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-outline-secondary mt-4" disabled>
+            <i class="bi bi-search me-2"></i>Search Coming Soon
+        </button>
+    </div>
+</section>
+
+<style>
+    .platform-support-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @@media (max-width: 640px) {
+        .platform-support-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

@@ -15,7 +15,7 @@
         <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
             <span class="visually-hidden">Loading...</span>
         </div>
-        Loading...
+        Loading dependent form...
     </div>
 }
 else if (member is null)
@@ -26,7 +26,7 @@ else
 {
     <PageHeader
         Title="Add Dependent"
-        Subtitle="@member.FullName"
+        Subtitle="@($"Add a covered life for {member.FullName}")"
         BackText="Back to Member Profile"
         BackHref="@($"/member-profile/{MemberId}")" />
 
@@ -124,7 +124,16 @@ else
     {
         saveFailed = false;
 
-        var savedDependent = await MemberService.AddDependentAsync(MemberId, model);
+        var dependent = new MemberDependent
+        {
+            FullName = model.FullName,
+            Relationship = model.Relationship,
+            DateOfBirth = model.DateOfBirth,
+            IdNumber = model.IdNumber,
+            CellphoneNumber = model.CellphoneNumber
+        };
+
+        var savedDependent = await MemberService.AddDependentAsync(MemberId, dependent);
 
         if (savedDependent is null)
         {

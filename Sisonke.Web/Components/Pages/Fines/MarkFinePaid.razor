@@ -1,6 +1,10 @@
 @page "/mark-fine-paid/{MemberFineId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Components.Shared
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
@@ -8,6 +12,9 @@
 
 @inject FineService FineService
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject StokvelService StokvelService
 
 <PageTitle>Mark Fine Paid</PageTitle>
 
@@ -23,6 +30,16 @@
 else if (memberFine is null)
 {
     <AlertBanner Type="danger" Title="Fine not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canManageFines)
+{
+    <PageHeader
+        Title="Mark Fine Paid"
+        Subtitle="@memberFine.Member.FullName"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{memberFine.MemberId}")" />
+
+    <AlertBanner Type="warning" Title="Access restricted." Message="Only office bearers can mark fines as paid." Icon="bi bi-exclamation-triangle-fill" />
 }
 else
 {
@@ -102,6 +119,7 @@ else
     private bool showPaymentConfirmation = true;
     private bool updateFailed;
     private string? successMessage;
+    private bool canManageFines;
 
     [Parameter]
     public Guid MemberFineId { get; set; }
@@ -109,12 +127,34 @@ else
     protected override async Task OnInitializedAsync()
     {
         memberFine = await FineService.GetMemberFineByIdAsync(MemberFineId);
-        showPaymentConfirmation = memberFine?.Status == FineStatus.Unpaid;
+
+        if (memberFine is not null)
+        {
+            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(memberFine.Member.TenantId);
+
+            if (stokvel is not null)
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    canManageFines = await MemberAccessService.CanManageFinesAsync(userId, stokvel.Id);
+                }
+            }
+        }
+
+        showPaymentConfirmation = canManageFines && memberFine?.Status == FineStatus.Unpaid;
         isLoading = false;
     }
 
     private async Task ConfirmPaymentAsync()
     {
+        if (!canManageFines)
+        {
+            return;
+        }
+
         updateFailed = false;
         var updatedFine = await FineService.MarkFineAsPaidAsync(MemberFineId);
 

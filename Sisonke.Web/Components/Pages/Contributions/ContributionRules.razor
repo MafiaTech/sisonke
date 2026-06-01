@@ -1,6 +1,10 @@
 @page "/contribution-rules/{StokvelId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
@@ -8,6 +12,8 @@
 @inject ContributionService ContributionService
 @inject NavigationManager NavigationManager
 @inject StokvelService StokvelService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 
 <PageTitle>Contribution Rules</PageTitle>
 
@@ -23,6 +29,10 @@
 else if (stokvel is null)
 {
     <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canViewStokvel)
+{
+    <AlertBanner Type="warning" Title="Access restricted." Message="You do not have access to these contribution rules." Icon="bi bi-exclamation-triangle-fill" />
 }
 else
 {
@@ -42,6 +52,11 @@ else
         <AlertBanner Type="danger" Title="Unable to save contribution rule." Message="Please try again." Icon="bi bi-x-circle-fill" />
     }
 
+    @if (!canManageContributionRules)
+    {
+        <AlertBanner Type="info" Title="Read-only mode." Message="You are viewing contribution rules in read-only mode." Icon="bi bi-info-circle-fill" />
+    }
+
     <div class="form-page">
         <EditForm Model="@rule" OnValidSubmit="@HandleValidSubmit" FormName="ContributionRuleForm">
             <DataAnnotationsValidator />
@@ -56,14 +71,14 @@ else
                             <label class="form-label" for="amount">Contribution amount (R) <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">R</span>
-                                <InputNumber id="amount" class="form-control" @bind-Value="rule.Amount" />
+                                <InputNumber id="amount" class="form-control" @bind-Value="rule.Amount" disabled="@(!canManageContributionRules)" />
                             </div>
                             <div class="form-text">Amount each member contributes per cycle.</div>
                         </div>
 
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="frequency">Contribution frequency</label>
-                            <InputSelect id="frequency" class="form-select" @bind-Value="rule.Frequency">
+                            <InputSelect id="frequency" class="form-select" @bind-Value="rule.Frequency" disabled="@(!canManageContributionRules)">
                                 @foreach (var frequency in Enum.GetValues<ContributionFrequency>())
                                 {
                                     <option value="@frequency">@frequency</option>
@@ -73,13 +88,13 @@ else
 
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="due-day">Due day of month</label>
-                            <InputNumber id="due-day" class="form-control" @bind-Value="rule.DueDayOfMonth" />
+                            <InputNumber id="due-day" class="form-control" @bind-Value="rule.DueDayOfMonth" disabled="@(!canManageContributionRules)" />
                             <div class="form-text">Day of the month contributions are due (1–28).</div>
                         </div>
 
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="effective-from">Effective from</label>
-                            <InputDate id="effective-from" class="form-control" @bind-Value="rule.EffectiveFrom" />
+                            <InputDate id="effective-from" class="form-control" @bind-Value="rule.EffectiveFrom" disabled="@(!canManageContributionRules)" />
                             <div class="form-text">Date from which this rule becomes active.</div>
                         </div>
                     </div>
@@ -95,20 +110,20 @@ else
                             <label class="form-label" for="late-payment-fine">Late payment fine (R)</label>
                             <div class="input-group">
                                 <span class="input-group-text">R</span>
-                                <InputNumber id="late-payment-fine" class="form-control" @bind-Value="rule.LatePaymentFineAmount" />
+                                <InputNumber id="late-payment-fine" class="form-control" @bind-Value="rule.LatePaymentFineAmount" disabled="@(!canManageContributionRules)" />
                             </div>
                             <div class="form-text">Fine amount charged when payment is received after the grace period.</div>
                         </div>
 
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="grace-period">Grace period (days)</label>
-                            <InputNumber id="grace-period" class="form-control" @bind-Value="rule.GracePeriodDays" />
+                            <InputNumber id="grace-period" class="form-control" @bind-Value="rule.GracePeriodDays" disabled="@(!canManageContributionRules)" />
                             <div class="form-text">Number of days after the due date before a late fine is applied.</div>
                         </div>
 
                         <div class="col-12">
                             <div class="form-check form-switch">
-                                <InputCheckbox id="allow-partial-payments" class="form-check-input" @bind-Value="rule.AllowPartialPayments" />
+                                <InputCheckbox id="allow-partial-payments" class="form-check-input" @bind-Value="rule.AllowPartialPayments" disabled="@(!canManageContributionRules)" />
                                 <label class="form-check-label fw-semibold" for="allow-partial-payments">Allow partial payments</label>
                             </div>
                             <div class="form-text">When enabled, members may pay contributions in instalments within the grace period.</div>
@@ -117,12 +132,15 @@ else
                 </div>
             </div>
 
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" type="submit">
-                    <i class="bi bi-check-circle me-2"></i>Save Contribution Rule
-                </button>
-                <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">Cancel</a>
-            </div>
+            @if (canManageContributionRules)
+            {
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-check-circle me-2"></i>Save Contribution Rule
+                    </button>
+                    <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">Cancel</a>
+                </div>
+            }
         </EditForm>
     </div>
 }
@@ -133,13 +151,44 @@ else
     private bool isLoading = true;
     private bool savedSuccessfully;
     private bool saveFailed;
+    private bool canViewStokvel;
+    private bool canManageContributionRules;
 
     [Parameter]
     public Guid StokvelId { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        isLoading = true;
+        canViewStokvel = false;
+        canManageContributionRules = false;
+
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        if (stokvel is null)
+        {
+            isLoading = false;
+            return;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        canViewStokvel = await MemberAccessService.CanViewStokvelAsync(userId, StokvelId);
+
+        if (!canViewStokvel)
+        {
+            isLoading = false;
+            return;
+        }
+
+        canManageContributionRules = await MemberAccessService.CanManageContributionRulesAsync(userId, StokvelId);
 
         var activeRule = await ContributionService.GetActiveContributionRuleByStokvelIdAsync(StokvelId);
         rule = activeRule is null
@@ -160,6 +209,11 @@ else
 
     private async Task HandleValidSubmit()
     {
+        if (!canManageContributionRules)
+        {
+            return;
+        }
+
         savedSuccessfully = false;
         saveFailed = false;
 

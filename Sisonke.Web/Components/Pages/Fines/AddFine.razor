@@ -1,7 +1,11 @@
 @page "/add-fine/{MemberId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
@@ -9,6 +13,8 @@
 @inject MemberService MemberService
 @inject NavigationManager NavigationManager
 @inject StokvelService StokvelService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 
 <PageTitle>Add Fine</PageTitle>
 
@@ -24,6 +30,16 @@
 else if (member is null)
 {
     <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canManageFines)
+{
+    <PageHeader
+        Title="Add Fine"
+        Subtitle="@member.FullName"
+        BackText="Back to Member Profile"
+        BackHref="@($"/member-profile/{MemberId}")" />
+
+    <AlertBanner Type="warning" Title="Access restricted." Message="Only office bearers can add fines." Icon="bi bi-exclamation-triangle-fill" />
 }
 else
 {
@@ -104,6 +120,7 @@ else
     private AddFineModel model = new();
     private bool isLoading = true;
     private bool saveFailed;
+    private bool canManageFines;
 
     [Parameter]
     public Guid MemberId { get; set; }
@@ -117,6 +134,20 @@ else
             var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
             if (stokvel is not null)
             {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    canManageFines = await MemberAccessService.CanManageFinesAsync(userId, stokvel.Id);
+                }
+
+                if (!canManageFines)
+                {
+                    isLoading = false;
+                    return;
+                }
+
                 fineTypes = await FineService.GetFineTypesByStokvelIdAsync(stokvel.Id);
 
                 if (fineTypes.Count == 0)
@@ -132,6 +163,11 @@ else
 
     private async Task HandleValidSubmit()
     {
+        if (!canManageFines)
+        {
+            return;
+        }
+
         saveFailed = false;
         var savedFine = await FineService.AddMemberFineAsync(MemberId, model.FineTypeId, model.Amount, model.Reason, model.FineDate);
         if (savedFine is null) { saveFailed = true; return; }

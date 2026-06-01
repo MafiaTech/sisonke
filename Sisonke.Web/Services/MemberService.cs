@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
+using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
@@ -90,6 +91,85 @@ public class MemberService(
         return member;
     }
 
+    public async Task<Member?> EnsureCreatorMemberForStokvelAsync(
+        Guid stokvelId,
+        string applicationUserId,
+        string? fullName,
+        string? emailAddress,
+        string? cellphoneNumber,
+        string? idNumber,
+        string? residentialArea)
+    {
+        if (string.IsNullOrWhiteSpace(applicationUserId))
+        {
+            return null;
+        }
+
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return null;
+        }
+
+        var normalizedIdNumber = NormalizeIdNumber(idNumber);
+        var tenantMembers = await context.Members
+            .Where(member => member.TenantId == stokvel.TenantId)
+            .ToListAsync();
+
+        var existingMember = string.IsNullOrWhiteSpace(normalizedIdNumber)
+            ? tenantMembers.FirstOrDefault(member => member.ApplicationUserId == applicationUserId)
+            : tenantMembers.FirstOrDefault(member => NormalizeIdNumber(member.IdNumber) == normalizedIdNumber);
+
+        var hasOfficeBearer = tenantMembers.Any(member => IsOfficeBearerRole(member.DefaultRole));
+
+        if (existingMember is not null)
+        {
+            existingMember.ApplicationUserId = applicationUserId;
+            existingMember.EmailAddress = string.IsNullOrWhiteSpace(existingMember.EmailAddress) ? emailAddress : existingMember.EmailAddress;
+            existingMember.CellphoneNumber = string.IsNullOrWhiteSpace(existingMember.CellphoneNumber) ? cellphoneNumber ?? "Not captured" : existingMember.CellphoneNumber;
+            existingMember.IdNumber = string.IsNullOrWhiteSpace(existingMember.IdNumber) ? idNumber : existingMember.IdNumber;
+            existingMember.ResidentialArea = string.IsNullOrWhiteSpace(existingMember.ResidentialArea) ? residentialArea : existingMember.ResidentialArea;
+
+            if (!hasOfficeBearer)
+            {
+                existingMember.DefaultRole = SisonkeRole.Chairperson;
+            }
+
+            if (existingMember.Status != MemberStatus.Active)
+            {
+                existingMember.Status = MemberStatus.Active;
+            }
+
+            await context.SaveChangesAsync();
+            return existingMember;
+        }
+
+        var creatorMember = new Member
+        {
+            Id = Guid.NewGuid(),
+            TenantId = stokvel.TenantId,
+            ApplicationUserId = applicationUserId,
+            MemberNumber = $"MEM-{DateTime.Today.Year}-{Random.Shared.Next(1000, 10000)}",
+            FullName = string.IsNullOrWhiteSpace(fullName) ? emailAddress ?? "Stokvel Creator" : fullName.Trim(),
+            CellphoneNumber = string.IsNullOrWhiteSpace(cellphoneNumber) ? "Not captured" : cellphoneNumber.Trim(),
+            EmailAddress = emailAddress,
+            IdNumber = idNumber,
+            ResidentialArea = residentialArea,
+            JoiningDate = DateTime.Today,
+            Status = MemberStatus.Active,
+            GovernanceStatus = MemberGovernanceStatus.Active,
+            DefaultRole = hasOfficeBearer ? SisonkeRole.Member : SisonkeRole.Chairperson,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.Members.Add(creatorMember);
+        await context.SaveChangesAsync();
+
+        return creatorMember;
+    }
+
     public async Task<Member?> UpdateMemberAsync(Member updatedMember)
     {
         var member = await context.Members
@@ -110,6 +190,69 @@ public class MemberService(
         member.DefaultRole = updatedMember.DefaultRole;
         member.IsInCoolingPeriod = updatedMember.IsInCoolingPeriod;
         member.CoolingPeriodEndDate = updatedMember.CoolingPeriodEndDate;
+        member.IsDeceased = updatedMember.IsDeceased;
+
+        if (updatedMember.IsDeceased)
+        {
+            member.DeceasedDate = updatedMember.DeceasedDate;
+
+            if (member.DeathReportedAt is null)
+            {
+                member.DeathReportedAt = DateTime.UtcNow;
+            }
+        }
+        else
+        {
+            member.DeceasedDate = null;
+            member.DeathReportedAt = null;
+        }
+
+        await context.SaveChangesAsync();
+
+        return member;
+    }
+
+    public async Task<Member?> UpdateMemberGovernanceStatusAsync(
+        Guid memberId,
+        MemberGovernanceStatus governanceStatus,
+        string? reason)
+    {
+        var member = await context.Members
+            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+
+        if (member is null)
+        {
+            return null;
+        }
+
+        var now = DateTime.UtcNow;
+
+        member.GovernanceStatus = governanceStatus;
+        member.GovernanceStatusReason = reason;
+        member.GovernanceStatusChangedAt = now;
+
+        if (governanceStatus == MemberGovernanceStatus.Suspended)
+        {
+            member.SuspendedAt ??= now;
+        }
+        else if (governanceStatus == MemberGovernanceStatus.Expelled)
+        {
+            member.ExpelledAt ??= now;
+        }
+        else if (governanceStatus == MemberGovernanceStatus.Warning)
+        {
+            member.LastWarningIssuedAt ??= now;
+        }
+        else if (governanceStatus == MemberGovernanceStatus.Active)
+        {
+            member.SuspendedAt = null;
+            member.ExpelledAt = null;
+        }
+        else if (governanceStatus == MemberGovernanceStatus.Deceased)
+        {
+            member.IsDeceased = true;
+            member.DeathReportedAt ??= now;
+        }
 
         await context.SaveChangesAsync();
 
@@ -277,7 +420,17 @@ public class MemberService(
 
         dependent.Id = Guid.NewGuid();
         dependent.MemberId = memberId;
-        dependent.IsActive = true;
+
+        if (dependent.IsDeceased)
+        {
+            dependent.IsActive = false;
+            dependent.DeathReportedAt ??= DateTime.UtcNow;
+        }
+        else
+        {
+            dependent.IsActive = true;
+        }
+
         dependent.CreatedAt = DateTime.UtcNow;
 
         context.MemberDependents.Add(dependent);
@@ -308,7 +461,25 @@ public class MemberService(
         dependent.DateOfBirth = updatedDependent.DateOfBirth;
         dependent.IdNumber = updatedDependent.IdNumber;
         dependent.CellphoneNumber = updatedDependent.CellphoneNumber;
-        dependent.IsActive = updatedDependent.IsActive;
+
+        if (updatedDependent.IsDeceased)
+        {
+            dependent.IsDeceased = true;
+            dependent.IsActive = false;
+            dependent.DeceasedDate = updatedDependent.DeceasedDate;
+
+            if (dependent.DeathReportedAt is null)
+            {
+                dependent.DeathReportedAt = DateTime.UtcNow;
+            }
+        }
+        else
+        {
+            dependent.IsDeceased = false;
+            dependent.IsActive = updatedDependent.IsActive;
+            dependent.DeceasedDate = null;
+            dependent.DeathReportedAt = null;
+        }
 
         await context.SaveChangesAsync();
 
@@ -379,5 +550,21 @@ public class MemberService(
             .CountAsync(beneficiary => beneficiary.MemberId == memberId);
 
         return beneficiaryCount < maxBeneficiaries;
+    }
+
+    private static string NormalizeIdNumber(string? idNumber)
+    {
+        return string.IsNullOrWhiteSpace(idNumber)
+            ? string.Empty
+            : idNumber.Trim().Replace(" ", string.Empty).Replace("-", string.Empty);
+    }
+
+    private static bool IsOfficeBearerRole(SisonkeRole role)
+    {
+        return role is SisonkeRole.StokvelAdmin
+            or SisonkeRole.Chairperson
+            or SisonkeRole.Secretary
+            or SisonkeRole.Treasurer
+            or SisonkeRole.CommitteeMember;
     }
 }

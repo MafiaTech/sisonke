@@ -48,6 +48,9 @@ builder.Services.AddScoped<OperatingRuleService>();
 builder.Services.AddScoped<ConstitutionService>();
 builder.Services.AddScoped<MeetingService>();
 builder.Services.AddScoped<VotingService>();
+builder.Services.AddScoped<FuneralClaimService>();
+builder.Services.AddScoped<MemberAccountLinkingService>();
+builder.Services.AddScoped<MemberAccessService>();
 
 var app = builder.Build();
 

@@ -486,10 +486,19 @@ public static class SisonkeSeedData
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
             claimsAndPayouts,
+            "What is the waiting period in months before a new member or dependent can claim?",
+            QuestionType.Number,
+            true,
+            3,
+            "For burial societies, this is commonly used before new members or covered lives become eligible for funeral benefits.");
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            claimsAndPayouts,
             "What documents are required for a claim or payout?",
             QuestionType.Text,
             false,
-            3);
+            4);
 
         await context.SaveChangesAsync();
     }
