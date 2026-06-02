@@ -40,7 +40,7 @@ else
     <section class="sisonke-hero-card mb-4">
         <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-end">
             <div>
-                <p class="mb-2 text-uppercase fw-bold" style="letter-spacing:.08em;color:rgba(255,255,255,.65);font-size:.75rem;">
+                <p class="my-memberships-eyebrow">
                     Memberships linked to your registered SA ID number.
                 </p>
                 <h1>My Memberships</h1>
@@ -80,26 +80,26 @@ else
                 </div>
             </div>
             <div class="sisonke-card-body">
-                <div class="sisonke-grid-2">
+                <div class="sisonke-detail-grid">
                     <div>
-                        <div class="membership-detail-label">Full Name</div>
-                        <div class="membership-detail-value">@(currentUser.FullName ?? "-")</div>
+                        <div class="sisonke-detail-label">Full Name</div>
+                        <div class="sisonke-detail-value">@(currentUser.FullName ?? "-")</div>
                     </div>
                     <div>
-                        <div class="membership-detail-label">Email</div>
-                        <div class="membership-detail-value">@(currentUser.Email ?? "-")</div>
+                        <div class="sisonke-detail-label">Email</div>
+                        <div class="sisonke-detail-value">@(currentUser.Email ?? "-")</div>
                     </div>
                     <div>
-                        <div class="membership-detail-label">ID Number</div>
-                        <div class="membership-detail-value">@(currentUser.IdNumber ?? "-")</div>
+                        <div class="sisonke-detail-label">ID Number</div>
+                        <div class="sisonke-detail-value">@(currentUser.IdNumber ?? "-")</div>
                     </div>
                     <div>
-                        <div class="membership-detail-label">Cellphone Number</div>
-                        <div class="membership-detail-value">@(currentUser.CellphoneNumber ?? "-")</div>
+                        <div class="sisonke-detail-label">Cellphone Number</div>
+                        <div class="sisonke-detail-value">@(currentUser.CellphoneNumber ?? "-")</div>
                     </div>
                     <div>
-                        <div class="membership-detail-label">Residential Area</div>
-                        <div class="membership-detail-value">@(currentUser.ResidentialArea ?? "-")</div>
+                        <div class="sisonke-detail-label">Residential Area</div>
+                        <div class="sisonke-detail-value">@(currentUser.ResidentialArea ?? "-")</div>
                     </div>
                 </div>
             </div>
@@ -124,7 +124,7 @@ else
     }
     else
     {
-        <div class="sisonke-grid-3">
+        <div class="sisonke-grid sisonke-grid-2">
             @foreach (var member in memberships)
             {
                 var stokvel = GetStokvelForMember(member);
@@ -134,7 +134,7 @@ else
                     <div class="sisonke-card-body">
                         <div class="d-flex justify-content-between gap-3 align-items-start mb-3">
                             <div>
-                                <div class="membership-detail-label">Stokvel</div>
+                                <div class="sisonke-detail-label">Stokvel</div>
                                 <h2 class="membership-card-title">@stokvelName</h2>
                                 @if (stokvel is null)
                                 {
@@ -150,20 +150,20 @@ else
 
                         <div class="membership-card-details">
                             <div>
-                                <div class="membership-detail-label">Member</div>
-                                <div class="membership-detail-value">@Display(member.FullName)</div>
+                                <div class="sisonke-detail-label">Member</div>
+                                <div class="sisonke-detail-value">@Display(member.FullName)</div>
                             </div>
                             <div>
-                                <div class="membership-detail-label">Member Number</div>
-                                <div class="membership-detail-value">@Display(member.MemberNumber)</div>
+                                <div class="sisonke-detail-label">Member Number</div>
+                                <div class="sisonke-detail-value">@Display(member.MemberNumber)</div>
                             </div>
                             <div>
-                                <div class="membership-detail-label">Role</div>
-                                <div class="membership-detail-value">@member.DefaultRole</div>
+                                <div class="sisonke-detail-label">Role</div>
+                                <div class="sisonke-detail-value">@member.DefaultRole</div>
                             </div>
                             <div>
-                                <div class="membership-detail-label">Access Type</div>
-                                <div class="membership-detail-value">@(isOfficeBearer ? "Office Bearer" : "Member")</div>
+                                <div class="sisonke-detail-label">Access Type</div>
+                                <div class="sisonke-detail-value">@(isOfficeBearer ? "Office Bearer" : "Member")</div>
                             </div>
                         </div>
 
@@ -210,24 +210,35 @@ else
         gap: 1rem;
         grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
     }
+    .my-memberships-eyebrow {
+        color: rgba(255, 255, 255, .68);
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .1em;
+        margin-bottom: .5rem;
+        text-transform: uppercase;
+    }
     .membership-card {
         height: 100%;
     }
     .membership-card-title {
-        color: var(--sk-text);
-        font-size: 1.125rem;
-        font-weight: 800;
+        color: var(--text);
+        font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+        font-size: 1.18rem;
+        font-weight: 700;
+        letter-spacing: 0;
+        line-height: 1.2;
         margin: .15rem 0 0;
     }
     .membership-detail-label {
-        color: var(--sk-text-muted);
+        color: var(--muted);
         font-size: .7rem;
         font-weight: 800;
         letter-spacing: .07em;
         text-transform: uppercase;
     }
     .membership-detail-value {
-        color: var(--sk-text);
+        color: var(--text);
         font-size: .925rem;
         font-weight: 600;
         margin-top: .2rem;

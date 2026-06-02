@@ -19,445 +19,620 @@
 @inject StokvelService StokvelService
 
 <PageTitle>My Member Dashboard</PageTitle>
+<link rel="stylesheet" href="/css/member-workspace.css" />
 
 @if (isLoading)
 {
-    <div class="alert alert-info">Loading your member dashboard...</div>
+    <div class="sisonke-alert sisonke-alert-blue">Loading your member dashboard...</div>
 }
 else if (member is null)
 {
-    <AlertBanner Type="danger" Message="Member not found." />
+    <div class="sisonke-alert sisonke-alert-red">Member not found.</div>
 }
 else if (!isAllowed)
 {
-    <AlertBanner Type="warning" Message="You do not have access to this member view." />
-    <a class="btn btn-outline-secondary btn-sm" href="/my-workspace">
+    <div class="sisonke-alert sisonke-alert-gold">You do not have access to this member view.</div>
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
         <i class="bi bi-columns-gap me-1"></i>Back to My Workspace
     </a>
 }
 else if (stokvel is null)
 {
-    <AlertBanner Type="danger" Message="Stokvel not found for this member." />
-    <a class="btn btn-outline-secondary btn-sm" href="/my-workspace">
+    <div class="sisonke-alert sisonke-alert-red">Stokvel not found for this member.</div>
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
         <i class="bi bi-columns-gap me-1"></i>Back to My Workspace
     </a>
 }
 else
 {
-    <div class="d-flex flex-column gap-4">
-        <section class="sisonke-hero-card">
-            <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-end">
-                <div>
-                    <p class="mb-2 text-uppercase fw-bold" style="letter-spacing:.08em;color:rgba(255,255,255,.65);font-size:.75rem;">Welcome back</p>
-                    <h1>@member.FullName</h1>
-                    <p class="mt-3">@stokvel.Name</p>
-                    <div class="d-flex flex-wrap gap-2 mt-3">
-                        <span class="@GetMemberStatusBadgeClass(member.Status)">@member.Status</span>
-                        <span class="sisonke-badge sisonke-badge-gray">@member.DefaultRole</span>
-                    </div>
+    <div class="mw-member-workspace">
+        <div class="mw-hero">
+            <div class="mw-hero-ring"></div>
+            <div class="mw-hero-ring2"></div>
+            <div class="mw-hero-left">
+                <div class="mw-hero-eyebrow" id="mw-greeting">Welcome back</div>
+                <div class="mw-hero-name">@Display(member.FullName)</div>
+                <div class="mw-hero-sub">
+                    <span>@stokvel.Name</span>
+                    <span class="mw-hero-sub-dot"></span>
+                    <span>@member.DefaultRole</span>
                 </div>
-                <div class="member-home-hero-meta">
-                    <div>
-                        <span>Member number</span>
-                        <strong>@Display(member.MemberNumber)</strong>
+                <div class="mw-hero-chips">
+                    <span class="mw-hchip mw-hchip--green">@member.Status</span>
+                    <span class="mw-hchip mw-hchip--ochre">@Display(member.MemberNumber)</span>
+                    <span class="mw-hchip mw-hchip--white">Joined @member.JoiningDate.ToString("dd MMM yyyy")</span>
+                </div>
+            </div>
+            <div class="mw-hero-right">
+                <div class="mw-hero-tiles">
+                    <div class="mw-htile">
+                        <div class="mw-htile-label">Member No.</div>
+                        <div class="mw-htile-val">@Display(member.MemberNumber)</div>
                     </div>
-                    <div>
-                        <span>Joining date</span>
-                        <strong>@member.JoiningDate.ToString("dd MMM yyyy")</strong>
+                    <div class="mw-htile">
+                        <div class="mw-htile-label">Joining Date</div>
+                        <div class="mw-htile-val mw-htile-val--mint">@member.JoiningDate.ToString("dd MMM yyyy")</div>
                     </div>
-                    <div>
-                        <span>ID number</span>
-                        <strong>@Display(member.IdNumber)</strong>
+                    <div class="mw-htile">
+                        <div class="mw-htile-label">ID Number</div>
+                        <div class="mw-htile-val">@Display(member.IdNumber)</div>
                     </div>
-                    <div>
-                        <span>Cellphone</span>
-                        <strong>@Display(member.CellphoneNumber)</strong>
+                    <div class="mw-htile">
+                        <div class="mw-htile-label">Cellphone</div>
+                        <div class="mw-htile-val mw-htile-val--ochre">@Display(member.CellphoneNumber)</div>
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <section class="sisonke-card">
-            <div class="sisonke-card-body">
-                <div class="sisonke-card-head">
-                    <div>
-                        <h2>Member Details</h2>
-                        <p>Your captured contact and stokvel membership information.</p>
-                    </div>
-                    <span class="@GetMemberStatusBadgeClass(member.Status)">@member.Status</span>
-                </div>
-
-                <div class="sisonke-grid sisonke-grid-3">
-                    <div class="member-detail-tile">
-                        <span>Full Name</span>
-                        <strong>@Display(member.FullName)</strong>
-                    </div>
-                    <div class="member-detail-tile">
-                        <span>Stokvel</span>
-                        <strong>@stokvel.Name</strong>
-                    </div>
-                    <div class="member-detail-tile">
-                        <span>Role</span>
-                        <strong>@member.DefaultRole</strong>
-                    </div>
-                    <div class="member-detail-tile">
-                        <span>Member Number</span>
-                        <strong>@Display(member.MemberNumber)</strong>
-                    </div>
-                    <div class="member-detail-tile">
-                        <span>Joining Date</span>
-                        <strong>@member.JoiningDate.ToString("dd MMM yyyy")</strong>
-                    </div>
-                    <div class="member-detail-tile">
-                        <span>ID Number</span>
-                        <strong>@Display(member.IdNumber)</strong>
-                    </div>
-                    <div class="member-detail-tile">
-                        <span>Cellphone</span>
-                        <strong>@Display(member.CellphoneNumber)</strong>
-                    </div>
-                    <div class="member-detail-tile">
-                        <span>Email</span>
-                        <strong>@Display(member.EmailAddress)</strong>
-                    </div>
-                    <div class="member-detail-tile">
-                        <span>Residential Area</span>
-                        <strong>@Display(member.ResidentialArea)</strong>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <div class="sisonke-grid-4">
-            <a class="sisonke-quick-action" href="/member-profile/@MemberId">
-                <i class="bi bi-person-circle fs-4"></i>
-                <span>View My Profile</span>
+        <div class="mw-qa-row">
+            <a class="mw-qa" href="/member-profile/@MemberId">
+                <div class="mw-qa-wrap" style="background:var(--mw-fern-pale)">👤</div>
+                <span class="mw-qa-lbl">View My Profile</span>
             </a>
-            <a class="sisonke-quick-action" href="/create-claim/@MemberId">
-                <i class="bi bi-file-earmark-medical fs-4"></i>
-                <span>Create Claim</span>
+            <a class="mw-qa" href="/create-claim/@MemberId">
+                <div class="mw-qa-wrap" style="background:var(--mw-slate-pale)">📋</div>
+                <span class="mw-qa-lbl">Create Claim</span>
             </a>
-            <a class="sisonke-quick-action" href="@($"/meetings/{stokvel!.Id}")">
-                <i class="bi bi-calendar-event fs-4"></i>
-                <span>View Meetings</span>
+            <a class="mw-qa" href="/meetings/@stokvel.Id">
+                <div class="mw-qa-wrap" style="background:var(--mw-ochre-pale)">📅</div>
+                <span class="mw-qa-lbl">View Meetings</span>
             </a>
-            <a class="sisonke-quick-action" href="@($"/constitution-builder/{stokvel!.Id}")">
-                <i class="bi bi-journal-text fs-4"></i>
-                <span>View Constitution</span>
+            <a class="mw-qa" href="/constitution-builder/@stokvel.Id">
+                <div class="mw-qa-wrap" style="background:var(--mw-terra-pale)">📜</div>
+                <span class="mw-qa-lbl">Constitution</span>
             </a>
         </div>
 
-        <div class="sisonke-grid-3">
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">My Contribution Status</h3>
+        <div class="mw-sec-head">
+            <span class="mw-sec-label">Member Details</span>
+            <div class="mw-sec-line"></div>
+        </div>
+        <div class="mw-card mw-mb26" style="animation-delay:0.05s">
+            <div class="mw-prof-banner">
+                <div class="mw-prof-avi">
+                    @(string.Join("", (member.FullName ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => part[0])).ToUpperInvariant())
+                </div>
+                <div class="mw-prof-info">
+                    <div class="mw-prof-name">@Display(member.FullName)</div>
+                    <div class="mw-prof-org">@stokvel.Name</div>
+                    <div class="mw-prof-chips">
+                        <span class="mw-badge mw-bg-ok mw-bg-dot">@member.Status</span>
+                        <span class="mw-badge mw-bg-info">@member.DefaultRole</span>
+                        <span class="mw-badge mw-bg-warn">@Display(member.ResidentialArea)</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mw-md-grid">
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">Full Name</div>
+                    <div class="mw-md-val">@Display(member.FullName)</div>
+                </div>
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">Stokvel</div>
+                    <div class="mw-md-val">@stokvel.Name</div>
+                </div>
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">Role</div>
+                    <div class="mw-md-val">@member.DefaultRole</div>
+                </div>
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">Member Number</div>
+                    <div class="mw-md-val mw-md-val--mono">@Display(member.MemberNumber)</div>
+                </div>
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">Joining Date</div>
+                    <div class="mw-md-val">@member.JoiningDate.ToString("dd MMM yyyy")</div>
+                </div>
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">ID Number</div>
+                    <div class="mw-md-val mw-md-val--mono">@Display(member.IdNumber)</div>
+                </div>
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">Telephone</div>
+                    <div class="mw-md-val mw-md-val--mono">@Display(member.CellphoneNumber)</div>
+                </div>
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">Email</div>
+                    <div class="mw-md-val">@Display(member.EmailAddress)</div>
+                </div>
+                <div class="mw-md-cell">
+                    <div class="mw-md-lbl">Residential Area</div>
+                    <div class="mw-md-val">@Display(member.ResidentialArea)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mw-sec-head">
+            <span class="mw-sec-label">Financial &amp; Membership</span>
+            <div class="mw-sec-line"></div>
+        </div>
+        <div class="mw-g mw-g3 mw-mb26">
+            <div class="mw-card mw-card-accent mw-ca-fern">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-fern">💰</div>
+                        <span class="mw-card-lbl">My Contribution Status</span>
+                    </div>
+                </div>
+                <div class="mw-card-body">
+                    <div class="mw-alert mw-alert-info">
+                        <div class="mw-alert-icon">ℹ</div>
+                        <div>
+                            <div class="mw-alert-title">Coming Soon</div>
+                            <div class="mw-alert-body">Contribution tracking coming soon.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mw-card mw-card-accent mw-ca-terra">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-terra">⚖</div>
+                        <span class="mw-card-lbl">My Fines</span>
+                    </div>
+                    @if (OpenFinesCount == 0)
+                    {
+                        <span class="mw-badge mw-bg-ok">All Clear</span>
+                    }
+                    else
+                    {
+                        <span class="mw-badge mw-bg-danger">@OpenFinesCount Open</span>
+                    }
+                </div>
+                <div class="mw-card-body">
+                    @if (memberFines.Count == 0)
+                    {
+                        <div class="mw-alert mw-alert-info">
+                            <div class="mw-alert-icon">ℹ</div>
+                            <div>
+                                <div class="mw-alert-title">No fines recorded</div>
+                                <div class="mw-alert-body">No fines have been recorded against your membership.</div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mw-smini">
+                            <div class="mw-smini-block">
+                                <span class="mw-smini-num" style="color:var(--mw-terra)">@FormatCurrency(OutstandingFineTotal)</span>
+                                <span class="mw-smini-lbl">Outstanding</span>
+                            </div>
+                            <div class="mw-smini-block">
+                                <span class="mw-smini-num">@OpenFinesCount</span>
+                                <span class="mw-smini-lbl">Open</span>
+                            </div>
+                            <div class="mw-smini-block">
+                                <span class="mw-smini-num" style="color:var(--mw-ok)">@PaidFinesCount</span>
+                                <span class="mw-smini-lbl">Paid</span>
+                            </div>
+                        </div>
+                        <div class="mw-div"></div>
+                        @foreach (var fine in memberFines.OrderByDescending(fine => fine.FineDate).Take(4))
+                        {
+                            <div class="mw-lrow">
+                                <div class="mw-lrow-ico mw-ico-terra">!</div>
+                                <div class="mw-lrow-detail">
+                                    <div class="mw-lrow-title">@Display(fine.FineType?.Name)</div>
+                                    <div class="mw-lrow-sub">@fine.FineDate.ToString("dd MMM yyyy") · @Display(fine.Reason)</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="mw-md-val mw-md-val--mono">@FormatCurrency(fine.Amount)</div>
+                                    <span class="@GetFineStatusBadgeClass(fine.Status)">@fine.Status</span>
+                                </div>
+                            </div>
+                        }
+                    }
+                    <div class="mw-div"></div>
+                    <a class="mw-btn mw-btn-outline mw-btn-sm mw-btn-full" href="/member-profile/@MemberId">
+                        View My Profile
+                    </a>
+                </div>
+            </div>
+
+            <div class="sisonke-card mw-card-accent mw-ca-blue">
+                <div class="sisonke-card-head">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-blue">📋</div>
+                        <span class="mw-card-lbl">My Claims</span>
+                    </div>
+                    <a class="sisonke-btn sisonke-btn-primary" href="/create-claim/@MemberId">Create Claim</a>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="mw-smini">
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num">@memberClaims.Count</span>
+                            <span class="mw-smini-lbl">Total</span>
+                        </div>
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-dust)">@DraftClaimCount</span>
+                            <span class="mw-smini-lbl">Draft</span>
+                        </div>
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-slate)">@SubmittedOrReviewClaimCount</span>
+                            <span class="mw-smini-lbl">In Review</span>
+                        </div>
+                    </div>
+                    <div class="mw-smini">
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-ok)">@ApprovedClaimCount</span>
+                            <span class="mw-smini-lbl">Approved</span>
+                        </div>
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-danger)">@RejectedClaimCount</span>
+                            <span class="mw-smini-lbl">Rejected</span>
+                        </div>
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-ochre)">@(LatestClaim?.Status.ToString() ?? "None")</span>
+                            <span class="mw-smini-lbl">Latest</span>
+                        </div>
+                    </div>
+                    <div class="mw-div"></div>
+                    @if (memberClaims.Count == 0)
+                    {
                         <div class="sisonke-alert sisonke-alert-blue">
                             <i class="bi bi-info-circle-fill mt-1"></i>
-                            <div>Contribution tracking coming soon.</div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">My Fines</h3>
-                        <div class="sisonke-grid sisonke-grid-2 mb-3">
-                            <div class="member-mini-stat">
-                                <span>Total fines</span>
-                                <strong>@memberFines.Count</strong>
-                            </div>
-                            <div class="member-mini-stat">
-                                <span>Outstanding</span>
-                                <strong>@FormatCurrency(OutstandingFineTotal)</strong>
+                            <div>
+                                <strong>No claims have been submitted for this membership.</strong>
+                                <div>Use the existing Create Claim flow for yourself or a covered dependent.</div>
                             </div>
                         </div>
-                        @if (memberFines.Count == 0)
-                        {
-                            <div class="sisonke-alert sisonke-alert-green">
-                                <i class="bi bi-check-circle-fill mt-1"></i>
-                                <div>Your fines will appear here.</div>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="d-flex flex-column gap-2">
-                                @foreach (var fine in memberFines.Take(3))
-                                {
-                                    <div class="border rounded-3 p-2">
-                                        <div class="d-flex justify-content-between gap-2">
-                                            <span class="fw-semibold">@fine.FineType.Name</span>
-                                            <span>@FormatCurrency(fine.Amount)</span>
-                                        </div>
-                                        <div class="small text-muted">@fine.FineDate.ToString("dd MMM yyyy") · @fine.Status</div>
-                                        @if (!string.IsNullOrWhiteSpace(fine.Reason))
-                                        {
-                                            <div class="small text-muted">@fine.Reason</div>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        }
-                    </div>
-                </section>
-            </div>
-
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">My Claims</h3>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <div class="border rounded-3 p-2 h-100">
-                                    <div class="text-muted small">Total claims</div>
-                                    <div class="fw-semibold">@memberClaims.Count</div>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="border rounded-3 p-2 h-100">
-                                    <div class="text-muted small">Latest status</div>
-                                    @if (LatestClaim is null)
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="sisonke-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Reference</th>
+                                        <th>Subject / Deceased</th>
+                                        <th>Type</th>
+                                        <th>Date of death</th>
+                                        <th>Status</th>
+                                        <th>Submitted</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var claim in memberClaims.OrderByDescending(claim => claim.CreatedAt))
                                     {
-                                        <div class="fw-semibold">None</div>
+                                        <tr>
+                                            <td class="mw-md-val--mono">@GetClaimReference(claim)</td>
+                                            <td>@Display(claim.DeceasedFullName)</td>
+                                            <td>@claim.SubjectType</td>
+                                            <td>@(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "Not captured")</td>
+                                            <td><span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span></td>
+                                            <td>@(claim.SubmittedAt?.ToString("dd MMM yyyy") ?? "Not submitted")</td>
+                                            <td class="text-end">
+                                                <a class="sisonke-btn sisonke-btn-outline" href="/claim/@claim.Id">View Claim</a>
+                                            </td>
+                                        </tr>
                                     }
-                                    else
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="mw-card mw-card-accent mw-ca-forest">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-fern">👨‍👩‍👧</div>
+                        <span class="mw-card-lbl">My Dependents / Covered Lives</span>
+                    </div>
+                    <a class="mw-btn mw-btn-outline mw-btn-xs" href="/member-profile/@MemberId">View Profile</a>
+                </div>
+                <div class="mw-card-body">
+                    <div class="mw-smini">
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num">@dependents.Count</span>
+                            <span class="mw-smini-lbl">Total</span>
+                        </div>
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-fern)">@ActiveDependentCount</span>
+                            <span class="mw-smini-lbl">Active</span>
+                        </div>
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-terra)">@DeceasedDependentCount</span>
+                            <span class="mw-smini-lbl">Deceased</span>
+                        </div>
+                    </div>
+                    <div class="mw-div"></div>
+                    @if (dependents.Count == 0)
+                    {
+                        <div class="mw-alert mw-alert-info">
+                            <div class="mw-alert-icon">ℹ</div>
+                            <div>
+                                <div class="mw-alert-title">No dependents captured</div>
+                                <div class="mw-alert-body">No dependents / covered lives have been captured for this membership yet.</div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var dependent in dependents.Take(4))
+                        {
+                            <div class="mw-lrow">
+                                <div class="mw-lrow-ico mw-ico-fern">👤</div>
+                                <div class="mw-lrow-detail">
+                                    <div class="mw-lrow-title">@Display(dependent.FullName)</div>
+                                    <div class="mw-lrow-sub">@dependent.Relationship · @(dependent.DateOfBirth?.ToString("dd MMM yyyy") ?? "Date of birth not captured")</div>
+                                </div>
+                                <span class="@GetDependentStatusBadgeClass(dependent)">@GetDependentStatusText(dependent)</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="mw-sec-head">
+            <span class="mw-sec-label">Operations &amp; Meetings</span>
+            <div class="mw-sec-line"></div>
+        </div>
+        <div class="mw-g mw-g3 mw-mb26">
+            <div class="mw-card mw-card-accent mw-ca-ochre">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-ochre">🏠</div>
+                        <span class="mw-card-lbl">My Payout / Host Turn</span>
+                    </div>
+                </div>
+                <div class="mw-card-body">
+                    <div class="mw-alert mw-alert-warn">
+                        <div class="mw-alert-icon">ℹ</div>
+                        <div>
+                            <div class="mw-alert-title">Coming Soon</div>
+                            <div class="mw-alert-body">Payout and host rotation coming soon.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sisonke-card mw-card-accent mw-ca-forest">
+                <div class="sisonke-card-head">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-fern">📅</div>
+                        <span class="mw-card-lbl">Meeting Schedule</span>
+                    </div>
+                    @if (upcomingMeetings.Count > 0)
+                    {
+                        <span class="mw-badge mw-bg-info">@upcomingMeetings.Count Upcoming</span>
+                    }
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="mw-smini">
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num">@upcomingMeetings.Count</span>
+                            <span class="mw-smini-lbl">Upcoming</span>
+                        </div>
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-fern)">
+                                @(NextMeeting?.MeetingDate.ToString("dd MMM") ?? "None")
+                            </span>
+                            <span class="mw-smini-lbl">Next Date</span>
+                        </div>
+                        <div class="mw-smini-block">
+                            <span class="mw-smini-num" style="color:var(--mw-ochre)">
+                                @(NextMeeting?.MeetingDate.ToString("HH:mm") ?? "--:--")
+                            </span>
+                            <span class="mw-smini-lbl">Time</span>
+                        </div>
+                    </div>
+                    @if (NextMeeting is not null)
+                    {
+                        <div class="mw-alert mw-alert-info">
+                            <div class="mw-alert-icon">ℹ</div>
+                            <div>
+                                <div class="mw-alert-title">@Display(NextMeeting.Title)</div>
+                                <div class="mw-alert-body">
+                                    @Display(NextMeeting.Purpose) · Venue: @Display(NextMeeting.Venue)
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    <div class="mw-div"></div>
+                    @if (upcomingMeetings.Count == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-blue">
+                            <i class="bi bi-info-circle-fill mt-1"></i>
+                            <div>
+                                <strong>No upcoming meetings have been scheduled yet.</strong>
+                                <div>Meeting dates will appear here once your stokvel schedules them.</div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="sisonke-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Purpose / Title</th>
+                                        <th>Venue</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var meeting in upcomingMeetings)
                                     {
-                                        <span class="@GetClaimStatusBadgeClass(LatestClaim.Status)">@LatestClaim.Status</span>
+                                        <tr>
+                                            <td>@meeting.MeetingDate.ToString("dd MMM yyyy")</td>
+                                            <td>@meeting.MeetingDate.ToString("HH:mm")</td>
+                                            <td>
+                                                <div class="fw-semibold">@Display(meeting.Title)</div>
+                                                @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
+                                                {
+                                                    <div class="text-muted small">@meeting.Purpose</div>
+                                                }
+                                            </td>
+                                            <td>@Display(meeting.Venue)</td>
+                                            <td><span class="@GetMeetingStatusBadgeClass(meeting.Status)">@meeting.Status</span></td>
+                                            <td class="text-end">
+                                                <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                                    <a class="sisonke-btn sisonke-btn-outline" href="/meeting/@meeting.Id">View</a>
+                                                    <button class="sisonke-btn sisonke-btn-outline" type="button" disabled>
+                                                        Submit apology coming soon
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     }
-                                </div>
-                            </div>
+                                </tbody>
+                            </table>
                         </div>
-                        @if (memberClaims.Count == 0)
-                        {
-                            <div class="sisonke-alert sisonke-alert-blue">
-                                <i class="bi bi-info-circle-fill mt-1"></i>
-                                <div>No claims found.</div>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="d-flex flex-column gap-2 mb-3">
-                                @foreach (var claim in memberClaims.Take(3))
-                                {
-                                    <div class="border rounded-3 p-2">
-                                        <div class="fw-semibold">@claim.DeceasedFullName</div>
-                                        <div class="small text-muted">
-                                            @claim.SubjectType · @claim.Status · @(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "Date not captured")
-                                        </div>
-                                        <a class="sisonke-btn sisonke-btn-outline mt-2" href="@($"/claim/{claim.Id}")">View Claim</a>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        <div class="d-flex flex-wrap gap-2">
-                            @if (memberClaims.Count > 0)
-                            {
-                                <a class="sisonke-btn sisonke-btn-outline" href="/member-profile/@MemberId">View Claims</a>
-                            }
-                            <a class="sisonke-btn sisonke-btn-primary" href="/create-claim/@MemberId">Create Claim</a>
+                    }
+                    <div class="mw-div"></div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="sisonke-btn sisonke-btn-outline" href="/meetings/@stokvel.Id">
+                            View All Meetings
+                        </a>
+                        <button class="sisonke-btn sisonke-btn-outline" type="button" disabled>
+                            Submit apology coming soon
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mw-card mw-card-accent mw-ca-warn">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-warn">✋</div>
+                        <span class="mw-card-lbl">Submit Apology</span>
+                    </div>
+                </div>
+                <div class="mw-card-body">
+                    <div class="mw-alert mw-alert-warn">
+                        <div class="mw-alert-icon">ℹ</div>
+                        <div>
+                            <div class="mw-alert-title">Coming Soon</div>
+                            <div class="mw-alert-body">Apology submission will be available soon.</div>
                         </div>
                     </div>
-                </section>
+                    <button class="mw-btn mw-btn-outline mw-btn-sm mw-btn-full" type="button" disabled>Submit apology coming soon</button>
+                </div>
             </div>
+        </div>
 
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">My Dependents / Covered Lives</h3>
-                        <div class="row g-2 mb-3">
-                            <div class="col-4">
-                                <div class="border rounded-3 p-2 h-100">
-                                    <div class="text-muted small">Total</div>
-                                    <div class="fw-semibold">@dependents.Count</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="border rounded-3 p-2 h-100">
-                                    <div class="text-muted small">Active</div>
-                                    <div class="fw-semibold">@ActiveDependentCount</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="border rounded-3 p-2 h-100">
-                                    <div class="text-muted small">Deceased</div>
-                                    <div class="fw-semibold">@DeceasedDependentCount</div>
-                                </div>
-                            </div>
-                        </div>
-                        @if (dependents.Count == 0)
-                        {
-                            <div class="sisonke-alert sisonke-alert-blue">
-                                <i class="bi bi-info-circle-fill mt-1"></i>
-                                <div>Covered lives will appear here.</div>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="d-flex flex-column gap-2 mb-3">
-                                @foreach (var dependent in dependents.Take(3))
-                                {
-                                    <div class="border rounded-3 p-2">
-                                        <div class="fw-semibold">@dependent.FullName</div>
-                                        <div class="small text-muted">@dependent.Relationship</div>
-                                        <span class="@GetDependentStatusBadgeClass(dependent)">
-                                            @(dependent.IsDeceased ? "Deceased" : dependent.IsActive ? "Active" : "Inactive")
-                                        </span>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        <a class="sisonke-btn sisonke-btn-outline" href="/member-profile/@MemberId">View Profile</a>
+        <div class="mw-sec-head">
+            <span class="mw-sec-label">Account &amp; Documents</span>
+            <div class="mw-sec-line"></div>
+        </div>
+        <div class="mw-g mw-g3">
+            <div class="mw-card mw-card-accent mw-ca-blue">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-blue">📁</div>
+                        <span class="mw-card-lbl">My Documents</span>
                     </div>
-                </section>
-            </div>
-
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">Meeting Schedule</h3>
-                        @if (upcomingMeetings.Count == 0)
-                        {
-                            <div class="sisonke-alert sisonke-alert-blue">
-                                <i class="bi bi-info-circle-fill mt-1"></i>
-                                <div>No upcoming meetings found.</div>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="d-flex flex-column gap-2 mb-3">
-                                @foreach (var meeting in upcomingMeetings.Take(2))
-                                {
-                                    <div class="border rounded-3 p-2">
-                                        <div class="fw-semibold">@meeting.Title</div>
-                                        <div class="small text-muted">@meeting.MeetingDate.ToString("dd MMM yyyy HH:mm")</div>
-                                        @if (!string.IsNullOrWhiteSpace(meeting.Venue))
-                                        {
-                                            <div class="small text-muted">@meeting.Venue</div>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        }
-
-                        <a class="sisonke-btn sisonke-btn-outline" href="@($"/meetings/{stokvel!.Id}")">View Meetings</a>
-                    </div>
-                </section>
-            </div>
-
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">Submit Apology</h3>
-                        <div class="sisonke-alert sisonke-alert-gold mb-3">
-                            <i class="bi bi-hourglass-split mt-1"></i>
-                            <div>Coming Soon: Apology submission will be available from this member view.</div>
-                        </div>
-                        <button type="button" class="sisonke-btn sisonke-btn-outline" disabled>Submit Apology</button>
-                    </div>
-                </section>
-            </div>
-
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">My Documents</h3>
-                        <div class="sisonke-alert sisonke-alert-gold">
-                            <i class="bi bi-hourglass-split mt-1"></i>
-                            <div>Coming Soon: Your documents will appear here.</div>
+                </div>
+                <div class="mw-card-body">
+                    <div class="mw-alert mw-alert-info">
+                        <div class="mw-alert-icon">ℹ</div>
+                        <div>
+                            <div class="mw-alert-title">Coming Soon</div>
+                            <div class="mw-alert-body">Your documents will appear here.</div>
                         </div>
                     </div>
-                </section>
+                </div>
             </div>
 
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">My Profile</h3>
-                        <p class="text-muted">View your captured member profile and covered lives.</p>
-                        <a class="sisonke-btn sisonke-btn-primary" href="/member-profile/@MemberId">View My Profile</a>
+            <div class="mw-card mw-card-accent mw-ca-fern">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-fern">👤</div>
+                        <span class="mw-card-lbl">My Profile</span>
                     </div>
-                </section>
+                    <a class="mw-btn mw-btn-outline mw-btn-xs" href="/member-profile/@MemberId">View</a>
+                </div>
+                <div class="mw-card-body">
+                    <div class="mw-p-row">
+                        <span class="mw-p-lbl">Phone</span>
+                        <span class="mw-p-val mw-p-val--mono">@Display(member.CellphoneNumber)</span>
+                    </div>
+                    <div class="mw-p-row">
+                        <span class="mw-p-lbl">Email</span>
+                        <span class="mw-p-val">@Display(member.EmailAddress)</span>
+                    </div>
+                    <div class="mw-p-row">
+                        <span class="mw-p-lbl">ID Number</span>
+                        <span class="mw-p-val mw-p-val--mono">@Display(member.IdNumber)</span>
+                    </div>
+                    <div class="mw-p-row">
+                        <span class="mw-p-lbl">Joined</span>
+                        <span class="mw-p-val">@member.JoiningDate.ToString("dd MMM yyyy")</span>
+                    </div>
+                    <div class="mw-p-row">
+                        <span class="mw-p-lbl">Area</span>
+                        <span class="mw-p-val">@Display(member.ResidentialArea)</span>
+                    </div>
+                    <div class="mw-div"></div>
+                    <a class="mw-btn mw-btn-forest mw-btn-sm mw-btn-full" href="/member-profile/@MemberId">
+                        View Full Profile
+                    </a>
+                </div>
             </div>
 
-            <div>
-                <section class="sisonke-card h-100">
-                    <div class="sisonke-card-body">
-                        <h3 class="h6 mb-3">Constitution</h3>
-                        <p class="text-muted">View the stokvel constitution.</p>
-                        <a class="sisonke-btn sisonke-btn-outline" href="@($"/constitution-builder/{stokvel!.Id}")">View Constitution</a>
+            <div class="mw-card mw-card-accent mw-ca-forest">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-fern">📜</div>
+                        <span class="mw-card-lbl">Constitution</span>
                     </div>
-                </section>
+                    <span class="mw-badge mw-bg-info">Read Only</span>
+                </div>
+                <div class="mw-card-body">
+                    <a class="mw-const-banner" href="/constitution-builder/@stokvel.Id">
+                        <div class="mw-const-ico">📜</div>
+                        <div>
+                            <div class="mw-const-title">@stokvel.Name</div>
+                            <div class="mw-const-sub">View the stokvel constitution · Read only</div>
+                        </div>
+                        <span class="mw-const-arrow">→</span>
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 }
 
-<style>
-    .member-home-hero-meta {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: .75rem;
-        min-width: min(100%, 30rem);
-        padding: 1rem;
-        border: 1px solid rgb(255 255 255 / .28);
-        border-radius: var(--r-md);
-        background: rgb(255 255 255 / .12);
-    }
-
-    .member-home-hero-meta div,
-    .member-detail-tile,
-    .member-mini-stat {
-        display: grid;
-        gap: .2rem;
-    }
-
-    .member-home-hero-meta span {
-        color: rgb(255 255 255 / .72);
-        font-size: .72rem;
-        font-weight: 800;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-    }
-
-    .member-home-hero-meta strong {
-        color: #fff;
-        font-size: .95rem;
-        overflow-wrap: anywhere;
-    }
-
-    .member-detail-tile,
-    .member-mini-stat {
-        min-width: 0;
-        border: 1px solid var(--border);
-        border-radius: var(--r-md);
-        background: var(--cream);
-        padding: .85rem;
-    }
-
-    .member-detail-tile span,
-    .member-mini-stat span {
-        color: var(--muted);
-        font-size: .72rem;
-        font-weight: 800;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-    }
-
-    .member-detail-tile strong,
-    .member-mini-stat strong {
-        color: var(--text);
-        font-size: .95rem;
-        overflow-wrap: anywhere;
-    }
-
-    @@media (max-width: 768px) {
-        .member-home-hero-meta {
-            grid-template-columns: 1fr;
+<script>
+    (function () {
+        var h = new Date().getHours();
+        var g = h < 12 ? 'Good morning \uD83C\uDF3F'
+            : h < 18 ? 'Good afternoon \u2600\uFE0F'
+            : 'Good evening \uD83C\uDF19';
+        var el = document.getElementById('mw-greeting');
+        if (el) {
+            el.textContent = g;
         }
-    }
-</style>
+    })();
+</script>
 
 @code {
     [Parameter]
@@ -476,13 +651,27 @@ else
         .OrderByDescending(claim => claim.CreatedAt)
         .FirstOrDefault();
 
-    private int ActiveDependentCount => dependents.Count(dependent => dependent.IsActive);
+    private Meeting? NextMeeting => upcomingMeetings
+        .OrderBy(meeting => meeting.MeetingDate)
+        .FirstOrDefault();
 
+    private int DraftClaimCount => memberClaims.Count(claim => claim.Status == FuneralClaimStatus.Draft);
+    private int SubmittedOrReviewClaimCount => memberClaims.Count(claim =>
+        claim.Status is FuneralClaimStatus.Submitted or FuneralClaimStatus.UnderReview or FuneralClaimStatus.OnHold);
+    private int ApprovedClaimCount => memberClaims.Count(claim =>
+        claim.Status is FuneralClaimStatus.Approved or FuneralClaimStatus.Paid);
+    private int RejectedClaimCount => memberClaims.Count(claim => claim.Status == FuneralClaimStatus.Rejected);
+
+    private int ActiveDependentCount => dependents.Count(dependent => dependent.IsActive);
     private int DeceasedDependentCount => dependents.Count(dependent => dependent.IsDeceased);
+    private int InactiveDependentCount => dependents.Count(dependent => !dependent.IsActive && !dependent.IsDeceased);
 
     private decimal OutstandingFineTotal => memberFines
         .Where(fine => fine.Status == FineStatus.Unpaid)
         .Sum(fine => fine.Amount);
+
+    private int OpenFinesCount => memberFines.Count(fine => fine.Status == FineStatus.Unpaid);
+    private int PaidFinesCount => memberFines.Count(fine => fine.Status == FineStatus.Paid);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -594,6 +783,24 @@ else
         };
     }
 
+    private static string GetClaimReference(FuneralClaim claim)
+    {
+        return $"CLM-{claim.Id.ToString()[..8].ToUpperInvariant()}";
+    }
+
+    private static string GetMeetingStatusBadgeClass(MeetingStatus status)
+    {
+        return status switch
+        {
+            MeetingStatus.Planned => "sisonke-badge sisonke-badge-blue",
+            MeetingStatus.Scheduled => "sisonke-badge sisonke-badge-gold",
+            MeetingStatus.InProgress => "sisonke-badge sisonke-badge-teal",
+            MeetingStatus.Completed => "sisonke-badge sisonke-badge-green",
+            MeetingStatus.Cancelled => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
     private static string GetDependentStatusBadgeClass(MemberDependent dependent)
     {
         if (dependent.IsDeceased)
@@ -604,6 +811,28 @@ else
         return dependent.IsActive
             ? "sisonke-badge sisonke-badge-green"
             : "sisonke-badge sisonke-badge-gray";
+    }
+
+    private static string GetDependentStatusText(MemberDependent dependent)
+    {
+        if (dependent.IsDeceased)
+        {
+            return "Deceased";
+        }
+
+        return dependent.IsActive ? "Active" : "Inactive";
+    }
+
+    private static string GetFineStatusBadgeClass(FineStatus status)
+    {
+        return status switch
+        {
+            FineStatus.Unpaid => "sisonke-badge sisonke-badge-red",
+            FineStatus.Paid => "sisonke-badge sisonke-badge-green",
+            FineStatus.Waived => "sisonke-badge sisonke-badge-gold",
+            FineStatus.Cancelled => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
     }
 
     private static string FormatCurrency(decimal amount)

@@ -9,34 +9,36 @@
 
     <main class="sisonke-main">
         <div class="sisonke-topbar">
-            <div>
-                <div class="sisonke-nav-section m-0" style="color:var(--muted);">Current Area</div>
-                <div class="fw-semibold">@CurrentAreaLabel</div>
+            <div class="sisonke-topbar-inner">
+                <div>
+                    <div class="sisonke-nav-section m-0" style="color:var(--muted);">Current Area</div>
+                    <div class="fw-semibold">@CurrentAreaLabel</div>
+                </div>
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" aria-label="Notifications" title="Notifications coming soon">
+                                <i class="bi bi-bell"></i>
+                            </button>
+                            <a href="Account/Manage" class="top-row-user">
+                                <i class="bi bi-person-circle me-1"></i>
+                                @context.User.Identity?.Name
+                            </a>
+                        </div>
+                    </Authorized>
+                    <NotAuthorized>
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <a href="Account/Register">Create Account</a>
+                            <a href="Account/Login">Sign In</a>
+                        </div>
+                    </NotAuthorized>
+                </AuthorizeView>
             </div>
-            <AuthorizeView>
-                <Authorized>
-                    <div class="d-flex align-items-center gap-3 flex-wrap">
-                        <button class="btn btn-sm btn-outline-secondary" type="button" aria-label="Notifications" title="Notifications coming soon">
-                            <i class="bi bi-bell"></i>
-                        </button>
-                        <a href="Account/Manage" class="top-row-user">
-                            <i class="bi bi-person-circle me-1"></i>
-                            @context.User.Identity?.Name
-                        </a>
-                    </div>
-                </Authorized>
-                <NotAuthorized>
-                    <div class="d-flex align-items-center gap-3 flex-wrap">
-                        <a href="Account/Register">Create Account</a>
-                        <a href="Account/Login">Sign In</a>
-                    </div>
-                </NotAuthorized>
-            </AuthorizeView>
         </div>
 
-        <article class="content px-0">
+        <div class="sisonke-content">
             @Body
-        </article>
+        </div>
     </main>
 </div>
 

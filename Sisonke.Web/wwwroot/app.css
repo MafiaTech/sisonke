@@ -4,6 +4,11 @@
 
 /* ── Design tokens ──────────────────────────────────────── */
 :root {
+    --sisonke-sidebar-width: 220px;
+    --sisonke-content-max-width: 1320px;
+    --sisonke-content-padding-x: 32px;
+    --sisonke-content-padding-y: 28px;
+
     /* Green scale */
     --sk-green-900:   #0d2218;
     --sk-green-800:   #1B4332;
@@ -2275,7 +2280,7 @@ a, .btn-link { color: var(--sk-green-700); }
     padding: 1.25rem 1rem;
     position: fixed;
     top: 0;
-    width: 17rem;
+    width: var(--sisonke-sidebar-width);
     z-index: 20;
 }
 
@@ -2366,23 +2371,32 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .sisonke-main {
     flex: 1;
-    margin-left: 17rem;
+    margin-left: var(--sisonke-sidebar-width);
+    min-height: 100vh;
     min-width: 0;
-    padding: 1.5rem;
+    padding: 0;
+    background: var(--cream);
 }
 
 .sisonke-topbar {
     align-items: center;
     background: rgba(255, 255, 255, .78);
-    border: 1px solid rgba(229, 224, 211, .75);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-sm);
+    border-bottom: 1px solid rgba(229, 224, 211, .75);
     display: flex;
     gap: 1rem;
     justify-content: space-between;
-    margin-bottom: 1rem;
     min-height: 4rem;
-    padding: .85rem 1.1rem;
+    padding: 0 var(--sisonke-content-padding-x);
+}
+
+.sisonke-topbar-inner {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin: 0 auto;
+    max-width: var(--sisonke-content-max-width);
+    width: 100%;
 }
 
 .sisonke-page-header {
@@ -2665,7 +2679,7 @@ a, .btn-link { color: var(--sk-green-700); }
     transform: translateY(-2px);
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 700px) {
     .sisonke-sidebar {
         height: auto;
         position: relative;
@@ -2678,7 +2692,11 @@ a, .btn-link { color: var(--sk-green-700); }
 
     .sisonke-main {
         margin-left: 0;
-        padding: 1rem;
+        padding: 0;
+    }
+
+    .sisonke-topbar {
+        padding: 0 16px;
     }
 
     .sisonke-grid-4 {
@@ -2715,5 +2733,114 @@ a, .btn-link { color: var(--sk-green-700); }
 
     .sisonke-table {
         min-width: 42rem;
+    }
+}
+
+/* ── Standard centered content pages ────────────────────── */
+.sisonke-content,
+.sisonke-content-wide,
+.sisonke-content-narrow,
+.sisonke-page-container {
+    margin: 0 auto;
+    padding: var(--sisonke-content-padding-y) var(--sisonke-content-padding-x) 60px;
+    width: 100%;
+}
+
+.sisonke-content,
+.sisonke-page-container {
+    max-width: var(--sisonke-content-max-width);
+}
+
+.sisonke-content-wide {
+    max-width: 1480px;
+}
+
+.sisonke-content-narrow {
+    max-width: 1040px;
+}
+
+.sisonke-form-shell {
+    max-width: 920px;
+    margin: 0 auto;
+}
+
+.sisonke-page-container .sisonke-hero-card {
+    background:
+        radial-gradient(ellipse at 82% 30%, rgba(201, 146, 42, .22) 0%, transparent 54%),
+        linear-gradient(140deg, var(--forest, #123f2c) 0%, var(--forest-mid, #1b5a40) 62%, #2d6a3b 100%);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: var(--r-xl, 1.4rem);
+    box-shadow: var(--shadow-lg, 0 24px 70px rgba(21, 32, 51, .16));
+    padding: 2rem 2.125rem;
+}
+
+.sisonke-page-container .sisonke-hero-card h1 {
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-size: clamp(2rem, 3vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.sisonke-page-container .sisonke-card {
+    border-color: var(--border, #e5e0d3);
+    border-radius: var(--r-lg, 1rem);
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(21, 32, 51, .08));
+}
+
+.sisonke-page-container .sisonke-card-head {
+    background: color-mix(in srgb, var(--cream, #fbf8ef) 72%, white);
+}
+
+.sisonke-detail-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sisonke-detail-label {
+    color: var(--muted, #6f7886);
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.sisonke-detail-value {
+    color: var(--text, #18202f);
+    font-size: .94rem;
+    font-weight: 700;
+    margin-top: .2rem;
+    overflow-wrap: anywhere;
+}
+
+.sisonke-membership-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sisonke-standard-heading {
+    color: var(--text, #18202f);
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+@media (max-width: 768px) {
+    .sisonke-content,
+    .sisonke-content-wide,
+    .sisonke-content-narrow,
+    .sisonke-page-container {
+        max-width: 100%;
+        padding: 16px;
+    }
+
+    .sisonke-page-container .sisonke-hero-card {
+        padding: 1.35rem;
+    }
+
+    .sisonke-detail-grid,
+    .sisonke-membership-grid {
+        grid-template-columns: 1fr;
     }
 }
