@@ -37,6 +37,11 @@ else
         <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
     }
 
+    @if (!string.IsNullOrWhiteSpace(warningMessage))
+    {
+        <AlertBanner Type="warning" Title="@warningMessage" Message="" Icon="bi bi-exclamation-triangle-fill" />
+    }
+
     <!-- ── Back nav + action bar ── -->
     <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
         <div>
@@ -138,31 +143,34 @@ else
                         }
                     </dl>
 
-                    <div class="member-status-control">
-                        <div class="card-section-title">Member Status Control</div>
+                    @if (canManageMemberStatus)
+                    {
+                        <div class="member-status-control">
+                            <div class="card-section-title">Member Status Control</div>
 
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label" for="governance-status">Member Status</label>
-                                <InputSelect id="governance-status" class="form-select" @bind-Value="selectedGovernanceStatus">
-                                    @foreach (var governanceStatus in Enum.GetValues<MemberGovernanceStatus>())
-                                    {
-                                        <option value="@governanceStatus">@governanceStatus</option>
-                                    }
-                                </InputSelect>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label" for="governance-status">Member Status</label>
+                                    <InputSelect id="governance-status" class="form-select" @bind-Value="selectedGovernanceStatus">
+                                        @foreach (var governanceStatus in Enum.GetValues<MemberGovernanceStatus>())
+                                        {
+                                            <option value="@governanceStatus">@governanceStatus</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="governance-reason">Reason</label>
+                                    <InputTextArea id="governance-reason" class="form-control" rows="3" @bind-Value="governanceStatusReason" />
+                                </div>
                             </div>
-                            <div class="col-12">
-                                <label class="form-label" for="governance-reason">Reason</label>
-                                <InputTextArea id="governance-reason" class="form-control" rows="3" @bind-Value="governanceStatusReason" />
+
+                            <div class="mt-4">
+                                <button class="btn btn-primary" type="button" @onclick="ShowGovernanceStatusConfirmation">
+                                    <i class="bi bi-shield-check me-2"></i>Update Status
+                                </button>
                             </div>
                         </div>
-
-                        <div class="mt-4">
-                            <button class="btn btn-primary" type="button" @onclick="ShowGovernanceStatusConfirmation">
-                                <i class="bi bi-shield-check me-2"></i>Update Status
-                            </button>
-                        </div>
-                    </div>
+                    }
                 </div>
             </div>
         </div>
@@ -705,7 +713,9 @@ else
     private MemberGovernanceStatus selectedGovernanceStatus = MemberGovernanceStatus.Active;
     private string? governanceStatusReason;
     private string? successMessage;
+    private string? warningMessage;
     private bool canManageStokvel;
+    private bool canManageMemberStatus;
     private bool isOwnMemberProfile;
     private bool canViewFines;
 
@@ -716,8 +726,11 @@ else
     {
         isLoading = true;
         canManageStokvel = false;
+        canManageMemberStatus = false;
         isOwnMemberProfile = false;
         canViewFines = false;
+        successMessage = null;
+        warningMessage = null;
         member = await MemberService.GetMemberByIdAsync(MemberId);
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
 
@@ -729,6 +742,7 @@ else
             if (!string.IsNullOrWhiteSpace(userId))
             {
                 canManageStokvel = await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
+                canManageMemberStatus = await MemberAccessService.CanManageMemberStatusAsync(userId, stokvel.Id);
                 isOwnMemberProfile = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
                 canViewFines = canManageStokvel || isOwnMemberProfile;
             }
@@ -781,6 +795,14 @@ else
     private void ShowGovernanceStatusConfirmation()
     {
         successMessage = null;
+        warningMessage = null;
+
+        if (!canManageMemberStatus)
+        {
+            warningMessage = "You are not authorised to update this member's status.";
+            return;
+        }
+
         showGovernanceStatusConfirmation = true;
     }
 
@@ -792,6 +814,14 @@ else
     private async Task ConfirmGovernanceStatusUpdateAsync()
     {
         showGovernanceStatusConfirmation = false;
+        successMessage = null;
+        warningMessage = null;
+
+        if (!canManageMemberStatus)
+        {
+            warningMessage = "You are not authorised to update this member's status.";
+            return;
+        }
 
         var updatedMember = await MemberService.UpdateMemberGovernanceStatusAsync(
             MemberId,

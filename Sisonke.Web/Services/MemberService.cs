@@ -134,7 +134,7 @@ public class MemberService(
 
             if (!hasOfficeBearer)
             {
-                existingMember.DefaultRole = SisonkeRole.Chairperson;
+                existingMember.DefaultRole = SisonkeRole.Creator;
             }
 
             if (existingMember.Status != MemberStatus.Active)
@@ -160,7 +160,7 @@ public class MemberService(
             JoiningDate = DateTime.Today,
             Status = MemberStatus.Active,
             GovernanceStatus = MemberGovernanceStatus.Active,
-            DefaultRole = hasOfficeBearer ? SisonkeRole.Member : SisonkeRole.Chairperson,
+            DefaultRole = hasOfficeBearer ? SisonkeRole.Member : SisonkeRole.Creator,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -565,6 +565,7 @@ public class MemberService(
             or SisonkeRole.Chairperson
             or SisonkeRole.Secretary
             or SisonkeRole.Treasurer
-            or SisonkeRole.CommitteeMember;
+            or SisonkeRole.CommitteeMember
+            or SisonkeRole.Creator;
     }
 }

@@ -1,0 +1,23 @@
+@page "/member-workspace"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+
+@inject NavigationManager NavigationManager
+
+<PageTitle>Member Workspace</PageTitle>
+
+<div class="loading-state">
+    <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    Opening your memberships...
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/my-memberships", replace: true);
+    }
+}

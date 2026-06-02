@@ -1,5 +1,7 @@
 @page "/"
 @using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
 
 <PageTitle>Sisonke — Stokvel Management</PageTitle>
 
@@ -264,6 +266,18 @@
     </NotAuthorized>
 
 </AuthorizeView>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            NavigationManager.NavigateTo("/my-workspace", replace: true);
+        }
+    }
+}
 
 <style>
     /* ── Logged-in greeting card ──────────────────────────── */

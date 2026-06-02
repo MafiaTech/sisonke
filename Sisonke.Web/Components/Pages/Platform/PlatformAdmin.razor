@@ -6,49 +6,130 @@
 
 <PageTitle>Platform Administration</PageTitle>
 
-<PageHeader
-    Title="Platform Administration"
-    Subtitle="Platform-wide tools and operational oversight for Sisonke."
-    BackText="Back to Workspace"
-    BackHref="/my-workspace" />
+<div class="sisonke-role-platform-admin">
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-purple">Platform Admin</span>
+            <h1>Sisonke SaaS Platform</h1>
+            <p>Platform administration console</p>
+        </div>
+        <div class="platform-hero-panel">
+            <span>Access</span>
+            <strong>Platform-wide administration</strong>
+        </div>
+    </section>
 
-<div class="platform-card-grid">
-    @foreach (var card in placeholderCards)
-    {
-        <section class="card border-0 shadow-sm h-100">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
-                        <i class="bi @card.Icon"></i>
-                    </div>
-                    <div>
-                        <h2 class="h6 fw-700 mb-1">@card.Title</h2>
-                        <p class="text-muted small mb-0">Coming soon.</p>
-                    </div>
+    <div class="mb-4">
+        <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
+            <i class="bi bi-arrow-left me-2"></i>Back to Workspace
+        </a>
+    </div>
+
+    <section class="sisonke-grid sisonke-grid-3 mb-4">
+        @foreach (var stat in statCards)
+        {
+            <article class="sisonke-stat-card">
+                <div class="sisonke-card-icon">
+                    <i class="bi @stat.Icon"></i>
+                </div>
+                <div class="sisonke-stat-label">@stat.Title</div>
+                <div class="sisonke-stat-value">@stat.Value</div>
+                <span class="@stat.BadgeClass">@stat.BadgeText</span>
+            </article>
+        }
+    </section>
+
+    <section class="sisonke-card">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Administration Areas</h2>
+                    <p>Platform management tools will appear here as operational modules are completed.</p>
                 </div>
             </div>
-        </section>
-    }
+
+            <div class="sisonke-grid sisonke-grid-3">
+                @foreach (var card in actionCards)
+                {
+                    <article class="sisonke-quick-action platform-action-card">
+                        <div class="sisonke-card-icon">
+                            <i class="bi @card.Icon"></i>
+                        </div>
+                        <div>
+                            <h3>@card.Title</h3>
+                            <p>@card.Description</p>
+                            <span class="sisonke-badge sisonke-badge-gray">Coming Soon</span>
+                        </div>
+                    </article>
+                }
+            </div>
+        </div>
+    </section>
 </div>
 
 <style>
-    .platform-card-grid {
+    .platform-hero-panel {
         display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+        gap: .25rem;
+        min-width: min(18rem, 100%);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
+    }
+
+    .platform-hero-panel span {
+        color: rgb(255 255 255 / .78);
+        font-size: .75rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .platform-hero-panel strong {
+        color: #fff;
+        font-size: 1rem;
+    }
+
+    .platform-action-card {
+        align-items: flex-start;
+    }
+
+    .platform-action-card h3 {
+        margin: 0 0 .25rem;
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .platform-action-card p {
+        margin: 0 0 .75rem;
+        color: var(--muted);
+        font-size: .9rem;
     }
 </style>
 
 @code {
-    private readonly List<PlaceholderCardModel> placeholderCards =
+    private readonly List<StatCardModel> statCards =
     [
-        new("Total Stokvels", "bi-diagram-3"),
-        new("Total Users", "bi-people"),
-        new("Total Members", "bi-person-vcard"),
-        new("Open Claims", "bi-file-earmark-medical"),
-        new("Subscription Management", "bi-credit-card"),
-        new("Audit Logs", "bi-list-check")
+        new("Total Stokvels", "Coming Soon", "bi-diagram-3", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
+        new("Total Users", "Coming Soon", "bi-people", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
+        new("Total Members", "Coming Soon", "bi-person-vcard", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
+        new("Open Claims", "Coming Soon", "bi-file-earmark-medical", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
+        new("Active Subscriptions", "Coming Soon", "bi-credit-card", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
+        new("Support Tickets", "Coming Soon", "bi-life-preserver", "sisonke-badge sisonke-badge-gray", "Coming soon")
     ];
 
-    private sealed record PlaceholderCardModel(string Title, string Icon);
+    private readonly List<ActionCardModel> actionCards =
+    [
+        new("Stokvel Registry", "Browse and manage registered stokvel records.", "bi-building"),
+        new("User Management", "Review platform user accounts and access state.", "bi-person-gear"),
+        new("Subscription Management", "Manage plans, subscriptions and billing state.", "bi-credit-card-2-front"),
+        new("Audit Logs", "Track platform administration and sensitive changes.", "bi-list-check"),
+        new("Platform Settings", "Configure platform-wide operational settings.", "bi-sliders"),
+        new("Support Queue", "Review escalated support requests.", "bi-headset")
+    ];
+
+    private sealed record StatCardModel(string Title, string Value, string Icon, string BadgeClass, string BadgeText);
+
+    private sealed record ActionCardModel(string Title, string Description, string Icon);
 }

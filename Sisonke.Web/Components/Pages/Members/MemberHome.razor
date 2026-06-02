@@ -24,194 +24,440 @@
 {
     <div class="alert alert-info">Loading your member dashboard...</div>
 }
+else if (member is null)
+{
+    <AlertBanner Type="danger" Message="Member not found." />
+}
 else if (!isAllowed)
 {
     <AlertBanner Type="warning" Message="You do not have access to this member view." />
+    <a class="btn btn-outline-secondary btn-sm" href="/my-workspace">
+        <i class="bi bi-columns-gap me-1"></i>Back to My Workspace
+    </a>
 }
-else if (member is null)
+else if (stokvel is null)
 {
-    <AlertBanner Type="danger" Message="Member profile not found." />
+    <AlertBanner Type="danger" Message="Stokvel not found for this member." />
+    <a class="btn btn-outline-secondary btn-sm" href="/my-workspace">
+        <i class="bi bi-columns-gap me-1"></i>Back to My Workspace
+    </a>
 }
 else
 {
     <div class="d-flex flex-column gap-4">
-        <PageHeader Title="My Member Dashboard"
-                    Subtitle="@($"Your member view for {stokvel?.Name ?? member.Tenant?.Name ?? "this stokvel"}.")" />
-
-        <section class="card border-0 shadow-sm">
-            <div class="card-body">
-                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
-                    <div>
-                        <p class="text-uppercase text-muted small fw-semibold mb-1">Member</p>
-                        <h2 class="h4 mb-2">@member.FullName</h2>
-                        <div class="d-flex flex-wrap gap-2">
-                            <StatusBadge Text="@member.Status.ToString()" Variant="@GetMemberStatusVariant(member.Status)" />
-                            <span class="badge text-bg-light border">@member.DefaultRole</span>
-                        </div>
-                    </div>
-                    <div class="text-lg-end">
-                        <p class="text-uppercase text-muted small fw-semibold mb-1">Stokvel</p>
-                        <h3 class="h5 mb-1">@((stokvel?.Name) ?? member.Tenant?.Name ?? "Not available")</h3>
-                        <div class="text-muted small">Member no. @Display(member.MemberNumber)</div>
+        <section class="sisonke-hero-card">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-end">
+                <div>
+                    <p class="mb-2 text-uppercase fw-bold" style="letter-spacing:.08em;color:rgba(255,255,255,.65);font-size:.75rem;">Welcome back</p>
+                    <h1>@member.FullName</h1>
+                    <p class="mt-3">@stokvel.Name</p>
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <span class="@GetMemberStatusBadgeClass(member.Status)">@member.Status</span>
+                        <span class="sisonke-badge sisonke-badge-gray">@member.DefaultRole</span>
                     </div>
                 </div>
-
-                <div class="row g-3 mt-3">
-                    <div class="col-md-4">
-                        <div class="border rounded-3 p-3 h-100">
-                            <div class="text-muted small">Member status</div>
-                            <div class="fw-semibold">@member.Status</div>
-                        </div>
+                <div class="member-home-hero-meta">
+                    <div>
+                        <span>Member number</span>
+                        <strong>@Display(member.MemberNumber)</strong>
                     </div>
-                    <div class="col-md-4">
-                        <div class="border rounded-3 p-3 h-100">
-                            <div class="text-muted small">Default role</div>
-                            <div class="fw-semibold">@member.DefaultRole</div>
-                        </div>
+                    <div>
+                        <span>Joining date</span>
+                        <strong>@member.JoiningDate.ToString("dd MMM yyyy")</strong>
                     </div>
-                    <div class="col-md-4">
-                        <div class="border rounded-3 p-3 h-100">
-                            <div class="text-muted small">Joining date</div>
-                            <div class="fw-semibold">@member.JoiningDate.ToString("dd MMM yyyy")</div>
-                        </div>
+                    <div>
+                        <span>ID number</span>
+                        <strong>@Display(member.IdNumber)</strong>
+                    </div>
+                    <div>
+                        <span>Cellphone</span>
+                        <strong>@Display(member.CellphoneNumber)</strong>
                     </div>
                 </div>
             </div>
         </section>
 
-        <div class="row g-3">
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
+        <section class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Member Details</h2>
+                        <p>Your captured contact and stokvel membership information.</p>
+                    </div>
+                    <span class="@GetMemberStatusBadgeClass(member.Status)">@member.Status</span>
+                </div>
+
+                <div class="sisonke-grid sisonke-grid-3">
+                    <div class="member-detail-tile">
+                        <span>Full Name</span>
+                        <strong>@Display(member.FullName)</strong>
+                    </div>
+                    <div class="member-detail-tile">
+                        <span>Stokvel</span>
+                        <strong>@stokvel.Name</strong>
+                    </div>
+                    <div class="member-detail-tile">
+                        <span>Role</span>
+                        <strong>@member.DefaultRole</strong>
+                    </div>
+                    <div class="member-detail-tile">
+                        <span>Member Number</span>
+                        <strong>@Display(member.MemberNumber)</strong>
+                    </div>
+                    <div class="member-detail-tile">
+                        <span>Joining Date</span>
+                        <strong>@member.JoiningDate.ToString("dd MMM yyyy")</strong>
+                    </div>
+                    <div class="member-detail-tile">
+                        <span>ID Number</span>
+                        <strong>@Display(member.IdNumber)</strong>
+                    </div>
+                    <div class="member-detail-tile">
+                        <span>Cellphone</span>
+                        <strong>@Display(member.CellphoneNumber)</strong>
+                    </div>
+                    <div class="member-detail-tile">
+                        <span>Email</span>
+                        <strong>@Display(member.EmailAddress)</strong>
+                    </div>
+                    <div class="member-detail-tile">
+                        <span>Residential Area</span>
+                        <strong>@Display(member.ResidentialArea)</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="sisonke-grid-4">
+            <a class="sisonke-quick-action" href="/member-profile/@MemberId">
+                <i class="bi bi-person-circle fs-4"></i>
+                <span>View My Profile</span>
+            </a>
+            <a class="sisonke-quick-action" href="/create-claim/@MemberId">
+                <i class="bi bi-file-earmark-medical fs-4"></i>
+                <span>Create Claim</span>
+            </a>
+            <a class="sisonke-quick-action" href="@($"/meetings/{stokvel!.Id}")">
+                <i class="bi bi-calendar-event fs-4"></i>
+                <span>View Meetings</span>
+            </a>
+            <a class="sisonke-quick-action" href="@($"/constitution-builder/{stokvel!.Id}")">
+                <i class="bi bi-journal-text fs-4"></i>
+                <span>View Constitution</span>
+            </a>
+        </div>
+
+        <div class="sisonke-grid-3">
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
                         <h3 class="h6 mb-3">My Contribution Status</h3>
-                    <p class="text-muted mb-0">Contribution tracking coming soon.</p>
+                        <div class="sisonke-alert sisonke-alert-blue">
+                            <i class="bi bi-info-circle-fill mt-1"></i>
+                            <div>Contribution tracking coming soon.</div>
+                        </div>
                     </div>
                 </section>
             </div>
 
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
                         <h3 class="h6 mb-3">My Fines</h3>
-                    @if (memberFines.Count == 0)
-                    {
-                        <p class="text-muted mb-0">Your fines will appear here.</p>
-                    }
-                    else
-                    {
-                        <div class="d-flex flex-column gap-2">
-                            @foreach (var fine in memberFines.Take(3))
-                            {
-                                <div class="border rounded-3 p-2">
-                                    <div class="d-flex justify-content-between gap-2">
-                                        <span class="fw-semibold">@fine.FineType.Name</span>
-                                        <span>@fine.Amount.ToString("C")</span>
+                        <div class="sisonke-grid sisonke-grid-2 mb-3">
+                            <div class="member-mini-stat">
+                                <span>Total fines</span>
+                                <strong>@memberFines.Count</strong>
+                            </div>
+                            <div class="member-mini-stat">
+                                <span>Outstanding</span>
+                                <strong>@FormatCurrency(OutstandingFineTotal)</strong>
+                            </div>
+                        </div>
+                        @if (memberFines.Count == 0)
+                        {
+                            <div class="sisonke-alert sisonke-alert-green">
+                                <i class="bi bi-check-circle-fill mt-1"></i>
+                                <div>Your fines will appear here.</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-2">
+                                @foreach (var fine in memberFines.Take(3))
+                                {
+                                    <div class="border rounded-3 p-2">
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <span class="fw-semibold">@fine.FineType.Name</span>
+                                            <span>@FormatCurrency(fine.Amount)</span>
+                                        </div>
+                                        <div class="small text-muted">@fine.FineDate.ToString("dd MMM yyyy") · @fine.Status</div>
+                                        @if (!string.IsNullOrWhiteSpace(fine.Reason))
+                                        {
+                                            <div class="small text-muted">@fine.Reason</div>
+                                        }
                                     </div>
-                                    <div class="small text-muted">@fine.FineDate.ToString("dd MMM yyyy") · @fine.Status</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+            </div>
+
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
+                        <h3 class="h6 mb-3">My Claims</h3>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <div class="border rounded-3 p-2 h-100">
+                                    <div class="text-muted small">Total claims</div>
+                                    <div class="fw-semibold">@memberClaims.Count</div>
                                 </div>
-                            }
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded-3 p-2 h-100">
+                                    <div class="text-muted small">Latest status</div>
+                                    @if (LatestClaim is null)
+                                    {
+                                        <div class="fw-semibold">None</div>
+                                    }
+                                    else
+                                    {
+                                        <span class="@GetClaimStatusBadgeClass(LatestClaim.Status)">@LatestClaim.Status</span>
+                                    }
+                                </div>
+                            </div>
                         </div>
-                    }
-                    </div>
-                </section>
-            </div>
-
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
-                        <h3 class="h6 mb-3">My Payout / Host Turn</h3>
-                    <p class="text-muted mb-0">Payout and host rotation coming soon.</p>
-                    </div>
-                </section>
-            </div>
-
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
-                        <h3 class="h6 mb-3">Meeting Schedule</h3>
-                    @if (upcomingMeetings.Count == 0)
-                    {
-                        <p class="text-muted">No upcoming meetings found.</p>
-                    }
-                    else
-                    {
-                        <div class="d-flex flex-column gap-2 mb-3">
-                            @foreach (var meeting in upcomingMeetings.Take(2))
+                        @if (memberClaims.Count == 0)
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue">
+                                <i class="bi bi-info-circle-fill mt-1"></i>
+                                <div>No claims found.</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                @foreach (var claim in memberClaims.Take(3))
+                                {
+                                    <div class="border rounded-3 p-2">
+                                        <div class="fw-semibold">@claim.DeceasedFullName</div>
+                                        <div class="small text-muted">
+                                            @claim.SubjectType · @claim.Status · @(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "Date not captured")
+                                        </div>
+                                        <a class="sisonke-btn sisonke-btn-outline mt-2" href="@($"/claim/{claim.Id}")">View Claim</a>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <div class="d-flex flex-wrap gap-2">
+                            @if (memberClaims.Count > 0)
                             {
-                                <div class="border rounded-3 p-2">
-                                    <div class="fw-semibold">@meeting.Title</div>
-                                    <div class="small text-muted">@meeting.MeetingDate.ToString("dd MMM yyyy HH:mm")</div>
-                                </div>
+                                <a class="sisonke-btn sisonke-btn-outline" href="/member-profile/@MemberId">View Claims</a>
                             }
+                            <a class="sisonke-btn sisonke-btn-primary" href="/create-claim/@MemberId">Create Claim</a>
                         </div>
-                    }
-
-                    @if (stokvel is not null)
-                    {
-                        <a class="btn btn-outline-primary btn-sm" href="/meetings/@stokvel.Id">View Meetings</a>
-                    }
                     </div>
                 </section>
             </div>
 
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
+                        <h3 class="h6 mb-3">My Dependents / Covered Lives</h3>
+                        <div class="row g-2 mb-3">
+                            <div class="col-4">
+                                <div class="border rounded-3 p-2 h-100">
+                                    <div class="text-muted small">Total</div>
+                                    <div class="fw-semibold">@dependents.Count</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border rounded-3 p-2 h-100">
+                                    <div class="text-muted small">Active</div>
+                                    <div class="fw-semibold">@ActiveDependentCount</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border rounded-3 p-2 h-100">
+                                    <div class="text-muted small">Deceased</div>
+                                    <div class="fw-semibold">@DeceasedDependentCount</div>
+                                </div>
+                            </div>
+                        </div>
+                        @if (dependents.Count == 0)
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue">
+                                <i class="bi bi-info-circle-fill mt-1"></i>
+                                <div>Covered lives will appear here.</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                @foreach (var dependent in dependents.Take(3))
+                                {
+                                    <div class="border rounded-3 p-2">
+                                        <div class="fw-semibold">@dependent.FullName</div>
+                                        <div class="small text-muted">@dependent.Relationship</div>
+                                        <span class="@GetDependentStatusBadgeClass(dependent)">
+                                            @(dependent.IsDeceased ? "Deceased" : dependent.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <a class="sisonke-btn sisonke-btn-outline" href="/member-profile/@MemberId">View Profile</a>
+                    </div>
+                </section>
+            </div>
+
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
+                        <h3 class="h6 mb-3">Meeting Schedule</h3>
+                        @if (upcomingMeetings.Count == 0)
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue">
+                                <i class="bi bi-info-circle-fill mt-1"></i>
+                                <div>No upcoming meetings found.</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                @foreach (var meeting in upcomingMeetings.Take(2))
+                                {
+                                    <div class="border rounded-3 p-2">
+                                        <div class="fw-semibold">@meeting.Title</div>
+                                        <div class="small text-muted">@meeting.MeetingDate.ToString("dd MMM yyyy HH:mm")</div>
+                                        @if (!string.IsNullOrWhiteSpace(meeting.Venue))
+                                        {
+                                            <div class="small text-muted">@meeting.Venue</div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <a class="sisonke-btn sisonke-btn-outline" href="@($"/meetings/{stokvel!.Id}")">View Meetings</a>
+                    </div>
+                </section>
+            </div>
+
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
                         <h3 class="h6 mb-3">Submit Apology</h3>
-                    <p class="text-muted">Apology submission coming soon.</p>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Submit Apology</button>
+                        <div class="sisonke-alert sisonke-alert-gold mb-3">
+                            <i class="bi bi-hourglass-split mt-1"></i>
+                            <div>Coming Soon: Apology submission will be available from this member view.</div>
+                        </div>
+                        <button type="button" class="sisonke-btn sisonke-btn-outline" disabled>Submit Apology</button>
                     </div>
                 </section>
             </div>
 
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
                         <h3 class="h6 mb-3">My Documents</h3>
-                    <p class="text-muted mb-0">Your documents will appear here.</p>
+                        <div class="sisonke-alert sisonke-alert-gold">
+                            <i class="bi bi-hourglass-split mt-1"></i>
+                            <div>Coming Soon: Your documents will appear here.</div>
+                        </div>
                     </div>
                 </section>
             </div>
 
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
                         <h3 class="h6 mb-3">My Profile</h3>
-                    <p class="text-muted">View your captured member profile and covered lives.</p>
-                    <a class="btn btn-primary btn-sm" href="/member-profile/@MemberId">View My Profile</a>
+                        <p class="text-muted">View your captured member profile and covered lives.</p>
+                        <a class="sisonke-btn sisonke-btn-primary" href="/member-profile/@MemberId">View My Profile</a>
                     </div>
                 </section>
             </div>
 
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
-                        <h3 class="h6 mb-3">Claims</h3>
-                    <p class="text-muted">Create a funeral claim for yourself or a covered dependent.</p>
-                    <a class="btn btn-primary btn-sm" href="/create-claim/@MemberId">Create Claim</a>
-                    </div>
-                </section>
-            </div>
-
-            <div class="col-lg-4">
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
+            <div>
+                <section class="sisonke-card h-100">
+                    <div class="sisonke-card-body">
                         <h3 class="h6 mb-3">Constitution</h3>
-                    <p class="text-muted">View the stokvel constitution. Ordinary member view-only mode will be enforced later.</p>
-                    @if (stokvel is not null)
-                    {
-                        <a class="btn btn-outline-primary btn-sm" href="/constitution-builder/@stokvel.Id">View Constitution</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>View Constitution</button>
-                    }
+                        <p class="text-muted">View the stokvel constitution.</p>
+                        <a class="sisonke-btn sisonke-btn-outline" href="@($"/constitution-builder/{stokvel!.Id}")">View Constitution</a>
                     </div>
                 </section>
             </div>
         </div>
     </div>
 }
+
+<style>
+    .member-home-hero-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .75rem;
+        min-width: min(100%, 30rem);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
+    }
+
+    .member-home-hero-meta div,
+    .member-detail-tile,
+    .member-mini-stat {
+        display: grid;
+        gap: .2rem;
+    }
+
+    .member-home-hero-meta span {
+        color: rgb(255 255 255 / .72);
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .member-home-hero-meta strong {
+        color: #fff;
+        font-size: .95rem;
+        overflow-wrap: anywhere;
+    }
+
+    .member-detail-tile,
+    .member-mini-stat {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        background: var(--cream);
+        padding: .85rem;
+    }
+
+    .member-detail-tile span,
+    .member-mini-stat span {
+        color: var(--muted);
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .member-detail-tile strong,
+    .member-mini-stat strong {
+        color: var(--text);
+        font-size: .95rem;
+        overflow-wrap: anywhere;
+    }
+
+    @@media (max-width: 768px) {
+        .member-home-hero-meta {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 
 @code {
     [Parameter]
@@ -220,9 +466,23 @@ else
     private Member? member;
     private Stokvel? stokvel;
     private List<MemberFine> memberFines = [];
+    private List<FuneralClaim> memberClaims = [];
+    private List<MemberDependent> dependents = [];
     private List<Meeting> upcomingMeetings = [];
     private bool isLoading = true;
     private bool isAllowed;
+
+    private FuneralClaim? LatestClaim => memberClaims
+        .OrderByDescending(claim => claim.CreatedAt)
+        .FirstOrDefault();
+
+    private int ActiveDependentCount => dependents.Count(dependent => dependent.IsActive);
+
+    private int DeceasedDependentCount => dependents.Count(dependent => dependent.IsDeceased);
+
+    private decimal OutstandingFineTotal => memberFines
+        .Where(fine => fine.Status == FineStatus.Unpaid)
+        .Sum(fine => fine.Amount);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -231,10 +491,20 @@ else
         member = null;
         stokvel = null;
         memberFines = [];
+        memberClaims = [];
+        dependents = [];
         upcomingMeetings = [];
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+
+        if (member is null)
+        {
+            isLoading = false;
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(userId))
         {
@@ -242,7 +512,7 @@ else
             return;
         }
 
-        isAllowed = await MemberAccessService.CanViewMemberProfileAsync(userId, MemberId);
+        isAllowed = await MemberAccessService.CanAccessMemberHomeAsync(userId, MemberId);
 
         if (!isAllowed)
         {
@@ -250,24 +520,25 @@ else
             return;
         }
 
-        member = await MemberService.GetMemberByIdAsync(MemberId);
+        stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
 
-        if (member is not null)
+        if (stokvel is null)
         {
-            stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
-            memberFines = await FineService.GetMemberFinesAsync(MemberId);
-
-            if (stokvel is not null)
-            {
-                var meetings = await MeetingService.GetMeetingsByStokvelIdAsync(stokvel.Id);
-                upcomingMeetings = meetings
-                    .Where(meeting =>
-                        meeting.MeetingDate >= DateTime.Today &&
-                        (meeting.Status == MeetingStatus.Planned || meeting.Status == MeetingStatus.InProgress))
-                    .OrderBy(meeting => meeting.MeetingDate)
-                    .ToList();
-            }
+            isLoading = false;
+            return;
         }
+
+        memberFines = await FineService.GetMemberFinesAsync(MemberId);
+        memberClaims = await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
+        dependents = await MemberService.GetDependentsByMemberIdAsync(MemberId);
+
+        var meetings = await MeetingService.GetMeetingsByStokvelIdAsync(stokvel.Id);
+        upcomingMeetings = meetings
+            .Where(meeting =>
+                meeting.MeetingDate >= DateTime.Today &&
+                (meeting.Status == MeetingStatus.Planned || meeting.Status == MeetingStatus.InProgress))
+            .OrderBy(meeting => meeting.MeetingDate)
+            .ToList();
 
         isLoading = false;
     }
@@ -290,5 +561,53 @@ else
             MemberStatus.Removed => "secondary",
             _ => "secondary"
         };
+    }
+
+    private static string GetMemberStatusBadgeClass(MemberStatus status)
+    {
+        return status switch
+        {
+            MemberStatus.Active => "sisonke-badge sisonke-badge-green",
+            MemberStatus.Pending => "sisonke-badge sisonke-badge-gold",
+            MemberStatus.CoolingPeriod => "sisonke-badge sisonke-badge-gold",
+            MemberStatus.Suspended => "sisonke-badge sisonke-badge-red",
+            MemberStatus.Deceased => "sisonke-badge sisonke-badge-red",
+            MemberStatus.Resigned => "sisonke-badge sisonke-badge-gray",
+            MemberStatus.Removed => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static string GetClaimStatusBadgeClass(FuneralClaimStatus status)
+    {
+        return status switch
+        {
+            FuneralClaimStatus.Draft => "sisonke-badge sisonke-badge-gray",
+            FuneralClaimStatus.Submitted => "sisonke-badge sisonke-badge-blue",
+            FuneralClaimStatus.UnderReview => "sisonke-badge sisonke-badge-teal",
+            FuneralClaimStatus.OnHold => "sisonke-badge sisonke-badge-gold",
+            FuneralClaimStatus.Approved => "sisonke-badge sisonke-badge-green",
+            FuneralClaimStatus.Rejected => "sisonke-badge sisonke-badge-red",
+            FuneralClaimStatus.Paid => "sisonke-badge sisonke-badge-green",
+            FuneralClaimStatus.Cancelled => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static string GetDependentStatusBadgeClass(MemberDependent dependent)
+    {
+        if (dependent.IsDeceased)
+        {
+            return "sisonke-badge sisonke-badge-red";
+        }
+
+        return dependent.IsActive
+            ? "sisonke-badge sisonke-badge-green"
+            : "sisonke-badge sisonke-badge-gray";
+    }
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return amount.ToString("C", new System.Globalization.CultureInfo("en-ZA"));
     }
 }

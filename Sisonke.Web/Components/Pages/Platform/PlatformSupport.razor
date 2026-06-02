@@ -6,59 +6,145 @@
 
 <PageTitle>Support Console</PageTitle>
 
-<PageHeader
-    Title="Support Console"
-    Subtitle="Support tools for finding users, members and stokvel records."
-    BackText="Back to Workspace"
-    BackHref="/my-workspace" />
-
-<section class="card border-0 shadow-sm">
-    <div class="card-body p-4">
-        <div class="d-flex align-items-center gap-3 mb-4">
-            <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
-                <i class="bi bi-search"></i>
-            </div>
-            <div>
-                <h2 class="h6 fw-700 mb-1">Search by</h2>
-                <p class="text-muted small mb-0">Search is coming soon.</p>
-            </div>
+<div class="sisonke-role-support">
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-teal">Support</span>
+            <h1>Support Console</h1>
+            <p>Search and troubleshoot member/stokvel access issues.</p>
         </div>
-
-        <div class="platform-support-grid">
-            <div class="support-search-field">
-                <label class="form-label" for="support-email">Email</label>
-                <input id="support-email" class="form-control" placeholder="name@example.com" disabled />
-            </div>
-            <div class="support-search-field">
-                <label class="form-label" for="support-id-number">SA ID Number</label>
-                <input id="support-id-number" class="form-control" placeholder="13-digit SA ID" disabled />
-            </div>
-            <div class="support-search-field">
-                <label class="form-label" for="support-stokvel-name">Stokvel Name</label>
-                <input id="support-stokvel-name" class="form-control" placeholder="Stokvel name" disabled />
-            </div>
-            <div class="support-search-field">
-                <label class="form-label" for="support-member-number">Member Number</label>
-                <input id="support-member-number" class="form-control" placeholder="Member number" disabled />
-            </div>
+        <div class="support-hero-panel">
+            <span>Mode</span>
+            <strong>Read-only troubleshooting tools</strong>
         </div>
+    </section>
 
-        <button type="button" class="btn btn-outline-secondary mt-4" disabled>
-            <i class="bi bi-search me-2"></i>Search Coming Soon
-        </button>
+    <div class="mb-4">
+        <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
+            <i class="bi bi-arrow-left me-2"></i>Back to Workspace
+        </a>
     </div>
-</section>
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Search</h2>
+                    <p>Search is coming soon. These fields are prepared for future support lookups.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-gray">Coming Soon</span>
+            </div>
+
+            <div class="sisonke-grid sisonke-grid-2">
+                @foreach (var field in searchFields)
+                {
+                    <div class="support-search-card">
+                        <label class="form-label" for="@field.InputId">@field.Label</label>
+                        <input id="@field.InputId" class="form-control" placeholder="@field.Placeholder" disabled />
+                    </div>
+                }
+            </div>
+
+            <button type="button" class="sisonke-btn sisonke-btn-outline mt-4" disabled>
+                <i class="bi bi-search me-2"></i>Search Coming Soon
+            </button>
+        </div>
+    </section>
+
+    <section class="sisonke-card">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Support Actions</h2>
+                    <p>Access investigation and escalation tools for support users.</p>
+                </div>
+            </div>
+
+            <div class="sisonke-grid sisonke-grid-4">
+                @foreach (var action in supportActions)
+                {
+                    <article class="sisonke-quick-action support-action-card">
+                        <div class="sisonke-card-icon">
+                            <i class="bi @action.Icon"></i>
+                        </div>
+                        <div>
+                            <h3>@action.Title</h3>
+                            <p>@action.Description</p>
+                            <span class="@action.BadgeClass">@action.BadgeText</span>
+                        </div>
+                    </article>
+                }
+            </div>
+        </div>
+    </section>
+</div>
 
 <style>
-    .platform-support-grid {
+    .support-hero-panel {
         display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .25rem;
+        min-width: min(18rem, 100%);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
     }
 
-    @@media (max-width: 640px) {
-        .platform-support-grid {
-            grid-template-columns: 1fr;
-        }
+    .support-hero-panel span {
+        color: rgb(255 255 255 / .78);
+        font-size: .75rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .support-hero-panel strong {
+        color: #fff;
+        font-size: 1rem;
+    }
+
+    .support-search-card {
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        background: var(--cream);
+        padding: 1rem;
+    }
+
+    .support-action-card {
+        align-items: flex-start;
+    }
+
+    .support-action-card h3 {
+        margin: 0 0 .25rem;
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .support-action-card p {
+        margin: 0 0 .75rem;
+        color: var(--muted);
+        font-size: .9rem;
     }
 </style>
+
+@code {
+    private readonly List<SearchFieldModel> searchFields =
+    [
+        new("Search by Email", "support-email", "name@example.com"),
+        new("Search by SA ID Number", "support-id-number", "13-digit SA ID"),
+        new("Search by Stokvel Name", "support-stokvel-name", "Stokvel name"),
+        new("Search by Member Number", "support-member-number", "Member number")
+    ];
+
+    private readonly List<SupportActionModel> supportActions =
+    [
+        new("View User Membership Links", "Inspect account-to-member matching once search is available.", "bi-link-45deg", "sisonke-badge sisonke-badge-gray", "Coming Soon"),
+        new("View Stokvel Read-only", "Open stokvel records without changing operational data.", "bi-eye", "sisonke-badge sisonke-badge-gray", "Coming Soon"),
+        new("Escalate to Platform Admin", "Route unresolved cases to platform administration.", "bi-arrow-up-right-circle", "sisonke-badge sisonke-badge-teal", "Support Flow"),
+        new("Knowledge Base", "Guides and troubleshooting playbooks for support staff.", "bi-journal-text", "sisonke-badge sisonke-badge-gray", "Coming Soon")
+    ];
+
+    private sealed record SearchFieldModel(string Label, string InputId, string Placeholder);
+
+    private sealed record SupportActionModel(string Title, string Description, string Icon, string BadgeClass, string BadgeText);
+}

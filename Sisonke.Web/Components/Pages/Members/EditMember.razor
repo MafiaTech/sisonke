@@ -1,11 +1,15 @@
 @page "/edit-member/{MemberId:guid}"
 @rendermode InteractiveServer
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
 @inject MemberService MemberService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
 <PageTitle>Edit Member</PageTitle>
@@ -25,11 +29,24 @@ else if (editMember is null)
 }
 else
 {
-    <PageHeader
-        Title="Edit Member"
-        Subtitle="@($"Member #{editMember.MemberNumber}")"
-        BackText="Back to Member Profile"
-        BackHref="@($"/member-profile/{MemberId}")" />
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-blue">Member Profile</span>
+            <h1>Edit Member</h1>
+            <p>Update member details for member #@editMember.MemberNumber.</p>
+        </div>
+        <div class="edit-member-meta">
+            <div><span>Name</span><strong>@editMember.FullName</strong></div>
+            <div><span>Status</span><strong>@editMember.Status</strong></div>
+            <div><span>Role</span><strong>@editMember.DefaultRole</strong></div>
+        </div>
+    </section>
+
+    <div class="mb-4">
+        <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
+            <i class="bi bi-arrow-left me-2"></i>Back to Member Profile
+        </a>
+    </div>
 
     @if (saveFailed)
     {
@@ -42,27 +59,27 @@ else
 
         <div class="form-page">
 
-            <div class="card mb-3">
-                <div class="card-body p-4">
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
                     <p class="form-section-title">Personal Details</p>
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
+                    <div class="sisonke-grid sisonke-grid-2">
+                        <div class="member-form-field">
                             <label class="form-label" for="full-name">Full name</label>
                             <InputText id="full-name" class="form-control" placeholder="e.g. Thandi Nkosi" @bind-Value="editMember.FullName" />
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="cellphone-number">Cellphone number</label>
                             <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="editMember.CellphoneNumber" />
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="email-address">Email address</label>
                             <InputText id="email-address" class="form-control" placeholder="e.g. thandi@email.com" @bind-Value="editMember.EmailAddress" />
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="id-number">ID number</label>
                             <InputText id="id-number" class="form-control" placeholder="13-digit SA ID number" @bind-Value="editMember.IdNumber" />
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="residential-area">Residential area</label>
                             <InputText id="residential-area" class="form-control" placeholder="e.g. Soweto, Gauteng" @bind-Value="editMember.ResidentialArea" />
                         </div>
@@ -70,38 +87,52 @@ else
                 </div>
             </div>
 
-            <div class="card mb-3">
-                <div class="card-body p-4">
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
                     <p class="form-section-title">Membership Details</p>
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
+                    <div class="sisonke-grid sisonke-grid-2">
+                        <div class="member-form-field">
                             <label class="form-label" for="joining-date">Joining date</label>
                             <InputDate id="joining-date" class="form-control" @bind-Value="editMember.JoiningDate" />
                         </div>
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="default-role">Default role</label>
-                            <InputSelect id="default-role" class="form-select" @bind-Value="editMember.DefaultRole">
-                                @foreach (var role in Enum.GetValues<SisonkeRole>())
-                                {
-                                    <option value="@role">@role</option>
-                                }
-                            </InputSelect>
-                        </div>
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="status">Status</label>
-                            <InputSelect id="status" class="form-select" @bind-Value="editMember.Status">
-                                @foreach (var status in Enum.GetValues<MemberStatus>())
-                                {
-                                    <option value="@status">@status</option>
-                                }
-                            </InputSelect>
-                        </div>
+                        @if (canManageProtectedMemberFields)
+                        {
+                            <div class="member-form-field">
+                                <label class="form-label" for="default-role">Default role</label>
+                                <InputSelect id="default-role" class="form-select" @bind-Value="editMember.DefaultRole">
+                                    @foreach (var role in Enum.GetValues<SisonkeRole>())
+                                    {
+                                        <option value="@role">@role</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="status">Status</label>
+                                <InputSelect id="status" class="form-select" @bind-Value="editMember.Status">
+                                    @foreach (var status in Enum.GetValues<MemberStatus>())
+                                    {
+                                        <option value="@status">@status</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="member-form-field">
+                                <div class="detail-mini-label">Default role</div>
+                                <span class="sisonke-badge sisonke-badge-gray">@editMember.DefaultRole</span>
+                            </div>
+                            <div class="member-form-field">
+                                <div class="detail-mini-label">Status</div>
+                                <span class="sisonke-badge sisonke-badge-gray">@editMember.Status</span>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
 
-            <div class="card mb-4">
-                <div class="card-body p-4">
+            <div class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
                     <p class="form-section-title">Cooling Period</p>
                     <div class="row g-3">
                         <div class="col-12">
@@ -122,8 +153,8 @@ else
                 </div>
             </div>
 
-            <div class="card mb-4">
-                <div class="card-body p-4">
+            <div class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
                     <p class="form-section-title">Deceased Tracking</p>
                     <div class="row g-3">
                         <div class="col-12">
@@ -146,20 +177,52 @@ else
             </div>
 
             <div class="d-flex gap-2">
-                <button class="btn btn-primary" type="submit">
+                <button class="sisonke-btn sisonke-btn-primary" type="submit">
                     <i class="bi bi-check-lg me-2"></i>Save Changes
                 </button>
-                <a class="btn btn-outline-secondary" href="@($"/member-profile/{MemberId}")">Cancel</a>
+                <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">Cancel</a>
             </div>
 
         </div>
     </EditForm>
 }
 
+<style>
+    .edit-member-meta {
+        display: grid;
+        gap: .75rem;
+        min-width: min(18rem, 100%);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
+    }
+
+    .edit-member-meta div {
+        display: grid;
+        gap: .15rem;
+    }
+
+    .edit-member-meta span {
+        color: rgb(255 255 255 / .78);
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+
+    .edit-member-meta strong {
+        color: #fff;
+        font-size: .96rem;
+    }
+</style>
+
 @code {
     private Member? editMember;
     private bool isLoading = true;
     private bool saveFailed;
+    private bool canManageProtectedMemberFields;
+    private SisonkeRole originalRole;
+    private MemberStatus originalStatus;
 
     [Parameter]
     public Guid MemberId { get; set; }
@@ -167,6 +230,22 @@ else
     protected override async Task OnInitializedAsync()
     {
         editMember = await MemberService.GetMemberByIdAsync(MemberId);
+
+        if (editMember is not null)
+        {
+            originalRole = editMember.DefaultRole;
+            originalStatus = editMember.Status;
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var stokvelId = await MemberAccessService.GetStokvelIdForMemberAsync(MemberId);
+
+            if (!string.IsNullOrWhiteSpace(userId) && stokvelId is not null)
+            {
+                canManageProtectedMemberFields = await MemberAccessService.CanManageMemberStatusAsync(userId, stokvelId.Value);
+            }
+        }
+
         isLoading = false;
     }
 
@@ -178,6 +257,12 @@ else
         }
 
         saveFailed = false;
+
+        if (!canManageProtectedMemberFields)
+        {
+            editMember.DefaultRole = originalRole;
+            editMember.Status = originalStatus;
+        }
 
         if (editMember.IsDeceased && editMember.DeathReportedAt is null)
         {

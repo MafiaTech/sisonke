@@ -36,11 +36,25 @@ else if (currentUser is null)
 }
 else
 {
-    <PageHeader
-        Title="Register New Stokvel"
-        Subtitle="After registration you'll complete the setup questionnaire so Sisonke can configure your stokvel."
-        BackText="Back to Workspace"
-        BackHref="/my-workspace" />
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Organisation Registration</span>
+            <h1>Register a New Stokvel</h1>
+            <p>Create a stokvel and become the first office bearer.</p>
+        </div>
+        <div class="register-creator-summary">
+            <div><span>Full name</span><strong>@Display(currentUser.FullName)</strong></div>
+            <div><span>Email</span><strong>@Display(currentUser.Email)</strong></div>
+            <div><span>ID Number</span><strong>@Display(currentUser.IdNumber)</strong></div>
+            <div><span>Cellphone</span><strong>@Display(currentUser.CellphoneNumber)</strong></div>
+        </div>
+    </section>
+
+    <div class="mb-4">
+        <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
+            <i class="bi bi-arrow-left me-2"></i>Back to Workspace
+        </a>
+    </div>
 }
 
 @if (!isLoading && currentUser is not null && saveFailed)
@@ -56,23 +70,71 @@ else
 @if (!isLoading && currentUser is not null)
 {
     <div class="form-page">
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+                    <div>
+                        <div class="form-section-title">Review & Create</div>
+                        <p class="text-muted mb-0">
+                            Use this page to create a new stokvel or society. You will become the first office bearer for this stokvel.
+                        </p>
+                    </div>
+                    <div class="text-lg-end">
+                        <div class="text-muted small">Organisation registration</div>
+                        <span class="sisonke-badge sisonke-badge-green">Office bearer setup</span>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-3">
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <div class="detail-mini-label">Full name</div>
+                        <div class="fw-600">@Display(currentUser.FullName)</div>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <div class="detail-mini-label">Email</div>
+                        <div class="fw-600">@Display(currentUser.Email)</div>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <div class="detail-mini-label">ID number</div>
+                        <div class="fw-600">@Display(currentUser.IdNumber)</div>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <div class="detail-mini-label">Cellphone</div>
+                        <div class="fw-600">@Display(currentUser.CellphoneNumber)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (string.IsNullOrWhiteSpace(currentUser.IdNumber))
+        {
+            <div class="sisonke-alert sisonke-alert-gold">
+                Your ID number is not captured on your account. Please update your profile before registering a stokvel.
+            </div>
+        }
+
         <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
             <DataAnnotationsValidator />
             <ValidationSummary class="alert alert-danger" />
 
         <!-- ── Section: Stokvel identity ── -->
-        <div class="card mb-3">
-            <div class="card-body p-4">
-                <div class="form-section-title">Stokvel Identity</div>
-                <div class="row g-3">
-                    <div class="col-12 col-md-6">
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Stokvel Details</h2>
+                        <p>Capture the organisation name, type and expected membership size.</p>
+                    </div>
+                </div>
+                <div class="sisonke-grid sisonke-grid-2">
+                    <div class="member-form-field">
                         <label class="form-label" for="stokvel-name">
                             Stokvel name <span class="text-danger">*</span>
                         </label>
                         <InputText id="stokvel-name" class="form-control" placeholder="e.g. Mahlalela Burial Society" @bind-Value="model.Name" />
                     </div>
 
-                    <div class="col-12 col-md-6">
+                    <div class="member-form-field">
                         <label class="form-label" for="stokvel-type">Stokvel type</label>
                         <InputSelect id="stokvel-type" class="form-select" @bind-Value="model.Type">
                             @foreach (var stokvelType in Enum.GetValues<StokvelType>())
@@ -82,7 +144,7 @@ else
                         </InputSelect>
                     </div>
 
-                    <div class="col-12 col-md-6">
+                    <div class="member-form-field">
                         <label class="form-label" for="expected-member-count">Expected total members</label>
                         <InputNumber id="expected-member-count" class="form-control" TValue="int?"
                             Value="@model.ExpectedMemberCount"
@@ -91,12 +153,12 @@ else
                         <div class="form-text">Helps Sisonke recommend the right package and track member capture progress.</div>
                     </div>
 
-                    <div class="col-12 col-md-6">
+                    <div class="member-form-field">
                         <label class="form-label" for="established-date">Established date</label>
                         <InputDate id="established-date" class="form-control" @bind-Value="model.EstablishedDate" />
                     </div>
 
-                    <div class="col-12 col-md-6">
+                    <div class="member-form-field">
                         <label class="form-label" for="province">Province</label>
                         <select id="province" class="form-select" value="@model.Province" @onchange="OnProvinceChanged">
                             <option value="">— Select province —</option>
@@ -107,7 +169,7 @@ else
                         </select>
                     </div>
 
-                    <div class="col-12 col-md-6">
+                    <div class="member-form-field">
                         <label class="form-label" for="town-or-area">Town or area</label>
                         <select id="town-or-area" class="form-select" @bind="model.TownOrArea" disabled="@(!towns.Any())">
                             <option value="">— Select town/area —</option>
@@ -118,7 +180,7 @@ else
                         </select>
                     </div>
 
-                    <div class="col-12">
+                    <div class="member-form-field register-form-wide">
                         <label class="form-label" for="description">Description <span class="text-muted fw-normal">(optional)</span></label>
                         <InputTextArea id="description" class="form-control" rows="3" placeholder="Brief description of the stokvel's purpose and goals." @bind-Value="model.Description" />
                     </div>
@@ -127,29 +189,33 @@ else
         </div>
 
             <!-- ── Section: Creator details ── -->
-            <div class="card mb-3">
-                <div class="card-body p-4">
-                    <div class="form-section-title">First Office Bearer</div>
-                    <p class="text-muted small mb-3">You will be linked to this stokvel as the first chairperson so you can complete setup and manage the organisation.</p>
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Review & Create</h2>
+                            <p>You will be linked to this stokvel as the creator so you can complete setup and manage the organisation.</p>
+                        </div>
+                    </div>
+                    <div class="sisonke-grid sisonke-grid-2">
+                        <div class="member-form-field">
                             <label class="form-label" for="creator-full-name">Full name <span class="text-danger">*</span></label>
                             <InputText id="creator-full-name" class="form-control" @bind-Value="model.CreatorFullName" />
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="creator-cellphone">Cellphone number <span class="text-danger">*</span></label>
                             <InputText id="creator-cellphone" class="form-control" placeholder="e.g. 0821234567" @bind-Value="model.CreatorCellphoneNumber" />
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="creator-email">Email address</label>
                             <InputText id="creator-email" class="form-control" @bind-Value="model.CreatorEmail" />
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="creator-id-number">SA ID number</label>
                             <InputText id="creator-id-number" class="form-control" placeholder="13-digit SA ID" @bind-Value="model.CreatorIdNumber" />
                             <div class="form-text">Used to link this office bearer record to your login account.</div>
                         </div>
-                        <div class="col-12">
+                        <div class="member-form-field register-form-wide">
                             <label class="form-label" for="creator-area">Residential area</label>
                             <InputText id="creator-area" class="form-control" placeholder="e.g. Soweto, Gauteng" @bind-Value="model.CreatorResidentialArea" />
                         </div>
@@ -158,10 +224,10 @@ else
             </div>
 
             <!-- ── Section: Subscription package ── -->
-            <div class="card mb-3">
-                <div class="card-body p-4">
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="form-section-title mb-0">Subscription Package</div>
+                        <div class="form-section-title mb-0">Membership Size & Package</div>
                         @if (model.SubscriptionPlanId is null)
                         {
                             <span class="text-danger small fw-semibold">Selection required</span>
@@ -187,7 +253,7 @@ else
                                             }
                                             @if (isSelected)
                                             {
-                                                <span class="badge" style="background:var(--sk-green-800)">
+                                                <span class="sisonke-badge sisonke-badge-green">
                                                     <i class="bi bi-check2 me-1"></i>Selected
                                                 </span>
                                             }
@@ -206,15 +272,55 @@ else
             </div>
 
             <!-- ── Submit ── -->
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" type="submit">
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="sisonke-btn sisonke-btn-primary" type="submit">
                     <i class="bi bi-check-circle me-2"></i>Register Stokvel
                 </button>
-                <a class="btn btn-outline-secondary" href="/my-workspace">Cancel</a>
+                <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Cancel</a>
             </div>
         </EditForm>
     </div>
 }
+
+<style>
+    .register-creator-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .75rem;
+        min-width: min(28rem, 100%);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
+    }
+
+    .register-creator-summary div {
+        display: grid;
+        gap: .15rem;
+    }
+
+    .register-creator-summary span {
+        color: rgb(255 255 255 / .78);
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+
+    .register-creator-summary strong {
+        color: #fff;
+        font-size: .92rem;
+    }
+
+    .register-form-wide {
+        grid-column: 1 / -1;
+    }
+
+    @@media (max-width: 768px) {
+        .register-creator-summary {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 
 @code {
     private readonly RegisterStokvelFormModel model = new();
@@ -327,4 +433,9 @@ else
 
     private static string GetMemberRangeText(SubscriptionPlan plan) =>
         plan.MaxMembers is null ? $"{plan.MinMembers}+ members" : $"{plan.MinMembers}–{plan.MaxMembers} members";
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
+    }
 }

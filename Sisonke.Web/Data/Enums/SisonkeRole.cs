@@ -9,5 +9,6 @@ public enum SisonkeRole
     Secretary = 5,
     Treasurer = 6,
     CommitteeMember = 7,
-    Member = 8
+    Member = 8,
+    Creator = 9
 }

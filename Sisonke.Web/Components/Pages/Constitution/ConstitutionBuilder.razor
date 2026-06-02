@@ -5,6 +5,7 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
@@ -35,34 +36,56 @@ else if (!canViewStokvel)
 }
 else
 {
-    <PageHeader
-        Title="Constitution Builder"
-        Subtitle="Create, review and approve a governance constitution for this stokvel."
-        BackText="Back to Dashboard"
-        BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
-
-    <div class="constitution-status-bar mb-4">
+    <section class="sisonke-hero-card mb-4">
         <div>
-            <div class="detail-mini-label">Stokvel</div>
-            <div class="fw-600">@stokvel.Name</div>
-        </div>
-        <div>
-            <div class="detail-mini-label">Type</div>
-            <div class="text-muted small">@stokvel.Type</div>
-        </div>
-        <div>
-            <div class="detail-mini-label">Document status</div>
-            <StatusBadge Text="@constitutionStatus" Type="@GetStatusBadgeType(constitutionStatus)" />
-        </div>
-        @if (IsApproved)
-        {
-            <div class="ms-auto">
-                <span class="badge bg-success">
-                    <i class="bi bi-shield-check me-1"></i>Approved
-                </span>
+            <span class="sisonke-badge sisonke-badge-gold">Governance</span>
+            <h1>Constitution</h1>
+            <p>Build, review and approve the stokvel constitution.</p>
+            <div class="constitution-hero-badges">
+                <span class="@GetStatusBadgeClass(constitutionStatus)">@constitutionStatus</span>
+                @if (IsApproved)
+                {
+                    <span class="sisonke-badge sisonke-badge-green">
+                        <i class="bi bi-shield-check me-1"></i>Approved
+                    </span>
+                }
             </div>
-        }
+        </div>
+        <div class="constitution-hero-meta">
+            <div>
+                <span>Stokvel</span>
+                <strong>@stokvel.Name</strong>
+            </div>
+            <div>
+                <span>Type</span>
+                <strong>@stokvel.Type</strong>
+            </div>
+            <div>
+                <span>Last Updated</span>
+                <strong>@FormatConstitutionDate(latestConstitution)</strong>
+            </div>
+        </div>
+    </section>
+
+    <div class="mb-4">
+        <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">
+            <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+        </a>
     </div>
+
+    @if (canManageConstitution && !canApproveConstitution)
+    {
+        <div class="sisonke-alert sisonke-alert-gold">
+            Only the Chairperson, Creator or Admin can approve the constitution.
+        </div>
+    }
+
+    @if (!canManageConstitution)
+    {
+        <div class="sisonke-alert sisonke-alert-blue">
+            You are viewing the constitution in read-only mode.
+        </div>
+    }
 
     @if (!string.IsNullOrWhiteSpace(successMessage))
     {
@@ -76,25 +99,28 @@ else
 
     @if (!canManageConstitution)
     {
-        <AlertBanner Type="info" Title="Read-only mode." Message="You are viewing the constitution in read-only mode." Icon="bi bi-info-circle-fill" />
-
-        <div class="card mb-4">
-            <div class="card-body p-4 p-md-5">
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
                 @if (HasUploadedConstitution)
                 {
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
+                    <div class="sisonke-card-head">
+                        <div class="d-flex align-items-center gap-2">
+                        <div class="sisonke-card-icon">
                             <i class="bi bi-file-earmark-arrow-up-fill"></i>
                         </div>
-                        <h2 class="h6 mb-0 fw-700">Uploaded Constitution</h2>
+                        <div>
+                            <h2>Uploaded Constitution</h2>
+                            <p>View the uploaded constitution document.</p>
+                        </div>
+                        </div>
                     </div>
 
-                    <div class="row g-3 mb-4">
-                        <div class="col-12 col-md-6">
+                    <div class="sisonke-grid sisonke-grid-2 mb-4">
+                        <div>
                             <div class="detail-mini-label">Original file name</div>
                             <div class="fw-600">@latestConstitution?.OriginalFileName</div>
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div>
                             <div class="detail-mini-label">File size</div>
                             <div class="text-muted small">@FormatFileSize(latestConstitution?.FileSizeBytes)</div>
                         </div>
@@ -102,7 +128,7 @@ else
 
                     @if (!string.IsNullOrWhiteSpace(latestConstitution?.StoredFilePath))
                     {
-                        <a class="btn btn-primary" href="@latestConstitution.StoredFilePath" target="_blank" rel="noopener noreferrer">
+                        <a class="sisonke-btn sisonke-btn-primary" href="@latestConstitution.StoredFilePath" target="_blank" rel="noopener noreferrer">
                             <i class="bi bi-box-arrow-up-right me-2"></i>Open Uploaded Document
                         </a>
                     }
@@ -129,44 +155,49 @@ else
     }
     else if (HasUploadedConstitution)
     {
-        <div class="card mb-4">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <div class="dash-card-icon-sm" style="background:var(--sk-green-50);color:var(--sk-green-700)">
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div class="d-flex align-items-center gap-2">
+                    <div class="sisonke-card-icon">
                         <i class="bi bi-file-earmark-arrow-up-fill"></i>
                     </div>
-                    <h2 class="h6 mb-0 fw-700">Uploaded Constitution</h2>
+                    <div>
+                        <h2>Uploaded Constitution</h2>
+                        <p>Review and approve the uploaded constitution document.</p>
+                    </div>
+                    </div>
                 </div>
 
-                <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-6">
+                <div class="sisonke-grid sisonke-grid-2 mb-4">
+                    <div>
                         <div class="detail-mini-label">Original file name</div>
                         <div class="fw-600">@latestConstitution?.OriginalFileName</div>
                     </div>
-                    <div class="col-12 col-md-6">
+                    <div>
                         <div class="detail-mini-label">File size</div>
                         <div class="text-muted small">@FormatFileSize(latestConstitution?.FileSizeBytes)</div>
                     </div>
-                    <div class="col-12 col-md-6">
+                    <div>
                         <div class="detail-mini-label">Uploaded status</div>
-                        <StatusBadge Text="Uploaded" Type="info" />
+                        <span class="sisonke-badge sisonke-badge-blue">Uploaded</span>
                     </div>
-                    <div class="col-12 col-md-6">
+                    <div>
                         <div class="detail-mini-label">Approved status</div>
-                        <StatusBadge Text="@(IsApproved ? "Approved" : "Not Approved")" Type="@(IsApproved ? "success" : "warning")" />
+                        <span class="@(IsApproved ? "sisonke-badge sisonke-badge-green" : "sisonke-badge sisonke-badge-gold")">@(IsApproved ? "Approved" : "Not Approved")</span>
                     </div>
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
                     @if (!string.IsNullOrWhiteSpace(latestConstitution?.StoredFilePath))
                     {
-                        <a class="btn btn-primary" href="@latestConstitution.StoredFilePath" target="_blank" rel="noopener noreferrer">
+                        <a class="sisonke-btn sisonke-btn-primary" href="@latestConstitution.StoredFilePath" target="_blank" rel="noopener noreferrer">
                             <i class="bi bi-box-arrow-up-right me-2"></i>Open Uploaded Document
                         </a>
                     }
-                    @if (!IsApproved)
+                    @if (!IsApproved && canApproveConstitution)
                     {
-                        <button type="button" class="btn btn-success" @onclick="ShowApprovalConfirmation">
+                        <button type="button" class="sisonke-btn sisonke-btn-gold" @onclick="ShowApprovalConfirmation">
                             <i class="bi bi-check-circle me-2"></i>Approve Constitution
                         </button>
                     }
@@ -174,7 +205,7 @@ else
             </div>
         </div>
 
-        @if (!IsApproved)
+        @if (!IsApproved && canApproveConstitution)
         {
             <ConfirmationModal
                 IsVisible="@showApprovalConfirmation"
@@ -189,8 +220,15 @@ else
     }
     else
     {
-        <div class="card mb-4">
-            <div class="card-body p-4">
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Questionnaire Wizard</h2>
+                        <p>Complete the Basics, Money, Rules and Sign-off steps to generate a constitution preview.</p>
+                    </div>
+                </div>
+
                 <div class="wizard-steps mb-4">
                     @for (var step = 1; step <= stepTitles.Length; step++)
                     {
@@ -206,6 +244,7 @@ else
 
                 @if (currentStep == 1)
                 {
+                    <div class="constitution-step-card">
                     <div class="form-section-title">Basics</div>
                     <div class="row g-3">
                         <div class="col-12">
@@ -231,9 +270,11 @@ else
                             <input id="treasurer" class="form-control" value="@GetAnswer("executiveTreasurer")" @oninput='e => SetAnswer("executiveTreasurer", e.Value?.ToString())' />
                         </div>
                     </div>
+                    </div>
                 }
             else if (currentStep == 2)
             {
+                <div class="constitution-step-card">
                 <div class="form-section-title">Money</div>
                 <div class="row g-3">
                     <div class="col-12 col-md-6">
@@ -290,9 +331,11 @@ else
                         </select>
                     </div>
                 </div>
+                </div>
             }
             else if (currentStep == 3)
             {
+                <div class="constitution-step-card">
                 <div class="form-section-title">Rules</div>
                 <div class="row g-3">
                     <div class="col-12 col-md-6">
@@ -363,9 +406,11 @@ else
                         </div>
                     }
                 </div>
+                </div>
             }
             else
             {
+                <div class="constitution-step-card">
                 <div class="form-section-title">Sign-off</div>
                 <div class="row g-3">
                     <div class="col-12">
@@ -386,50 +431,78 @@ else
                         </div>
                     </div>
                 </div>
+                </div>
             }
 
             <div class="wizard-actions mt-4">
                 @if (currentStep > 1)
                 {
-                    <button type="button" class="btn btn-outline-secondary" @onclick="PreviousStep">
+                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="PreviousStep">
                         <i class="bi bi-arrow-left me-2"></i>Previous
                     </button>
                 }
                 @if (currentStep < 4)
                 {
-                    <button type="button" class="btn btn-primary" @onclick="NextStep">
+                    <button type="button" class="sisonke-btn sisonke-btn-primary" @onclick="NextStep">
                         Next<i class="bi bi-arrow-right ms-2"></i>
                     </button>
                 }
-                <button type="button" class="btn btn-outline-primary" @onclick="SaveProgressAsync">
+                <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="SaveProgressAsync">
                     <i class="bi bi-save me-2"></i>Save Progress
                 </button>
-                <a class="btn btn-outline-secondary ms-auto" href="@($"/stokvel-dashboard/{StokvelId}")">
+                <a class="sisonke-btn sisonke-btn-outline ms-auto" href="@($"/stokvel-dashboard/{StokvelId}")">
                     <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
                 </a>
             </div>
         </div>
     </div>
 
-    <div class="constitution-toolbar mb-4">
-        <button type="button" class="btn btn-primary" @onclick="GeneratePreviewAsync">
-            <i class="bi bi-file-earmark-text me-2"></i>Generate Constitution Preview
-        </button>
-        <button type="button" class="btn btn-outline-primary" @onclick="SaveDraftAsync">
-            <i class="bi bi-floppy me-2"></i>Save Draft
-        </button>
-        @if (!IsApproved)
-        {
-            <button type="button" class="btn btn-success" @onclick="ShowApprovalConfirmation">
-                <i class="bi bi-check-circle me-2"></i>Approve Constitution
-            </button>
-        }
+    <div class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Build Actions</h2>
+                    <p>Generate a preview, save a draft, upload an existing document or approve the final constitution.</p>
+                </div>
+            </div>
+
+            <div class="constitution-toolbar">
+                <button type="button" class="sisonke-btn sisonke-btn-primary" @onclick="GeneratePreviewAsync">
+                    <i class="bi bi-file-earmark-text me-2"></i>Generate Preview
+                </button>
+                <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="SaveDraftAsync">
+                    <i class="bi bi-floppy me-2"></i>Save Draft
+                </button>
+                <label class="sisonke-btn sisonke-btn-outline mb-0" for="existing-constitution">
+                    <i class="bi bi-upload me-2"></i>Upload Existing
+                </label>
+                <InputFile id="existing-constitution" class="constitution-file-input" OnChange="@OnExistingConstitutionSelected" />
+                @if (selectedConstitutionFile is not null)
+                {
+                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="UploadExistingConstitutionAsync">
+                        Upload @selectedConstitutionFile.Name
+                    </button>
+                }
+                @if (!IsApproved && canApproveConstitution)
+                {
+                    <button type="button" class="sisonke-btn sisonke-btn-gold" @onclick="ShowApprovalConfirmation">
+                        <i class="bi bi-check-circle me-2"></i>Approve Constitution
+                    </button>
+                }
+            </div>
+        </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(previewContent))
     {
-        <div class="card mb-4">
-            <div class="card-body p-4 p-md-5">
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-body constitution-preview-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Constitution Preview</h2>
+                        <p>Review the generated constitution content before saving or approval.</p>
+                    </div>
+                </div>
                 @if (IsApproved)
                 {
                     <div class="approved-watermark-banner mb-4">
@@ -444,7 +517,7 @@ else
         </div>
     }
 
-    @if (!IsApproved)
+    @if (!IsApproved && canApproveConstitution)
     {
         <ConfirmationModal
             IsVisible="@showApprovalConfirmation"
@@ -460,6 +533,40 @@ else
 }
 
 <style>
+    .constitution-hero-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+        margin-top: .5rem;
+    }
+
+    .constitution-hero-meta {
+        display: grid;
+        gap: .75rem;
+        min-width: min(18rem, 100%);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
+    }
+
+    .constitution-hero-meta div {
+        display: grid;
+        gap: .15rem;
+    }
+
+    .constitution-hero-meta span {
+        color: rgb(255 255 255 / .78);
+        font-size: .75rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+
+    .constitution-hero-meta strong {
+        color: #fff;
+        font-size: .98rem;
+    }
+
     .fw-600 { font-weight: 600; }
     .fw-700 { font-weight: 700; }
     .dash-card-icon-sm {
@@ -476,7 +583,7 @@ else
         font-size: .6875rem;
         text-transform: uppercase;
         letter-spacing: .05em;
-        color: var(--sk-text-muted);
+        color: var(--muted);
         font-weight: 600;
         margin-bottom: .15rem;
     }
@@ -486,13 +593,15 @@ else
         gap: .75rem;
     }
     .wizard-step {
-        border: 1px solid #d1d5db;
-        border-radius: .5rem;
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
         background: #fff;
-        color: #374151;
+        color: var(--text);
+        box-shadow: var(--shadow-sm);
         font-weight: 600;
         padding: .75rem;
         text-align: left;
+        transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
     }
     .wizard-step span {
         display: inline-flex;
@@ -501,17 +610,24 @@ else
         width: 1.75rem;
         height: 1.75rem;
         border-radius: 50%;
-        background: #e5e7eb;
+        background: var(--sage-pale);
         margin-right: .5rem;
     }
     .wizard-step.active {
-        border-color: var(--sk-green-700);
-        color: var(--sk-green-800);
-        background: var(--sk-green-50);
+        border-color: var(--forest-mid);
+        color: var(--forest);
+        background: var(--sage-pale);
+        box-shadow: var(--shadow-md);
     }
     .wizard-step.active span {
-        background: var(--sk-green-700);
+        background: var(--forest);
         color: #fff;
+    }
+    .constitution-step-card {
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        background: var(--cream);
+        padding: 1rem;
     }
     .wizard-actions,
     .constitution-toolbar {
@@ -520,11 +636,22 @@ else
         gap: .75rem;
         align-items: center;
     }
+    .constitution-file-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .constitution-preview-card {
+        padding: clamp(1.25rem, 2vw, 2rem);
+    }
     .approved-watermark-banner {
-        background: var(--sk-success-bg);
-        border: 1px solid #6ee7b7;
-        border-radius: var(--sk-radius-sm);
-        color: #065f46;
+        background: var(--sage-pale);
+        border: 1px solid var(--sage);
+        border-radius: var(--r-sm);
+        color: var(--forest);
         font-size: .875rem;
         font-weight: 600;
         padding: .75rem 1rem;
@@ -563,6 +690,7 @@ else
 
     private Stokvel? stokvel;
     private ConstitutionDocument? latestConstitution;
+    private IBrowserFile? selectedConstitutionFile;
     private Dictionary<string, string> wizardAnswers = new(StringComparer.OrdinalIgnoreCase);
     private string constitutionStatus = string.Empty;
     private string? previewContent;
@@ -573,6 +701,7 @@ else
     private string? errorMessage;
     private bool canViewStokvel;
     private bool canManageConstitution;
+    private bool canApproveConstitution;
 
     private bool IsApproved => string.Equals(constitutionStatus, "Approved", StringComparison.OrdinalIgnoreCase);
     private bool HasUploadedConstitution => latestConstitution?.IsUploadedDocument == true;
@@ -588,6 +717,7 @@ else
         showApprovalConfirmation = false;
         canViewStokvel = false;
         canManageConstitution = false;
+        canApproveConstitution = false;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
 
@@ -615,6 +745,8 @@ else
         }
 
         canManageConstitution = await MemberAccessService.CanManageConstitutionAsync(userId, StokvelId);
+        var linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
+        canApproveConstitution = CanApproveConstitutionRole(linkedMember?.DefaultRole.ToString());
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         wizardAnswers = await ConstitutionService.GetWizardAnswersAsync(StokvelId);
         latestConstitution = await ConstitutionService.GetLatestConstitutionAsync(StokvelId);
@@ -745,9 +877,51 @@ else
         successMessage = "Constitution draft saved successfully.";
     }
 
-    private void ShowApprovalConfirmation()
+    private void OnExistingConstitutionSelected(InputFileChangeEventArgs args)
     {
         if (!canManageConstitution)
+        {
+            return;
+        }
+
+        selectedConstitutionFile = args.File;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private async Task UploadExistingConstitutionAsync()
+    {
+        if (!canManageConstitution)
+        {
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+
+        if (selectedConstitutionFile is null)
+        {
+            errorMessage = "Please select a constitution document to upload.";
+            return;
+        }
+
+        latestConstitution = await ConstitutionService.UploadExistingConstitutionAsync(StokvelId, selectedConstitutionFile);
+
+        if (latestConstitution is null)
+        {
+            errorMessage = "Existing constitution could not be uploaded. Use a PDF, DOC or DOCX file up to 10MB.";
+            return;
+        }
+
+        selectedConstitutionFile = null;
+        previewContent = null;
+        await ReloadStatusAsync();
+        successMessage = "Existing constitution uploaded successfully.";
+    }
+
+    private void ShowApprovalConfirmation()
+    {
+        if (!canApproveConstitution)
         {
             return;
         }
@@ -761,7 +935,7 @@ else
 
     private async Task ConfirmApprovalAsync()
     {
-        if (!canManageConstitution)
+        if (!canApproveConstitution)
         {
             return;
         }
@@ -856,4 +1030,35 @@ else
 
     private static string GetStatusBadgeType(string status) =>
         status switch { "Approved" => "success", "Draft" => "warning", "Not Created" => "secondary", _ => "info" };
+
+    private static string GetStatusBadgeClass(string status) =>
+        status switch
+        {
+            "Approved" => "sisonke-badge sisonke-badge-green",
+            "Draft" => "sisonke-badge sisonke-badge-gold",
+            "Uploaded" => "sisonke-badge sisonke-badge-blue",
+            "Not Created" => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-teal"
+        };
+
+    private static bool CanApproveConstitutionRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static string FormatConstitutionDate(ConstitutionDocument? document)
+    {
+        if (document is null)
+        {
+            return "Not updated yet";
+        }
+
+        var date = document.ApprovedAt ?? document.CreatedAt;
+        return date.ToString("dd MMM yyyy");
+    }
 }

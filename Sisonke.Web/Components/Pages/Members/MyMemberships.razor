@@ -37,11 +37,22 @@ else if (!isLoggedIn)
 }
 else
 {
-    <PageHeader
-        Title="My Memberships"
-        Subtitle="Memberships linked to your registered ID number"
-        BackText="Dashboard"
-        BackHref="/" />
+    <section class="sisonke-hero-card mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-end">
+            <div>
+                <p class="mb-2 text-uppercase fw-bold" style="letter-spacing:.08em;color:rgba(255,255,255,.65);font-size:.75rem;">
+                    Memberships linked to your registered SA ID number.
+                </p>
+                <h1>My Memberships</h1>
+                <p class="mt-3">@GetUserDisplayName()</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="sisonke-badge sisonke-badge-green">@memberships.Count linked</span>
+                <span class="sisonke-badge sisonke-badge-gold">@officeBearerMemberIds.Count managed</span>
+                <span class="sisonke-badge sisonke-badge-blue">@OrdinaryMembershipCount member</span>
+            </div>
+        </div>
+    </section>
 
     @if (!string.IsNullOrWhiteSpace(successMessage))
     {
@@ -59,13 +70,24 @@ else
 
     @if (currentUser is not null)
     {
-        <div class="card mb-3">
-            <div class="card-body p-4">
-                <div class="card-section-title">Registered User Details</div>
-                <div class="membership-user-grid">
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-head">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="sisonke-card-icon">
+                        <i class="bi bi-person-circle"></i>
+                    </div>
+                    <div class="card-section-title mb-0">Registered User Details</div>
+                </div>
+            </div>
+            <div class="sisonke-card-body">
+                <div class="sisonke-grid-2">
                     <div>
                         <div class="membership-detail-label">Full Name</div>
                         <div class="membership-detail-value">@(currentUser.FullName ?? "-")</div>
+                    </div>
+                    <div>
+                        <div class="membership-detail-label">Email</div>
+                        <div class="membership-detail-value">@(currentUser.Email ?? "-")</div>
                     </div>
                     <div>
                         <div class="membership-detail-label">ID Number</div>
@@ -85,46 +107,55 @@ else
     }
 
     <div class="d-flex justify-content-end mb-3">
-        <button class="btn btn-primary btn-sm" type="button" @onclick="RefreshLinkedMembershipsAsync">
+        <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="RefreshLinkedMembershipsAsync">
             <i class="bi bi-arrow-clockwise me-1"></i>Refresh Linked Memberships
         </button>
     </div>
 
     @if (memberships.Count == 0)
     {
-        <div class="ms-empty-state">
-            <div class="ms-empty-icon-ring">
-                <i class="bi bi-person-vcard" aria-hidden="true"></i>
+        <div class="sisonke-alert sisonke-alert-blue">
+            <i class="bi bi-info-circle-fill mt-1"></i>
+            <div>
+                <strong>No linked memberships found yet.</strong>
+                <div>Make sure your ID number matches the one captured by your stokvel secretary.</div>
             </div>
-            <h2 class="ms-empty-title">No linked memberships found yet.</h2>
-            <p class="ms-empty-text">Make sure your ID number matches the one captured by your stokvel secretary.</p>
         </div>
     }
     else
     {
-        <div class="membership-card-grid">
+        <div class="sisonke-grid-3">
             @foreach (var member in memberships)
             {
                 var stokvel = GetStokvelForMember(member);
                 var isOfficeBearer = officeBearerMemberIds.Contains(member.Id);
-                <div class="card membership-card">
-                    <div class="card-body p-4">
+                var stokvelName = stokvel?.Name ?? member.Tenant?.Name ?? "Stokvel unavailable";
+                <div class="sisonke-card membership-card">
+                    <div class="sisonke-card-body">
                         <div class="d-flex justify-content-between gap-3 align-items-start mb-3">
                             <div>
                                 <div class="membership-detail-label">Stokvel</div>
-                                <h2 class="membership-card-title">@(stokvel?.Name ?? member.Tenant.Name)</h2>
+                                <h2 class="membership-card-title">@stokvelName</h2>
+                                @if (stokvel is null)
+                                {
+                                    <div class="small text-warning mt-1">Stokvel unavailable</div>
+                                }
                             </div>
-                            <StatusBadge Text="@member.Status.ToString()" Type="@GetMemberStatusBadgeType(member)" />
+                            <span class="@GetMemberStatusBadgeClass(member)">@member.Status</span>
                         </div>
+
+                        <span class="@(isOfficeBearer ? "sisonke-badge sisonke-badge-gold" : "sisonke-badge sisonke-badge-green")">
+                            @(isOfficeBearer ? "Office Bearer" : "Member")
+                        </span>
 
                         <div class="membership-card-details">
                             <div>
                                 <div class="membership-detail-label">Member</div>
-                                <div class="membership-detail-value">@member.FullName</div>
+                                <div class="membership-detail-value">@Display(member.FullName)</div>
                             </div>
                             <div>
                                 <div class="membership-detail-label">Member Number</div>
-                                <div class="membership-detail-value">@member.MemberNumber</div>
+                                <div class="membership-detail-value">@Display(member.MemberNumber)</div>
                             </div>
                             <div>
                                 <div class="membership-detail-label">Role</div>
@@ -139,17 +170,23 @@ else
                         <div class="membership-card-actions mt-4">
                             @if (isOfficeBearer && stokvel is not null)
                             {
-                                <a class="btn btn-sm btn-primary" href="@($"/stokvel-dashboard/{stokvel.Id}")">
+                                <a class="sisonke-btn sisonke-btn-primary" href="@($"/stokvel-dashboard/{stokvel.Id}")">
                                     Open Management Dashboard
                                 </a>
                             }
+                            else if (isOfficeBearer)
+                            {
+                                <button type="button" class="sisonke-btn sisonke-btn-outline" disabled>
+                                    Management Dashboard Unavailable
+                                </button>
+                            }
                             else
                             {
-                                <a class="btn btn-sm btn-primary" href="@($"/member-home/{member.Id}")">
+                                <a class="sisonke-btn sisonke-btn-primary" href="@($"/member-home/{member.Id}")">
                                     Open My Member View
                                 </a>
                             }
-                            <a class="btn btn-sm btn-outline-primary" href="@($"/member-profile/{member.Id}")">
+                            <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{member.Id}")">
                                 View Profile
                             </a>
                         </div>
@@ -218,6 +255,7 @@ else
     private string? successMessage;
     private bool isLoading = true;
     private bool isLoggedIn;
+    private int OrdinaryMembershipCount => Math.Max(0, memberships.Count - officeBearerMemberIds.Count);
 
     protected override async Task OnInitializedAsync()
     {
@@ -302,4 +340,23 @@ else
             "Suspended" => "warning",
             _ => "secondary"
         };
+
+    private static string GetMemberStatusBadgeClass(Member member) =>
+        member.Status.ToString() switch
+        {
+            "Active" => "sisonke-badge sisonke-badge-green",
+            "Suspended" => "sisonke-badge sisonke-badge-gold",
+            "Deceased" => "sisonke-badge sisonke-badge-red",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
+    }
+
+    private string GetUserDisplayName()
+    {
+        return currentUser?.FullName ?? currentUser?.Email ?? "Your Sisonke account";
+    }
 }

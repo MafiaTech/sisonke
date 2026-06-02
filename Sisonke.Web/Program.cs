@@ -34,6 +34,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
         options.SignIn.RequireConfirmedAccount = true;
         options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
     })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
@@ -60,6 +61,11 @@ using (var scope = app.Services.CreateScope())
 
     await context.Database.MigrateAsync();
     await SisonkeSeedData.SeedAsync(context);
+
+    if (app.Environment.IsDevelopment())
+    {
+        await SisonkeDemoDataSeeder.SeedAsync(scope.ServiceProvider);
+    }
 }
 
 // Configure the HTTP request pipeline.

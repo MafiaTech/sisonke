@@ -26,17 +26,25 @@ else if (stokvel is null)
 }
 else
 {
-    <PageHeader
-        Title="Register Member"
-        Subtitle="Add a new member to this stokvel."
-        BackText="Back to Members"
-        BackHref="@($"/members/{StokvelId}")" />
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Registering under: @stokvel.Name</span>
+            <h1>Register Member</h1>
+            <p>Add a new member to this stokvel.</p>
+        </div>
+        <div class="member-register-meta">
+            <div><span>Stokvel</span><strong>@stokvel.Name</strong></div>
+            <div><span>Type</span><strong>@stokvel.Type</strong></div>
+            <div><span>Package</span><strong>@GetSubscriptionPackageText()</strong></div>
+            <div><span>Members</span><strong>@GetMemberCountText()</strong></div>
+        </div>
+    </section>
 
-    <div class="card mb-3">
-        <div class="card-body p-4">
+    <div class="sisonke-card mb-3">
+        <div class="sisonke-card-body">
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                 <div>
-                    <span class="context-badge">Registering under: @stokvel.Name</span>
+                    <span class="sisonke-badge sisonke-badge-green">Registering under: @stokvel.Name</span>
                     <h2 class="stokvel-context-title">@stokvel.Name</h2>
                     <div class="stokvel-context-meta">
                         <span><i class="bi bi-collection me-1"></i>@stokvel.Type</span>
@@ -44,7 +52,7 @@ else
                         <span><i class="bi bi-people me-1"></i>@GetMemberCountText()</span>
                     </div>
                 </div>
-                <StatusBadge Text="New Member Registration" Type="info" />
+                <span class="sisonke-badge sisonke-badge-blue">New Member Registration</span>
             </div>
         </div>
     </div>
@@ -66,10 +74,10 @@ else
                 }
                 <p class="mlw-hint">Upgrade your subscription package to add more members to this stokvel.</p>
                 <div class="mlw-actions">
-                    <a class="btn btn-accent btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
+                    <a class="sisonke-btn sisonke-btn-gold" href="@($"/stokvel-dashboard/{StokvelId}")">
                         <i class="bi bi-arrow-up-circle me-2"></i>View Subscription Package
                     </a>
-                    <a class="btn btn-outline-secondary btn-sm" href="@($"/members/{StokvelId}")">
+                    <a class="sisonke-btn sisonke-btn-outline" href="@($"/members/{StokvelId}")">
                         <i class="bi bi-chevron-left me-1"></i>Back to Members
                     </a>
                 </div>
@@ -87,32 +95,32 @@ else
             <ValidationSummary class="alert alert-danger" />
 
             <!-- Personal details -->
-            <div class="card mb-3">
-                <div class="card-body p-4">
+            <div class="sisonke-card mb-3 member-registration-card">
+                <div class="sisonke-card-body">
                     <div class="form-section-title text-uppercase">Personal Details</div>
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
+                    <div class="sisonke-grid sisonke-grid-2">
+                        <div class="member-form-field">
                             <label class="form-label" for="full-name">Full name <span class="text-danger">*</span></label>
                             <InputText id="full-name" class="form-control" placeholder="e.g. Thabo Nkosi" @bind-Value="newMember.FullName" />
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="cellphone-number">Cellphone number <span class="text-danger">*</span></label>
                             <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="newMember.CellphoneNumber" />
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="email-address">Email address</label>
                             <InputText id="email-address" class="form-control" type="email" placeholder="optional" @bind-Value="newMember.EmailAddress" />
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="id-number">SA ID number</label>
                             <InputText id="id-number" class="form-control" placeholder="13-digit SA ID" @bind-Value="newMember.IdNumber" />
                             <div class="form-text">Used later to link this member to a login account and other stokvel memberships.</div>
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="residential-area">Residential area</label>
                             <InputText id="residential-area" class="form-control" placeholder="e.g. Soweto, Gauteng" @bind-Value="newMember.ResidentialArea" />
                         </div>
@@ -121,16 +129,16 @@ else
             </div>
 
             <!-- Membership details -->
-            <div class="card mb-3">
-                <div class="card-body p-4">
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
                     <div class="form-section-title">Membership Details</div>
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
+                    <div class="sisonke-grid sisonke-grid-2">
+                        <div class="member-form-field">
                             <label class="form-label" for="joining-date">Joining date</label>
                             <InputDate id="joining-date" class="form-control" @bind-Value="newMember.JoiningDate" />
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="default-role">Default role</label>
                             <InputSelect id="default-role" class="form-select" @bind-Value="newMember.DefaultRole">
                                 @foreach (var role in Enum.GetValues<SisonkeRole>())
@@ -140,7 +148,7 @@ else
                             </InputSelect>
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="status">Member status</label>
                             <InputSelect id="status" class="form-select" @bind-Value="newMember.Status">
                                 @foreach (var status in Enum.GetValues<MemberStatus>())
@@ -154,8 +162,8 @@ else
             </div>
 
             <!-- Cooling period -->
-            <div class="card mb-3">
-                <div class="card-body p-4">
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
                     <div class="form-section-title">Cooling Period</div>
                     <div class="row g-3">
                         <div class="col-12">
@@ -168,7 +176,7 @@ else
 
                         @if (newMember.IsInCoolingPeriod)
                         {
-                            <div class="col-12 col-md-6">
+                            <div class="member-form-field mt-3">
                                 <label class="form-label" for="cooling-period-end-date">Cooling period end date</label>
                                 <InputDate id="cooling-period-end-date" class="form-control" @bind-Value="newMember.CoolingPeriodEndDate" />
                             </div>
@@ -180,17 +188,45 @@ else
             <div class="d-flex gap-2">
                 @if (canAddMember)
                 {
-                    <button class="btn btn-primary" type="submit">
+                    <button class="sisonke-btn sisonke-btn-primary" type="submit">
                         <i class="bi bi-person-check me-2"></i>Save Member
                     </button>
                 }
-                <a class="btn btn-outline-secondary" href="@($"/members/{StokvelId}")">Cancel / Back to Members</a>
+                <a class="sisonke-btn sisonke-btn-outline" href="@($"/members/{StokvelId}")">Cancel / Back to Members</a>
             </div>
         </EditForm>
     </div>
 }
 
 <style>
+    .member-register-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .75rem;
+        min-width: min(28rem, 100%);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
+    }
+
+    .member-register-meta div {
+        display: grid;
+        gap: .15rem;
+    }
+
+    .member-register-meta span {
+        color: rgb(255 255 255 / .78);
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+
+    .member-register-meta strong {
+        color: #fff;
+        font-size: .92rem;
+    }
+
     .fw-600 { font-weight: 600; }
     .context-badge {
         display: inline-flex;
@@ -207,15 +243,21 @@ else
         margin: 0;
         font-size: 1.25rem;
         font-weight: 800;
-        color: var(--sk-text);
+        color: var(--text);
     }
     .stokvel-context-meta {
         display: flex;
         flex-wrap: wrap;
         gap: .5rem 1rem;
-        color: var(--sk-text-muted);
+        color: var(--muted);
         font-size: .875rem;
         margin-top: .5rem;
+    }
+
+    @@media (max-width: 768px) {
+        .member-register-meta {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 

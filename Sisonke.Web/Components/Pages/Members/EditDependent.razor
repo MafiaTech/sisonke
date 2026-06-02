@@ -25,11 +25,23 @@ else if (dependent is null)
 }
 else
 {
-    <PageHeader
-        Title="Edit Dependent"
-        Subtitle="Update covered life details."
-        BackText="Back to Member Profile"
-        BackHref="@($"/member-profile/{dependent.MemberId}")" />
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-green">Covered Life</span>
+            <h1>Edit Dependent</h1>
+            <p>Update covered life details.</p>
+        </div>
+        <div class="dependent-hero-meta">
+            <div><span>Dependent</span><strong>@dependent.FullName</strong></div>
+            <div><span>Status</span><strong>@(dependent.IsDeceased ? "Deceased" : dependent.IsActive ? "Active" : "Inactive")</strong></div>
+        </div>
+    </section>
+
+    <div class="mb-4">
+        <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{dependent.MemberId}")">
+            <i class="bi bi-arrow-left me-2"></i>Back to Member Profile
+        </a>
+    </div>
 
     @if (saveFailed)
     {
@@ -50,8 +62,8 @@ else
             Icon="bi bi-exclamation-triangle-fill" />
 
         <div class="d-flex gap-2 flex-wrap">
-            <a class="btn btn-primary" href="@($"/claim/{activeClaim.Id}")">View Claim</a>
-            <a class="btn btn-outline-secondary" href="@($"/member-profile/{dependent.MemberId}")">Back to Member Profile</a>
+            <a class="sisonke-btn sisonke-btn-primary" href="@($"/claim/{activeClaim.Id}")">View Claim</a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{dependent.MemberId}")">Back to Member Profile</a>
         </div>
     }
     else
@@ -61,17 +73,22 @@ else
         <ValidationSummary class="alert alert-danger" />
 
         <div class="form-page">
-            <div class="card mb-4">
-                <div class="card-body p-4">
-                    <p class="form-section-title">Dependent Details</p>
+            <div class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Dependent Details</h2>
+                            <p>Keep covered life records current and consistent.</p>
+                        </div>
+                    </div>
 
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
+                    <div class="sisonke-grid sisonke-grid-2">
+                        <div class="member-form-field">
                             <label class="form-label" for="full-name">Full name <span class="text-danger">*</span></label>
                             <InputText id="full-name" class="form-control" placeholder="e.g. Zanele Nkosi" @bind-Value="model.FullName" />
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="relationship">Relationship</label>
                             <InputSelect id="relationship" class="form-select" @bind-Value="model.Relationship">
                                 @foreach (var relationship in relationshipOptions)
@@ -81,24 +98,24 @@ else
                             </InputSelect>
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="date-of-birth">Date of birth</label>
                             <InputDate id="date-of-birth" class="form-control" @bind-Value="model.DateOfBirth" />
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="id-number">ID number</label>
                             <InputText id="id-number" class="form-control" placeholder="13-digit SA ID number" @bind-Value="model.IdNumber" />
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="member-form-field">
                             <label class="form-label" for="cellphone-number">Cellphone number</label>
                             <InputText id="cellphone-number" class="form-control" placeholder="e.g. 0821234567" @bind-Value="model.CellphoneNumber" />
                         </div>
 
                         @if (!model.IsDeceased)
                         {
-                            <div class="col-12">
+                            <div class="member-form-field dependent-form-wide">
                                 <div class="form-check form-switch">
                                     <InputCheckbox id="is-active" class="form-check-input" @bind-Value="model.IsActive" />
                                     <label class="form-check-label fw-semibold" for="is-active">Active dependent</label>
@@ -107,7 +124,7 @@ else
                             </div>
                         }
 
-                        <div class="col-12">
+                        <div class="member-form-field dependent-form-wide">
                             <div class="form-check form-switch">
                                 <InputCheckbox id="is-deceased" class="form-check-input" @bind-Value="model.IsDeceased" />
                                 <label class="form-check-label fw-semibold" for="is-deceased">Dependent is deceased</label>
@@ -117,7 +134,7 @@ else
 
                         @if (model.IsDeceased)
                         {
-                            <div class="col-12 col-md-6">
+                            <div class="member-form-field">
                                 <label class="form-label" for="deceased-date">Deceased date</label>
                                 <InputDate id="deceased-date" class="form-control" @bind-Value="model.DeceasedDate" />
                             </div>
@@ -128,13 +145,13 @@ else
 
             <div class="d-flex justify-content-between gap-2 flex-wrap">
                 <div class="d-flex gap-2">
-                    <button class="btn btn-primary" type="submit">
+                    <button class="sisonke-btn sisonke-btn-primary" type="submit">
                         <i class="bi bi-floppy me-2"></i>Save Changes
                     </button>
-                    <a class="btn btn-outline-secondary" href="@($"/member-profile/{dependent.MemberId}")">Cancel</a>
+                    <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{dependent.MemberId}")">Cancel</a>
                 </div>
 
-                <button class="btn btn-outline-danger" type="button" @onclick="ShowDeleteConfirmation">
+                <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="ShowDeleteConfirmation">
                     <i class="bi bi-trash me-2"></i>Delete
                 </button>
             </div>
@@ -152,6 +169,39 @@ else
         OnCancel="@HideDeleteConfirmation" />
     }
 }
+
+<style>
+    .dependent-hero-meta {
+        display: grid;
+        gap: .75rem;
+        min-width: min(18rem, 100%);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
+    }
+
+    .dependent-hero-meta div {
+        display: grid;
+        gap: .15rem;
+    }
+
+    .dependent-hero-meta span {
+        color: rgb(255 255 255 / .78);
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+
+    .dependent-hero-meta strong {
+        color: #fff;
+        font-size: .96rem;
+    }
+
+    .dependent-form-wide {
+        grid-column: 1 / -1;
+    }
+</style>
 
 @code {
     private static readonly string[] relationshipOptions =

@@ -10,7 +10,10 @@
     [Parameter]
     public string Type { get; set; } = "secondary";
 
-    private string BadgeClass => Type.ToLowerInvariant() switch
+    [Parameter]
+    public string? Variant { get; set; }
+
+    private string BadgeClass => (Variant ?? Type).ToLowerInvariant() switch
     {
         "success"   => "bg-success",
         "warning"   => "bg-warning text-dark",
@@ -18,6 +21,7 @@
         "info"      => "bg-info text-dark",
         "secondary" => "bg-secondary",
         "primary"   => "bg-primary",
+        "dark"      => "bg-dark",
         _           => "bg-secondary"
     };
 }

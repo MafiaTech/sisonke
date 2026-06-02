@@ -1,0 +1,86 @@
+@page "/workspace"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject MemberAccountLinkingService MemberLinkingService
+@inject MemberAccessService MemberAccessService
+@inject StokvelService StokvelService
+@inject NavigationManager Nav
+
+<PageTitle>Workspace</PageTitle>
+
+@if (isLoading)
+{
+    <div style="display:flex;align-items:center;justify-content:center;min-height:60vh;gap:12px;color:#7A7A7A;font-family:'DM Sans',sans-serif;">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        Loading your workspace…
+    </div>
+}
+
+@code {
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var principal = authState.User;
+
+        if (principal.Identity?.IsAuthenticated != true)
+        {
+            Nav.NavigateTo("/Account/Login", replace: true);
+            return;
+        }
+
+        // Platform roles via Identity claims (consistent with existing MyWorkspace.razor pattern)
+        if (principal.IsInRole("PlatformAdmin") || principal.IsInRole("PlatformSuperAdmin"))
+        {
+            Nav.NavigateTo("/workspace/platform", replace: true);
+            return;
+        }
+
+        if (principal.IsInRole("PlatformSupport"))
+        {
+            Nav.NavigateTo("/workspace/support", replace: true);
+            return;
+        }
+
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            var memberships = await MemberLinkingService.GetMembershipsForUserAsync(userId);
+
+            // Platform-level roles via SisonkeRole enum on member record
+            if (memberships.Any(m =>
+                m.DefaultRole == SisonkeRole.PlatformSuperAdmin ||
+                m.DefaultRole == SisonkeRole.PlatformSupportAdmin))
+            {
+                Nav.NavigateTo("/workspace/platform", replace: true);
+                return;
+            }
+
+            // Support role
+            if (memberships.Any(m => m.DefaultRole == SisonkeRole.PlatformSupportAdmin))
+            {
+                Nav.NavigateTo("/workspace/support", replace: true);
+                return;
+            }
+
+            // Office bearer check (Chairperson, Secretary, Treasurer, StokvelAdmin)
+            foreach (var member in memberships)
+            {
+                var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+                if (stokvel is not null &&
+                    await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id))
+                {
+                    Nav.NavigateTo("/workspace/admin", replace: true);
+                    return;
+                }
+            }
+        }
+
+        // Default: ordinary member
+        Nav.NavigateTo("/workspace/member", replace: true);
+    }
+}

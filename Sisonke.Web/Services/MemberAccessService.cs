@@ -12,9 +12,41 @@ public class MemberAccessService(ApplicationDbContext context)
             role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
             role?.Trim().Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true ||
             role?.Trim().Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true ||
             role?.Trim().Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
             role?.Trim().Equals("Office Bearer", StringComparison.OrdinalIgnoreCase) == true ||
             role?.Trim().Equals("OfficeBearer", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanReviewClaimsRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanApproveClaimsRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanManageMemberStatusRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     public async Task<Member?> GetLinkedMemberForUserAsync(string userId, Guid stokvelId)
@@ -25,17 +57,26 @@ public class MemberAccessService(ApplicationDbContext context)
         }
 
         var stokvel = await context.Stokvels
-            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
 
         if (stokvel is null)
         {
             return null;
         }
 
-        return await context.Members
-            .SingleOrDefaultAsync(member =>
+        var linkedMembers = await context.Members
+            .Where(member =>
                 member.ApplicationUserId == userId &&
-                member.TenantId == stokvel.TenantId);
+                member.TenantId == stokvel.TenantId)
+            .OrderBy(member => member.CreatedAt)
+            .ThenBy(member => member.FullName)
+            .ToListAsync();
+
+        return linkedMembers.FirstOrDefault(member => IsOfficeBearerRole(member.DefaultRole.ToString())) ??
+            linkedMembers.FirstOrDefault();
     }
 
     public async Task<List<Member>> GetLinkedMembershipsForUserAsync(string userId)
@@ -125,7 +166,10 @@ public class MemberAccessService(ApplicationDbContext context)
         }
 
         var member = await context.Members
-            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+            .Where(existingMember => existingMember.Id == memberId)
+            .OrderBy(existingMember => existingMember.CreatedAt)
+            .ThenBy(existingMember => existingMember.FullName)
+            .FirstOrDefaultAsync();
 
         if (member is null)
         {
@@ -137,14 +181,61 @@ public class MemberAccessService(ApplicationDbContext context)
             return true;
         }
 
-        var stokvel = await context.Stokvels
-            .SingleOrDefaultAsync(existingStokvel => existingStokvel.TenantId == member.TenantId);
+        var stokvelId = await GetStokvelIdForMemberAsync(memberId);
 
-        if (stokvel is null)
+        return stokvelId is not null && await CanManageStokvelAsync(userId, stokvelId.Value);
+    }
+
+    public async Task<Guid?> GetStokvelIdForMemberAsync(Guid memberId)
+    {
+        var member = await context.Members
+            .Where(existingMember => existingMember.Id == memberId)
+            .OrderBy(existingMember => existingMember.CreatedAt)
+            .ThenBy(existingMember => existingMember.FullName)
+            .FirstOrDefaultAsync();
+
+        if (member is null)
         {
-            return false;
+            return null;
         }
 
-        return await CanManageStokvelAsync(userId, stokvel.Id);
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.TenantId == member.TenantId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        return stokvel?.Id;
+    }
+
+    public async Task<bool> CanAccessMemberHomeAsync(string userId, Guid memberId)
+    {
+        return await CanViewMemberProfileAsync(userId, memberId);
+    }
+
+    public Task<bool> CanAccessManagementDashboardAsync(string userId, Guid stokvelId)
+    {
+        return CanManageStokvelAsync(userId, stokvelId);
+    }
+
+    public async Task<bool> CanReviewClaimsAsync(string userId, Guid stokvelId)
+    {
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanReviewClaimsRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanApproveClaimsAsync(string userId, Guid stokvelId)
+    {
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanApproveClaimsRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanManageMemberStatusAsync(string userId, Guid stokvelId)
+    {
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanManageMemberStatusRole(member.DefaultRole.ToString());
     }
 }

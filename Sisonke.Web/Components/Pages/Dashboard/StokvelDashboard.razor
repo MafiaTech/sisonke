@@ -31,9 +31,9 @@
 else if (stokvel is null)
 {
     <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
-    <a class="back-nav" href="/my-stokvels"><i class="bi bi-chevron-left"></i>Back to My Stokvels</a>
+    <a class="back-nav" href="/my-workspace"><i class="bi bi-chevron-left"></i>Back to My Workspace</a>
 }
-else if (!canViewFullDashboard)
+else if (!canManageDashboard && linkedMember is not null)
 {
     <div class="d-flex flex-column gap-3">
         <AlertBanner Type="warning"
@@ -42,14 +42,26 @@ else if (!canViewFullDashboard)
                      Icon="bi bi-exclamation-triangle-fill" />
 
         <div class="d-flex flex-wrap gap-2">
-            @if (linkedMember is not null)
-            {
-                <a class="btn btn-primary" href="@($"/member-home/{linkedMember.Id}")">
-                    <i class="bi bi-person-circle me-1"></i>Go to My Member View
-                </a>
-            }
-            <a class="btn btn-outline-secondary" href="/my-memberships">
-                <i class="bi bi-grid me-1"></i>Back to My Memberships
+            <a class="btn btn-primary" href="@($"/member-home/{linkedMember.Id}")">
+                <i class="bi bi-person-circle me-1"></i>Go to My Member View
+            </a>
+            <a class="btn btn-outline-secondary" href="/my-workspace">
+                <i class="bi bi-columns-gap me-1"></i>Back to My Workspace
+            </a>
+        </div>
+    </div>
+}
+else if (!canManageDashboard)
+{
+    <div class="d-flex flex-column gap-3">
+        <AlertBanner Type="warning"
+                     Title="Access restricted."
+                     Message="You do not have access to this stokvel."
+                     Icon="bi bi-exclamation-triangle-fill" />
+
+        <div>
+            <a class="btn btn-outline-secondary" href="/my-workspace">
+                <i class="bi bi-columns-gap me-1"></i>Back to My Workspace
             </a>
         </div>
     </div>
@@ -80,6 +92,28 @@ else
             <i class="bi bi-grid me-1"></i>My Stokvels
         </a>
     </div>
+
+    @if (linkedMember is not null)
+    {
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
+                    <div>
+                        <div class="detail-mini-label">Logged-in Office Bearer</div>
+                        <div class="sub-plan-name">@linkedMember.FullName</div>
+                    </div>
+                    <div>
+                        <div class="detail-mini-label">Role</div>
+                        <div class="detail-mini-value">@linkedMember.DefaultRole</div>
+                    </div>
+                    <div>
+                        <div class="detail-mini-label">Responsibility</div>
+                        <div class="detail-mini-value">@GetResponsibilityLabel(linkedMember.DefaultRole.ToString())</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
 
     @if (!stokvel.IsSetupComplete)
     {
@@ -396,7 +430,7 @@ else
     private string memberLimitMessage = string.Empty;
     private string constitutionStatus = "Not Created";
     private bool isLoading = true;
-    private bool canViewFullDashboard;
+    private bool canManageDashboard;
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -413,7 +447,7 @@ else
         linkedMember = null;
         memberLimitMessage = string.Empty;
         constitutionStatus = "Not Created";
-        canViewFullDashboard = false;
+        canManageDashboard = false;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
 
@@ -428,11 +462,11 @@ else
             return;
         }
 
-        canViewFullDashboard = await MemberAccessService.CanViewFullDashboardAsync(userId, StokvelId);
+        canManageDashboard = await MemberAccessService.CanAccessManagementDashboardAsync(userId, StokvelId);
+        linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
 
-        if (!canViewFullDashboard)
+        if (!canManageDashboard)
         {
-            linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
             isLoading = false;
             return;
         }
@@ -470,4 +504,18 @@ else
 
     private static string GetConstitutionStatusBadgeType(string status) =>
         status switch { "Draft" => "warning", "Uploaded" => "info", "Approved" => "success", _ => "secondary" };
+
+    private static string GetResponsibilityLabel(string? role)
+    {
+        return role?.Trim() switch
+        {
+            "Chairperson" => "Final approvals",
+            "Secretary" => "Administration & reviews",
+            "Treasurer" => "Finance",
+            "Creator" => "Full setup and administration",
+            "Admin" => "Full setup and administration",
+            "StokvelAdmin" => "Full setup and administration",
+            _ => "Office bearer administration"
+        };
+    }
 }

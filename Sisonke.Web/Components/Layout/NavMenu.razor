@@ -1,107 +1,208 @@
 @implements IDisposable
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Sisonke.Web.Data
+@using Sisonke.Web.Services
+
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject MemberAccountLinkingService MemberAccountLinkingService
+@inject MemberAccessService MemberAccessService
+@inject StokvelService StokvelService
 
-<div class="top-row navbar navbar-dark ps-0">
-    <div class="container-fluid p-0">
-        <a class="brand-link" href="">
-            <div class="brand-icon-wrap">
-                <i class="bi bi-piggy-bank-fill" aria-hidden="true"></i>
-            </div>
-            <div class="brand-text">
-                <span class="brand-name">Sisonke</span>
-                <span class="brand-tagline">Stokvel Management</span>
-            </div>
-        </a>
-    </div>
-</div>
+<aside class="@SidebarCssClass">
+    <a class="sisonke-sidebar-brand" href="@HomeHref">
+        <div class="sisonke-sidebar-mark">
+            <i class="bi bi-piggy-bank-fill" aria-hidden="true"></i>
+        </div>
+        <div>
+            <span class="sisonke-sidebar-name">Sisonke</span>
+            <span class="sisonke-sidebar-tagline">Stokvel Management</span>
+        </div>
+    </a>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
 
         <div class="nav-item px-0">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            <NavLink class="sisonke-nav-item" href="@HomeHref" Match="NavLinkMatch.All">
                 <i class="bi bi-house-fill nav-icon" aria-hidden="true"></i>
                 <span>Home</span>
             </NavLink>
         </div>
 
-        <div class="nav-section-label">Stokvels</div>
+        @if (isAuthenticated)
+        {
+            <div class="sisonke-nav-section">Account</div>
+            <div class="nav-item px-0">
+                <NavLink class="sisonke-nav-item" href="my-memberships">
+                    <i class="bi bi-person-vcard nav-icon" aria-hidden="true"></i>
+                    <span>My Memberships</span>
+                </NavLink>
+            </div>
+            <div class="nav-item px-0">
+                    <NavLink class="sisonke-nav-item" href="Account/Manage">
+                    <i class="bi bi-person-circle nav-icon" aria-hidden="true"></i>
+                    <span>@GetAccountLabel()</span>
+                    </NavLink>
+                </div>
 
-        <div class="nav-item px-0">
-            <NavLink class="nav-link" href="my-stokvels">
-                <i class="bi bi-grid-fill nav-icon" aria-hidden="true"></i>
-                <span>My Stokvels</span>
-            </NavLink>
-        </div>
+            @if (hasManagedStokvels || canRegisterStokvel)
+            {
+                <div class="sisonke-nav-section">Stokvels</div>
+                @if (hasManagedStokvels)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="managed-stokvels">
+                            <i class="bi bi-grid-fill nav-icon" aria-hidden="true"></i>
+                            <span>Stokvels I Manage</span>
+                        </NavLink>
+                    </div>
+                }
+                @if (canRegisterStokvel)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="register-stokvel">
+                            <i class="bi bi-plus-circle-fill nav-icon" aria-hidden="true"></i>
+                            <span>Register Stokvel</span>
+                        </NavLink>
+                    </div>
+                }
+            }
 
-        <div class="nav-item px-0">
-            <NavLink class="nav-link" href="register-stokvel">
-                <i class="bi bi-plus-circle-fill nav-icon" aria-hidden="true"></i>
-                <span>Register Stokvel</span>
-            </NavLink>
-        </div>
+            @if (isPlatformAdmin || isPlatformSupport)
+            {
+                <div class="sisonke-nav-section">Platform</div>
+                @if (isPlatformAdmin)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="platform-admin">
+                            <i class="bi bi-shield-lock-fill nav-icon" aria-hidden="true"></i>
+                            <span>Platform Admin</span>
+                        </NavLink>
+                    </div>
+                }
+                <div class="nav-item px-0">
+                    <NavLink class="sisonke-nav-item" href="platform-support">
+                        <i class="bi bi-life-preserver nav-icon" aria-hidden="true"></i>
+                        <span>Support Console</span>
+                    </NavLink>
+                </div>
+            }
 
-        <AuthorizeView>
-            <Authorized>
-                <div class="nav-section-label">Account</div>
-                <div class="nav-item px-0">
-                    <NavLink class="nav-link" href="my-workspace">
-                        <i class="bi bi-columns-gap nav-icon" aria-hidden="true"></i>
-                        <span>My Workspace</span>
-                    </NavLink>
-                </div>
-                <div class="nav-item px-0">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <i class="bi bi-person-circle nav-icon" aria-hidden="true"></i>
-                        <span>@context.User.Identity?.Name</span>
-                    </NavLink>
-                </div>
-                <div class="nav-item px-0">
-                    <NavLink class="nav-link" href="my-memberships">
-                        <i class="bi bi-person-vcard nav-icon" aria-hidden="true"></i>
-                        <span>My Memberships</span>
-                    </NavLink>
-                </div>
-                <div class="nav-item px-0">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                            <i class="bi bi-box-arrow-left nav-icon" aria-hidden="true"></i>
-                            <span>Sign Out</span>
-                        </button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-section-label">Account</div>
-                <div class="nav-item px-0">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <i class="bi bi-person-plus-fill nav-icon" aria-hidden="true"></i>
-                        <span>Create Account</span>
-                    </NavLink>
-                </div>
-                <div class="nav-item px-0">
-                    <NavLink class="nav-link" href="Account/Login">
-                        <i class="bi bi-box-arrow-in-right nav-icon" aria-hidden="true"></i>
-                        <span>Sign In</span>
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
+            <div class="nav-item px-0">
+                <form action="Account/Logout" method="post">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                    <button type="submit" class="sisonke-nav-item w-100" style="background:transparent;border:0;text-align:left;">
+                        <i class="bi bi-box-arrow-left nav-icon" aria-hidden="true"></i>
+                        <span>Sign Out</span>
+                    </button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <div class="sisonke-nav-section">Account</div>
+            <div class="nav-item px-0">
+                <NavLink class="sisonke-nav-item" href="Account/Register">
+                    <i class="bi bi-person-plus-fill nav-icon" aria-hidden="true"></i>
+                    <span>Create Account</span>
+                </NavLink>
+            </div>
+            <div class="nav-item px-0">
+                <NavLink class="sisonke-nav-item" href="Account/Login">
+                    <i class="bi bi-box-arrow-in-right nav-icon" aria-hidden="true"></i>
+                    <span>Sign In</span>
+                </NavLink>
+            </div>
+        }
 
     </nav>
-</div>
+</aside>
 
 @code {
     private string? currentUrl;
+    private ApplicationUser? currentUser;
+    private bool isAuthenticated;
+    private bool hasManagedStokvels;
+    private bool isPlatformAdmin;
+    private bool isPlatformSupport;
+    private bool canRegisterStokvel;
+    private string HomeHref => isAuthenticated ? "/my-workspace" : "/";
+    private string SidebarCssClass => $"sisonke-sidebar {RoleCssClass}";
+    private string RoleCssClass =>
+        isPlatformAdmin ? "sisonke-role-platform-admin" :
+        isPlatformSupport ? "sisonke-role-support" :
+        hasManagedStokvels ? "sisonke-role-executive" :
+        "sisonke-role-member";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+
+        await LoadNavigationStateAsync();
+    }
+
+    private async Task LoadNavigationStateAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var principal = authState.User;
+
+        isAuthenticated = principal.Identity?.IsAuthenticated == true;
+        hasManagedStokvels = false;
+        isPlatformAdmin = false;
+        isPlatformSupport = false;
+        canRegisterStokvel = false;
+        currentUser = null;
+
+        if (!isAuthenticated)
+        {
+            return;
+        }
+
+        currentUser = await UserManager.GetUserAsync(principal);
+        canRegisterStokvel = !string.IsNullOrWhiteSpace(currentUser?.IdNumber);
+        isPlatformAdmin = principal.IsInRole("PlatformAdmin");
+        isPlatformSupport = principal.IsInRole("PlatformSupport");
+
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        var memberships = await MemberAccountLinkingService.GetMembershipsForUserAsync(userId);
+
+        foreach (var member in memberships)
+        {
+            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+
+            if (stokvel is not null && await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id))
+            {
+                hasManagedStokvels = true;
+                return;
+            }
+        }
+    }
+
+    private string GetAccountLabel()
+    {
+        if (!string.IsNullOrWhiteSpace(currentUser?.FullName))
+        {
+            return currentUser.FullName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(currentUser?.Email))
+        {
+            return currentUser.Email;
+        }
+
+        return "Account";
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)

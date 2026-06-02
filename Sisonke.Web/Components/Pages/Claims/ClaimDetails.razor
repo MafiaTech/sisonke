@@ -1,12 +1,18 @@
 @page "/claim/{ClaimId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
 @inject FuneralClaimService FuneralClaimService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Claim Details</PageTitle>
@@ -24,13 +30,46 @@ else if (claim is null)
 {
     <AlertBanner Type="danger" Title="Claim not found." Message="" Icon="bi bi-x-circle-fill" />
 }
+else if (!canViewClaim)
+{
+    <AlertBanner
+        Type="warning"
+        Title="You do not have access to this claim."
+        Message=""
+        Icon="bi bi-exclamation-triangle-fill" />
+
+    <a class="btn btn-outline-secondary btn-sm" href="/my-workspace">
+        <i class="bi bi-columns-gap me-1"></i>Back to My Workspace
+    </a>
+}
 else
 {
-    <PageHeader
-        Title="Claim Details"
-        Subtitle="@claim.DeceasedFullName"
-        BackText="Back to Member Profile"
-        BackHref="@($"/member-profile/{claim.MemberId}")" />
+    <section class="sisonke-hero-card mb-4">
+        <div class="claim-hero-content">
+            <span class="sisonke-badge sisonke-badge-gold">Funeral Claim</span>
+            <h1>@claim.DeceasedFullName</h1>
+            <p>@claim.SubjectType claim for @claim.Member.FullName</p>
+            <div class="claim-hero-badges">
+                <span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span>
+                <span class="@GetBooleanBadgeClass(claim.IsWaitingPeriodSatisfied)">Waiting period: @(claim.IsWaitingPeriodSatisfied ? "Satisfied" : "Not satisfied")</span>
+                <span class="@GetBooleanBadgeClass(claim.IsMemberStatusEligible)">Member eligibility: @(claim.IsMemberStatusEligible ? "Eligible" : "Not eligible")</span>
+            </div>
+        </div>
+        <div class="claim-hero-meta">
+            <div>
+                <span>Subject</span>
+                <strong>@claim.SubjectType</strong>
+            </div>
+            <div>
+                <span>Date of Death</span>
+                <strong>@(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "-")</strong>
+            </div>
+            <div>
+                <span>Member</span>
+                <strong>@claim.Member.FullName</strong>
+            </div>
+        </div>
+    </section>
 
     @if (!claim.IsWaitingPeriodSatisfied)
     {
@@ -74,11 +113,15 @@ else
         <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
     }
 
-    <div class="row g-3">
-        <div class="col-12 col-lg-7">
-            <div class="card h-100">
-                <div class="card-body p-4">
-                    <div class="card-section-title">Claim Information</div>
+    <div class="sisonke-grid sisonke-grid-2 claim-page-grid">
+        <div class="sisonke-card h-100">
+            <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Claim Information</h2>
+                            <p>Current claim details and eligibility checks.</p>
+                        </div>
+                    </div>
                     <dl class="claim-dl">
                         <div class="claim-dl-row"><dt>Deceased full name</dt><dd>@claim.DeceasedFullName</dd></div>
                         <div class="claim-dl-row"><dt>Claim subject type</dt><dd>@claim.SubjectType</dd></div>
@@ -90,34 +133,45 @@ else
                         <div class="claim-dl-row"><dt>Date of death</dt><dd>@(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "-")</dd></div>
                         <div class="claim-dl-row">
                             <dt>Claim status</dt>
-                            <dd><StatusBadge Text="@claim.Status.ToString()" Type="@GetClaimStatusBadgeType(claim.Status)" /></dd>
+                            <dd><span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span></dd>
                         </div>
                         <div class="claim-dl-row">
                             <dt>Waiting period satisfied</dt>
-                            <dd><StatusBadge Text="@(claim.IsWaitingPeriodSatisfied ? "Yes" : "No")" Type="@(claim.IsWaitingPeriodSatisfied ? "success" : "warning")" /></dd>
+                            <dd><span class="@GetBooleanBadgeClass(claim.IsWaitingPeriodSatisfied)">@(claim.IsWaitingPeriodSatisfied ? "Yes" : "No")</span></dd>
                         </div>
                         <div class="claim-dl-row">
                             <dt>Member status eligible</dt>
-                            <dd><StatusBadge Text="@(claim.IsMemberStatusEligible ? "Yes" : "No")" Type="@(claim.IsMemberStatusEligible ? "success" : "warning")" /></dd>
+                            <dd><span class="@GetBooleanBadgeClass(claim.IsMemberStatusEligible)">@(claim.IsMemberStatusEligible ? "Yes" : "No")</span></dd>
                         </div>
                         <div class="claim-dl-row"><dt>Claim reason</dt><dd>@(claim.ClaimReason ?? "-")</dd></div>
                         <div class="claim-dl-row last"><dt>Review notes</dt><dd>@(claim.ReviewNotes ?? "-")</dd></div>
                     </dl>
-                </div>
             </div>
         </div>
 
-        <div class="col-12 col-lg-5">
-            <div class="card h-100">
-                <div class="card-body p-4">
-                    <div class="card-section-title">Claim Actions</div>
+        <div class="sisonke-card h-100">
+            <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Claim Actions</h2>
+                            <p>Submit, review and decide claims according to your role.</p>
+                        </div>
+                    </div>
 
-                    <button class="btn btn-primary w-100 mb-4" type="button" @onclick="SubmitClaimAsync" disabled="@(!hasDeathCertificate)">
-                        <i class="bi bi-send me-2"></i>Submit Claim
-                    </button>
+                    @if (canAttemptSubmitClaim)
+                    {
+                        <button class="sisonke-btn sisonke-btn-primary w-100 mb-4" type="button" @onclick="SubmitClaimAsync" disabled="@(!canSubmitClaim)">
+                            <i class="bi bi-send me-2"></i>Submit Claim
+                        </button>
+                    }
 
                     <div class="workflow-section">
-                        <div class="card-section-title">Secretary Review</div>
+                        <div class="sisonke-card-head compact">
+                            <div>
+                                <h2>Secretary Review</h2>
+                                <p>Administrative review and recommendation.</p>
+                            </div>
+                        </div>
 
                         @if (claim.SecretaryReviewedAt is not null)
                         {
@@ -125,9 +179,9 @@ else
                                 <div class="claim-dl-row">
                                     <dt>Recommendation</dt>
                                     <dd>
-                                        <StatusBadge
-                                            Text="@(claim.SecretaryRecommendedApproval == true ? "Recommend Approval" : "Do Not Recommend")"
-                                            Type="@(claim.SecretaryRecommendedApproval == true ? "success" : "warning")" />
+                                        <span class="@GetBooleanBadgeClass(claim.SecretaryRecommendedApproval == true)">
+                                            @(claim.SecretaryRecommendedApproval == true ? "Recommend Approval" : "Do Not Recommend")
+                                        </span>
                                     </dd>
                                 </div>
                                 <div class="claim-dl-row"><dt>Reviewed by</dt><dd>@(claim.SecretaryReviewedByName ?? "-")</dd></div>
@@ -136,35 +190,43 @@ else
                             </dl>
                         }
 
-                        <EditForm Model="@secretaryReviewModel" OnValidSubmit="@SaveSecretaryReviewAsync" FormName="SecretaryReviewForm">
-                            <DataAnnotationsValidator />
+                        @if (canReviewClaim)
+                        {
+                            <EditForm Model="@secretaryReviewModel" OnValidSubmit="@SaveSecretaryReviewAsync" FormName="SecretaryReviewForm">
+                                <DataAnnotationsValidator />
 
-                            <div class="mb-3">
-                                <label class="form-label" for="recommend-approval">Recommend Approval</label>
-                                <InputSelect id="recommend-approval" class="form-select" @bind-Value="secretaryReviewModel.RecommendApproval">
-                                    <option value="true">Yes</option>
-                                    <option value="false">No</option>
-                                </InputSelect>
-                            </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="recommend-approval">Recommend Approval</label>
+                                    <InputSelect id="recommend-approval" class="form-select" @bind-Value="secretaryReviewModel.RecommendApproval">
+                                        <option value="true">Yes</option>
+                                        <option value="false">No</option>
+                                    </InputSelect>
+                                </div>
 
-                            <div class="mb-3">
-                                <label class="form-label" for="secretary-review-notes">Review Notes</label>
-                                <InputTextArea id="secretary-review-notes" class="form-control" rows="3" @bind-Value="secretaryReviewModel.ReviewNotes" />
-                            </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="secretary-review-notes">Review Notes</label>
+                                    <InputTextArea id="secretary-review-notes" class="form-control" rows="3" @bind-Value="secretaryReviewModel.ReviewNotes" />
+                                </div>
 
-                            <div class="mb-3">
-                                <label class="form-label" for="secretary-reviewed-by">Reviewed By Name</label>
-                                <InputText id="secretary-reviewed-by" class="form-control" @bind-Value="secretaryReviewModel.ReviewedByName" />
-                            </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="secretary-reviewed-by">Reviewed By Name</label>
+                                    <InputText id="secretary-reviewed-by" class="form-control" @bind-Value="secretaryReviewModel.ReviewedByName" />
+                                </div>
 
-                            <button class="btn btn-outline-primary" type="submit">
-                                <i class="bi bi-clipboard-check me-2"></i>Save Secretary Review
-                            </button>
-                        </EditForm>
+                                <button class="sisonke-btn sisonke-btn-outline" type="submit">
+                                    <i class="bi bi-clipboard-check me-2"></i>Save Secretary Review
+                                </button>
+                            </EditForm>
+                        }
                     </div>
 
                     <div class="workflow-section">
-                        <div class="card-section-title">Chairperson Decision</div>
+                        <div class="sisonke-card-head compact">
+                            <div>
+                                <h2>Chairperson Decision</h2>
+                                <p>Final claim outcome and decision notes.</p>
+                            </div>
+                        </div>
 
                         @if (claim.ChairpersonDecisionAt is not null)
                         {
@@ -175,40 +237,46 @@ else
                             </dl>
                         }
 
-                        <EditForm Model="@chairpersonDecisionModel" FormName="ChairpersonDecisionForm">
-                            <DataAnnotationsValidator />
+                        @if (canApproveClaim)
+                        {
+                            <EditForm Model="@chairpersonDecisionModel" FormName="ChairpersonDecisionForm">
+                                <DataAnnotationsValidator />
 
-                            <div class="mb-3">
-                                <label class="form-label" for="chairperson-decision-notes">Decision Notes</label>
-                                <InputTextArea id="chairperson-decision-notes" class="form-control" rows="3" @bind-Value="chairpersonDecisionModel.DecisionNotes" />
-                            </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="chairperson-decision-notes">Decision Notes</label>
+                                    <InputTextArea id="chairperson-decision-notes" class="form-control" rows="3" @bind-Value="chairpersonDecisionModel.DecisionNotes" />
+                                </div>
 
-                            <div class="mb-3">
-                                <label class="form-label" for="chairperson-decided-by">Decided By Name</label>
-                                <InputText id="chairperson-decided-by" class="form-control" @bind-Value="chairpersonDecisionModel.DecidedByName" />
-                            </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="chairperson-decided-by">Decided By Name</label>
+                                    <InputText id="chairperson-decided-by" class="form-control" @bind-Value="chairpersonDecisionModel.DecidedByName" />
+                                </div>
 
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button class="btn btn-success" type="button" @onclick="ShowApproveConfirmation">
-                                    <i class="bi bi-check2-circle me-2"></i>Approve Claim
-                                </button>
-                                <button class="btn btn-outline-danger" type="button" @onclick="ShowRejectConfirmation">
-                                    <i class="bi bi-x-circle me-2"></i>Reject Claim
-                                </button>
-                            </div>
-                        </EditForm>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="ShowApproveConfirmation">
+                                        <i class="bi bi-check2-circle me-2"></i>Approve Claim
+                                    </button>
+                                    <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="ShowRejectConfirmation">
+                                        <i class="bi bi-x-circle me-2"></i>Reject Claim
+                                    </button>
+                                </div>
+                            </EditForm>
+                        }
                     </div>
-                </div>
             </div>
         </div>
 
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body p-4">
-                    <div class="card-section-title">Required Documents</div>
+        <div class="sisonke-card claim-documents-card">
+            <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Required Documents</h2>
+                            <p>Death Certificate is required before submission. Other documents are optional for now.</p>
+                        </div>
+                    </div>
 
                     <div class="table-responsive mb-4">
-                        <table class="table table-sm mb-0">
+                        <table class="sisonke-table mb-0">
                             <thead>
                                 <tr>
                                     <th>Document</th>
@@ -221,49 +289,57 @@ else
                                     <td class="fw-semibold">Death Certificate</td>
                                     <td>Required</td>
                                     <td>
-                                        <StatusBadge Text="@(hasDeathCertificate ? "Uploaded" : "Missing")" Type="@(hasDeathCertificate ? "success" : "warning")" />
+                                        <span class="@GetBooleanBadgeClass(hasDeathCertificate)">@(hasDeathCertificate ? "Uploaded" : "Missing")</span>
                                     </td>
                                 </tr>
-                                <tr><td>BI-1663</td><td>Optional</td><td><span class="text-muted">-</span></td></tr>
-                                <tr><td>ID Copy</td><td>Optional</td><td><span class="text-muted">-</span></td></tr>
-                                <tr><td>Proof of Membership</td><td>Optional</td><td><span class="text-muted">-</span></td></tr>
-                                <tr><td>Proof of Payment</td><td>Optional</td><td><span class="text-muted">-</span></td></tr>
-                                <tr><td>Other</td><td>Optional</td><td><span class="text-muted">-</span></td></tr>
+                                <tr><td>BI-1663</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
+                                <tr><td>ID Copy</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
+                                <tr><td>Proof of Membership</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
+                                <tr><td>Proof of Payment</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
+                                <tr><td>Other</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="card-section-title">Documents</div>
-
-                    <div class="row g-3 align-items-end mb-4">
-                        <div class="col-12 col-md-4">
-                            <label class="form-label" for="document-type">Document type</label>
-                            <InputSelect id="document-type" class="form-select" @bind-Value="selectedDocumentType">
-                                @foreach (var documentType in Enum.GetValues<ClaimDocumentType>())
-                                {
-                                    <option value="@documentType">@documentType</option>
-                                }
-                            </InputSelect>
-                        </div>
-                        <div class="col-12 col-md-5">
-                            <label class="form-label" for="claim-document">Document</label>
-                            <InputFile id="claim-document" class="form-control" OnChange="@OnFileSelected" />
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <button class="btn btn-primary w-100" type="button" @onclick="UploadDocumentAsync">
-                                <i class="bi bi-upload me-2"></i>Upload
-                            </button>
+                    <div class="sisonke-card-head compact">
+                        <div>
+                            <h2>Documents</h2>
+                            <p>Upload and view supporting claim documents.</p>
                         </div>
                     </div>
 
+                    @if (canUploadDocuments)
+                    {
+                        <div class="row g-3 align-items-end mb-4">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="document-type">Document type</label>
+                                <InputSelect id="document-type" class="form-select" @bind-Value="selectedDocumentType">
+                                    @foreach (var documentType in Enum.GetValues<ClaimDocumentType>())
+                                    {
+                                        <option value="@documentType">@documentType</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-12 col-md-5">
+                                <label class="form-label" for="claim-document">Document</label>
+                                <InputFile id="claim-document" class="form-control" OnChange="@OnFileSelected" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <button class="sisonke-btn sisonke-btn-primary w-100" type="button" @onclick="UploadDocumentAsync">
+                                    <i class="bi bi-upload me-2"></i>Upload
+                                </button>
+                            </div>
+                        </div>
+                    }
+
                     @if (claim.Documents.Count == 0)
                     {
-                        <p class="text-muted small mb-0">No documents uploaded yet.</p>
+                        <div class="sisonke-alert sisonke-alert-blue mb-0">No documents uploaded yet.</div>
                     }
                     else
                     {
                         <div class="table-responsive">
-                            <table class="table table-sm mb-0">
+                            <table class="sisonke-table mb-0">
                                 <thead>
                                     <tr>
                                         <th>Document type</th>
@@ -280,7 +356,7 @@ else
                                             <td class="text-muted small">@document.OriginalFileName</td>
                                             <td class="text-muted small">@document.UploadedAt.ToString("dd MMM yyyy")</td>
                                             <td>
-                                                <a class="btn btn-sm btn-outline-secondary" href="@document.StoredFilePath" target="_blank" rel="noopener noreferrer">Open</a>
+                                                <a class="sisonke-btn sisonke-btn-outline" href="@document.StoredFilePath" target="_blank" rel="noopener noreferrer">Open</a>
                                             </td>
                                         </tr>
                                     }
@@ -291,7 +367,6 @@ else
                 </div>
             </div>
         </div>
-    </div>
 
     <ConfirmationModal
         IsVisible="@showApproveConfirmation"
@@ -315,29 +390,81 @@ else
 }
 
 <style>
+    .claim-page-grid {
+        align-items: stretch;
+    }
+
+    .claim-documents-card {
+        grid-column: 1 / -1;
+    }
+
+    .claim-hero-content {
+        display: grid;
+        gap: .75rem;
+    }
+
+    .claim-hero-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    .claim-hero-meta {
+        display: grid;
+        gap: .75rem;
+        min-width: min(18rem, 100%);
+        padding: 1rem;
+        border: 1px solid rgb(255 255 255 / .28);
+        border-radius: var(--r-md);
+        background: rgb(255 255 255 / .12);
+    }
+
+    .claim-hero-meta div {
+        display: grid;
+        gap: .15rem;
+    }
+
+    .claim-hero-meta span {
+        color: rgb(255 255 255 / .78);
+        font-size: .75rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+
+    .claim-hero-meta strong {
+        color: #fff;
+        font-size: .98rem;
+    }
+
+    .sisonke-card-head.compact {
+        margin-top: .25rem;
+        margin-bottom: 1rem;
+        padding-bottom: .75rem;
+    }
+
     .claim-dl { margin: 0; }
     .claim-dl-row {
         display: flex;
         gap: 1rem;
         padding: .625rem 0;
-        border-bottom: 1px solid var(--sk-border);
+        border-bottom: 1px solid var(--border);
         font-size: .9rem;
     }
     .claim-dl-row.last { border-bottom: none; }
     .claim-dl-row dt {
         flex: 0 0 42%;
-        color: var(--sk-text-muted);
+        color: var(--muted);
         font-size: .875rem;
         font-weight: 400;
     }
     .claim-dl-row dd {
         flex: 1;
         margin: 0;
-        color: var(--sk-text);
+        color: var(--text);
         font-weight: 500;
     }
     .workflow-section {
-        border-top: 1px solid var(--sk-border);
+        border-top: 1px solid var(--border);
         margin-top: 1.25rem;
         padding-top: 1.25rem;
     }
@@ -360,6 +487,12 @@ else
     private IBrowserFile? selectedFile;
     private bool isLoading = true;
     private bool hasDeathCertificate;
+    private bool canViewClaim;
+    private bool canReviewClaim;
+    private bool canApproveClaim;
+    private bool canAttemptSubmitClaim;
+    private bool canSubmitClaim;
+    private bool canUploadDocuments;
     private bool showApproveConfirmation;
     private bool showRejectConfirmation;
     private string? successMessage;
@@ -377,11 +510,47 @@ else
     private async Task LoadClaimAsync()
     {
         isLoading = true;
+        canViewClaim = false;
+        canReviewClaim = false;
+        canApproveClaim = false;
+        canAttemptSubmitClaim = false;
+        canSubmitClaim = false;
+        canUploadDocuments = false;
         claim = await FuneralClaimService.GetClaimByIdAsync(ClaimId);
         hasDeathCertificate = claim is not null && await FuneralClaimService.HasDeathCertificateAsync(ClaimId);
 
         if (claim is not null)
         {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var stokvelId = await MemberAccessService.GetStokvelIdForMemberAsync(claim.MemberId);
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                var isOwnMemberClaim = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, claim.MemberId);
+                canViewClaim = await MemberAccessService.CanViewMemberProfileAsync(userId, claim.MemberId);
+                var canManageStokvel = false;
+
+                if (stokvelId is not null)
+                {
+                    canManageStokvel = await MemberAccessService.CanManageStokvelAsync(userId, stokvelId.Value);
+                    canReviewClaim = await MemberAccessService.CanReviewClaimsAsync(userId, stokvelId.Value);
+                    canApproveClaim = await MemberAccessService.CanApproveClaimsAsync(userId, stokvelId.Value);
+                }
+
+                canViewClaim = canViewClaim || canManageStokvel;
+
+                canAttemptSubmitClaim =
+                    IsClaimSubmittableByStatus(claim.Status) &&
+                    (isOwnMemberClaim || canManageStokvel);
+
+                canSubmitClaim = hasDeathCertificate && canAttemptSubmitClaim;
+
+                canUploadDocuments =
+                    (isOwnMemberClaim && IsClaimUploadableByMemberStatus(claim.Status)) ||
+                    canManageStokvel;
+            }
+
             secretaryReviewModel.RecommendApproval = claim.SecretaryRecommendedApproval ?? true;
             secretaryReviewModel.ReviewNotes = claim.SecretaryReviewNotes;
             secretaryReviewModel.ReviewedByName = claim.SecretaryReviewedByName ?? "Secretary";
@@ -412,6 +581,12 @@ else
             return;
         }
 
+        if (!canUploadDocuments)
+        {
+            errorMessage = "You do not have permission to upload documents for this claim.";
+            return;
+        }
+
         var document = await FuneralClaimService.UploadClaimDocumentAsync(
             ClaimId,
             selectedDocumentType,
@@ -433,6 +608,18 @@ else
         successMessage = null;
         warningMessage = null;
         errorMessage = null;
+
+        if (!canSubmitClaim)
+        {
+            if (!hasDeathCertificate)
+            {
+                warningMessage = "Death Certificate is required before submitting this claim.";
+                return;
+            }
+
+            errorMessage = "This claim cannot be submitted from your current access or status.";
+            return;
+        }
 
         var updatedClaim = await FuneralClaimService.SubmitClaimAsync(ClaimId);
 
@@ -459,6 +646,12 @@ else
         warningMessage = null;
         errorMessage = null;
 
+        if (!canReviewClaim)
+        {
+            errorMessage = "You do not have permission to review this claim.";
+            return;
+        }
+
         var updatedClaim = await FuneralClaimService.ReviewClaimAsSecretaryAsync(
             ClaimId,
             secretaryReviewModel.RecommendApproval,
@@ -480,6 +673,13 @@ else
         successMessage = null;
         warningMessage = null;
         errorMessage = null;
+
+        if (!canApproveClaim)
+        {
+            errorMessage = "You do not have permission to approve this claim.";
+            return;
+        }
+
         showApproveConfirmation = true;
     }
 
@@ -494,6 +694,12 @@ else
         successMessage = null;
         warningMessage = null;
         errorMessage = null;
+
+        if (!canApproveClaim)
+        {
+            errorMessage = "You do not have permission to approve this claim.";
+            return;
+        }
 
         var updatedClaim = await FuneralClaimService.ApproveClaimAsChairpersonAsync(
             ClaimId,
@@ -515,6 +721,13 @@ else
         successMessage = null;
         warningMessage = null;
         errorMessage = null;
+
+        if (!canApproveClaim)
+        {
+            errorMessage = "You do not have permission to reject this claim.";
+            return;
+        }
+
         showRejectConfirmation = true;
     }
 
@@ -529,6 +742,12 @@ else
         successMessage = null;
         warningMessage = null;
         errorMessage = null;
+
+        if (!canApproveClaim)
+        {
+            errorMessage = "You do not have permission to reject this claim.";
+            return;
+        }
 
         var updatedClaim = await FuneralClaimService.RejectClaimAsChairpersonAsync(
             ClaimId,
@@ -558,6 +777,35 @@ else
             FuneralClaimStatus.Cancelled => "secondary",
             _ => "secondary"
         };
+
+    private static string GetClaimStatusBadgeClass(FuneralClaimStatus status) =>
+        status switch
+        {
+            FuneralClaimStatus.Draft => "sisonke-badge sisonke-badge-gray",
+            FuneralClaimStatus.Submitted => "sisonke-badge sisonke-badge-blue",
+            FuneralClaimStatus.UnderReview => "sisonke-badge sisonke-badge-teal",
+            FuneralClaimStatus.OnHold => "sisonke-badge sisonke-badge-gold",
+            FuneralClaimStatus.Approved => "sisonke-badge sisonke-badge-green",
+            FuneralClaimStatus.Rejected => "sisonke-badge sisonke-badge-red",
+            FuneralClaimStatus.Paid => "sisonke-badge sisonke-badge-green",
+            FuneralClaimStatus.Cancelled => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string GetBooleanBadgeClass(bool value) =>
+        value
+            ? "sisonke-badge sisonke-badge-green"
+            : "sisonke-badge sisonke-badge-gold";
+
+    private static bool IsClaimSubmittableByStatus(FuneralClaimStatus status)
+    {
+        return status is FuneralClaimStatus.Draft or FuneralClaimStatus.OnHold;
+    }
+
+    private static bool IsClaimUploadableByMemberStatus(FuneralClaimStatus status)
+    {
+        return status is FuneralClaimStatus.Draft or FuneralClaimStatus.OnHold or FuneralClaimStatus.Submitted;
+    }
 
     private sealed class SecretaryReviewModel
     {

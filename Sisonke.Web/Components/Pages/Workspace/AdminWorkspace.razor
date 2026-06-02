@@ -1,0 +1,23 @@
+@page "/admin-workspace"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+
+@inject NavigationManager NavigationManager
+
+<PageTitle>Admin Workspace</PageTitle>
+
+<div class="loading-state">
+    <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    Opening platform administration...
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/platform-admin", replace: true);
+    }
+}

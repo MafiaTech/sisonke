@@ -137,36 +137,26 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<TenantSubscription?> GetActiveSubscriptionByStokvelIdAsync(Guid stokvelId)
     {
-        var stokvel = await context.Stokvels
-            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+        var stokvel = await GetStokvelByIdForLookupAsync(stokvelId);
 
         if (stokvel is null)
         {
             return null;
         }
 
-        return await context.TenantSubscriptions
-            .Include(subscription => subscription.SubscriptionPlan)
-            .SingleOrDefaultAsync(subscription =>
-                subscription.TenantId == stokvel.TenantId &&
-                subscription.Status == SubscriptionStatus.Active);
+        return await GetLatestActiveSubscriptionByTenantIdAsync(stokvel.TenantId);
     }
 
     public async Task<bool> CanAddMemberAsync(Guid stokvelId)
     {
-        var stokvel = await context.Stokvels
-            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+        var stokvel = await GetStokvelByIdForLookupAsync(stokvelId);
 
         if (stokvel is null)
         {
             return false;
         }
 
-        var subscription = await context.TenantSubscriptions
-            .Include(existingSubscription => existingSubscription.SubscriptionPlan)
-            .SingleOrDefaultAsync(existingSubscription =>
-                existingSubscription.TenantId == stokvel.TenantId &&
-                existingSubscription.Status == SubscriptionStatus.Active);
+        var subscription = await GetLatestActiveSubscriptionByTenantIdAsync(stokvel.TenantId);
 
         if (subscription?.SubscriptionPlan is null)
         {
@@ -188,19 +178,14 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<string> GetMemberLimitMessageAsync(Guid stokvelId)
     {
-        var stokvel = await context.Stokvels
-            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+        var stokvel = await GetStokvelByIdForLookupAsync(stokvelId);
 
         if (stokvel is null)
         {
             return "Subscription package could not be found.";
         }
 
-        var subscription = await context.TenantSubscriptions
-            .Include(existingSubscription => existingSubscription.SubscriptionPlan)
-            .SingleOrDefaultAsync(existingSubscription =>
-                existingSubscription.TenantId == stokvel.TenantId &&
-                existingSubscription.Status == SubscriptionStatus.Active);
+        var subscription = await GetLatestActiveSubscriptionByTenantIdAsync(stokvel.TenantId);
 
         if (subscription?.SubscriptionPlan is null)
         {
@@ -218,6 +203,28 @@ public class StokvelService(ApplicationDbContext context)
         }
 
         return $"{activeMemberCount} of {subscription.SubscriptionPlan.MaxMembers} members captured on the {subscription.SubscriptionPlan.Name} package.";
+    }
+
+    private async Task<Stokvel?> GetStokvelByIdForLookupAsync(Guid stokvelId)
+    {
+        // Duplicate-tolerant lookup for local/demo data.
+        return await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Id)
+            .FirstOrDefaultAsync();
+    }
+
+    private async Task<TenantSubscription?> GetLatestActiveSubscriptionByTenantIdAsync(Guid tenantId)
+    {
+        // Duplicate-tolerant lookup for local/demo data.
+        return await context.TenantSubscriptions
+            .Include(existingSubscription => existingSubscription.SubscriptionPlan)
+            .Where(existingSubscription =>
+                existingSubscription.TenantId == tenantId &&
+                existingSubscription.Status == SubscriptionStatus.Active)
+            .OrderByDescending(existingSubscription => existingSubscription.StartDate)
+            .FirstOrDefaultAsync();
     }
 
     private async Task<string> CreateUniqueSlugAsync(string name)

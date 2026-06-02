@@ -1,0 +1,40 @@
+@page "/platform-workspace"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Platform Workspace</PageTitle>
+
+<div class="loading-state">
+    <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    Opening platform workspace...
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.IsInRole("PlatformAdmin"))
+        {
+            NavigationManager.NavigateTo("/platform-admin", replace: true);
+            return;
+        }
+
+        if (user.IsInRole("PlatformSupport"))
+        {
+            NavigationManager.NavigateTo("/platform-support", replace: true);
+            return;
+        }
+
+        NavigationManager.NavigateTo("/my-workspace", replace: true);
+    }
+}

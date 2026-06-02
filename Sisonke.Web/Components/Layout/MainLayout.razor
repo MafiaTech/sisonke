@@ -1,28 +1,40 @@
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
+@implements IDisposable
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inject NavigationManager NavigationManager
 
-    <main>
-        <div class="top-row px-4 auth">
+<div class="sisonke-shell sisonke-role-member">
+    <NavMenu />
+
+    <main class="sisonke-main">
+        <div class="sisonke-topbar">
+            <div>
+                <div class="sisonke-nav-section m-0" style="color:var(--muted);">Current Area</div>
+                <div class="fw-semibold">@CurrentAreaLabel</div>
+            </div>
             <AuthorizeView>
                 <Authorized>
-                    <a href="Account/Manage" class="top-row-user">
-                        <i class="bi bi-person-circle me-1"></i>
-                        @context.User.Identity?.Name
-                    </a>
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" aria-label="Notifications" title="Notifications coming soon">
+                            <i class="bi bi-bell"></i>
+                        </button>
+                        <a href="Account/Manage" class="top-row-user">
+                            <i class="bi bi-person-circle me-1"></i>
+                            @context.User.Identity?.Name
+                        </a>
+                    </div>
                 </Authorized>
                 <NotAuthorized>
-                    <a href="Account/Register">Create Account</a>
-                    <a href="Account/Login">Sign In</a>
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <a href="Account/Register">Create Account</a>
+                        <a href="Account/Login">Sign In</a>
+                    </div>
                 </NotAuthorized>
             </AuthorizeView>
         </div>
 
-        <article class="content px-4">
+        <article class="content px-0">
             @Body
         </article>
     </main>
@@ -33,3 +45,59 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private string CurrentAreaLabel => GetCurrentAreaLabel();
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private string GetCurrentAreaLabel()
+    {
+        var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Trim('/').ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return "Home";
+        }
+
+        if (path.StartsWith("my-workspace"))
+        {
+            return "My Workspace";
+        }
+
+        if (path.StartsWith("my-memberships") || path.StartsWith("member-home") || path.StartsWith("member-profile"))
+        {
+            return "Member Workspace";
+        }
+
+        if (path.StartsWith("managed-stokvels") || path.StartsWith("stokvel-dashboard"))
+        {
+            return "Executive Workspace";
+        }
+
+        if (path.StartsWith("platform-admin"))
+        {
+            return "Platform Administration";
+        }
+
+        if (path.StartsWith("platform-support"))
+        {
+            return "Support Console";
+        }
+
+        return "Sisonke";
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}
