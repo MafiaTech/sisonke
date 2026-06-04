@@ -49,6 +49,67 @@ public class MemberAccessService(ApplicationDbContext context)
             normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
     }
 
+    private static bool CanManageMeetingsRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanViewSecretaryTasksRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanViewChairpersonTasksRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanViewTreasurerTasksRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanManagePaymentsRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanViewFinancialsRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     public async Task<Member?> GetLinkedMemberForUserAsync(string userId, Guid stokvelId)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -237,5 +298,89 @@ public class MemberAccessService(ApplicationDbContext context)
         var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
 
         return member is not null && CanManageMemberStatusRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanManageMeetingsAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanManageMeetingsRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanManageAttendanceAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanManageMeetingsRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanViewSecretaryTasksAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanViewSecretaryTasksRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanViewChairpersonTasksAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanViewChairpersonTasksRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanViewTreasurerTasksAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanViewTreasurerTasksRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanManagePaymentsAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanManagePaymentsRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanViewFinancialsAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanViewFinancialsRole(member.DefaultRole.ToString());
     }
 }

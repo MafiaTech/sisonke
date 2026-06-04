@@ -11,6 +11,7 @@
 @using Sisonke.Web.Services
 
 @inject FuneralClaimService FuneralClaimService
+@inject MemberService MemberService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
@@ -177,12 +178,8 @@ else
                         {
                             <dl class="claim-dl mb-3">
                                 <div class="claim-dl-row">
-                                    <dt>Recommendation</dt>
-                                    <dd>
-                                        <span class="@GetBooleanBadgeClass(claim.SecretaryRecommendedApproval == true)">
-                                            @(claim.SecretaryRecommendedApproval == true ? "Recommend Approval" : "Do Not Recommend")
-                                        </span>
-                                    </dd>
+                                    <dt>Review status</dt>
+                                    <dd><span class="sisonke-badge sisonke-badge-green">Complete</span></dd>
                                 </div>
                                 <div class="claim-dl-row"><dt>Reviewed by</dt><dd>@(claim.SecretaryReviewedByName ?? "-")</dd></div>
                                 <div class="claim-dl-row"><dt>Reviewed at</dt><dd>@claim.SecretaryReviewedAt.Value.ToString("dd MMM yyyy HH:mm")</dd></div>
@@ -190,31 +187,18 @@ else
                             </dl>
                         }
 
-                        @if (canReviewClaim)
+                        @if (canCompleteSecretaryReview)
                         {
                             <EditForm Model="@secretaryReviewModel" OnValidSubmit="@SaveSecretaryReviewAsync" FormName="SecretaryReviewForm">
                                 <DataAnnotationsValidator />
-
-                                <div class="mb-3">
-                                    <label class="form-label" for="recommend-approval">Recommend Approval</label>
-                                    <InputSelect id="recommend-approval" class="form-select" @bind-Value="secretaryReviewModel.RecommendApproval">
-                                        <option value="true">Yes</option>
-                                        <option value="false">No</option>
-                                    </InputSelect>
-                                </div>
 
                                 <div class="mb-3">
                                     <label class="form-label" for="secretary-review-notes">Review Notes</label>
                                     <InputTextArea id="secretary-review-notes" class="form-control" rows="3" @bind-Value="secretaryReviewModel.ReviewNotes" />
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label" for="secretary-reviewed-by">Reviewed By Name</label>
-                                    <InputText id="secretary-reviewed-by" class="form-control" @bind-Value="secretaryReviewModel.ReviewedByName" />
-                                </div>
-
-                                <button class="sisonke-btn sisonke-btn-outline" type="submit">
-                                    <i class="bi bi-clipboard-check me-2"></i>Save Secretary Review
+                                <button class="sisonke-btn sisonke-btn-outline" type="submit" disabled="@string.IsNullOrWhiteSpace(secretaryReviewModel.ReviewNotes)">
+                                    <i class="bi bi-clipboard-check me-2"></i>Complete Review
                                 </button>
                             </EditForm>
                         }
@@ -237,7 +221,7 @@ else
                             </dl>
                         }
 
-                        @if (canApproveClaim)
+                        @if (canMakeChairpersonDecision)
                         {
                             <EditForm Model="@chairpersonDecisionModel" FormName="ChairpersonDecisionForm">
                                 <DataAnnotationsValidator />
@@ -245,11 +229,6 @@ else
                                 <div class="mb-3">
                                     <label class="form-label" for="chairperson-decision-notes">Decision Notes</label>
                                     <InputTextArea id="chairperson-decision-notes" class="form-control" rows="3" @bind-Value="chairpersonDecisionModel.DecisionNotes" />
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label" for="chairperson-decided-by">Decided By Name</label>
-                                    <InputText id="chairperson-decided-by" class="form-control" @bind-Value="chairpersonDecisionModel.DecidedByName" />
                                 </div>
 
                                 <div class="d-flex gap-2 flex-wrap">
@@ -263,6 +242,65 @@ else
                             </EditForm>
                         }
                     </div>
+
+                    @if (ShouldShowPayoutSection)
+                    {
+                        <div class="workflow-section">
+                            <div class="sisonke-card-head compact">
+                                <div>
+                                    <h2>Treasurer Payout</h2>
+                                    <p>Approved claim payout status and payment capture.</p>
+                                </div>
+                            </div>
+
+                            @if (claim.Status == FuneralClaimStatus.Approved)
+                            {
+                                <div class="sisonke-alert sisonke-alert-gold mb-3">
+                                    This approved claim is awaiting treasurer payout.
+                                </div>
+                            }
+                            else if (claim.Status == FuneralClaimStatus.Paid)
+                            {
+                                <div class="sisonke-alert sisonke-alert-green mb-3">
+                                    This claim payout has been marked paid.
+                                </div>
+                            }
+
+                            <dl class="claim-dl mb-3">
+                                <div class="claim-dl-row"><dt>Payout amount</dt><dd>@(claim.PayoutAmount?.ToString("C0", new System.Globalization.CultureInfo("en-ZA")) ?? "-")</dd></div>
+                                <div class="claim-dl-row"><dt>Payout reference</dt><dd>@(claim.PayoutReference ?? "-")</dd></div>
+                                <div class="claim-dl-row"><dt>Payout paid date</dt><dd>@(claim.PayoutPaidAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm") ?? "-")</dd></div>
+                                <div class="claim-dl-row"><dt>Payout notes</dt><dd>@(claim.PayoutNotes ?? "-")</dd></div>
+                                <div class="claim-dl-row last"><dt>Captured by</dt><dd>@(payoutCapturedByMemberName ?? "-")</dd></div>
+                            </dl>
+
+                            @if (claim.Status == FuneralClaimStatus.Approved && canManagePayments)
+                            {
+                                <EditForm Model="@payoutModel" OnValidSubmit="@MarkPayoutPaidAsync" FormName="ClaimPayoutForm">
+                                    <DataAnnotationsValidator />
+
+                                    <div class="row g-3">
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label" for="payout-amount">Payout amount</label>
+                                            <InputNumber id="payout-amount" class="form-control" @bind-Value="payoutModel.PayoutAmount" />
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label" for="payout-reference">Payout reference</label>
+                                            <InputText id="payout-reference" class="form-control" @bind-Value="payoutModel.PayoutReference" />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label" for="payout-notes">Notes</label>
+                                            <InputTextArea id="payout-notes" class="form-control" rows="3" @bind-Value="payoutModel.PayoutNotes" />
+                                        </div>
+                                    </div>
+
+                                    <button class="sisonke-btn sisonke-btn-gold mt-3" type="submit" disabled="@(!CanSubmitPayout)">
+                                        <i class="bi bi-cash-coin me-2"></i>Mark Payout Paid
+                                    </button>
+                                </EditForm>
+                            }
+                        </div>
+                    }
             </div>
         </div>
 
@@ -483,21 +521,35 @@ else
     private FuneralClaim? claim;
     private SecretaryReviewModel secretaryReviewModel = new();
     private ChairpersonDecisionModel chairpersonDecisionModel = new();
+    private ClaimPayoutModel payoutModel = new();
     private ClaimDocumentType selectedDocumentType = ClaimDocumentType.DeathCertificate;
     private IBrowserFile? selectedFile;
     private bool isLoading = true;
     private bool hasDeathCertificate;
     private bool canViewClaim;
     private bool canReviewClaim;
+    private bool canCompleteSecretaryReview;
     private bool canApproveClaim;
+    private bool canMakeChairpersonDecision;
+    private bool canManagePayments;
     private bool canAttemptSubmitClaim;
     private bool canSubmitClaim;
     private bool canUploadDocuments;
     private bool showApproveConfirmation;
     private bool showRejectConfirmation;
+    private string? currentUserId;
+    private Guid? currentStokvelId;
+    private string? payoutCapturedByMemberName;
     private string? successMessage;
     private string? warningMessage;
     private string? errorMessage;
+    private bool CanSubmitPayout => payoutModel.PayoutAmount > 0 && !string.IsNullOrWhiteSpace(payoutModel.PayoutReference);
+    private bool ShouldShowPayoutSection =>
+        claim is not null &&
+        (claim.Status is FuneralClaimStatus.Approved or FuneralClaimStatus.Paid ||
+            claim.PayoutAmount is not null ||
+            claim.PayoutPaidAt is not null ||
+            !string.IsNullOrWhiteSpace(claim.PayoutReference));
 
     [Parameter]
     public Guid ClaimId { get; set; }
@@ -512,10 +564,16 @@ else
         isLoading = true;
         canViewClaim = false;
         canReviewClaim = false;
+        canCompleteSecretaryReview = false;
         canApproveClaim = false;
+        canMakeChairpersonDecision = false;
+        canManagePayments = false;
         canAttemptSubmitClaim = false;
         canSubmitClaim = false;
         canUploadDocuments = false;
+        currentUserId = null;
+        currentStokvelId = null;
+        payoutCapturedByMemberName = null;
         claim = await FuneralClaimService.GetClaimByIdAsync(ClaimId);
         hasDeathCertificate = claim is not null && await FuneralClaimService.HasDeathCertificateAsync(ClaimId);
 
@@ -524,6 +582,8 @@ else
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
             var stokvelId = await MemberAccessService.GetStokvelIdForMemberAsync(claim.MemberId);
+            currentUserId = userId;
+            currentStokvelId = stokvelId;
 
             if (!string.IsNullOrWhiteSpace(userId))
             {
@@ -536,6 +596,9 @@ else
                     canManageStokvel = await MemberAccessService.CanManageStokvelAsync(userId, stokvelId.Value);
                     canReviewClaim = await MemberAccessService.CanReviewClaimsAsync(userId, stokvelId.Value);
                     canApproveClaim = await MemberAccessService.CanApproveClaimsAsync(userId, stokvelId.Value);
+                    canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, stokvelId.Value);
+                    canCompleteSecretaryReview = canReviewClaim && IsClaimReviewableBySecretary(claim);
+                    canMakeChairpersonDecision = canApproveClaim && IsClaimInChairpersonApprovalStage(claim);
                 }
 
                 canViewClaim = canViewClaim || canManageStokvel;
@@ -551,11 +614,20 @@ else
                     canManageStokvel;
             }
 
-            secretaryReviewModel.RecommendApproval = claim.SecretaryRecommendedApproval ?? true;
             secretaryReviewModel.ReviewNotes = claim.SecretaryReviewNotes;
-            secretaryReviewModel.ReviewedByName = claim.SecretaryReviewedByName ?? "Secretary";
             chairpersonDecisionModel.DecisionNotes = claim.ChairpersonDecisionNotes;
-            chairpersonDecisionModel.DecidedByName = claim.ChairpersonDecisionByName ?? "Chairperson";
+            payoutModel = new ClaimPayoutModel
+            {
+                PayoutAmount = claim.PayoutAmount ?? 0,
+                PayoutReference = claim.PayoutReference,
+                PayoutNotes = claim.PayoutNotes
+            };
+
+            if (claim.PayoutCapturedByMemberId is not null)
+            {
+                var capturedByMember = await MemberService.GetMemberByIdAsync(claim.PayoutCapturedByMemberId.Value);
+                payoutCapturedByMemberName = capturedByMember?.FullName;
+            }
         }
 
         isLoading = false;
@@ -603,6 +675,61 @@ else
         await LoadClaimAsync();
     }
 
+    private async Task MarkPayoutPaidAsync()
+    {
+        successMessage = null;
+        warningMessage = null;
+        errorMessage = null;
+
+        if (!canManagePayments)
+        {
+            errorMessage = "Only the Treasurer can mark a claim payout as paid.";
+            return;
+        }
+
+        if (claim is null || claim.Status != FuneralClaimStatus.Approved)
+        {
+            errorMessage = "Only approved claims can be marked as paid.";
+            return;
+        }
+
+        if (!CanSubmitPayout)
+        {
+            errorMessage = "Payout amount and reference are required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentUserId) || currentStokvelId is null)
+        {
+            errorMessage = "Treasurer member record could not be resolved.";
+            return;
+        }
+
+        var treasurerMember = await MemberAccessService.GetLinkedMemberForUserAsync(currentUserId, currentStokvelId.Value);
+
+        if (treasurerMember is null)
+        {
+            errorMessage = "Treasurer member record could not be resolved.";
+            return;
+        }
+
+        var markedPaid = await FuneralClaimService.MarkClaimPayoutPaidAsync(
+            ClaimId,
+            payoutModel.PayoutAmount,
+            payoutModel.PayoutReference ?? string.Empty,
+            payoutModel.PayoutNotes,
+            treasurerMember.Id);
+
+        if (!markedPaid)
+        {
+            errorMessage = "Claim payout could not be marked as paid.";
+            return;
+        }
+
+        successMessage = "Claim payout marked as paid.";
+        await LoadClaimAsync();
+    }
+
     private async Task SubmitClaimAsync()
     {
         successMessage = null;
@@ -646,19 +773,38 @@ else
         warningMessage = null;
         errorMessage = null;
 
-        if (!canReviewClaim)
+        if (!canCompleteSecretaryReview)
         {
             errorMessage = "You do not have permission to review this claim.";
             return;
         }
 
-        var updatedClaim = await FuneralClaimService.ReviewClaimAsSecretaryAsync(
-            ClaimId,
-            secretaryReviewModel.RecommendApproval,
-            secretaryReviewModel.ReviewNotes,
-            secretaryReviewModel.ReviewedByName);
+        if (string.IsNullOrWhiteSpace(secretaryReviewModel.ReviewNotes))
+        {
+            errorMessage = "Review notes are required before completing the secretary review.";
+            return;
+        }
 
-        if (updatedClaim is null)
+        if (string.IsNullOrWhiteSpace(currentUserId) || currentStokvelId is null)
+        {
+            errorMessage = "Secretary reviewer could not be resolved.";
+            return;
+        }
+
+        var secretaryMember = await MemberAccessService.GetLinkedMemberForUserAsync(currentUserId, currentStokvelId.Value);
+
+        if (secretaryMember is null)
+        {
+            errorMessage = "Secretary member record could not be resolved.";
+            return;
+        }
+
+        var reviewCompleted = await FuneralClaimService.CompleteSecretaryReviewAsync(
+            ClaimId,
+            secretaryReviewModel.ReviewNotes,
+            secretaryMember.Id);
+
+        if (!reviewCompleted)
         {
             errorMessage = "Secretary review could not be saved.";
             return;
@@ -674,7 +820,7 @@ else
         warningMessage = null;
         errorMessage = null;
 
-        if (!canApproveClaim)
+        if (!canMakeChairpersonDecision)
         {
             errorMessage = "You do not have permission to approve this claim.";
             return;
@@ -695,18 +841,32 @@ else
         warningMessage = null;
         errorMessage = null;
 
-        if (!canApproveClaim)
+        if (!canMakeChairpersonDecision)
         {
             errorMessage = "You do not have permission to approve this claim.";
             return;
         }
 
-        var updatedClaim = await FuneralClaimService.ApproveClaimAsChairpersonAsync(
-            ClaimId,
-            chairpersonDecisionModel.DecisionNotes,
-            chairpersonDecisionModel.DecidedByName);
+        if (string.IsNullOrWhiteSpace(currentUserId) || currentStokvelId is null)
+        {
+            errorMessage = "Chairperson reviewer could not be resolved.";
+            return;
+        }
 
-        if (updatedClaim is null)
+        var chairpersonMember = await MemberAccessService.GetLinkedMemberForUserAsync(currentUserId, currentStokvelId.Value);
+
+        if (chairpersonMember is null)
+        {
+            errorMessage = "Chairperson member record could not be resolved.";
+            return;
+        }
+
+        var approved = await FuneralClaimService.ApproveClaimAsync(
+            ClaimId,
+            chairpersonMember.Id,
+            chairpersonDecisionModel.DecisionNotes);
+
+        if (!approved)
         {
             errorMessage = "Claim could not be approved. Ensure the Death Certificate is uploaded.";
             return;
@@ -722,7 +882,7 @@ else
         warningMessage = null;
         errorMessage = null;
 
-        if (!canApproveClaim)
+        if (!canMakeChairpersonDecision)
         {
             errorMessage = "You do not have permission to reject this claim.";
             return;
@@ -743,18 +903,38 @@ else
         warningMessage = null;
         errorMessage = null;
 
-        if (!canApproveClaim)
+        if (!canMakeChairpersonDecision)
         {
             errorMessage = "You do not have permission to reject this claim.";
             return;
         }
 
-        var updatedClaim = await FuneralClaimService.RejectClaimAsChairpersonAsync(
-            ClaimId,
-            chairpersonDecisionModel.DecisionNotes,
-            chairpersonDecisionModel.DecidedByName);
+        if (string.IsNullOrWhiteSpace(chairpersonDecisionModel.DecisionNotes))
+        {
+            errorMessage = "Decision notes are required when rejecting a claim.";
+            return;
+        }
 
-        if (updatedClaim is null)
+        if (string.IsNullOrWhiteSpace(currentUserId) || currentStokvelId is null)
+        {
+            errorMessage = "Chairperson reviewer could not be resolved.";
+            return;
+        }
+
+        var chairpersonMember = await MemberAccessService.GetLinkedMemberForUserAsync(currentUserId, currentStokvelId.Value);
+
+        if (chairpersonMember is null)
+        {
+            errorMessage = "Chairperson member record could not be resolved.";
+            return;
+        }
+
+        var rejected = await FuneralClaimService.RejectClaimAsync(
+            ClaimId,
+            chairpersonMember.Id,
+            chairpersonDecisionModel.DecisionNotes);
+
+        if (!rejected)
         {
             errorMessage = "Claim could not be rejected.";
             return;
@@ -807,19 +987,32 @@ else
         return status is FuneralClaimStatus.Draft or FuneralClaimStatus.OnHold or FuneralClaimStatus.Submitted;
     }
 
+    private static bool IsClaimReviewableBySecretary(FuneralClaim claim)
+    {
+        return claim.SecretaryReviewedAt is null &&
+            claim.Status is FuneralClaimStatus.Submitted or FuneralClaimStatus.UnderReview or FuneralClaimStatus.OnHold;
+    }
+
+    private static bool IsClaimInChairpersonApprovalStage(FuneralClaim claim)
+    {
+        return claim.SecretaryReviewedAt is not null &&
+            claim.Status == FuneralClaimStatus.UnderReview;
+    }
+
     private sealed class SecretaryReviewModel
     {
-        public bool RecommendApproval { get; set; } = true;
-
         public string? ReviewNotes { get; set; }
-
-        public string? ReviewedByName { get; set; } = "Secretary";
     }
 
     private sealed class ChairpersonDecisionModel
     {
         public string? DecisionNotes { get; set; }
+    }
 
-        public string? DecidedByName { get; set; } = "Chairperson";
+    private sealed class ClaimPayoutModel
+    {
+        public decimal PayoutAmount { get; set; }
+        public string? PayoutReference { get; set; }
+        public string? PayoutNotes { get; set; }
     }
 }

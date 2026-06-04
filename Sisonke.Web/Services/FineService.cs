@@ -34,6 +34,49 @@ public class FineService(ApplicationDbContext context)
             .ToListAsync();
     }
 
+    public async Task<List<MemberFine>> GetOutstandingFinesByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        return await context.MemberFines
+            .Include(memberFine => memberFine.Member)
+            .Include(memberFine => memberFine.FineType)
+            .Where(memberFine =>
+                memberFine.TenantId == stokvel.TenantId &&
+                memberFine.Status == FineStatus.Unpaid)
+            .OrderByDescending(memberFine => memberFine.FineDate)
+            .ThenBy(memberFine => memberFine.Member.FullName)
+            .ToListAsync();
+    }
+
+    public async Task<int> GetOutstandingFineCountByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        return await context.MemberFines
+            .CountAsync(memberFine =>
+                memberFine.TenantId == stokvel.TenantId &&
+                memberFine.Status == FineStatus.Unpaid);
+    }
+
     public async Task<MemberFine?> GetMemberFineByIdAsync(Guid memberFineId)
     {
         return await context.MemberFines

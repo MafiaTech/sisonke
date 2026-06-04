@@ -1,11 +1,18 @@
 @page "/meeting-attendance/{MeetingId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
 @inject MeetingService MeetingService
+@inject MeetingApologyService MeetingApologyService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject StokvelService StokvelService
 @inject NavigationManager NavigationManager
 
@@ -23,6 +30,13 @@
 else if (meeting is null)
 {
     <AlertBanner Type="danger" Title="Meeting not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canManageAttendance)
+{
+    <AlertBanner Type="warning" Title="Only authorised office bearers can manage attendance." Message="" Icon="bi bi-exclamation-triangle-fill" />
+    <a class="btn btn-outline-secondary" href="@($"/meeting/{MeetingId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Meeting
+    </a>
 }
 else
 {
@@ -103,6 +117,7 @@ else
                     <thead>
                         <tr>
                             <th>Member name</th>
+                            <th>Apology</th>
                             <th>Status</th>
                             <th>Late</th>
                             <th>Left early</th>
@@ -113,9 +128,28 @@ else
                     <tbody>
                         @foreach (var attendance in attendanceRecords)
                         {
+                            var hasApology = apologiesByMemberId.TryGetValue(attendance.MemberId, out var apology);
                             <tr>
                                 <td>
                                     <div class="fw-600">@attendance.Member.FullName</div>
+                                </td>
+                                <td>
+                                    @if (hasApology && apology is not null)
+                                    {
+                                        <div class="apology-inline">
+                                            <span class="sisonke-badge sisonke-badge-green">Apology Submitted</span>
+                                            <div class="apology-detail mt-2">
+                                                <div><strong>Type:</strong> @DisplayApologyType(apology.ApologyType)</div>
+                                                <div><strong>Reason:</strong> @DisplayOrDash(apology.Reason)</div>
+                                                <div><strong>Submitted:</strong> @apology.SubmittedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                                                <div><strong>Status:</strong> @DisplayOrDash(apology.Status)</div>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">None</span>
+                                    }
                                 </td>
                                 <td>
                                     <select class="form-select form-select-sm" @bind="attendance.Status">
@@ -184,13 +218,22 @@ else
     .attendance-table th {
         padding: 1rem;
     }
+    .apology-detail {
+        color: var(--sk-text-muted);
+        font-size: .78rem;
+        line-height: 1.45;
+        max-width: 22rem;
+    }
 </style>
 
 @code {
     private Meeting? meeting;
+    private Stokvel? stokvel;
     private List<MeetingAttendance> attendanceRecords = [];
+    private Dictionary<Guid, MeetingApology> apologiesByMemberId = [];
     private (int Present, int Absent, int Apologies, int Late) attendanceSummary;
     private bool isLoading = true;
+    private bool canManageAttendance;
     private string? successMessage;
     private string? errorMessage;
 
@@ -212,9 +255,47 @@ else
 
         if (meeting is not null)
         {
+            stokvel = await StokvelService.GetStokvelByTenantIdAsync(meeting.TenantId);
+
+            if (stokvel is null)
+            {
+                isLoading = false;
+                return;
+            }
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            canManageAttendance = !string.IsNullOrWhiteSpace(userId) &&
+                await MemberAccessService.CanManageAttendanceAsync(userId, stokvel.Id);
+
+            if (!canManageAttendance)
+            {
+                isLoading = false;
+                return;
+            }
+
             await MeetingService.InitializeAttendanceRegisterAsync(MeetingId);
             attendanceRecords = await MeetingService.GetAttendanceByMeetingIdAsync(MeetingId);
-            attendanceSummary = await MeetingService.GetAttendanceSummaryAsync(MeetingId);
+            var apologies = await MeetingApologyService.GetApologiesByMeetingIdAsync(MeetingId);
+            apologiesByMemberId = apologies
+                .GroupBy(apology => apology.MemberId)
+                .ToDictionary(
+                    apologyGroup => apologyGroup.Key,
+                    apologyGroup => apologyGroup.OrderByDescending(apology => apology.SubmittedAt).First());
+
+            foreach (var attendance in attendanceRecords)
+            {
+                if (apologiesByMemberId.ContainsKey(attendance.MemberId) &&
+                    attendance.Status == AttendanceStatus.Absent &&
+                    string.IsNullOrWhiteSpace(attendance.Notes) &&
+                    !attendance.IsLate &&
+                    !attendance.LeftEarly)
+                {
+                    attendance.Status = AttendanceStatus.Apology;
+                }
+            }
+
+            attendanceSummary = BuildAttendanceSummary();
         }
 
         isLoading = false;
@@ -238,8 +319,27 @@ else
             return;
         }
 
-        attendanceSummary = await MeetingService.GetAttendanceSummaryAsync(MeetingId);
+        attendanceSummary = BuildAttendanceSummary();
         successMessage = "Attendance updated.";
+    }
+
+    private (int Present, int Absent, int Apologies, int Late) BuildAttendanceSummary()
+    {
+        return (
+            attendanceRecords.Count(attendance => attendance.Status == AttendanceStatus.Present),
+            attendanceRecords.Count(attendance => attendance.Status == AttendanceStatus.Absent),
+            attendanceRecords.Count(attendance => attendance.Status == AttendanceStatus.Apology),
+            attendanceRecords.Count(attendance => attendance.IsLate));
+    }
+
+    private static string DisplayApologyType(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Not specified" : value;
+    }
+
+    private static string DisplayOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
     }
 
     private static string GetStatusBadgeType(string status) =>

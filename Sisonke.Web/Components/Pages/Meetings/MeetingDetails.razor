@@ -1,11 +1,17 @@
 @page "/meeting/{MeetingId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
 @inject MeetingService MeetingService
 @inject StokvelService StokvelService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
 <PageTitle>@(meeting?.Title ?? "Meeting")</PageTitle>
@@ -22,6 +28,13 @@
 else if (meeting is null)
 {
     <AlertBanner Type="danger" Title="Meeting not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canViewMeeting)
+{
+    <AlertBanner Type="warning" Title="You do not have access to this meeting." Message="" Icon="bi bi-exclamation-triangle-fill" />
+    <a class="btn btn-outline-secondary" href="/my-workspace">
+        <i class="bi bi-arrow-left me-1"></i>Back to My Workspace
+    </a>
 }
 else
 {
@@ -56,18 +69,21 @@ else
                         @DisplayOrDash(meeting.Purpose)
                     </p>
                     <div class="meeting-detail-actions">
-                        <a class="btn btn-success btn-sm" href="@($"/meeting-attendance/{MeetingId}")">
-                            <i class="bi bi-person-check me-1"></i>Attendance Register
-                        </a>
-                        <a class="btn btn-purple btn-sm" href="@($"/meeting-votes/{MeetingId}")">
-                            <i class="bi bi-check2-square me-1"></i>Voting and Decisions
-                        </a>
-                        <a class="btn btn-outline-primary btn-sm" href="@($"/edit-meeting/{MeetingId}")">
-                            <i class="bi bi-pencil-square me-1"></i>Edit Meeting
-                        </a>
-                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ShowDeleteMeetingConfirmation">
-                            <i class="bi bi-trash me-1"></i>Delete Meeting
-                        </button>
+                        @if (canManageMeetings)
+                        {
+                            <a class="btn btn-success btn-sm" href="@($"/meeting-attendance/{MeetingId}")">
+                                <i class="bi bi-person-check me-1"></i>Attendance Register
+                            </a>
+                            <a class="btn btn-purple btn-sm" href="@($"/meeting-votes/{MeetingId}")">
+                                <i class="bi bi-check2-square me-1"></i>Voting and Decisions
+                            </a>
+                            <a class="btn btn-outline-primary btn-sm" href="@($"/edit-meeting/{MeetingId}")">
+                                <i class="bi bi-pencil-square me-1"></i>Edit Meeting
+                            </a>
+                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ShowDeleteMeetingConfirmation">
+                                <i class="bi bi-trash me-1"></i>Delete Meeting
+                            </button>
+                        }
                         <a class="btn btn-outline-secondary btn-sm" href="@backToMeetingsHref">
                             <i class="bi bi-arrow-left me-1"></i>Back to Meetings
                         </a>
@@ -84,9 +100,12 @@ else
                     <h2 class="agenda-card-title">Generated Agenda</h2>
                     <p class="agenda-card-subtitle">@meeting.AgendaItems.Count @(meeting.AgendaItems.Count == 1 ? "item" : "items") · use Voting &amp; Decisions to log formal resolutions.</p>
                 </div>
-                <button type="button" class="btn btn-purple btn-sm" @onclick="ShowAddAgendaItemForm">
-                    <i class="bi bi-plus-circle me-1"></i>Add Agenda Item
-                </button>
+                @if (canManageMeetings)
+                {
+                    <button type="button" class="btn btn-purple btn-sm" @onclick="ShowAddAgendaItemForm">
+                        <i class="bi bi-plus-circle me-1"></i>Add Agenda Item
+                    </button>
+                }
             </div>
 
             @if (!string.IsNullOrWhiteSpace(successMessage))
@@ -99,7 +118,7 @@ else
                 <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
             }
 
-            @if (isAddingAgendaItem)
+            @if (canManageMeetings && isAddingAgendaItem)
             {
                 <div class="agenda-management-form mb-3">
                     <div class="agenda-form-title">Add Agenda Item</div>
@@ -192,18 +211,21 @@ else
                                 </div>
                                 <div class="agenda-row-actions">
                                     <StatusBadge Text="@(agendaItem.IsCompleted ? "Completed" : "Open")" Type="@(agendaItem.IsCompleted ? "success" : "secondary")" />
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => MoveAgendaItemUpAsync(agendaItem.Id))">
-                                        <i class="bi bi-arrow-up me-1"></i>Move Up
-                                    </button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => MoveAgendaItemDownAsync(agendaItem.Id))">
-                                        <i class="bi bi-arrow-down me-1"></i>Move Down
-                                    </button>
-                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="@(() => ShowEditAgendaItemForm(agendaItem))">
-                                        <i class="bi bi-pencil-square me-1"></i>Edit
-                                    </button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="@(() => ShowDeleteAgendaItemConfirmation(agendaItem.Id))">
-                                        <i class="bi bi-trash me-1"></i>Delete
-                                    </button>
+                                    @if (canManageMeetings)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => MoveAgendaItemUpAsync(agendaItem.Id))">
+                                            <i class="bi bi-arrow-up me-1"></i>Move Up
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => MoveAgendaItemDownAsync(agendaItem.Id))">
+                                            <i class="bi bi-arrow-down me-1"></i>Move Down
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="@(() => ShowEditAgendaItemForm(agendaItem))">
+                                            <i class="bi bi-pencil-square me-1"></i>Edit
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="@(() => ShowDeleteAgendaItemConfirmation(agendaItem.Id))">
+                                            <i class="bi bi-trash me-1"></i>Delete
+                                        </button>
+                                    }
                                 </div>
                             }
                         </div>
@@ -240,6 +262,8 @@ else
     private string? successMessage;
     private string? errorMessage;
     private bool isLoading = true;
+    private bool canViewMeeting;
+    private bool canManageMeetings;
     private bool isAddingAgendaItem;
     private string newAgendaTitle = string.Empty;
     private string? newAgendaDescription;
@@ -271,11 +295,28 @@ else
             backToMeetingsHref = stokvel is null
                 ? "/my-stokvels"
                 : $"/meetings/{stokvel.Id}";
+
+            if (stokvel is not null)
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    canViewMeeting = await MemberAccessService.CanViewStokvelAsync(userId, stokvel.Id);
+                    canManageMeetings = await MemberAccessService.CanManageMeetingsAsync(userId, stokvel.Id);
+                }
+            }
         }
     }
 
     private void ShowAddAgendaItemForm()
     {
+        if (!canManageMeetings)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
         editingAgendaItemId = null;
@@ -293,6 +334,12 @@ else
 
     private async Task SaveNewAgendaItemAsync()
     {
+        if (!canManageMeetings)
+        {
+            errorMessage = "Only authorised office bearers can manage agenda items.";
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(newAgendaTitle))
         {
             return;
@@ -310,6 +357,12 @@ else
 
     private async Task MoveAgendaItemUpAsync(Guid agendaItemId)
     {
+        if (!canManageMeetings)
+        {
+            errorMessage = "Only authorised office bearers can manage agenda items.";
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
         await MeetingService.MoveAgendaItemUpAsync(agendaItemId);
@@ -318,6 +371,12 @@ else
 
     private async Task MoveAgendaItemDownAsync(Guid agendaItemId)
     {
+        if (!canManageMeetings)
+        {
+            errorMessage = "Only authorised office bearers can manage agenda items.";
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
         await MeetingService.MoveAgendaItemDownAsync(agendaItemId);
@@ -326,6 +385,11 @@ else
 
     private void ShowEditAgendaItemForm(MeetingAgendaItem agendaItem)
     {
+        if (!canManageMeetings)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
         isAddingAgendaItem = false;
@@ -347,6 +411,12 @@ else
 
     private async Task SaveAgendaItemEditAsync()
     {
+        if (!canManageMeetings)
+        {
+            errorMessage = "Only authorised office bearers can manage agenda items.";
+            return;
+        }
+
         if (editingAgendaItemId is null || string.IsNullOrWhiteSpace(editAgendaTitle))
         {
             return;
@@ -369,6 +439,11 @@ else
 
     private void ShowDeleteAgendaItemConfirmation(Guid agendaItemId)
     {
+        if (!canManageMeetings)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
         selectedAgendaItemId = agendaItemId;
@@ -383,6 +458,12 @@ else
 
     private async Task ConfirmDeleteAgendaItemAsync()
     {
+        if (!canManageMeetings)
+        {
+            errorMessage = "Only authorised office bearers can manage agenda items.";
+            return;
+        }
+
         if (selectedAgendaItemId is null)
         {
             return;
@@ -400,6 +481,11 @@ else
 
     private void ShowDeleteMeetingConfirmation()
     {
+        if (!canManageMeetings)
+        {
+            return;
+        }
+
         successMessage = null;
         errorMessage = null;
         showDeleteMeetingConfirmation = true;
@@ -412,6 +498,12 @@ else
 
     private async Task ConfirmDeleteMeetingAsync()
     {
+        if (!canManageMeetings)
+        {
+            errorMessage = "Only authorised office bearers can delete meetings.";
+            return;
+        }
+
         var deleted = await MeetingService.DeleteMeetingAsync(MeetingId);
         showDeleteMeetingConfirmation = false;
 

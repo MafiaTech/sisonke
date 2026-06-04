@@ -1,0 +1,299 @@
+@page "/treasurer-tasks/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject FineService FineService
+@inject FuneralClaimService FuneralClaimService
+@inject ContributionPaymentService ContributionPaymentService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Treasurer Task List</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading finance tasks...
+    </div>
+}
+else if (!canViewTreasurerTasks)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        You do not have access to the treasurer task list for this stokvel.
+    </div>
+
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
+        Back to My Workspace
+    </a>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Treasurer</span>
+            <h1>Treasurer Task List</h1>
+            <p>Financial items requiring capture, confirmation or follow-up.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+            <a class="sisonke-btn sisonke-btn-gold" href="@($"/finance-summary/{StokvelId}")">Finance Summary Report</a>
+            <a class="sisonke-btn sisonke-btn-primary" href="@($"/members/{StokvelId}")">Open Members</a>
+        </div>
+    </section>
+
+    @if (outstandingFines.Count == 0 && approvedClaimsAwaitingPayout.Count == 0)
+    {
+        <div class="sisonke-alert sisonke-alert-green mb-4">
+            No pending finance tasks. Everything is up to date.
+        </div>
+    }
+
+    <div class="sisonke-grid sisonke-grid-2 mb-4">
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Outstanding Fines</h2>
+                        <p>Unpaid fines that may need payment confirmation.</p>
+                    </div>
+                    <span class="sisonke-badge sisonke-badge-red">@outstandingFines.Count Open</span>
+                </div>
+
+                @if (outstandingFines.Count == 0)
+                {
+                    <div class="sisonke-alert sisonke-alert-green mb-0">
+                        No outstanding fines recorded.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="sisonke-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Member</th>
+                                    <th>Fine</th>
+                                    <th>Amount</th>
+                                    <th>Date Issued</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var fine in outstandingFines)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@(fine.Member?.FullName ?? "Member unavailable")</td>
+                                        <td>
+                                            <div>@(fine.FineType?.Name ?? "Fine")</div>
+                                            <div class="text-muted small">@(string.IsNullOrWhiteSpace(fine.Reason) ? "-" : fine.Reason)</div>
+                                        </td>
+                                        <td>@FormatZAR(fine.Amount)</td>
+                                        <td>@fine.FineDate.ToString("dd MMM yyyy")</td>
+                                        <td><span class="sisonke-badge sisonke-badge-red">@fine.Status</span></td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{fine.MemberId}")">Open Profile</a>
+                                                @if (canManagePayments)
+                                                {
+                                                    <a class="sisonke-btn sisonke-btn-gold" href="@($"/mark-fine-paid/{fine.Id}")">Mark Paid</a>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Approved Claims Awaiting Payout</h2>
+                        <p>Claims approved by the chairperson and awaiting finance follow-up.</p>
+                    </div>
+                    <span class="sisonke-badge sisonke-badge-gold">@approvedClaimsAwaitingPayout.Count Open</span>
+                </div>
+
+                @if (approvedClaimsAwaitingPayout.Count == 0)
+                {
+                    <div class="sisonke-alert sisonke-alert-green mb-0">
+                        No approved claims are awaiting payout.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="sisonke-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Claim</th>
+                                    <th>Member</th>
+                                    <th>Subject</th>
+                                    <th>Approved Date</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var claim in approvedClaimsAwaitingPayout)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@claim.Id.ToString("N")[..8].ToUpperInvariant()</td>
+                                        <td>@(claim.Member?.FullName ?? "Member unavailable")</td>
+                                        <td>
+                                            <div>@claim.DeceasedFullName</div>
+                                            <div class="text-muted small">@claim.SubjectType</div>
+                                        </td>
+                                        <td>@((claim.ApprovedAt ?? claim.ChairpersonDecisionAt)?.ToString("dd MMM yyyy") ?? "-")</td>
+                                        <td><span class="sisonke-badge sisonke-badge-green">@claim.Status</span></td>
+                                        <td>
+                                            <a class="sisonke-btn sisonke-btn-outline" href="@($"/claim/{claim.Id}")">Open Claim</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="sisonke-grid sisonke-grid-2">
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Contributions to Capture</h2>
+                        <p>@CurrentMonthLabel monthly contribution capture workspace.</p>
+                    </div>
+                    <span class="sisonke-badge sisonke-badge-blue">@currentMonthContributionSummary.RecordsGenerated Records</span>
+                </div>
+                @if (currentMonthContributionSummary.RecordsGenerated == 0)
+                {
+                    <div class="sisonke-alert sisonke-alert-blue">
+                        No contribution records have been generated for this month yet.
+                    </div>
+                }
+                <div class="sisonke-grid sisonke-grid-2 mb-3">
+                    <div class="sisonke-alert sisonke-alert-blue mb-0">
+                        <strong>@FormatZAR(currentMonthContributionSummary.ExpectedContributions)</strong> expected
+                    </div>
+                    <div class="sisonke-alert sisonke-alert-green mb-0">
+                        <strong>@FormatZAR(currentMonthContributionSummary.ActualContributions)</strong> actual
+                    </div>
+                    <div class="sisonke-alert sisonke-alert-gold mb-0">
+                        <strong>@FormatZAR(currentMonthContributionSummary.OutstandingContributions)</strong> outstanding
+                    </div>
+                    <div class="sisonke-alert sisonke-alert-blue mb-0">
+                        <strong>@currentMonthContributionSummary.CollectionRatePercentage.ToString("0.#")%</strong> collection rate
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <span class="sisonke-badge sisonke-badge-green">@currentMonthContributionSummary.PaidCount Paid</span>
+                    <span class="sisonke-badge sisonke-badge-gold">@currentMonthContributionSummary.PartiallyPaidCount Partial</span>
+                    <span class="sisonke-badge sisonke-badge-red">@currentMonthContributionSummary.OverdueCount Overdue</span>
+                    <span class="sisonke-badge sisonke-badge-gray">@currentMonthContributionSummary.UnpaidCount Unpaid</span>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    @if (canManagePayments)
+                    {
+                        <a class="sisonke-btn sisonke-btn-primary" href="@($"/contribution-capture/{StokvelId}")">Open Contribution Capture</a>
+                    }
+                    <a class="sisonke-btn sisonke-btn-outline" href="@($"/contribution-rules/{StokvelId}")">Contribution Rules</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Financial Reports</h2>
+                        <p>Monthly contribution, arrears and payment overview.</p>
+                    </div>
+                    <span class="sisonke-badge sisonke-badge-blue">Ready</span>
+                </div>
+                <a class="sisonke-btn sisonke-btn-primary" href="@($"/finance-summary/{StokvelId}")">Finance Summary Report</a>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isLoading = true;
+    private bool canViewTreasurerTasks;
+    private bool canManagePayments;
+    private List<MemberFine> outstandingFines = [];
+    private List<FuneralClaim> approvedClaimsAwaitingPayout = [];
+    private List<MemberContribution> currentMonthContributions = [];
+    private ContributionMonthSummaryDto currentMonthContributionSummary = new();
+    private string CurrentMonthLabel => DateTime.Today.ToString("MMMM yyyy");
+    private int CurrentMonthPaidContributionCount => currentMonthContributions.Count(contribution => contribution.Status == PaymentStatus.Paid);
+    private int CurrentMonthOpenContributionCount => currentMonthContributions.Count(contribution =>
+        contribution.Status is PaymentStatus.Unpaid or PaymentStatus.PartiallyPaid or PaymentStatus.Late);
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        canViewTreasurerTasks = false;
+        canManagePayments = false;
+        outstandingFines = [];
+        approvedClaimsAwaitingPayout = [];
+        currentMonthContributions = [];
+        currentMonthContributionSummary = new();
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        canViewTreasurerTasks = await MemberAccessService.CanViewTreasurerTasksAsync(userId, StokvelId);
+        canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, StokvelId);
+
+        if (!canViewTreasurerTasks)
+        {
+            isLoading = false;
+            return;
+        }
+
+        outstandingFines = await FineService.GetOutstandingFinesByStokvelIdAsync(StokvelId);
+        approvedClaimsAwaitingPayout = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutByStokvelIdAsync(StokvelId);
+        currentMonthContributions = await ContributionPaymentService.GetMonthlyContributionsAsync(
+            StokvelId,
+            DateTime.Today.Year,
+            DateTime.Today.Month);
+        currentMonthContributionSummary = await ContributionPaymentService.GetMonthlyContributionSummaryAsync(
+            StokvelId,
+            DateTime.Today.Year,
+            DateTime.Today.Month);
+        isLoading = false;
+    }
+
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+}

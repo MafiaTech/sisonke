@@ -1,0 +1,225 @@
+@page "/chairperson-tasks/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject FuneralClaimService FuneralClaimService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Chairperson Approval Tasks</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading chairperson tasks...
+    </div>
+}
+else if (!canViewChairpersonTasks)
+{
+    <div class="d-flex flex-column gap-3">
+        <AlertBanner
+            Type="warning"
+            Title="You do not have access to the chairperson approval tasks for this stokvel."
+            Message=""
+            Icon="bi bi-exclamation-triangle-fill" />
+
+        <div>
+            <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
+                <i class="bi bi-arrow-left me-1"></i>Back to My Workspace
+            </a>
+        </div>
+    </div>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Approvals</span>
+            <h1>Chairperson Approval Tasks</h1>
+            <p>Review claims and decisions awaiting final approval.</p>
+        </div>
+        <div class="chairperson-tasks-hero-meta">
+            <div>
+                <span>Claims awaiting approval</span>
+                <strong>@claimsAwaitingApproval.Count</strong>
+            </div>
+        </div>
+    </section>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a class="sisonke-btn sisonke-btn-outline" href="@DashboardHref">
+            <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+        </a>
+        @if (canViewSecretaryTasks)
+        {
+            <a class="sisonke-btn sisonke-btn-primary" href="@SecretaryTasksHref">
+                <i class="bi bi-list-check me-1"></i>Open Secretary Tasks
+            </a>
+        }
+    </div>
+
+    <section class="sisonke-card">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Claims Awaiting Approval</h2>
+                <p>Secretary-reviewed claims ready for chairperson decision.</p>
+            </div>
+            <span class="sisonke-badge sisonke-badge-blue">@claimsAwaitingApproval.Count</span>
+        </div>
+        <div class="sisonke-card-body">
+            @if (claimsAwaitingApproval.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-green mb-0">
+                    No claims are currently awaiting chairperson approval.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Claim</th>
+                                <th>Member</th>
+                                <th>Subject</th>
+                                <th>Date Submitted</th>
+                                <th>Secretary Review</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var claim in claimsAwaitingApproval)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@GetClaimReference(claim)</td>
+                                    <td>@DisplayOrDash(claim.Member?.FullName)</td>
+                                    <td>
+                                        <div>@claim.SubjectType</div>
+                                        <div class="text-muted small">@DisplayOrDash(claim.DeceasedFullName)</div>
+                                    </td>
+                                    <td>@(claim.SubmittedAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm") ?? "-")</td>
+                                    <td>
+                                        <div><span class="sisonke-badge sisonke-badge-green">Complete</span></div>
+                                        <div class="text-muted small mt-1">@DisplayOrDash(claim.SecretaryReviewNotes)</div>
+                                    </td>
+                                    <td><span class="@GetClaimStatusBadgeClass(claim.Status.ToString())">@claim.Status</span></td>
+                                    <td class="text-end">
+                                        <a class="sisonke-btn sisonke-btn-primary" href="@($"/claim/{claim.Id}")">
+                                            Open Claim
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+<style>
+    .chairperson-tasks-hero-meta {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: .75rem;
+        min-width: min(18rem, 100%);
+    }
+
+    .chairperson-tasks-hero-meta div {
+        background: rgb(255 255 255 / .12);
+        border: 1px solid rgb(255 255 255 / .2);
+        border-radius: var(--r-md);
+        padding: .85rem 1rem;
+    }
+
+    .chairperson-tasks-hero-meta span {
+        display: block;
+        color: rgb(255 255 255 / .72);
+        font-size: .72rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .chairperson-tasks-hero-meta strong {
+        color: #fff;
+        font-size: 1.8rem;
+        line-height: 1.1;
+    }
+</style>
+
+@code {
+    private List<FuneralClaim> claimsAwaitingApproval = [];
+    private bool isLoading = true;
+    private bool canViewChairpersonTasks;
+    private bool canViewSecretaryTasks;
+    private string DashboardHref => $"/stokvel-dashboard/{StokvelId}";
+    private string SecretaryTasksHref => $"/secretary-tasks/{StokvelId}";
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        claimsAwaitingApproval = [];
+        canViewChairpersonTasks = false;
+        canViewSecretaryTasks = false;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        canViewChairpersonTasks = await MemberAccessService.CanViewChairpersonTasksAsync(userId, StokvelId);
+        canViewSecretaryTasks = await MemberAccessService.CanViewSecretaryTasksAsync(userId, StokvelId);
+
+        if (!canViewChairpersonTasks)
+        {
+            isLoading = false;
+            return;
+        }
+
+        claimsAwaitingApproval = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalByStokvelIdAsync(StokvelId);
+        isLoading = false;
+    }
+
+    private static string DisplayOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string GetClaimReference(FuneralClaim claim)
+    {
+        return $"CLM-{claim.Id.ToString("N")[..8].ToUpperInvariant()}";
+    }
+
+    private static string GetClaimStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Submitted" => "sisonke-badge sisonke-badge-blue",
+            "UnderReview" => "sisonke-badge sisonke-badge-teal",
+            "OnHold" => "sisonke-badge sisonke-badge-gold",
+            "Approved" => "sisonke-badge sisonke-badge-green",
+            "Rejected" => "sisonke-badge sisonke-badge-red",
+            "Paid" => "sisonke-badge sisonke-badge-green",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+}

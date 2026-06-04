@@ -1,0 +1,279 @@
+@page "/member-statement/{MemberId:guid}/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject FinanceReportService FinanceReportService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Member Financial Statement</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading member statement...
+    </div>
+}
+else if (!canAccessStatement)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        You do not have access to this member statement.
+    </div>
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else if (statement is null)
+{
+    <div class="sisonke-alert sisonke-alert-red" role="alert">
+        Member financial statement could not be found.
+    </div>
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-blue">Statement</span>
+            <h1>Member Financial Statement</h1>
+            <p>@statement.MemberName</p>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <span class="sisonke-badge sisonke-badge-gray">Member No. @Display(statement.MemberNumber)</span>
+                <span class="sisonke-badge sisonke-badge-blue">@statement.StokvelName</span>
+                <span class="sisonke-badge sisonke-badge-gold">Generated @FormatDateTime(statement.GeneratedAt)</span>
+                <span class="sisonke-badge sisonke-badge-red">Outstanding @FormatZAR(statement.TotalOutstandingBalance)</span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">Back to Member Profile</a>
+            @if (canViewFinancials)
+            {
+                <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+            }
+            <button class="sisonke-btn sisonke-btn-outline" type="button" disabled>Export PDF Coming Soon</button>
+        </div>
+    </section>
+
+    <div class="sisonke-grid sisonke-grid-4 mb-4">
+        @MetricCard("Expected Contributions", FormatZAR(statement.TotalExpectedContributions), "blue")
+        @MetricCard("Contributions Paid", FormatZAR(statement.TotalContributionPaid), "green")
+        @MetricCard("Contribution Outstanding", FormatZAR(statement.TotalContributionOutstanding), "gold")
+        @MetricCard("Outstanding Fines", FormatZAR(statement.TotalOutstandingFines), "red")
+        @MetricCard("Total Outstanding Balance", FormatZAR(statement.TotalOutstandingBalance), "red")
+    </div>
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Contributions</h2>
+                    <p>Contribution position by month.</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="sisonke-badge sisonke-badge-red">@statement.OverdueContributionCount Overdue</span>
+                    @if (canManagePayments)
+                    {
+                        <a class="sisonke-btn sisonke-btn-primary" href="@($"/contribution-capture/{StokvelId}")">Contribution Capture</a>
+                    }
+                </div>
+            </div>
+
+            @if (statement.Contributions.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                    No contribution records have been captured for this member.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Month/Year</th>
+                                <th>Expected</th>
+                                <th>Paid</th>
+                                <th>Balance</th>
+                                <th>Due date</th>
+                                <th>Status</th>
+                                <th>Reference</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var contribution in statement.Contributions)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@contribution.MonthYear</td>
+                                    <td>@FormatZAR(contribution.ExpectedAmount)</td>
+                                    <td>@FormatZAR(contribution.PaidAmount)</td>
+                                    <td>@FormatZAR(contribution.Balance)</td>
+                                    <td>@(contribution.DueDate?.ToString("dd MMM yyyy") ?? "-")</td>
+                                    <td><span class="@GetPaymentStatusBadgeClass(contribution.Status)">@contribution.Status</span></td>
+                                    <td>@(string.IsNullOrWhiteSpace(contribution.Reference) ? "-" : contribution.Reference)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Fines</h2>
+                    <p>Fine position for this member.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-red">@statement.OutstandingFineCount Outstanding</span>
+            </div>
+
+            @if (statement.Fines.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                    No fines have been captured for this member.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Fine type</th>
+                                <th>Amount</th>
+                                <th>Paid</th>
+                                <th>Balance</th>
+                                <th>Status</th>
+                                <th>Issued date</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var fine in statement.Fines)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@fine.FineType</td>
+                                    <td>@FormatZAR(fine.Amount)</td>
+                                    <td>@FormatZAR(fine.AmountPaid)</td>
+                                    <td>@FormatZAR(fine.Balance)</td>
+                                    <td><span class="@GetFineStatusBadgeClass(fine.Status)">@fine.Status</span></td>
+                                    <td>@(fine.IssuedDate?.ToString("dd MMM yyyy") ?? "-")</td>
+                                    <td>@(string.IsNullOrWhiteSpace(fine.Reason) ? "-" : fine.Reason)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+
+    <div class="d-flex flex-wrap gap-2">
+        <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">Back to Member Profile</a>
+        @if (canViewFinancials)
+        {
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+        }
+        @if (canManagePayments)
+        {
+            <a class="sisonke-btn sisonke-btn-primary" href="@($"/contribution-capture/{StokvelId}")">Contribution Capture</a>
+        }
+        <button class="sisonke-btn sisonke-btn-outline" type="button" disabled>Export PDF Coming Soon</button>
+    </div>
+}
+
+@code {
+    private bool isLoading = true;
+    private bool isOwnMemberRecord;
+    private bool canViewFinancials;
+    private bool canManagePayments;
+    private bool canAccessStatement;
+    private MemberFinancialStatementDto? statement;
+
+    [Parameter]
+    public Guid MemberId { get; set; }
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        isOwnMemberRecord = false;
+        canViewFinancials = false;
+        canManagePayments = false;
+        canAccessStatement = false;
+        statement = null;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        isOwnMemberRecord = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+        canViewFinancials = await MemberAccessService.CanViewFinancialsAsync(userId, StokvelId);
+        canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, StokvelId);
+        canAccessStatement = isOwnMemberRecord || canViewFinancials;
+
+        if (canAccessStatement)
+        {
+            statement = await FinanceReportService.GetMemberFinancialStatementAsync(MemberId, StokvelId);
+        }
+
+        isLoading = false;
+    }
+
+    private static RenderFragment MetricCard(string title, string value, string badgeType) => @<div class="sisonke-card">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head px-0 pt-0">
+                <span class="sisonke-badge sisonke-badge-@badgeType">@title</span>
+            </div>
+            <div class="sisonke-stat-value">@value</div>
+        </div>
+    </div>;
+
+    private static string Display(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
+
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string FormatDateTime(DateTime value) =>
+        value == default ? "-" : value.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+
+    private static string GetPaymentStatusBadgeClass(string status) =>
+        status switch
+        {
+            "Paid" => "sisonke-badge sisonke-badge-green",
+            "PartiallyPaid" => "sisonke-badge sisonke-badge-gold",
+            "Overdue" => "sisonke-badge sisonke-badge-red",
+            "Unpaid" => "sisonke-badge sisonke-badge-gray",
+            "Exempted" => "sisonke-badge sisonke-badge-gray",
+            "WrittenOff" => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string GetFineStatusBadgeClass(string status) =>
+        status switch
+        {
+            "Paid" => "sisonke-badge sisonke-badge-green",
+            "Unpaid" => "sisonke-badge sisonke-badge-red",
+            "Waived" => "sisonke-badge sisonke-badge-gold",
+            "Cancelled" => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+}

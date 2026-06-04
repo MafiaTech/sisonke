@@ -1,0 +1,169 @@
+@page "/contribution-payment-audit/{ContributionPaymentId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+@using ContributionPaymentAuditEntity = Sisonke.Web.Data.Entities.ContributionPaymentAudit
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ContributionPaymentService ContributionPaymentService
+@inject MemberAccessService MemberAccessService
+
+<PageTitle>Contribution Payment Audit</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading audit trail...
+    </div>
+}
+else if (contributionPayment is null)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        Contribution payment record not found.
+    </div>
+
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else if (!canViewFinancials)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        You do not have access to this contribution payment audit trail.
+    </div>
+
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Finance Audit</span>
+            <h1>Contribution Payment Audit</h1>
+            <p>@(contributionPayment.Member?.FullName ?? "Member unavailable") · @GetContributionPeriod()</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            @if (stokvelId is Guid resolvedStokvelId)
+            {
+                <a class="sisonke-btn sisonke-btn-outline" href="@($"/contribution-capture/{resolvedStokvelId}")">Back to Contribution Capture</a>
+            }
+            else
+            {
+                <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+            }
+        </div>
+    </section>
+
+    <div class="sisonke-card">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Audit Trail</h2>
+                    <p>Traceable payment and status changes for this contribution record.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-blue">@auditTrail.Count Entries</span>
+            </div>
+
+            @if (auditTrail.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue mb-0" role="alert">
+                    No audit entries have been recorded for this contribution payment yet.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date/time</th>
+                                <th>Action</th>
+                                <th>Previous amount</th>
+                                <th>New amount</th>
+                                <th>Previous status</th>
+                                <th>New status</th>
+                                <th>Reference</th>
+                                <th>Notes</th>
+                                <th>Captured by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var audit in auditTrail)
+                            {
+                                <tr>
+                                    <td>@audit.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                    <td><span class="sisonke-badge sisonke-badge-blue">@audit.Action</span></td>
+                                    <td>@FormatNullableZAR(audit.PreviousAmountPaid)</td>
+                                    <td>@FormatNullableZAR(audit.NewAmountPaid)</td>
+                                    <td>@(audit.PreviousStatus ?? "-")</td>
+                                    <td>@(audit.NewStatus ?? "-")</td>
+                                    <td>@(string.IsNullOrWhiteSpace(audit.PaymentReference) ? "-" : audit.PaymentReference)</td>
+                                    <td>@(string.IsNullOrWhiteSpace(audit.Notes) ? "-" : audit.Notes)</td>
+                                    <td>@(audit.CapturedByMember?.FullName ?? "System")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool isLoading = true;
+    private bool canViewFinancials;
+    private Guid? stokvelId;
+    private MemberContribution? contributionPayment;
+    private List<ContributionPaymentAuditEntity> auditTrail = [];
+
+    [Parameter]
+    public Guid ContributionPaymentId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        canViewFinancials = false;
+        stokvelId = null;
+        contributionPayment = null;
+        auditTrail = [];
+
+        contributionPayment = await ContributionPaymentService.GetContributionPaymentByIdAsync(ContributionPaymentId);
+        stokvelId = await ContributionPaymentService.GetStokvelIdForContributionPaymentAsync(ContributionPaymentId);
+
+        if (contributionPayment is null || stokvelId is null)
+        {
+            isLoading = false;
+            return;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            canViewFinancials = await MemberAccessService.CanViewFinancialsAsync(userId, stokvelId.Value);
+        }
+
+        if (canViewFinancials)
+        {
+            auditTrail = await ContributionPaymentService.GetAuditTrailByContributionPaymentIdAsync(ContributionPaymentId);
+        }
+
+        isLoading = false;
+    }
+
+    private string GetContributionPeriod() =>
+        contributionPayment?.ContributionCycle?.PeriodStart.ToString("MMMM yyyy") ?? "Contribution period unavailable";
+
+    private static string FormatNullableZAR(decimal? amount) =>
+        amount.HasValue
+            ? amount.Value.ToString("C0", new System.Globalization.CultureInfo("en-ZA"))
+            : "-";
+}

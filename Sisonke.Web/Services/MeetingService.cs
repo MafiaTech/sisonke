@@ -170,6 +170,46 @@ public class MeetingService(ApplicationDbContext context)
                 (meeting.Status == MeetingStatus.Planned || meeting.Status == MeetingStatus.InProgress));
     }
 
+    public async Task<int> GetMeetingsNeedingAttendanceCountByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        return await context.Meetings
+            .Where(meeting =>
+                meeting.TenantId == stokvel.TenantId &&
+                meeting.Status != MeetingStatus.Cancelled &&
+                meeting.MeetingDate.Date <= DateTime.Today)
+            .CountAsync(meeting =>
+                !context.MeetingAttendances.Any(attendance => attendance.MeetingId == meeting.Id) ||
+                context.MeetingAttendances
+                    .Where(attendance => attendance.MeetingId == meeting.Id)
+                    .All(attendance =>
+                        attendance.Status == AttendanceStatus.Absent &&
+                        !attendance.IsLate &&
+                        !attendance.LeftEarly &&
+                        (attendance.Notes == null || attendance.Notes == string.Empty)));
+    }
+
+    public Task<int> GetMeetingsNeedingAttendanceCaptureCountByStokvelIdAsync(Guid stokvelId)
+    {
+        return GetMeetingsNeedingAttendanceCountByStokvelIdAsync(stokvelId);
+    }
+
+    public Task<int> GetMeetingsNeedingMinutesCountByStokvelIdAsync(Guid stokvelId)
+    {
+        // TODO: Return actual count once meeting minutes completion status is modeled.
+        return Task.FromResult(0);
+    }
+
     public async Task<MeetingAgendaItem?> AddAgendaItemAsync(Guid meetingId, string title, string? description)
     {
         var meeting = await context.Meetings

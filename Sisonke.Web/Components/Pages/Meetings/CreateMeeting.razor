@@ -1,12 +1,18 @@
 @page "/create-meeting/{StokvelId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
 @using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
 @inject StokvelService StokvelService
 @inject MeetingService MeetingService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
 <PageTitle>Create Meeting</PageTitle>
@@ -23,6 +29,11 @@
 else if (stokvel is null)
 {
     <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canManageMeetings)
+{
+    <AlertBanner Type="warning" Title="Only the Secretary, Chairperson, Creator or Admin can schedule meetings." Message="" Icon="bi bi-exclamation-triangle-fill" />
+    <a class="btn btn-outline-secondary" href="@($"/meetings/{StokvelId}")">Back to Meetings</a>
 }
 else
 {
@@ -84,6 +95,7 @@ else
     private Stokvel? stokvel;
     private CreateMeetingModel model = new();
     private bool isLoading = true;
+    private bool canManageMeetings;
     private string? errorMessage;
 
     [Parameter]
@@ -95,6 +107,12 @@ else
 
         if (stokvel is not null)
         {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            canManageMeetings = !string.IsNullOrWhiteSpace(userId) &&
+                await MemberAccessService.CanManageMeetingsAsync(userId, StokvelId);
+
             model.Title = $"{stokvel.Name} Meeting";
         }
 
@@ -104,6 +122,12 @@ else
     private async Task HandleValidSubmit()
     {
         errorMessage = null;
+
+        if (!canManageMeetings)
+        {
+            errorMessage = "Only the Secretary, Chairperson, Creator or Admin can schedule meetings.";
+            return;
+        }
 
         if (await MeetingService.HasMeetingOnDateAsync(StokvelId, model.MeetingDate))
         {

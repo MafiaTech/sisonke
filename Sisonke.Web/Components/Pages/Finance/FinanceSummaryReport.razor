@@ -1,0 +1,267 @@
+@page "/finance-summary/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject FinanceReportService FinanceReportService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Finance Summary Report</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading finance summary...
+    </div>
+}
+else if (!canViewFinancials)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        You do not have access to the finance summary for this stokvel.
+    </div>
+
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
+        Back to My Workspace
+    </a>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-blue">Finance</span>
+            <h1>Finance Summary Report</h1>
+            <p>Monthly contribution, arrears and payment overview.</p>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <span class="sisonke-badge sisonke-badge-gray">@(report?.StokvelName ?? "Stokvel")</span>
+                <span class="sisonke-badge sisonke-badge-gold">@SelectedMonthName @selectedYear</span>
+                <span class="sisonke-badge sisonke-badge-blue">Generated @FormatDateTime(report?.GeneratedAt)</span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+            <button class="sisonke-btn sisonke-btn-outline" type="button" disabled>Export PDF Coming Soon</button>
+        </div>
+    </section>
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Report Period</h2>
+                    <p>Select a month and year to load the finance summary.</p>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-end">
+                <div>
+                    <label class="form-label" for="finance-month">Month</label>
+                    <select id="finance-month" class="form-select" @bind="selectedMonth">
+                        @foreach (var month in Months)
+                        {
+                            <option value="@month.Value">@month.Name</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="finance-year">Year</label>
+                    <select id="finance-year" class="form-select" @bind="selectedYear">
+                        @foreach (var year in Years)
+                        {
+                            <option value="@year">@year</option>
+                        }
+                    </select>
+                </div>
+                <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="LoadReportAsync" disabled="@isReportLoading">
+                    Load Report
+                </button>
+            </div>
+        </div>
+    </section>
+
+    @if (isReportLoading)
+    {
+        <div class="sisonke-alert sisonke-alert-blue mb-4">Refreshing finance summary...</div>
+    }
+    else if (report is not null)
+    {
+        <div class="mb-4">
+            @if (report.ExpectedContributions == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue">No expected contribution records found for this month.</div>
+            }
+            else if (report.CollectionRatePercentage >= 90)
+            {
+                <div class="sisonke-alert sisonke-alert-green">Collections are healthy for this month.</div>
+            }
+            else if (report.CollectionRatePercentage >= 70)
+            {
+                <div class="sisonke-alert sisonke-alert-gold">Collections are moderate. Follow up on outstanding members.</div>
+            }
+            else
+            {
+                <div class="sisonke-alert sisonke-alert-red">Collections are below target. Arrears follow-up is required.</div>
+            }
+        </div>
+
+        <div class="sisonke-grid sisonke-grid-4 mb-4">
+            @MetricCard("Expected Contributions", FormatZAR(report.ExpectedContributions), null, "blue")
+            @MetricCard("Actual Contributions", FormatZAR(report.ActualContributions), null, "green")
+            @MetricCard("Outstanding Contributions", FormatZAR(report.OutstandingContributions), null, "gold")
+            @MetricCard("Collection Rate", FormatPercentage(report.CollectionRatePercentage), null, GetCollectionBadgeType(report.CollectionRatePercentage, report.ExpectedContributions))
+            @MetricCard("Active Members", report.ActiveMemberCount.ToString(), null, "gray")
+            @MetricCard("Members Paid", report.PaidCount.ToString(), null, "green")
+            @MetricCard("Members Overdue", report.OverdueCount.ToString(), null, "red")
+            @MetricCard("Outstanding Fines", FormatZAR(report.OutstandingFinesTotal), $"{report.OutstandingFinesCount} unpaid", "red")
+            @MetricCard("Approved Claims Awaiting Payout", FormatZAR(report.ApprovedClaimsAwaitingPayoutTotal), $"{report.ApprovedClaimsAwaitingPayoutCount} approved", "gold")
+        </div>
+
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Contribution Breakdown</h2>
+                        <p>@report.MonthName @report.Year contribution status.</p>
+                    </div>
+                    <span class="sisonke-badge sisonke-badge-blue">@FormatPercentage(report.CollectionRatePercentage)</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <tbody>
+                            <tr><th>Active member count</th><td>@report.ActiveMemberCount</td></tr>
+                            <tr><th>Monthly contribution amount</th><td>@FormatZAR(report.MonthlyContributionAmount)</td></tr>
+                            <tr><th>Expected contributions</th><td>@FormatZAR(report.ExpectedContributions)</td></tr>
+                            <tr><th>Actual contributions</th><td>@FormatZAR(report.ActualContributions)</td></tr>
+                            <tr><th>Outstanding</th><td>@FormatZAR(report.OutstandingContributions)</td></tr>
+                            <tr><th>Collection rate</th><td>@FormatPercentage(report.CollectionRatePercentage)</td></tr>
+                            <tr><th>Paid count</th><td>@report.PaidCount</td></tr>
+                            <tr><th>Partially paid count</th><td>@report.PartiallyPaidCount</td></tr>
+                            <tr><th>Overdue count</th><td>@report.OverdueCount</td></tr>
+                            <tr><th>Unpaid count</th><td>@report.UnpaidCount</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-arrears/{StokvelId}")">View Member Arrears</a>
+            @if (canManagePayments)
+            {
+                <a class="sisonke-btn sisonke-btn-primary" href="@($"/contribution-capture/{StokvelId}")">Contribution Capture</a>
+            }
+            @if (canManagePayments || canViewTreasurerTasks)
+            {
+                <a class="sisonke-btn sisonke-btn-gold" href="@($"/treasurer-tasks/{StokvelId}")">Treasurer Tasks</a>
+            }
+        </div>
+    }
+}
+
+@code {
+    private static readonly IReadOnlyList<(int Value, string Name)> Months = Enumerable
+        .Range(1, 12)
+        .Select(month => (month, new DateTime(2000, month, 1).ToString("MMMM")))
+        .ToList();
+
+    private bool isLoading = true;
+    private bool isReportLoading;
+    private bool canViewFinancials;
+    private bool canManagePayments;
+    private bool canViewTreasurerTasks;
+    private int selectedMonth = DateTime.Today.Month;
+    private int selectedYear = DateTime.Today.Year;
+    private FinanceSummaryReportDto? report;
+
+    private IEnumerable<int> Years => Enumerable.Range(DateTime.Today.Year - 5, 7).Reverse();
+    private string SelectedMonthName => Months.FirstOrDefault(month => month.Value == selectedMonth).Name ?? string.Empty;
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        canViewFinancials = false;
+        canManagePayments = false;
+        canViewTreasurerTasks = false;
+        report = null;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        canViewFinancials = await MemberAccessService.CanViewFinancialsAsync(userId, StokvelId);
+        canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, StokvelId);
+        canViewTreasurerTasks = await MemberAccessService.CanViewTreasurerTasksAsync(userId, StokvelId);
+
+        if (canViewFinancials)
+        {
+            await LoadReportAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task LoadReportAsync()
+    {
+        if (selectedYear < 1 || selectedMonth is < 1 or > 12)
+        {
+            return;
+        }
+
+        isReportLoading = true;
+        report = await FinanceReportService.GetFinanceSummaryReportAsync(StokvelId, selectedYear, selectedMonth);
+        isReportLoading = false;
+    }
+
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string FormatPercentage(decimal percentage) =>
+        $"{percentage:0.#}%";
+
+    private static string FormatDateTime(DateTime? value) =>
+        value is null || value == default ? "-" : value.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+
+    private static string GetCollectionBadgeType(decimal collectionRatePercentage, decimal expectedContributions)
+    {
+        if (expectedContributions == 0)
+        {
+            return "blue";
+        }
+
+        return collectionRatePercentage >= 90
+            ? "green"
+            : collectionRatePercentage >= 70
+                ? "gold"
+                : "red";
+    }
+
+    private static RenderFragment MetricCard(string title, string value, string? detail, string badgeType) => @<div class="sisonke-card">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head px-0 pt-0">
+                <span class="sisonke-badge sisonke-badge-@badgeType">@title</span>
+            </div>
+            <div class="sisonke-stat-value">@value</div>
+            @if (!string.IsNullOrWhiteSpace(detail))
+            {
+                <div class="text-muted small mt-2">@detail</div>
+            }
+        </div>
+    </div>;
+}

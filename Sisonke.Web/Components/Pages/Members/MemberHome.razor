@@ -16,7 +16,9 @@
 @inject FineService FineService
 @inject FuneralClaimService FuneralClaimService
 @inject MeetingService MeetingService
+@inject MeetingApologyService MeetingApologyService
 @inject StokvelService StokvelService
+@inject ContributionPaymentService ContributionPaymentService
 
 <PageTitle>My Member Dashboard</PageTitle>
 <link rel="stylesheet" href="/css/member-workspace.css" />
@@ -46,7 +48,7 @@ else if (stokvel is null)
 else
 {
     <div class="mw-member-workspace">
-        <div class="mw-hero">
+        <div class="mw-hero member-hero">
             <div class="mw-hero-ring"></div>
             <div class="mw-hero-ring2"></div>
             <div class="mw-hero-left">
@@ -64,7 +66,7 @@ else
                 </div>
             </div>
             <div class="mw-hero-right">
-                <div class="mw-hero-tiles">
+                <div class="mw-hero-tiles member-hero-grid">
                     <div class="mw-htile">
                         <div class="mw-htile-label">Member No.</div>
                         <div class="mw-htile-val">@Display(member.MemberNumber)</div>
@@ -85,22 +87,113 @@ else
             </div>
         </div>
 
-        <div class="mw-qa-row">
-            <a class="mw-qa" href="/member-profile/@MemberId">
-                <div class="mw-qa-wrap" style="background:var(--mw-fern-pale)">👤</div>
-                <span class="mw-qa-lbl">View My Profile</span>
+        <section class="sisonke-card upcoming-meetings-card">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2 class="h5 mb-1">Upcoming Meetings</h2>
+                    <div class="text-muted">View your next meetings and send apologies where needed.</div>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="sisonke-badge sisonke-badge-blue">@upcomingMeetings.Count Scheduled</span>
+                    <a class="sisonke-btn sisonke-btn-outline" href="/meetings/@stokvel.Id">View All</a>
+                </div>
+            </div>
+            <div class="sisonke-card-body">
+                @if (upcomingMeetings.Count == 0)
+                {
+                    <div class="sisonke-alert sisonke-alert-blue">
+                        No upcoming meetings have been scheduled yet.
+                    </div>
+                }
+                else
+                {
+                    <div class="member-meeting-grid">
+                        @foreach (var meeting in upcomingMeetings.Take(2))
+                        {
+                            var hasApology = meetingApologiesByMeetingId.ContainsKey(meeting.Id);
+                            var apologyType = GetApologyType(meeting.Id);
+                            var isPastMeeting = meeting.MeetingDate.Date < DateTime.Today;
+
+                            <article class="member-meeting-card">
+                                <div class="meeting-date-block">
+                                    <span class="meeting-date-day">@meeting.MeetingDate.Day.ToString("00")</span>
+                                    <span class="meeting-date-month">@meeting.MeetingDate.ToString("MMM")</span>
+                                    <span class="meeting-date-year">@meeting.MeetingDate.Year</span>
+                                </div>
+
+                                <div class="member-meeting-content">
+                                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                        <div>
+                                            <h3>@Display(meeting.Title)</h3>
+                                            @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
+                                            {
+                                                <p>@meeting.Purpose</p>
+                                            }
+                                        </div>
+                                        @if (hasApology)
+                                        {
+                                            <span class="sisonke-badge sisonke-badge-green">Apology Submitted</span>
+                                        }
+                                        else if (isPastMeeting)
+                                        {
+                                            <span class="sisonke-badge sisonke-badge-gray">Closed</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="sisonke-badge sisonke-badge-gold">RSVP Open</span>
+                                        }
+                                    </div>
+
+                                    <div class="member-meeting-meta">
+                                        <span><i class="bi bi-clock me-1"></i>@meeting.MeetingDate.ToString("HH:mm")</span>
+                                        <span><i class="bi bi-geo-alt me-1"></i>@Display(meeting.Venue)</span>
+                                        <span><i class="bi bi-calendar-check me-1"></i>Deadline @meeting.MeetingDate.ToString("dd MMM yyyy HH:mm")</span>
+                                    </div>
+
+                                    <div class="member-meeting-actions">
+                                        <a class="sisonke-btn sisonke-btn-outline" href="/meeting/@meeting.Id">View</a>
+                                        @if (hasApology)
+                                        {
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <span class="sisonke-badge sisonke-badge-green">Apology Submitted</span>
+                                                <span class="text-muted small">· @apologyType</span>
+                                            </div>
+                                        }
+                                        else if (isPastMeeting)
+                                        {
+                                            <span class="sisonke-badge sisonke-badge-gray">Closed</span>
+                                        }
+                                        else
+                                        {
+                                            <a class="sisonke-btn sisonke-btn-gold send-apology-btn" href="@($"/submit-apology/{meeting.Id}/{MemberId}")">
+                                                Send Apology
+                                            </a>
+                                        }
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+
+        <div class="member-quick-actions">
+            <a class="member-quick-action-tile" href="/member-profile/@MemberId">
+                <span class="member-quick-action-icon">👤</span>
+                <span>My Profile</span>
             </a>
-            <a class="mw-qa" href="/create-claim/@MemberId">
-                <div class="mw-qa-wrap" style="background:var(--mw-slate-pale)">📋</div>
-                <span class="mw-qa-lbl">Create Claim</span>
+            <a class="member-quick-action-tile" href="/create-claim/@MemberId">
+                <span class="member-quick-action-icon">📋</span>
+                <span>Create Claim</span>
             </a>
-            <a class="mw-qa" href="/meetings/@stokvel.Id">
-                <div class="mw-qa-wrap" style="background:var(--mw-ochre-pale)">📅</div>
-                <span class="mw-qa-lbl">View Meetings</span>
+            <a class="member-quick-action-tile" href="#member-contributions">
+                <span class="member-quick-action-icon">💰</span>
+                <span>Contributions</span>
             </a>
-            <a class="mw-qa" href="/constitution-builder/@stokvel.Id">
-                <div class="mw-qa-wrap" style="background:var(--mw-terra-pale)">📜</div>
-                <span class="mw-qa-lbl">Constitution</span>
+            <a class="member-quick-action-tile" href="/constitution-builder/@stokvel.Id">
+                <span class="member-quick-action-icon">📜</span>
+                <span>Constitution</span>
             </a>
         </div>
 
@@ -168,21 +261,107 @@ else
             <div class="mw-sec-line"></div>
         </div>
         <div class="mw-g mw-g3 mw-mb26">
-            <div class="mw-card mw-card-accent mw-ca-fern">
+            <div class="mw-card mw-card-accent mw-ca-fern" id="member-contributions">
                 <div class="mw-card-top">
                     <div class="mw-card-tl">
                         <div class="mw-card-ico mw-ico-fern">💰</div>
                         <span class="mw-card-lbl">My Contribution Status</span>
                     </div>
+                    <a class="mw-btn mw-btn-outline mw-btn-xs" href="@($"/member-statement/{MemberId}/{stokvel.Id}")">View Statement</a>
                 </div>
                 <div class="mw-card-body">
-                    <div class="mw-alert mw-alert-info">
-                        <div class="mw-alert-icon">ℹ</div>
-                        <div>
-                            <div class="mw-alert-title">Coming Soon</div>
-                            <div class="mw-alert-body">Contribution tracking coming soon.</div>
+                    @if (overdueContributions.Count > 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-red mb-3">
+                            You have overdue contributions. Total outstanding: @FormatCurrency(MemberContributionOutstandingTotal)
                         </div>
-                    </div>
+                    }
+
+                    @if (currentMonthContribution is null)
+                    {
+                        <div class="mw-alert mw-alert-info">
+                            <div class="mw-alert-icon">ℹ</div>
+                            <div>
+                                <div class="mw-alert-title">No current record</div>
+                                <div class="mw-alert-body">No contribution record has been generated for @CurrentMonthLabel yet.</div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mw-smini">
+                            <div class="mw-smini-block">
+                                <span class="mw-smini-num">@FormatCurrency(currentMonthContribution.ExpectedAmount)</span>
+                                <span class="mw-smini-lbl">Expected</span>
+                            </div>
+                            <div class="mw-smini-block">
+                                <span class="mw-smini-num" style="color:var(--mw-ok)">@FormatCurrency(currentMonthContribution.PaidAmount)</span>
+                                <span class="mw-smini-lbl">Paid</span>
+                            </div>
+                            <div class="mw-smini-block">
+                                <span class="mw-smini-num" style="color:var(--mw-ochre)">@FormatCurrency(currentMonthContribution.Balance)</span>
+                                <span class="mw-smini-lbl">Balance</span>
+                            </div>
+                        </div>
+                        <div class="mw-div"></div>
+                        <div class="mw-p-row">
+                            <span class="mw-p-lbl">Month</span>
+                            <span class="mw-p-val">@CurrentMonthLabel</span>
+                        </div>
+                        <div class="mw-p-row">
+                            <span class="mw-p-lbl">Status</span>
+                            <span class="@GetPaymentStatusBadgeClass(currentMonthContribution.Status)">@GetPaymentStatusText(currentMonthContribution.Status)</span>
+                        </div>
+                        <div class="mw-p-row">
+                            <span class="mw-p-lbl">Paid Date</span>
+                            <span class="mw-p-val">@(currentMonthContribution.PaidDate?.ToString("dd MMM yyyy") ?? "Not fully paid")</span>
+                        </div>
+                        <div class="mw-p-row">
+                            <span class="mw-p-lbl">Reference</span>
+                            <span class="mw-p-val">@(string.IsNullOrWhiteSpace(currentMonthContribution.PaymentReference) ? "Not captured" : currentMonthContribution.PaymentReference)</span>
+                        </div>
+                    }
+
+                    <div class="mw-div"></div>
+                    <div class="mw-card-lbl mb-2">Contribution History</div>
+                    @if (recentContributions.Count == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-blue mb-0">
+                            No contribution history has been recorded yet.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="sisonke-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Month / Year</th>
+                                        <th>Expected</th>
+                                        <th>Paid</th>
+                                        <th>Balance</th>
+                                        <th>Status</th>
+                                        <th>Paid Date</th>
+                                        <th>Reference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var contribution in recentContributions)
+                                    {
+                                        <tr>
+                                            <td>@contribution.MonthYearLabel</td>
+                                            <td>@FormatCurrency(contribution.ExpectedAmount)</td>
+                                            <td>@FormatCurrency(contribution.PaidAmount)</td>
+                                            <td>@FormatCurrency(contribution.Balance)</td>
+                                            <td><span class="@GetPaymentStatusBadgeClass(contribution.Status)">@GetPaymentStatusText(contribution.Status)</span></td>
+                                            <td>@(contribution.PaidDate?.ToString("dd MMM yyyy") ?? "-")</td>
+                                            <td>@(string.IsNullOrWhiteSpace(contribution.PaymentReference) ? "-" : contribution.PaymentReference)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
                 </div>
             </div>
 
@@ -284,7 +463,7 @@ else
                             <span class="mw-smini-lbl">Rejected</span>
                         </div>
                         <div class="mw-smini-block">
-                            <span class="mw-smini-num" style="color:var(--mw-ochre)">@(LatestClaim?.Status.ToString() ?? "None")</span>
+                            <span class="mw-smini-num" style="color:var(--mw-ochre)">@(LatestClaim is null ? "None" : GetClaimStatusText(LatestClaim.Status))</span>
                             <span class="mw-smini-lbl">Latest</span>
                         </div>
                     </div>
@@ -322,7 +501,7 @@ else
                                             <td>@Display(claim.DeceasedFullName)</td>
                                             <td>@claim.SubjectType</td>
                                             <td>@(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "Not captured")</td>
-                                            <td><span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span></td>
+                                            <td><span class="@GetClaimStatusBadgeClass(claim.Status)">@GetClaimStatusText(claim.Status)</span></td>
                                             <td>@(claim.SubmittedAt?.ToString("dd MMM yyyy") ?? "Not submitted")</td>
                                             <td class="text-end">
                                                 <a class="sisonke-btn sisonke-btn-outline" href="/claim/@claim.Id">View Claim</a>
@@ -411,132 +590,6 @@ else
                 </div>
             </div>
 
-            <div class="sisonke-card mw-card-accent mw-ca-forest">
-                <div class="sisonke-card-head">
-                    <div class="mw-card-tl">
-                        <div class="mw-card-ico mw-ico-fern">📅</div>
-                        <span class="mw-card-lbl">Meeting Schedule</span>
-                    </div>
-                    @if (upcomingMeetings.Count > 0)
-                    {
-                        <span class="mw-badge mw-bg-info">@upcomingMeetings.Count Upcoming</span>
-                    }
-                </div>
-                <div class="sisonke-card-body">
-                    <div class="mw-smini">
-                        <div class="mw-smini-block">
-                            <span class="mw-smini-num">@upcomingMeetings.Count</span>
-                            <span class="mw-smini-lbl">Upcoming</span>
-                        </div>
-                        <div class="mw-smini-block">
-                            <span class="mw-smini-num" style="color:var(--mw-fern)">
-                                @(NextMeeting?.MeetingDate.ToString("dd MMM") ?? "None")
-                            </span>
-                            <span class="mw-smini-lbl">Next Date</span>
-                        </div>
-                        <div class="mw-smini-block">
-                            <span class="mw-smini-num" style="color:var(--mw-ochre)">
-                                @(NextMeeting?.MeetingDate.ToString("HH:mm") ?? "--:--")
-                            </span>
-                            <span class="mw-smini-lbl">Time</span>
-                        </div>
-                    </div>
-                    @if (NextMeeting is not null)
-                    {
-                        <div class="mw-alert mw-alert-info">
-                            <div class="mw-alert-icon">ℹ</div>
-                            <div>
-                                <div class="mw-alert-title">@Display(NextMeeting.Title)</div>
-                                <div class="mw-alert-body">
-                                    @Display(NextMeeting.Purpose) · Venue: @Display(NextMeeting.Venue)
-                                </div>
-                            </div>
-                        </div>
-                    }
-                    <div class="mw-div"></div>
-                    @if (upcomingMeetings.Count == 0)
-                    {
-                        <div class="sisonke-alert sisonke-alert-blue">
-                            <i class="bi bi-info-circle-fill mt-1"></i>
-                            <div>
-                                <strong>No upcoming meetings have been scheduled yet.</strong>
-                                <div>Meeting dates will appear here once your stokvel schedules them.</div>
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="table-responsive">
-                            <table class="sisonke-table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Time</th>
-                                        <th>Purpose / Title</th>
-                                        <th>Venue</th>
-                                        <th>Status</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var meeting in upcomingMeetings)
-                                    {
-                                        <tr>
-                                            <td>@meeting.MeetingDate.ToString("dd MMM yyyy")</td>
-                                            <td>@meeting.MeetingDate.ToString("HH:mm")</td>
-                                            <td>
-                                                <div class="fw-semibold">@Display(meeting.Title)</div>
-                                                @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
-                                                {
-                                                    <div class="text-muted small">@meeting.Purpose</div>
-                                                }
-                                            </td>
-                                            <td>@Display(meeting.Venue)</td>
-                                            <td><span class="@GetMeetingStatusBadgeClass(meeting.Status)">@meeting.Status</span></td>
-                                            <td class="text-end">
-                                                <div class="d-flex justify-content-end gap-2 flex-wrap">
-                                                    <a class="sisonke-btn sisonke-btn-outline" href="/meeting/@meeting.Id">View</a>
-                                                    <button class="sisonke-btn sisonke-btn-outline" type="button" disabled>
-                                                        Submit apology coming soon
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                    <div class="mw-div"></div>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a class="sisonke-btn sisonke-btn-outline" href="/meetings/@stokvel.Id">
-                            View All Meetings
-                        </a>
-                        <button class="sisonke-btn sisonke-btn-outline" type="button" disabled>
-                            Submit apology coming soon
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mw-card mw-card-accent mw-ca-warn">
-                <div class="mw-card-top">
-                    <div class="mw-card-tl">
-                        <div class="mw-card-ico mw-ico-warn">✋</div>
-                        <span class="mw-card-lbl">Submit Apology</span>
-                    </div>
-                </div>
-                <div class="mw-card-body">
-                    <div class="mw-alert mw-alert-warn">
-                        <div class="mw-alert-icon">ℹ</div>
-                        <div>
-                            <div class="mw-alert-title">Coming Soon</div>
-                            <div class="mw-alert-body">Apology submission will be available soon.</div>
-                        </div>
-                    </div>
-                    <button class="mw-btn mw-btn-outline mw-btn-sm mw-btn-full" type="button" disabled>Submit apology coming soon</button>
-                </div>
-            </div>
         </div>
 
         <div class="mw-sec-head">
@@ -644,8 +697,14 @@ else
     private List<FuneralClaim> memberClaims = [];
     private List<MemberDependent> dependents = [];
     private List<Meeting> upcomingMeetings = [];
+    private Dictionary<Guid, MeetingApology> meetingApologiesByMeetingId = [];
+    private List<ContributionPaymentSummary> memberContributions = [];
+    private List<ContributionPaymentSummary> recentContributions = [];
+    private List<MemberContribution> overdueContributions = [];
+    private ContributionPaymentSummary? currentMonthContribution;
     private bool isLoading = true;
     private bool isAllowed;
+    private string CurrentMonthLabel => DateTime.Today.ToString("MMMM yyyy");
 
     private FuneralClaim? LatestClaim => memberClaims
         .OrderByDescending(claim => claim.CreatedAt)
@@ -672,6 +731,14 @@ else
 
     private int OpenFinesCount => memberFines.Count(fine => fine.Status == FineStatus.Unpaid);
     private int PaidFinesCount => memberFines.Count(fine => fine.Status == FineStatus.Paid);
+    private int ApologiesSubmittedCount => meetingApologiesByMeetingId.Count;
+    private int PendingApologyCount => Math.Max(0, upcomingMeetings.Count - meetingApologiesByMeetingId.Count);
+    private decimal MemberContributionOutstandingTotal => memberContributions
+        .Where(contribution =>
+            contribution.Status != PaymentStatus.Paid &&
+            contribution.Status != PaymentStatus.Exempted &&
+            contribution.Status != PaymentStatus.WrittenOff)
+        .Sum(contribution => contribution.Balance);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -683,6 +750,11 @@ else
         memberClaims = [];
         dependents = [];
         upcomingMeetings = [];
+        meetingApologiesByMeetingId = [];
+        memberContributions = [];
+        recentContributions = [];
+        overdueContributions = [];
+        currentMonthContribution = null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -720,6 +792,12 @@ else
         memberFines = await FineService.GetMemberFinesAsync(MemberId);
         memberClaims = await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
         dependents = await MemberService.GetDependentsByMemberIdAsync(MemberId);
+        memberContributions = await ContributionPaymentService.GetContributionsByMemberIdAsync(MemberId);
+        overdueContributions = await ContributionPaymentService.GetOverdueContributionsByMemberIdAsync(MemberId);
+        currentMonthContribution = memberContributions.FirstOrDefault(contribution =>
+            contribution.ContributionYear == DateTime.Today.Year &&
+            contribution.ContributionMonth == DateTime.Today.Month);
+        recentContributions = memberContributions.Take(6).ToList();
 
         var meetings = await MeetingService.GetMeetingsByStokvelIdAsync(stokvel.Id);
         upcomingMeetings = meetings
@@ -728,6 +806,16 @@ else
                 (meeting.Status == MeetingStatus.Planned || meeting.Status == MeetingStatus.InProgress))
             .OrderBy(meeting => meeting.MeetingDate)
             .ToList();
+
+        foreach (var meeting in upcomingMeetings)
+        {
+            var meetingApology = await MeetingApologyService.GetApologyAsync(meeting.Id, MemberId);
+
+            if (meetingApology is not null)
+            {
+                meetingApologiesByMeetingId[meeting.Id] = meetingApology;
+            }
+        }
 
         isLoading = false;
     }
@@ -767,6 +855,11 @@ else
         };
     }
 
+    private static string GetPaymentStatusText(PaymentStatus status)
+    {
+        return status == PaymentStatus.Late ? "Overdue" : status.ToString();
+    }
+
     private static string GetClaimStatusBadgeClass(FuneralClaimStatus status)
     {
         return status switch
@@ -780,6 +873,16 @@ else
             FuneralClaimStatus.Paid => "sisonke-badge sisonke-badge-green",
             FuneralClaimStatus.Cancelled => "sisonke-badge sisonke-badge-gray",
             _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static string GetClaimStatusText(FuneralClaimStatus status)
+    {
+        return status switch
+        {
+            FuneralClaimStatus.Approved => "Approved / Awaiting Payout",
+            FuneralClaimStatus.Paid => "Paid / Closed",
+            _ => status.ToString()
         };
     }
 
@@ -833,6 +936,28 @@ else
             FineStatus.Cancelled => "sisonke-badge sisonke-badge-gray",
             _ => "sisonke-badge sisonke-badge-gray"
         };
+    }
+
+    private static string GetPaymentStatusBadgeClass(PaymentStatus status)
+    {
+        return status switch
+        {
+            PaymentStatus.Paid => "sisonke-badge sisonke-badge-green",
+            PaymentStatus.PartiallyPaid => "sisonke-badge sisonke-badge-gold",
+            PaymentStatus.Late => "sisonke-badge sisonke-badge-red",
+            PaymentStatus.Unpaid => "sisonke-badge sisonke-badge-gray",
+            PaymentStatus.Exempted => "sisonke-badge sisonke-badge-gray",
+            PaymentStatus.WrittenOff => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private string GetApologyType(Guid meetingId)
+    {
+        return meetingApologiesByMeetingId.TryGetValue(meetingId, out var apology) &&
+            !string.IsNullOrWhiteSpace(apology.ApologyType)
+                ? apology.ApologyType
+                : "Not specified";
     }
 
     private static string FormatCurrency(decimal amount)

@@ -65,5 +65,17 @@ public class FuneralClaim
 
     public DateTime? RejectedAt { get; set; }
 
+    public decimal? PayoutAmount { get; set; }
+
+    public DateTime? PayoutPaidAt { get; set; }
+
+    [MaxLength(100)]
+    public string? PayoutReference { get; set; }
+
+    [MaxLength(1000)]
+    public string? PayoutNotes { get; set; }
+
+    public Guid? PayoutCapturedByMemberId { get; set; }
+
     public ICollection<FuneralClaimDocument> Documents { get; set; } = new List<FuneralClaimDocument>();
 }

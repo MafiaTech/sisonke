@@ -31,7 +31,7 @@ else if (memberFine is null)
 {
     <AlertBanner Type="danger" Title="Fine not found." Message="" Icon="bi bi-x-circle-fill" />
 }
-else if (!canManageFines)
+else if (!canManagePayments)
 {
     <PageHeader
         Title="Mark Fine Paid"
@@ -39,7 +39,9 @@ else if (!canManageFines)
         BackText="Back to Member Profile"
         BackHref="@($"/member-profile/{memberFine.MemberId}")" />
 
-    <AlertBanner Type="warning" Title="Access restricted." Message="Only office bearers can mark fines as paid." Icon="bi bi-exclamation-triangle-fill" />
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        Only the Treasurer can mark fines as paid.
+    </div>
 }
 else
 {
@@ -119,7 +121,7 @@ else
     private bool showPaymentConfirmation = true;
     private bool updateFailed;
     private string? successMessage;
-    private bool canManageFines;
+    private bool canManagePayments;
 
     [Parameter]
     public Guid MemberFineId { get; set; }
@@ -139,19 +141,20 @@ else
 
                 if (!string.IsNullOrWhiteSpace(userId))
                 {
-                    canManageFines = await MemberAccessService.CanManageFinesAsync(userId, stokvel.Id);
+                    canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, stokvel.Id);
                 }
             }
         }
 
-        showPaymentConfirmation = canManageFines && memberFine?.Status == FineStatus.Unpaid;
+        showPaymentConfirmation = canManagePayments && memberFine?.Status == FineStatus.Unpaid;
         isLoading = false;
     }
 
     private async Task ConfirmPaymentAsync()
     {
-        if (!canManageFines)
+        if (!canManagePayments)
         {
+            showPaymentConfirmation = false;
             return;
         }
 

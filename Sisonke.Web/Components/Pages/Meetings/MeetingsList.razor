@@ -1,12 +1,18 @@
 @page "/meetings/{StokvelId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
 @using System.Linq
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
 @inject StokvelService StokvelService
 @inject MeetingService MeetingService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Meetings</PageTitle>
 
@@ -23,6 +29,11 @@ else if (stokvel is null)
 {
     <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
 }
+else if (!canViewMeetings)
+{
+    <AlertBanner Type="warning" Title="You do not have access to these meetings." Message="" Icon="bi bi-exclamation-triangle-fill" />
+    <a class="btn btn-outline-secondary" href="/my-workspace">Back to My Workspace</a>
+}
 else
 {
     <div class="page-header meetings-page-header">
@@ -34,11 +45,19 @@ else
             <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
                 <i class="bi bi-speedometer2 me-1"></i>Dashboard
             </a>
-            <a class="btn btn-purple btn-sm" href="@($"/create-meeting/{StokvelId}")">
-                <i class="bi bi-plus-circle me-1"></i>Schedule Meeting
-            </a>
+            @if (canManageMeetings)
+            {
+                <a class="btn btn-purple btn-sm" href="@($"/create-meeting/{StokvelId}")">
+                    <i class="bi bi-plus-circle me-1"></i>Schedule Meeting
+                </a>
+            }
         </div>
     </div>
+
+    @if (!canManageMeetings)
+    {
+        <AlertBanner Type="info" Title="You are viewing meeting schedules in read-only mode." Message="" Icon="bi bi-info-circle-fill" />
+    }
 
     @if (meetings.Count == 0)
     {
@@ -123,9 +142,12 @@ else
                                     <a class="btn btn-purple btn-sm" href="@($"/meeting/{meeting.Id}")">
                                         <i class="bi bi-eye me-1"></i>View
                                     </a>
-                                    <a class="btn btn-outline-primary btn-sm" href="@($"/edit-meeting/{meeting.Id}")">
-                                        <i class="bi bi-pencil-square me-1"></i>Edit
-                                    </a>
+                                    @if (canManageMeetings)
+                                    {
+                                        <a class="btn btn-outline-primary btn-sm" href="@($"/edit-meeting/{meeting.Id}")">
+                                            <i class="bi bi-pencil-square me-1"></i>Edit
+                                        </a>
+                                    }
                                 </div>
                             </div>
                             <div class="meeting-card-agenda-row">
@@ -152,9 +174,12 @@ else
                         <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ShowNextMonth">
                             Next Month<i class="bi bi-chevron-right ms-1"></i>
                         </button>
-                        <a class="btn btn-purple btn-sm" href="@($"/create-meeting/{StokvelId}")">
-                            <i class="bi bi-plus-circle me-2"></i>Schedule Meeting
-                        </a>
+                        @if (canManageMeetings)
+                        {
+                            <a class="btn btn-purple btn-sm" href="@($"/create-meeting/{StokvelId}")">
+                                <i class="bi bi-plus-circle me-2"></i>Schedule Meeting
+                            </a>
+                        }
                     </div>
                 </div>
 
@@ -186,6 +211,8 @@ else
     private DateTime visibleMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private string activeTab = "Upcoming";
     private bool isLoading = true;
+    private bool canViewMeetings;
+    private bool canManageMeetings;
     private static readonly string[] CalendarDayNames =
     [
         "Monday",
@@ -206,7 +233,18 @@ else
 
         if (stokvel is not null)
         {
-            meetings = await MeetingService.GetMeetingsByStokvelIdAsync(StokvelId);
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            canManageMeetings = !string.IsNullOrWhiteSpace(userId) &&
+                await MemberAccessService.CanManageMeetingsAsync(userId, StokvelId);
+            canViewMeetings = !string.IsNullOrWhiteSpace(userId) &&
+                await MemberAccessService.CanViewStokvelAsync(userId, StokvelId);
+
+            if (canViewMeetings)
+            {
+                meetings = await MeetingService.GetMeetingsByStokvelIdAsync(StokvelId);
+            }
         }
 
         isLoading = false;

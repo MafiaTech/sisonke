@@ -227,6 +227,14 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb25zdGl0dXRpb25cVXBsb2FkQ29uc3RpdHV0aW9uLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Contributions/ContributionCapture.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb250cmlidXRpb25zXENvbnRyaWJ1dGlvbkNhcHR1cmUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Contributions/ContributionPaymentAudit.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb250cmlidXRpb25zXENvbnRyaWJ1dGlvblBheW1lbnRBdWRpdC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Contributions/ContributionRules.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb250cmlidXRpb25zXENvbnRyaWJ1dGlvblJ1bGVzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
@@ -241,6 +249,14 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Error.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xFcnJvci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Finance/FinanceSummaryReport.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xGaW5hbmNlXEZpbmFuY2VTdW1tYXJ5UmVwb3J0LnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Finance/MemberFinancialStatement.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xGaW5hbmNlXE1lbWJlckZpbmFuY2lhbFN0YXRlbWVudC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Fines/AddFine.razor]
@@ -281,6 +297,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Meetings/MeetingVotes.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZWV0aW5nc1xNZWV0aW5nVm90ZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Meetings/SubmitApology.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNZWV0aW5nc1xTdWJtaXRBcG9sb2d5LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Meetings/VoteDetails.razor]
@@ -377,6 +397,18 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Weather.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXZWF0aGVyLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Workflow/ChairpersonTasks.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXb3JrZmxvd1xDaGFpcnBlcnNvblRhc2tzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Workflow/SecretaryTasks.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXb3JrZmxvd1xTZWNyZXRhcnlUYXNrcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Workflow/TreasurerTasks.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXb3JrZmxvd1xUcmVhc3VyZXJUYXNrcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Workspace/AdminWorkspace.razor]

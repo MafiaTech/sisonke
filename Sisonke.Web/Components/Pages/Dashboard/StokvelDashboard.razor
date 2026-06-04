@@ -6,13 +6,17 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
 
 @inject StokvelService StokvelService
 @inject MemberService MemberService
 @inject FineService FineService
 @inject ContributionService ContributionService
+@inject ContributionPaymentService ContributionPaymentService
 @inject ConstitutionService ConstitutionService
 @inject MeetingService MeetingService
+@inject MeetingApologyService MeetingApologyService
+@inject FuneralClaimService FuneralClaimService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
@@ -71,8 +75,9 @@ else
     <!-- ── Page header ── -->
     <div class="page-header">
         <div class="page-header-text">
-            <h1>@stokvel.Name</h1>
+            <h1>Executive Workspace</h1>
             <p class="page-subtitle d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-semibold">@stokvel.Name</span>
                 <StatusBadge Text="@stokvel.Type.ToString()" Type="secondary" />
                 @if (stokvel.IsActive)
                 {
@@ -113,6 +118,216 @@ else
                 </div>
             </div>
         </section>
+    }
+
+    @if (linkedMember is not null)
+    {
+        @if (IsCreatorOrAdminRole(linkedMember.DefaultRole.ToString()))
+        {
+            <section class="executive-task-panel mb-4">
+                <div class="executive-task-panel-header">
+                    <div>
+                        <h2>Executive Task Overview</h2>
+                        <p>Combined workflow overview for this stokvel.</p>
+                    </div>
+                    <span class="sisonke-badge sisonke-badge-blue">@ExecutiveTaskTotal pending</span>
+                </div>
+                <div class="sisonke-card-body">
+                    @if (ExecutiveTaskTotal == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-green mb-3">
+                            No pending workflow tasks. Everything is up to date.
+                        </div>
+                    }
+                    <div class="executive-task-grid">
+                        <div class="executive-task-card task-accent-blue">
+                            <div class="detail-mini-label">Pending Apologies</div>
+                            <div class="executive-task-count">@pendingApologyCount</div>
+                            <p class="text-muted small mb-3">Submitted meeting apologies awaiting attendance review.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Apologies</a>
+                        </div>
+                        <div class="executive-task-card task-accent-gold">
+                            <div class="detail-mini-label">Claims to Review</div>
+                            <div class="executive-task-count">@claimsToReviewCount</div>
+                            <p class="text-muted small mb-3">Claims still needing secretary review.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
+                        </div>
+                        <div class="executive-task-card task-accent-green">
+                            <div class="detail-mini-label">Claims Awaiting Approval</div>
+                            <div class="executive-task-count">@claimsAwaitingChairpersonApprovalCount</div>
+                            <p class="text-muted small mb-3">Secretary-reviewed claims ready for final decision.</p>
+                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
+                        </div>
+                        <div class="executive-task-card task-accent-red">
+                            <div class="detail-mini-label">Finance Follow-up</div>
+                            <div class="executive-task-count">@TreasurerTaskTotal</div>
+                            <p class="text-muted small mb-3">Outstanding fines and approved claims awaiting payout.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/treasurer-tasks/{StokvelId}")">View Finance Tasks</a>
+                        </div>
+                        <div class="executive-task-card task-accent-purple">
+                            <div class="detail-mini-label">Attendance to Capture</div>
+                            <div class="executive-task-count">@attendanceToCaptureCount</div>
+                            <p class="text-muted small mb-3">Recent meetings where attendance appears uncaptured.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/meetings/{StokvelId}")">Capture Attendance</a>
+                        </div>
+                        <div class="executive-task-card task-accent-muted">
+                            <div class="detail-mini-label">Minutes to Complete</div>
+                            <div class="executive-task-count text-muted">Soon</div>
+                            <p class="text-muted small mb-3">Minutes completion status is not captured yet.</p>
+                            <button class="sisonke-btn sisonke-btn-outline executive-task-action" type="button" disabled>Coming Soon</button>
+                        </div>
+                        <div class="executive-task-card task-accent-green">
+                            <div class="detail-mini-label">Setup / Configuration</div>
+                            <div class="executive-task-count">@(stokvel.IsSetupComplete ? "Done" : "Open")</div>
+                            <p class="text-muted small mb-3">Quick setup and configuration status.</p>
+                            @if (!stokvel.IsSetupComplete)
+                            {
+                                <a class="sisonke-btn sisonke-btn-primary executive-task-action" href="@($"/stokvel-questionnaire/{StokvelId}")">Complete Setup</a>
+                            }
+                            else
+                            {
+                                <button class="sisonke-btn sisonke-btn-outline executive-task-action" type="button" disabled>Setup Complete</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
+        else if (canViewChairpersonTasks && IsChairpersonRole(linkedMember.DefaultRole.ToString()))
+        {
+            <section class="executive-task-panel mb-4">
+                <div class="executive-task-panel-header">
+                    <div>
+                        <h2>Chairperson Approval Tasks</h2>
+                        <p>Final decisions and approvals requiring attention.</p>
+                    </div>
+                    <a class="sisonke-btn sisonke-btn-primary" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
+                </div>
+                <div class="sisonke-card-body">
+                    @if (claimsAwaitingChairpersonApprovalCount == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-green mb-3">
+                            No claims are currently awaiting chairperson approval.
+                        </div>
+                    }
+                    <div class="executive-task-grid">
+                        <div class="executive-task-card task-accent-green">
+                            <div class="detail-mini-label">Claims Awaiting Approval</div>
+                            <div class="executive-task-count">@claimsAwaitingChairpersonApprovalCount</div>
+                            <p class="text-muted small mb-3">Secretary-reviewed claims ready for final decision.</p>
+                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
+                        </div>
+                        <div class="executive-task-card task-accent-gold">
+                            <div class="detail-mini-label">Constitution Approval</div>
+                            <div class="executive-task-count text-muted">Soon</div>
+                            <p class="text-muted small mb-3">Constitution approval workflow will appear here.</p>
+                            <button class="sisonke-btn sisonke-btn-outline executive-task-action" type="button" disabled>Coming Soon</button>
+                        </div>
+                        <div class="executive-task-card task-accent-red">
+                            <div class="detail-mini-label">Disciplinary Decisions</div>
+                            <div class="executive-task-count text-muted">Soon</div>
+                            <p class="text-muted small mb-3">Escalated member governance decisions will appear here.</p>
+                            <button class="sisonke-btn sisonke-btn-outline executive-task-action" type="button" disabled>Coming Soon</button>
+                        </div>
+                        <div class="executive-task-card task-accent-purple">
+                            <div class="detail-mini-label">Meeting Decisions</div>
+                            <div class="executive-task-count text-muted">Soon</div>
+                            <p class="text-muted small mb-3">Meeting decision approvals will appear here.</p>
+                            <button class="sisonke-btn sisonke-btn-outline executive-task-action" type="button" disabled>Coming Soon</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
+        else if (canViewSecretaryTasks && IsSecretaryRole(linkedMember.DefaultRole.ToString()))
+        {
+            <section class="executive-task-panel mb-4">
+                <div class="executive-task-panel-header">
+                    <div>
+                        <h2>Secretary Task List</h2>
+                        <p>Workflow items requiring administration or review.</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                        <span class="sisonke-badge sisonke-badge-blue">@SecretaryTaskTotal pending</span>
+                        <a class="sisonke-btn sisonke-btn-primary" href="@($"/secretary-tasks/{StokvelId}")">View All Tasks</a>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    @if (SecretaryTaskTotal == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-green mb-3">
+                            No pending secretary tasks. Everything is up to date.
+                        </div>
+                    }
+                    <div class="executive-task-grid">
+                        <div class="executive-task-card task-accent-blue">
+                            <div class="detail-mini-label">Pending Apologies</div>
+                            <div class="executive-task-count">@pendingApologyCount</div>
+                            <p class="text-muted small mb-3">Submitted meeting apologies awaiting attendance review.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Apologies</a>
+                        </div>
+                        <div class="executive-task-card task-accent-gold">
+                            <div class="detail-mini-label">Claims to Review</div>
+                            <div class="executive-task-count">@claimsToReviewCount</div>
+                            <p class="text-muted small mb-3">Submitted or on-hold claims still needing secretary review.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
+                        </div>
+                        <div class="executive-task-card task-accent-purple">
+                            <div class="detail-mini-label">Attendance to Capture</div>
+                            <div class="executive-task-count">@attendanceToCaptureCount</div>
+                            <p class="text-muted small mb-3">Recent meetings where attendance appears uncaptured.</p>
+                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/meetings/{StokvelId}")">Capture Attendance</a>
+                        </div>
+                        <div class="executive-task-card task-accent-muted">
+                            <div class="detail-mini-label">Minutes to Complete</div>
+                            <div class="executive-task-count text-muted">Soon</div>
+                            <p class="text-muted small mb-3">Minutes completion status is not captured yet.</p>
+                            <button class="sisonke-btn sisonke-btn-outline executive-task-action" type="button" disabled>Coming Soon</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
+        else if (canViewTreasurerTasks && IsTreasurerRole(linkedMember.DefaultRole.ToString()))
+        {
+            <section class="executive-task-panel mb-4">
+                <div class="executive-task-panel-header">
+                    <div>
+                        <h2>Treasurer Task List</h2>
+                        <p>Financial items requiring capture, confirmation or follow-up.</p>
+                    </div>
+                    <a class="sisonke-btn sisonke-btn-primary" href="@($"/treasurer-tasks/{StokvelId}")">View Finance Tasks</a>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="executive-task-grid">
+                        <div class="executive-task-card task-accent-red">
+                            <div class="detail-mini-label">Outstanding Fines</div>
+                            <div class="executive-task-count">@FormatZAR(outstandingFinesTotal)</div>
+                            <p class="text-muted small mb-3">@outstandingFineCount unpaid fine(s) currently recorded.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/treasurer-tasks/{StokvelId}")">View Fines</a>
+                        </div>
+                        <div class="executive-task-card task-accent-green">
+                            <div class="detail-mini-label">Contributions to Capture</div>
+                            <div class="executive-task-count text-muted">Soon</div>
+                            <p class="text-muted small mb-3">Contribution capture workflow is coming soon.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/contribution-capture/{StokvelId}")">Capture Contributions</a>
+                        </div>
+                        <div class="executive-task-card task-accent-gold">
+                            <div class="detail-mini-label">Approved Claims Awaiting Payout</div>
+                            <div class="executive-task-count">@approvedClaimsAwaitingPayoutCount</div>
+                            <p class="text-muted small mb-3">Approved claims needing finance follow-up.</p>
+                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/treasurer-tasks/{StokvelId}")">Open Claims</a>
+                        </div>
+                        <div class="executive-task-card task-accent-blue">
+                            <div class="detail-mini-label">Financial Reports</div>
+                            <div class="executive-task-count">@FormatPercentage(monthlyContributionSummary.CollectionRatePercentage)</div>
+                            <p class="text-muted small mb-3">Monthly contribution, arrears and payment overview.</p>
+                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/finance-summary/{StokvelId}")">Finance Summary</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
     }
 
     @if (!stokvel.IsSetupComplete)
@@ -170,11 +385,45 @@ else
                             <i class="bi bi-cash-coin" aria-hidden="true"></i>
                         </div>
                         <div class="stat-label">Monthly Contributions</div>
-                        <p class="stat-value">@FormatZAR(expectedMonthlyContributions)</p>
-                        <p class="stat-detail">Expected per cycle</p>
-                        <a class="btn btn-outline-primary btn-sm mt-3" href="@($"/contribution-rules/{StokvelId}")">
-                            <i class="bi bi-sliders me-1"></i>Contribution Rules
-                        </a>
+                        <p class="stat-value">@FormatZAR(monthlyContributionSummary.ExpectedContributions)</p>
+                        <p class="stat-detail">
+                            @DateTime.Today.ToString("MMMM yyyy") expected · @monthlyContributionSummary.ActiveMemberCount active members
+                        </p>
+                        @if (monthlyContributionSummary.RecordsGenerated == 0)
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue mt-3 mb-0">
+                                No contribution records generated for this month yet.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mt-3">
+                                <div class="cs-row"><span>Actual contributions</span><span>@FormatZAR(monthlyContributionSummary.ActualContributions)</span></div>
+                                <div class="cs-row"><span>Outstanding</span><span>@FormatZAR(monthlyContributionSummary.OutstandingContributions)</span></div>
+                                <div class="cs-row"><span>Overdue records</span><span>@monthlyContributionSummary.OverdueCount</span></div>
+                                <div class="cs-row"><span>Total outstanding</span><span>@FormatZAR(totalContributionOutstanding)</span></div>
+                                <div class="cs-row"><span>Monthly amount</span><span>@FormatZAR(monthlyContributionSummary.MonthlyContributionAmount)</span></div>
+                                <div class="cs-row"><span>Collection rate</span><span>@monthlyContributionSummary.CollectionRatePercentage.ToString("0.#")%</span></div>
+                                <div class="cs-row"><span>Paid records</span><span>@monthlyContributionSummary.PaidCount / @monthlyContributionSummary.RecordsGenerated</span></div>
+                                <div class="progress mt-2" role="progressbar" aria-label="Contribution collection rate" aria-valuenow="@GetCollectionRateProgress()" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="progress-bar" style="width:@(GetCollectionRateProgress())%"></div>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 mt-2">
+                                    <span class="sisonke-badge sisonke-badge-green">@monthlyContributionSummary.PaidCount Paid</span>
+                                    <span class="sisonke-badge sisonke-badge-gold">@monthlyContributionSummary.PartiallyPaidCount Partial</span>
+                                    <span class="sisonke-badge sisonke-badge-red">@monthlyContributionSummary.OverdueCount Overdue</span>
+                                    <span class="sisonke-badge sisonke-badge-gray">@monthlyContributionSummary.UnpaidCount Unpaid</span>
+                                </div>
+                            </div>
+                        }
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            @if (canManagePayments)
+                            {
+                                <a class="btn btn-outline-primary btn-sm" href="@($"/contribution-capture/{StokvelId}")">
+                                    <i class="bi bi-cash-stack me-1"></i>Capture Contributions
+                                </a>
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
@@ -214,6 +463,171 @@ else
                 </div>
             </div>
         </div>
+
+        @if (canViewFinancials)
+        {
+            <section class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Monthly Contribution Performance</h2>
+                            <p>Expected versus actual member contributions for the current month.</p>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a class="sisonke-btn sisonke-btn-outline" href="@($"/finance-summary/{StokvelId}")">Finance Summary</a>
+                            @if (canManagePayments)
+                            {
+                                <a class="sisonke-btn sisonke-btn-primary" href="@($"/contribution-capture/{StokvelId}")">Capture Contributions</a>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6 col-xl-3">
+                            <div class="sisonke-stat-card h-100">
+                                <div class="stat-label">Expected Contributions</div>
+                                <p class="stat-value">@FormatZAR(monthlyContributionSummary.ExpectedContributions)</p>
+                            </div>
+                        </div>
+                        <div class="col-6 col-xl-3">
+                            <div class="sisonke-stat-card h-100">
+                                <div class="stat-label">Actual Contributions</div>
+                                <p class="stat-value">@FormatZAR(monthlyContributionSummary.ActualContributions)</p>
+                            </div>
+                        </div>
+                        <div class="col-6 col-xl-3">
+                            <div class="sisonke-stat-card h-100">
+                                <div class="stat-label">Outstanding</div>
+                                <p class="stat-value">@FormatZAR(monthlyContributionSummary.OutstandingContributions)</p>
+                            </div>
+                        </div>
+                        <div class="col-6 col-xl-3">
+                            <div class="sisonke-stat-card h-100">
+                                <div class="stat-label">Collection Rate</div>
+                                <p class="stat-value">@monthlyContributionSummary.CollectionRatePercentage.ToString("0.#")%</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="detail-mini-label mb-0">Collection Rate %</span>
+                            <span class="detail-mini-value">@monthlyContributionSummary.CollectionRatePercentage.ToString("0.#")%</span>
+                        </div>
+                        <div class="progress" role="progressbar" aria-label="Contribution collection rate" aria-valuenow="@GetCollectionRateProgress()" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar" style="width:@($"{Math.Min(monthlyContributionSummary.CollectionRatePercentage, 100)}%")"></div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="sisonke-badge sisonke-badge-blue">@monthlyContributionSummary.ActiveMemberCount Active Members</span>
+                        <span class="sisonke-badge sisonke-badge-blue">@FormatZAR(monthlyContributionSummary.MonthlyContributionAmount) Monthly Amount</span>
+                        <span class="sisonke-badge sisonke-badge-green">@monthlyContributionSummary.PaidCount Paid</span>
+                        <span class="sisonke-badge sisonke-badge-red">@monthlyContributionSummary.OverdueCount Overdue</span>
+                        <span class="sisonke-badge sisonke-badge-gray">@monthlyContributionSummary.UnpaidCount Unpaid</span>
+                    </div>
+
+                    @if (monthlyContributionSummary.RecordsGenerated == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-blue mb-0">
+                            No contribution records have been generated for this month yet.
+                            @if (canManagePayments)
+                            {
+                                <div class="mt-2">
+                                    <a class="sisonke-btn sisonke-btn-outline" href="@($"/contribution-capture/{StokvelId}")">Open Contribution Capture</a>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        @if (canViewFinancials)
+        {
+            <section class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Contribution Trends</h2>
+                            <p>Expected versus actual collections over recent months.</p>
+                        </div>
+                        @if (canManagePayments)
+                        {
+                            <a class="sisonke-btn sisonke-btn-primary" href="@($"/contribution-capture/{StokvelId}")">Open Contribution Capture</a>
+                        }
+                    </div>
+
+                    @if (contributionTrends.Count == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-blue mb-0">
+                            Not enough contribution history yet.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive mb-3">
+                            <table class="sisonke-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        <th>Expected</th>
+                                        <th>Actual</th>
+                                        <th>Outstanding</th>
+                                        <th>Collection Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in contributionTrends)
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold">@item.MonthName</td>
+                                            <td>@FormatZAR(item.ExpectedContributions)</td>
+                                            <td>@FormatZAR(item.ActualContributions)</td>
+                                            <td>@FormatZAR(item.OutstandingContributions)</td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="sisonke-badge sisonke-badge-blue">@item.CollectionRatePercentage.ToString("0.#")%</span>
+                                                    <div class="progress flex-grow-1" role="progressbar" aria-label="@($"{item.MonthName} collection rate")" aria-valuenow="@GetCollectionRateProgress(item.CollectionRatePercentage)" aria-valuemin="0" aria-valuemax="100">
+                                                        <div class="progress-bar" style="width:@($"{Math.Min(item.CollectionRatePercentage, 100)}%")"></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if (GetContributionInsightTrends().Count < 2)
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                Not enough contribution history yet.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="sisonke-grid sisonke-grid-3">
+                                <div class="sisonke-alert sisonke-alert-green mb-0">
+                                    <div class="detail-mini-label">Best collection month</div>
+                                    <strong>@GetBestCollectionTrend()?.MonthName</strong>
+                                    <div>@FormatPercentage(GetBestCollectionTrend()?.CollectionRatePercentage ?? 0)</div>
+                                </div>
+                                <div class="sisonke-alert sisonke-alert-gold mb-0">
+                                    <div class="detail-mini-label">Lowest collection month</div>
+                                    <strong>@GetLowestCollectionTrend()?.MonthName</strong>
+                                    <div>@FormatPercentage(GetLowestCollectionTrend()?.CollectionRatePercentage ?? 0)</div>
+                                </div>
+                                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                    <div class="detail-mini-label">Average collection rate</div>
+                                    <strong>@FormatPercentage(GetAverageCollectionRate())</strong>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </section>
+        }
 
         <!-- ══ Main content row ═══════════════════════════════════ -->
         <div class="row g-3">
@@ -416,6 +830,22 @@ else
         padding: .25rem 0;
         border-top: 1px solid var(--sk-border);
     }
+    .secretary-task-list {
+        border-color: var(--border, var(--sk-border));
+        box-shadow: var(--shadow-sm, var(--sk-shadow));
+    }
+    .secretary-task-card {
+        min-height: 100%;
+        border-color: var(--border, var(--sk-border));
+        background: var(--card, #fff);
+    }
+    .secretary-task-count {
+        color: var(--forest, var(--sk-green-700));
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1.1;
+        margin: .35rem 0 .5rem;
+    }
 </style>
 
 @code {
@@ -429,8 +859,28 @@ else
     private Member? linkedMember;
     private string memberLimitMessage = string.Empty;
     private string constitutionStatus = "Not Created";
+    private ContributionMonthSummaryDto monthlyContributionSummary = new();
+    private List<ContributionMonthlyTrendDto> contributionTrends = [];
+    private decimal totalContributionOutstanding;
     private bool isLoading = true;
     private bool canManageDashboard;
+    private bool canViewSecretaryTasks;
+    private bool canViewChairpersonTasks;
+    private bool canManageMeetings;
+    private bool canReviewClaims;
+    private bool canManageAttendance;
+    private bool canViewTreasurerTasks;
+    private bool canManagePayments;
+    private bool canViewFinancials;
+    private int pendingApologyCount;
+    private int claimsToReviewCount;
+    private int claimsAwaitingChairpersonApprovalCount;
+    private int approvedClaimsAwaitingPayoutCount;
+    private int attendanceToCaptureCount;
+    private int outstandingFineCount;
+    private int SecretaryTaskTotal => pendingApologyCount + claimsToReviewCount + attendanceToCaptureCount;
+    private int TreasurerTaskTotal => outstandingFineCount + approvedClaimsAwaitingPayoutCount;
+    private int ExecutiveTaskTotal => pendingApologyCount + claimsToReviewCount + claimsAwaitingChairpersonApprovalCount + attendanceToCaptureCount + TreasurerTaskTotal;
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -447,7 +897,24 @@ else
         linkedMember = null;
         memberLimitMessage = string.Empty;
         constitutionStatus = "Not Created";
+        monthlyContributionSummary = new();
+        contributionTrends = [];
+        totalContributionOutstanding = 0;
         canManageDashboard = false;
+        canViewSecretaryTasks = false;
+        canViewChairpersonTasks = false;
+        canManageMeetings = false;
+        canReviewClaims = false;
+        canManageAttendance = false;
+        canViewTreasurerTasks = false;
+        canManagePayments = false;
+        canViewFinancials = false;
+        pendingApologyCount = 0;
+        claimsToReviewCount = 0;
+        claimsAwaitingChairpersonApprovalCount = 0;
+        approvedClaimsAwaitingPayoutCount = 0;
+        attendanceToCaptureCount = 0;
+        outstandingFineCount = 0;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
 
@@ -472,18 +939,41 @@ else
         }
 
         activeSubscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(StokvelId);
+        canViewSecretaryTasks = await MemberAccessService.CanViewSecretaryTasksAsync(userId, StokvelId);
+        canViewChairpersonTasks = await MemberAccessService.CanViewChairpersonTasksAsync(userId, StokvelId);
+        canManageMeetings = await MemberAccessService.CanManageMeetingsAsync(userId, StokvelId);
+        canReviewClaims = await MemberAccessService.CanReviewClaimsAsync(userId, StokvelId);
+        canManageAttendance = await MemberAccessService.CanManageAttendanceAsync(userId, StokvelId);
+        canViewTreasurerTasks = await MemberAccessService.CanViewTreasurerTasksAsync(userId, StokvelId);
+        canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, StokvelId);
+        canViewFinancials = await MemberAccessService.CanViewFinancialsAsync(userId, StokvelId);
         memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         memberCount = await MemberService.GetMemberCountByStokvelIdAsync(StokvelId);
         expectedMonthlyContributions = await ContributionService.GetExpectedMonthlyContributionsByStokvelIdAsync(StokvelId);
+        monthlyContributionSummary = await ContributionPaymentService.GetMonthlyContributionSummaryAsync(
+            StokvelId,
+            DateTime.Today.Year,
+            DateTime.Today.Month);
+        contributionTrends = await ContributionPaymentService.GetContributionTrendsAsync(StokvelId);
+        totalContributionOutstanding = await ContributionPaymentService.GetTotalOutstandingByStokvelIdAsync(StokvelId);
         outstandingFinesTotal = await FineService.GetOutstandingFinesTotalByStokvelIdAsync(StokvelId);
+        outstandingFineCount = await FineService.GetOutstandingFineCountByStokvelIdAsync(StokvelId);
         upcomingMeetingCount = await MeetingService.GetUpcomingMeetingCountByStokvelIdAsync(StokvelId);
+        pendingApologyCount = await MeetingApologyService.GetPendingApologyCountByStokvelIdAsync(StokvelId);
+        claimsToReviewCount = await FuneralClaimService.GetClaimsRequiringSecretaryReviewCountByStokvelIdAsync(StokvelId);
+        claimsAwaitingChairpersonApprovalCount = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalCountByStokvelIdAsync(StokvelId);
+        approvedClaimsAwaitingPayoutCount = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutCountByStokvelIdAsync(StokvelId);
+        attendanceToCaptureCount = await MeetingService.GetMeetingsNeedingAttendanceCountByStokvelIdAsync(StokvelId);
         openVoteCount = 0;
         isLoading = false;
     }
 
     private static string FormatZAR(decimal amount) =>
         amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string FormatPercentage(decimal percentage) =>
+        $"{percentage:0.#}%";
 
     private static string GetMemberRangeText(SubscriptionPlan plan) =>
         plan.MaxMembers is null
@@ -492,6 +982,47 @@ else
 
     private int GetMemberLimitProgress(int maxMembers) =>
         maxMembers <= 0 ? 0 : Math.Min(100, memberCount * 100 / maxMembers);
+
+    private int GetCollectionRateProgress() =>
+        Math.Clamp((int)Math.Round(monthlyContributionSummary.CollectionRatePercentage), 0, 100);
+
+    private static int GetCollectionRateProgress(decimal collectionRatePercentage) =>
+        Math.Clamp((int)Math.Round(collectionRatePercentage), 0, 100);
+
+    private List<ContributionMonthlyTrendDto> GetContributionInsightTrends() =>
+        contributionTrends
+            .Where(trend =>
+                trend.ExpectedContributions > 0 ||
+                trend.ActualContributions > 0 ||
+                trend.OutstandingContributions > 0 ||
+                trend.PaidCount > 0 ||
+                trend.PartiallyPaidCount > 0 ||
+                trend.OverdueCount > 0 ||
+                trend.UnpaidCount > 0)
+            .ToList();
+
+    private ContributionMonthlyTrendDto? GetBestCollectionTrend() =>
+        GetContributionInsightTrends()
+            .OrderByDescending(trend => trend.CollectionRatePercentage)
+            .ThenByDescending(trend => trend.Year)
+            .ThenByDescending(trend => trend.Month)
+            .FirstOrDefault();
+
+    private ContributionMonthlyTrendDto? GetLowestCollectionTrend() =>
+        GetContributionInsightTrends()
+            .OrderBy(trend => trend.CollectionRatePercentage)
+            .ThenBy(trend => trend.Year)
+            .ThenBy(trend => trend.Month)
+            .FirstOrDefault();
+
+    private decimal GetAverageCollectionRate()
+    {
+        var insightTrends = GetContributionInsightTrends();
+
+        return insightTrends.Count == 0
+            ? 0
+            : insightTrends.Average(trend => trend.CollectionRatePercentage);
+    }
 
     private static string GetConstitutionButtonText(string status) =>
         status switch
@@ -517,5 +1048,29 @@ else
             "StokvelAdmin" => "Full setup and administration",
             _ => "Office bearer administration"
         };
+    }
+
+    private static bool IsCreatorOrAdminRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool IsChairpersonRole(string? role)
+    {
+        return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool IsSecretaryRole(string? role)
+    {
+        return role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool IsTreasurerRole(string? role)
+    {
+        return role?.Trim().Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true;
     }
 }

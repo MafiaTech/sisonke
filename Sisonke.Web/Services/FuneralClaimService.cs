@@ -43,6 +43,154 @@ public class FuneralClaimService(
             .ToListAsync();
     }
 
+    public async Task<List<FuneralClaim>> GetClaimsRequiringSecretaryReviewByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        return await context.FuneralClaims
+            .Include(claim => claim.Member)
+            .Include(claim => claim.Dependent)
+            .Include(claim => claim.Documents)
+            .Where(claim =>
+                claim.Member.TenantId == stokvel.TenantId &&
+                claim.SecretaryReviewedAt == null &&
+                (claim.Status == FuneralClaimStatus.Submitted ||
+                    claim.Status == FuneralClaimStatus.UnderReview ||
+                    claim.Status == FuneralClaimStatus.OnHold))
+            .OrderBy(claim => claim.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<int> GetClaimsRequiringSecretaryReviewCountByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        return await context.FuneralClaims
+            .CountAsync(claim =>
+                claim.Member.TenantId == stokvel.TenantId &&
+                claim.SecretaryReviewedAt == null &&
+                (claim.Status == FuneralClaimStatus.Submitted ||
+                    claim.Status == FuneralClaimStatus.UnderReview ||
+                    claim.Status == FuneralClaimStatus.OnHold));
+    }
+
+    public Task<int> GetSecretaryReviewRequiredCountByStokvelIdAsync(Guid stokvelId)
+    {
+        return GetClaimsRequiringSecretaryReviewCountByStokvelIdAsync(stokvelId);
+    }
+
+    public async Task<List<FuneralClaim>> GetClaimsRequiringChairpersonApprovalByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        return await context.FuneralClaims
+            .Include(claim => claim.Member)
+            .Include(claim => claim.Dependent)
+            .Include(claim => claim.Documents)
+            .Where(claim =>
+                claim.Member.TenantId == stokvel.TenantId &&
+                claim.SecretaryReviewedAt != null &&
+                claim.ChairpersonDecisionAt == null &&
+                claim.Status == FuneralClaimStatus.UnderReview)
+            .OrderBy(claim => claim.SecretaryReviewedAt)
+            .ThenBy(claim => claim.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<int> GetClaimsRequiringChairpersonApprovalCountByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        return await context.FuneralClaims
+            .CountAsync(claim =>
+                claim.Member.TenantId == stokvel.TenantId &&
+                claim.SecretaryReviewedAt != null &&
+                claim.ChairpersonDecisionAt == null &&
+                claim.Status == FuneralClaimStatus.UnderReview);
+    }
+
+    public async Task<List<FuneralClaim>> GetApprovedClaimsAwaitingPayoutByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        return await context.FuneralClaims
+            .Include(claim => claim.Member)
+            .Include(claim => claim.Dependent)
+            .Include(claim => claim.Documents)
+            .Where(claim =>
+                claim.Member.TenantId == stokvel.TenantId &&
+                claim.Status == FuneralClaimStatus.Approved &&
+                claim.PayoutPaidAt == null)
+            .OrderBy(claim => claim.ApprovedAt ?? claim.ChairpersonDecisionAt ?? claim.SubmittedAt ?? claim.CreatedAt)
+            .ThenBy(claim => claim.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<int> GetApprovedClaimsAwaitingPayoutCountByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        return await context.FuneralClaims
+            .CountAsync(claim =>
+                claim.Member.TenantId == stokvel.TenantId &&
+                claim.Status == FuneralClaimStatus.Approved &&
+                claim.PayoutPaidAt == null);
+    }
+
     public async Task<FuneralClaim?> GetClaimByIdAsync(Guid claimId)
     {
         return await context.FuneralClaims
@@ -289,6 +437,54 @@ public class FuneralClaimService(
         return claim;
     }
 
+    public async Task<bool> CompleteSecretaryReviewAsync(
+        Guid claimId,
+        string secretaryNotes,
+        Guid reviewedByMemberId)
+    {
+        if (string.IsNullOrWhiteSpace(secretaryNotes))
+        {
+            return false;
+        }
+
+        var claim = await context.FuneralClaims
+            .Where(existingClaim => existingClaim.Id == claimId)
+            .FirstOrDefaultAsync();
+
+        if (claim is null)
+        {
+            return false;
+        }
+
+        if (claim.Status is not (
+            FuneralClaimStatus.Submitted or
+            FuneralClaimStatus.UnderReview or
+            FuneralClaimStatus.OnHold))
+        {
+            return false;
+        }
+
+        var reviewer = await context.Members
+            .Where(member => member.Id == reviewedByMemberId)
+            .FirstOrDefaultAsync();
+
+        if (reviewer is null || reviewer.TenantId != claim.TenantId)
+        {
+            return false;
+        }
+
+        claim.SecretaryRecommendedApproval = true;
+        claim.SecretaryReviewNotes = secretaryNotes.Trim();
+        claim.SecretaryReviewedByName = reviewer.FullName;
+        claim.SecretaryReviewedAt = DateTime.UtcNow;
+        claim.ReviewNotes = secretaryNotes.Trim();
+        claim.Status = FuneralClaimStatus.UnderReview;
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
     public async Task<FuneralClaim?> ApproveClaimAsChairpersonAsync(
         Guid claimId,
         string? decisionNotes,
@@ -328,6 +524,43 @@ public class FuneralClaimService(
         return claim;
     }
 
+    public async Task<bool> ApproveClaimAsync(Guid claimId, Guid approvedByMemberId, string? notes)
+    {
+        var claim = await context.FuneralClaims
+            .Where(existingClaim => existingClaim.Id == claimId)
+            .FirstOrDefaultAsync();
+
+        if (claim is null || !IsAwaitingChairpersonApproval(claim))
+        {
+            return false;
+        }
+
+        if (!await HasDeathCertificateAsync(claimId))
+        {
+            return false;
+        }
+
+        var approver = await context.Members
+            .Where(member => member.Id == approvedByMemberId)
+            .FirstOrDefaultAsync();
+
+        if (approver is null || approver.TenantId != claim.TenantId)
+        {
+            return false;
+        }
+
+        var decisionAt = DateTime.UtcNow;
+        claim.Status = FuneralClaimStatus.Approved;
+        claim.ApprovedAt = decisionAt;
+        claim.ChairpersonDecisionAt = decisionAt;
+        claim.ChairpersonDecisionByName = approver.FullName;
+        claim.ChairpersonDecisionNotes = notes;
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
     public async Task<FuneralClaim?> RejectClaimAsChairpersonAsync(
         Guid claimId,
         string? decisionNotes,
@@ -363,6 +596,43 @@ public class FuneralClaimService(
         return claim;
     }
 
+    public async Task<bool> RejectClaimAsync(Guid claimId, Guid rejectedByMemberId, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return false;
+        }
+
+        var claim = await context.FuneralClaims
+            .Where(existingClaim => existingClaim.Id == claimId)
+            .FirstOrDefaultAsync();
+
+        if (claim is null || !IsAwaitingChairpersonApproval(claim))
+        {
+            return false;
+        }
+
+        var rejector = await context.Members
+            .Where(member => member.Id == rejectedByMemberId)
+            .FirstOrDefaultAsync();
+
+        if (rejector is null || rejector.TenantId != claim.TenantId)
+        {
+            return false;
+        }
+
+        var decisionAt = DateTime.UtcNow;
+        claim.Status = FuneralClaimStatus.Rejected;
+        claim.RejectedAt = decisionAt;
+        claim.ChairpersonDecisionAt = decisionAt;
+        claim.ChairpersonDecisionByName = rejector.FullName;
+        claim.ChairpersonDecisionNotes = reason.Trim();
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
     public async Task<FuneralClaim?> UpdateClaimStatusAsync(
         Guid claimId,
         FuneralClaimStatus status,
@@ -391,6 +661,50 @@ public class FuneralClaimService(
         await context.SaveChangesAsync();
 
         return claim;
+    }
+
+    public async Task<bool> MarkClaimPayoutPaidAsync(
+        Guid claimId,
+        decimal payoutAmount,
+        string payoutReference,
+        string? payoutNotes,
+        Guid capturedByMemberId)
+    {
+        if (payoutAmount <= 0 || string.IsNullOrWhiteSpace(payoutReference))
+        {
+            return false;
+        }
+
+        var claim = await context.FuneralClaims
+            .Where(existingClaim => existingClaim.Id == claimId)
+            .FirstOrDefaultAsync();
+
+        if (claim is null || claim.Status != FuneralClaimStatus.Approved)
+        {
+            return false;
+        }
+
+        var capturedByMember = await context.Members
+            .Where(member => member.Id == capturedByMemberId)
+            .FirstOrDefaultAsync();
+
+        if (capturedByMember is null ||
+            capturedByMember.TenantId != claim.TenantId ||
+            capturedByMember.DefaultRole != SisonkeRole.Treasurer)
+        {
+            return false;
+        }
+
+        claim.PayoutAmount = payoutAmount;
+        claim.PayoutReference = payoutReference.Trim();
+        claim.PayoutNotes = string.IsNullOrWhiteSpace(payoutNotes) ? null : payoutNotes.Trim();
+        claim.PayoutCapturedByMemberId = capturedByMember.Id;
+        claim.PayoutPaidAt = DateTime.UtcNow;
+        claim.Status = FuneralClaimStatus.Paid;
+
+        await context.SaveChangesAsync();
+
+        return true;
     }
 
     public async Task<FuneralClaimDocument?> UploadClaimDocumentAsync(
@@ -459,5 +773,12 @@ public class FuneralClaimService(
         }
 
         return safeFileName;
+    }
+
+    private static bool IsAwaitingChairpersonApproval(FuneralClaim claim)
+    {
+        return claim.SecretaryReviewedAt is not null &&
+            claim.ChairpersonDecisionAt is null &&
+            claim.Status == FuneralClaimStatus.UnderReview;
     }
 }

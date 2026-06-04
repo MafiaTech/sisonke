@@ -1,0 +1,407 @@
+@page "/contribution-capture/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject ContributionPaymentService ContributionPaymentService
+@inject StokvelService StokvelService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Contribution Capture</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading contribution records...
+    </div>
+}
+else if (!canViewFinancials)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        You do not have access to contribution records for this stokvel.
+    </div>
+
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Finance</span>
+            <h1>Contribution Capture</h1>
+            <p>Track monthly member contribution payments.</p>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <span class="sisonke-badge sisonke-badge-green">@SelectedPeriodLabel</span>
+                @if (stokvel is not null)
+                {
+                    <span class="sisonke-badge sisonke-badge-gray">@stokvel.Name</span>
+                }
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/treasurer-tasks/{StokvelId}")">Finance Tasks</a>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-green" role="alert">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(warningMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-gold" role="alert">@warningMessage</div>
+    }
+
+    <div class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Select Contribution Period</h2>
+                    <p>Choose the month and year to load contribution records.</p>
+                </div>
+            </div>
+
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="capture-month">Month</label>
+                    <InputSelect id="capture-month" class="form-select" @bind-Value="selectedMonth">
+                        @foreach (var month in Months)
+                        {
+                            <option value="@month.Value">@month.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="capture-year">Year</label>
+                    <InputSelect id="capture-year" class="form-select" @bind-Value="selectedYear">
+                        @foreach (var year in Years)
+                        {
+                            <option value="@year">@year</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="LoadContributionsAsync">Load</button>
+                        @if (canManagePayments)
+                        {
+                            <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="GenerateRecordsAsync">
+                                Generate Monthly Records
+                            </button>
+                            <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="RefreshOverdueStatusAsync">
+                                Refresh Overdue Status
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!canManagePayments)
+    {
+        <div class="sisonke-alert sisonke-alert-blue" role="alert">
+            You are viewing contribution records in read-only mode. Only the Treasurer can capture or mark contribution payments as paid.
+        </div>
+    }
+
+    <div class="sisonke-card">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Contribution Records</h2>
+                    <p>@SelectedPeriodLabel contribution status for linked members.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-blue">@contributions.Count Records</span>
+            </div>
+
+            @if (contributions.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue mb-0" role="alert">
+                    No contribution records found for this month. Treasurer users can generate monthly records.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Member Number</th>
+                                <th>Expected</th>
+                                <th>Amount Paid</th>
+                                <th>Balance</th>
+                                <th>Status</th>
+                                <th>Paid Date</th>
+                                <th>Payment Reference</th>
+                                <th>Audit</th>
+                                @if (canManagePayments)
+                                {
+                                    <th>Capture</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var contribution in contributions)
+                            {
+                                var input = GetPaymentInput(contribution.Id);
+                                var canCaptureThisPayment = contribution.Status is PaymentStatus.Unpaid or PaymentStatus.PartiallyPaid or PaymentStatus.Late;
+
+                                <tr>
+                                    <td class="fw-semibold">@(contribution.Member?.FullName ?? "Member unavailable")</td>
+                                    <td>@(contribution.Member?.MemberNumber ?? "-")</td>
+                                    <td>@FormatZAR(contribution.ExpectedAmount)</td>
+                                    <td>@FormatZAR(contribution.PaidAmount)</td>
+                                    <td>@FormatZAR(contribution.OutstandingAmount)</td>
+                                    <td><span class="@GetPaymentStatusBadgeClass(contribution.Status)">@GetPaymentStatusText(contribution.Status)</span></td>
+                                    <td>@(contribution.FullyPaidDate?.ToString("dd MMM yyyy") ?? "-")</td>
+                                    <td>
+                                        @if (canManagePayments && canCaptureThisPayment)
+                                        {
+                                            <InputText class="form-control form-control-sm" @bind-Value="input.Reference" placeholder="Reference" />
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <a class="sisonke-btn sisonke-btn-outline" href="@($"/contribution-payment-audit/{contribution.Id}")">View Audit</a>
+                                    </td>
+                                    @if (canManagePayments)
+                                    {
+                                        <td>
+                                            @if (canCaptureThisPayment)
+                                            {
+                                                <div class="d-grid gap-2" style="min-width: 13rem;">
+                                                    <InputNumber class="form-control form-control-sm" @bind-Value="input.AmountPaid" />
+                                                    <InputText class="form-control form-control-sm" @bind-Value="input.Notes" placeholder="Notes" />
+                                                    <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="() => CapturePaymentAsync(contribution.Id)">
+                                                        Capture Payment
+                                                    </button>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="sisonke-badge sisonke-badge-green">Paid</span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private Stokvel? stokvel;
+    private bool isLoading = true;
+    private bool canViewFinancials;
+    private bool canManagePayments;
+    private string? currentUserId;
+    private int selectedMonth = DateTime.Today.Month;
+    private int selectedYear = DateTime.Today.Year;
+    private List<MemberContribution> contributions = [];
+    private readonly Dictionary<Guid, ContributionPaymentInput> paymentInputs = new();
+    private string? successMessage;
+    private string? warningMessage;
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    private string SelectedPeriodLabel => new DateTime(selectedYear, selectedMonth, 1).ToString("MMMM yyyy");
+
+    private static IEnumerable<(int Value, string Name)> Months =>
+        Enumerable.Range(1, 12).Select(month => (month, new DateTime(2000, month, 1).ToString("MMMM")));
+
+    private static IEnumerable<int> Years =>
+        Enumerable.Range(DateTime.Today.Year - 2, 5).Reverse();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        canViewFinancials = false;
+        canManagePayments = false;
+        currentUserId = null;
+        successMessage = null;
+        warningMessage = null;
+        contributions = [];
+        paymentInputs.Clear();
+
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        canViewFinancials = await MemberAccessService.CanViewFinancialsAsync(currentUserId, StokvelId);
+        canManagePayments = await MemberAccessService.CanManagePaymentsAsync(currentUserId, StokvelId);
+
+        if (canViewFinancials)
+        {
+            await LoadContributionsAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task LoadContributionsAsync()
+    {
+        successMessage = null;
+        warningMessage = null;
+        contributions = await ContributionPaymentService.GetMonthlyContributionsAsync(StokvelId, selectedYear, selectedMonth);
+        SyncPaymentInputs();
+    }
+
+    private async Task GenerateRecordsAsync()
+    {
+        successMessage = null;
+        warningMessage = null;
+
+        if (!canManagePayments || string.IsNullOrWhiteSpace(currentUserId))
+        {
+            warningMessage = "Only the Treasurer can capture or mark contribution payments as paid.";
+            return;
+        }
+
+        contributions = await ContributionPaymentService.EnsureMonthlyContributionRecordsAsync(StokvelId, selectedYear, selectedMonth);
+        SyncPaymentInputs();
+        successMessage = "Monthly contribution records generated.";
+    }
+
+    private async Task RefreshOverdueStatusAsync()
+    {
+        successMessage = null;
+        warningMessage = null;
+
+        if (!canManagePayments || string.IsNullOrWhiteSpace(currentUserId))
+        {
+            warningMessage = "Only the Treasurer can capture or mark contribution payments as paid.";
+            return;
+        }
+
+        var capturedByMember = await MemberAccessService.GetLinkedMemberForUserAsync(currentUserId, StokvelId);
+
+        if (capturedByMember is null)
+        {
+            warningMessage = "Unable to identify the Treasurer member record for this stokvel.";
+            return;
+        }
+
+        var updatedCount = await ContributionPaymentService.MarkOverdueContributionsAsync(
+            StokvelId,
+            selectedYear,
+            selectedMonth,
+            capturedByMember.Id);
+
+        contributions = await ContributionPaymentService.GetMonthlyContributionsAsync(StokvelId, selectedYear, selectedMonth);
+        SyncPaymentInputs();
+        successMessage = updatedCount == 1
+            ? "Overdue statuses updated. 1 record updated."
+            : $"Overdue statuses updated. {updatedCount} records updated.";
+    }
+
+    private async Task CapturePaymentAsync(Guid memberContributionId)
+    {
+        successMessage = null;
+        warningMessage = null;
+
+        if (!canManagePayments || string.IsNullOrWhiteSpace(currentUserId))
+        {
+            warningMessage = "Only the Treasurer can capture or mark contribution payments as paid.";
+            return;
+        }
+
+        var input = GetPaymentInput(memberContributionId);
+
+        if (input.AmountPaid <= 0)
+        {
+            warningMessage = "Enter an amount greater than zero before capturing payment.";
+            return;
+        }
+
+        var updatedContribution = await ContributionPaymentService.CaptureContributionPaymentAsync(
+            memberContributionId,
+            input.AmountPaid,
+            input.Reference,
+            input.Notes,
+            currentUserId);
+
+        if (updatedContribution is null)
+        {
+            warningMessage = "Contribution payment could not be captured.";
+            return;
+        }
+
+        successMessage = "Contribution payment captured.";
+        contributions = await ContributionPaymentService.GetMonthlyContributionsAsync(StokvelId, selectedYear, selectedMonth);
+        SyncPaymentInputs();
+    }
+
+    private void SyncPaymentInputs()
+    {
+        foreach (var contribution in contributions)
+        {
+            var input = GetPaymentInput(contribution.Id);
+            input.AmountPaid = contribution.OutstandingAmount > 0 ? contribution.OutstandingAmount : 0;
+            input.Reference ??= string.Empty;
+            input.Notes ??= string.Empty;
+        }
+    }
+
+    private ContributionPaymentInput GetPaymentInput(Guid memberContributionId)
+    {
+        if (!paymentInputs.TryGetValue(memberContributionId, out var input))
+        {
+            input = new ContributionPaymentInput();
+            paymentInputs[memberContributionId] = input;
+        }
+
+        return input;
+    }
+
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string GetPaymentStatusBadgeClass(PaymentStatus status) =>
+        status switch
+        {
+            PaymentStatus.Paid => "sisonke-badge sisonke-badge-green",
+            PaymentStatus.PartiallyPaid => "sisonke-badge sisonke-badge-gold",
+            PaymentStatus.Late => "sisonke-badge sisonke-badge-red",
+            PaymentStatus.Unpaid => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string GetPaymentStatusText(PaymentStatus status) =>
+        status == PaymentStatus.Late ? "Overdue" : status.ToString();
+
+    private sealed class ContributionPaymentInput
+    {
+        public decimal AmountPaid { get; set; }
+        public string? Reference { get; set; }
+        public string? Notes { get; set; }
+    }
+}

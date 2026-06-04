@@ -58,9 +58,17 @@ else
                 </a>
             }
         </div>
-        <a class="btn btn-primary btn-sm" href="@($"/edit-member/{MemberId}")">
-            <i class="bi bi-pencil me-1"></i>Edit Member
-        </a>
+        <div class="d-flex flex-wrap gap-2">
+            @if (stokvel is not null && (isOwnMemberProfile || canViewFinancials))
+            {
+                <a class="btn btn-outline-primary btn-sm" href="@($"/member-statement/{MemberId}/{stokvel.Id}")">
+                    <i class="bi bi-receipt me-1"></i>View Financial Statement
+                </a>
+            }
+            <a class="btn btn-primary btn-sm" href="@($"/edit-member/{MemberId}")">
+                <i class="bi bi-pencil me-1"></i>Edit Member
+            </a>
+        </div>
     </div>
 
     <!-- ── Modern profile header ── -->
@@ -537,7 +545,7 @@ else
                                             </td>
                                             <td class="text-muted small">@(fine.PaidDate?.ToString("dd MMM yyyy") ?? "—")</td>
                                             <td>
-                                                @if (canManageStokvel && fine.Status == FineStatus.Unpaid)
+                                                @if (canManagePayments && fine.Status == FineStatus.Unpaid)
                                                 {
                                                     <a class="btn btn-sm btn-success" href="@($"/mark-fine-paid/{fine.Id}")">Mark Paid</a>
                                                 }
@@ -715,9 +723,11 @@ else
     private string? successMessage;
     private string? warningMessage;
     private bool canManageStokvel;
+    private bool canManagePayments;
     private bool canManageMemberStatus;
     private bool isOwnMemberProfile;
     private bool canViewFines;
+    private bool canViewFinancials;
 
     [Parameter]
     public Guid MemberId { get; set; }
@@ -726,9 +736,11 @@ else
     {
         isLoading = true;
         canManageStokvel = false;
+        canManagePayments = false;
         canManageMemberStatus = false;
         isOwnMemberProfile = false;
         canViewFines = false;
+        canViewFinancials = false;
         successMessage = null;
         warningMessage = null;
         member = await MemberService.GetMemberByIdAsync(MemberId);
@@ -742,8 +754,10 @@ else
             if (!string.IsNullOrWhiteSpace(userId))
             {
                 canManageStokvel = await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
+                canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, stokvel.Id);
                 canManageMemberStatus = await MemberAccessService.CanManageMemberStatusAsync(userId, stokvel.Id);
                 isOwnMemberProfile = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+                canViewFinancials = await MemberAccessService.CanViewFinancialsAsync(userId, stokvel.Id);
                 canViewFines = canManageStokvel || isOwnMemberProfile;
             }
         }

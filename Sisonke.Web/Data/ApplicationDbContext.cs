@@ -22,9 +22,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ContributionCycle> ContributionCycles => Set<ContributionCycle>();
     public DbSet<MemberContribution> MemberContributions => Set<MemberContribution>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ContributionPaymentAudit> ContributionPaymentAudits => Set<ContributionPaymentAudit>();
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<MeetingAgendaItem> MeetingAgendaItems => Set<MeetingAgendaItem>();
     public DbSet<MeetingAttendance> MeetingAttendances => Set<MeetingAttendance>();
+    public DbSet<MeetingApology> MeetingApologies => Set<MeetingApology>();
     public DbSet<MeetingVote> MeetingVotes => Set<MeetingVote>();
     public DbSet<MeetingVoteResponse> MeetingVoteResponses => Set<MeetingVoteResponse>();
     public DbSet<QuestionnaireSection> QuestionnaireSections => Set<QuestionnaireSection>();
@@ -196,6 +198,30 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(p => p.MemberId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Entity<ContributionPaymentAudit>()
+            .HasOne(a => a.ContributionPayment)
+            .WithMany()
+            .HasForeignKey(a => a.ContributionPaymentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ContributionPaymentAudit>()
+            .HasOne(a => a.Member)
+            .WithMany()
+            .HasForeignKey(a => a.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ContributionPaymentAudit>()
+            .HasOne(a => a.Stokvel)
+            .WithMany()
+            .HasForeignKey(a => a.StokvelId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ContributionPaymentAudit>()
+            .HasOne(a => a.CapturedByMember)
+            .WithMany()
+            .HasForeignKey(a => a.CapturedByMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Entity<Meeting>()
             .HasOne(m => m.Tenant)
             .WithMany()
@@ -221,6 +247,22 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<MeetingAttendance>()
+            .HasIndex(a => new { a.MeetingId, a.MemberId })
+            .IsUnique();
+
+        builder.Entity<MeetingApology>()
+            .HasOne(a => a.Meeting)
+            .WithMany()
+            .HasForeignKey(a => a.MeetingId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MeetingApology>()
+            .HasOne(a => a.Member)
+            .WithMany()
+            .HasForeignKey(a => a.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MeetingApology>()
             .HasIndex(a => new { a.MeetingId, a.MemberId })
             .IsUnique();
 

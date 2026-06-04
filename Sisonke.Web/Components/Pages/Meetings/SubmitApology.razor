@@ -1,0 +1,273 @@
+@page "/submit-apology/{MeetingId:guid}/{MemberId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject MemberService MemberService
+@inject MeetingService MeetingService
+@inject MeetingApologyService MeetingApologyService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Submit Apology</PageTitle>
+
+@if (isLoading)
+{
+    <div class="sisonke-alert sisonke-alert-blue">Loading meeting apology details...</div>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="sisonke-alert sisonke-alert-red">@errorMessage</div>
+    <a class="sisonke-btn sisonke-btn-outline" href="/member-home/@MemberId">Back to Member Home</a>
+}
+else if (member is null)
+{
+    <div class="sisonke-alert sisonke-alert-red">Member not found.</div>
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else if (meeting is null)
+{
+    <div class="sisonke-alert sisonke-alert-red">Meeting not found.</div>
+    <a class="sisonke-btn sisonke-btn-outline" href="/member-home/@MemberId">Back to Member Home</a>
+}
+else
+{
+    <div class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Meeting Apology</span>
+            <h1 class="mt-3 mb-2">Submit Apology</h1>
+            <p class="mb-0">Submit an apology for a meeting you cannot attend.</p>
+        </div>
+        <div class="sisonke-grid sisonke-grid-2 mt-4">
+            <div>
+                <div class="small text-uppercase text-white-50 fw-semibold">Meeting</div>
+                <div class="fw-semibold">@Display(meeting.Title)</div>
+            </div>
+            <div>
+                <div class="small text-uppercase text-white-50 fw-semibold">Date</div>
+                <div class="fw-semibold">@meeting.MeetingDate.ToString("dd MMM yyyy HH:mm")</div>
+            </div>
+            <div>
+                <div class="small text-uppercase text-white-50 fw-semibold">Member</div>
+                <div class="fw-semibold">@Display(member.FullName)</div>
+            </div>
+            <div>
+                <div class="small text-uppercase text-white-50 fw-semibold">Venue</div>
+                <div class="fw-semibold">@Display(meeting.Venue)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sisonke-card">
+        <div class="sisonke-card-head">
+            <div>
+                <h2 class="h5 mb-1">Apology Details</h2>
+                <div class="text-muted">One apology can be submitted per member per meeting.</div>
+            </div>
+            <a class="sisonke-btn sisonke-btn-outline" href="/member-home/@MemberId">Back to Member Home</a>
+        </div>
+        <div class="sisonke-card-body">
+            @if (existingApology is not null)
+            {
+                <div class="sisonke-alert sisonke-alert-green">
+                    <div>
+                        <strong>Apology Submitted</strong>
+                        <div>Your apology was submitted on @existingApology.SubmittedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm").</div>
+                    </div>
+                </div>
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9"><span class="sisonke-badge sisonke-badge-green">@existingApology.Status</span></dd>
+
+                    <dt class="col-sm-3">Apology Type</dt>
+                    <dd class="col-sm-9">@DisplayApologyType(existingApology.ApologyType)</dd>
+
+                    <dt class="col-sm-3">Reason</dt>
+                    <dd class="col-sm-9">@existingApology.Reason</dd>
+
+                    <dt class="col-sm-3">Submitted</dt>
+                    <dd class="col-sm-9">@existingApology.SubmittedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</dd>
+
+                    @if (!string.IsNullOrWhiteSpace(existingApology.ResponseNote))
+                    {
+                        <dt class="col-sm-3">Response note</dt>
+                        <dd class="col-sm-9">@existingApology.ResponseNote</dd>
+                    }
+                </dl>
+            }
+            else if (meeting.MeetingDate.Date < DateTime.Today)
+            {
+                <div class="sisonke-alert sisonke-alert-gold">
+                    This meeting has already passed. Apologies can only be submitted for upcoming meetings.
+                </div>
+            }
+            else
+            {
+                @if (!string.IsNullOrWhiteSpace(successMessage))
+                {
+                    <div class="sisonke-alert sisonke-alert-green">@successMessage</div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(submitErrorMessage))
+                {
+                    <div class="sisonke-alert sisonke-alert-red">@submitErrorMessage</div>
+                }
+
+                <EditForm Model="input" OnValidSubmit="SubmitAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="apology-type">Apology Type</label>
+                        <InputSelect id="apology-type" class="form-control" @bind-Value="input.ApologyType">
+                            <option value="">Select apology type</option>
+                            @foreach (var apologyType in ApologyTypes)
+                            {
+                                <option value="@apologyType">@apologyType</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => input.ApologyType)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="apology-reason">Additional Notes / Reason</label>
+                        <InputTextArea
+                            id="apology-reason"
+                            class="form-control"
+                            rows="5"
+                            placeholder="Briefly explain why you cannot attend this meeting."
+                            @bind-Value="input.Reason" />
+                        <ValidationMessage For="@(() => input.Reason)" />
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="sisonke-btn sisonke-btn-primary" type="submit" disabled="@(!CanSubmit)">
+                            Submit Apology
+                        </button>
+                        <a class="sisonke-btn sisonke-btn-outline" href="/member-home/@MemberId">Cancel</a>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid MeetingId { get; set; }
+
+    [Parameter]
+    public Guid MemberId { get; set; }
+
+    private readonly ApologyInput input = new();
+    private Member? member;
+    private Meeting? meeting;
+    private MeetingApology? existingApology;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? submitErrorMessage;
+    private string? successMessage;
+    private static readonly string[] ApologyTypes =
+    [
+        "Work commitment",
+        "Family commitment",
+        "Medical reason",
+        "Travel / out of town",
+        "Emergency",
+        "Other"
+    ];
+    private bool CanSubmit =>
+        !string.IsNullOrWhiteSpace(input.ApologyType) &&
+        !string.IsNullOrWhiteSpace(input.Reason);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        submitErrorMessage = null;
+        successMessage = null;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            errorMessage = "Please sign in to submit a meeting apology.";
+            isLoading = false;
+            return;
+        }
+
+        var canAccessMemberHome = await MemberAccessService.CanAccessMemberHomeAsync(userId, MemberId);
+        var ownsMember = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+
+        if (!canAccessMemberHome || !ownsMember)
+        {
+            errorMessage = "You do not have access to submit an apology for this membership.";
+            isLoading = false;
+            return;
+        }
+
+        member = await MemberService.GetMemberByIdAsync(MemberId);
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+
+        if (member is not null && meeting is not null && member.TenantId != meeting.TenantId)
+        {
+            errorMessage = "This meeting does not belong to the same stokvel as this membership.";
+            isLoading = false;
+            return;
+        }
+
+        existingApology = await MeetingApologyService.GetApologyAsync(MeetingId, MemberId);
+        isLoading = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        submitErrorMessage = null;
+        successMessage = null;
+
+        var apology = await MeetingApologyService.SubmitApologyAsync(
+            MeetingId,
+            MemberId,
+            input.ApologyType,
+            input.Reason);
+
+        if (apology is null)
+        {
+            submitErrorMessage = "Apology could not be submitted. Check that the meeting is upcoming and the apology type and reason are captured.";
+            return;
+        }
+
+        successMessage = "Apology submitted.";
+        NavigationManager.NavigateTo($"/member-home/{MemberId}");
+    }
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
+    }
+
+    private static string DisplayApologyType(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Not specified" : value;
+    }
+
+    private sealed class ApologyInput
+    {
+        [Required(ErrorMessage = "Please select an apology type.")]
+        public string ApologyType { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Please capture a reason for the apology.")]
+        [MaxLength(1000, ErrorMessage = "Reason cannot exceed 1000 characters.")]
+        public string Reason { get; set; } = string.Empty;
+    }
+}

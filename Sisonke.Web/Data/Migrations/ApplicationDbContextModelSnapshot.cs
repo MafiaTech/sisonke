@@ -416,6 +416,62 @@ namespace Sisonke.Web.Migrations
                     b.ToTable("ContributionCycles");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.ContributionPaymentAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CapturedByMemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ContributionPaymentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("NewAmountPaid")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NewStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PaymentReference")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("PreviousAmountPaid")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PreviousStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CapturedByMemberId");
+
+                    b.HasIndex("ContributionPaymentId");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.ToTable("ContributionPaymentAudits");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.ContributionRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -538,6 +594,23 @@ namespace Sisonke.Web.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid>("MemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("PayoutAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PayoutCapturedByMemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PayoutNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("PayoutPaidAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PayoutReference")
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RejectedAt")
@@ -698,6 +771,56 @@ namespace Sisonke.Web.Migrations
                     b.HasIndex("MeetingId");
 
                     b.ToTable("MeetingAgendaItems");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingApology", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ApologyType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MeetingId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResponseNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ReviewedByMemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("MeetingId", "MemberId")
+                        .IsUnique();
+
+                    b.ToTable("MeetingApologies");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingAttendance", b =>
@@ -1560,6 +1683,41 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.ContributionPaymentAudit", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "CapturedByMember")
+                        .WithMany()
+                        .HasForeignKey("CapturedByMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.MemberContribution", "ContributionPayment")
+                        .WithMany()
+                        .HasForeignKey("ContributionPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CapturedByMember");
+
+                    b.Navigation("ContributionPayment");
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Stokvel");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.ContributionRule", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.Tenant", "Tenant")
@@ -1639,6 +1797,25 @@ namespace Sisonke.Web.Migrations
                         .IsRequired();
 
                     b.Navigation("Meeting");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingApology", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Meeting", "Meeting")
+                        .WithMany()
+                        .HasForeignKey("MeetingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Meeting");
+
+                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MeetingAttendance", b =>
