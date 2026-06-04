@@ -304,6 +304,61 @@ else
             </div>
         </div>
 
+        @if (canViewPayoutAuditTrail)
+        {
+            <div class="sisonke-card claim-audit-card">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Payout Audit Trail</h2>
+                            <p>Recorded payout actions for this claim.</p>
+                        </div>
+                    </div>
+
+                    @if (payoutAuditTrail.Count == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-blue mb-0">No payout audit records have been captured yet.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="sisonke-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Date/time</th>
+                                        <th>Action</th>
+                                        <th>Previous amount</th>
+                                        <th>New amount</th>
+                                        <th>Previous status</th>
+                                        <th>New status</th>
+                                        <th>Reference</th>
+                                        <th>Notes</th>
+                                        <th>Captured by</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var audit in payoutAuditTrail)
+                                    {
+                                        <tr>
+                                            <td class="text-muted small">@audit.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                            <td><span class="sisonke-badge sisonke-badge-gold">@audit.Action</span></td>
+                                            <td>@FormatCurrency(audit.PreviousPayoutAmount)</td>
+                                            <td>@FormatCurrency(audit.NewPayoutAmount)</td>
+                                            <td>@(audit.PreviousStatus ?? "-")</td>
+                                            <td>@(audit.NewStatus ?? "-")</td>
+                                            <td>@(audit.PayoutReference ?? "-")</td>
+                                            <td>@(audit.Notes ?? "-")</td>
+                                            <td>@(audit.CapturedByMember?.FullName ?? "-")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
         <div class="sisonke-card claim-documents-card">
             <div class="sisonke-card-body">
                     <div class="sisonke-card-head">
@@ -432,7 +487,8 @@ else
         align-items: stretch;
     }
 
-    .claim-documents-card {
+    .claim-documents-card,
+    .claim-audit-card {
         grid-column: 1 / -1;
     }
 
@@ -519,6 +575,7 @@ else
 
 @code {
     private FuneralClaim? claim;
+    private List<ClaimPayoutAudit> payoutAuditTrail = [];
     private SecretaryReviewModel secretaryReviewModel = new();
     private ChairpersonDecisionModel chairpersonDecisionModel = new();
     private ClaimPayoutModel payoutModel = new();
@@ -535,6 +592,7 @@ else
     private bool canAttemptSubmitClaim;
     private bool canSubmitClaim;
     private bool canUploadDocuments;
+    private bool canViewPayoutAuditTrail;
     private bool showApproveConfirmation;
     private bool showRejectConfirmation;
     private string? currentUserId;
@@ -571,6 +629,8 @@ else
         canAttemptSubmitClaim = false;
         canSubmitClaim = false;
         canUploadDocuments = false;
+        canViewPayoutAuditTrail = false;
+        payoutAuditTrail = [];
         currentUserId = null;
         currentStokvelId = null;
         payoutCapturedByMemberName = null;
@@ -597,6 +657,7 @@ else
                     canReviewClaim = await MemberAccessService.CanReviewClaimsAsync(userId, stokvelId.Value);
                     canApproveClaim = await MemberAccessService.CanApproveClaimsAsync(userId, stokvelId.Value);
                     canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, stokvelId.Value);
+                    canViewPayoutAuditTrail = await MemberAccessService.CanViewFinancialsAsync(userId, stokvelId.Value);
                     canCompleteSecretaryReview = canReviewClaim && IsClaimReviewableBySecretary(claim);
                     canMakeChairpersonDecision = canApproveClaim && IsClaimInChairpersonApprovalStage(claim);
                 }
@@ -627,6 +688,11 @@ else
             {
                 var capturedByMember = await MemberService.GetMemberByIdAsync(claim.PayoutCapturedByMemberId.Value);
                 payoutCapturedByMemberName = capturedByMember?.FullName;
+            }
+
+            if (canViewPayoutAuditTrail)
+            {
+                payoutAuditTrail = await FuneralClaimService.GetClaimPayoutAuditTrailAsync(claim.Id);
             }
         }
 
@@ -976,6 +1042,11 @@ else
         value
             ? "sisonke-badge sisonke-badge-green"
             : "sisonke-badge sisonke-badge-gold";
+
+    private static string FormatCurrency(decimal? amount)
+    {
+        return amount?.ToString("C0", new System.Globalization.CultureInfo("en-ZA")) ?? "-";
+    }
 
     private static bool IsClaimSubmittableByStatus(FuneralClaimStatus status)
     {

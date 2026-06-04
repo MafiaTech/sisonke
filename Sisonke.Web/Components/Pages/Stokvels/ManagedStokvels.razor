@@ -13,7 +13,7 @@
 @inject MemberAccessService MemberAccessService
 @inject StokvelService StokvelService
 
-<PageTitle>Stokvels I Manage</PageTitle>
+<PageTitle>My Managed Stokvels</PageTitle>
 
 @if (isLoading)
 {
@@ -26,17 +26,17 @@
 }
 else
 {
-    <PageHeader
-        Title="Stokvels I Manage"
-        Subtitle="Office bearer access linked to your account."
-        BackText="Back to Workspace"
-        BackHref="/my-workspace" />
-
-    <div class="d-flex justify-content-end mb-3">
-        <a class="btn btn-primary btn-sm" href="/register-stokvel">
-            <i class="bi bi-plus-circle me-1"></i>Register New Stokvel
-        </a>
-    </div>
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Office Bearer</span>
+            <h1>My Managed Stokvels</h1>
+            <p>Your office bearer access and role-based shortcuts.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">My Workspace</a>
+            <a class="sisonke-btn sisonke-btn-primary" href="/register-stokvel">Register New Stokvel</a>
+        </div>
+    </section>
 
     @if (managedMemberships.Count == 0)
     {
@@ -46,56 +46,101 @@ else
             </div>
             <h2 class="ms-empty-title">You are not currently an office bearer for any stokvel.</h2>
             <p class="ms-empty-text">Managed stokvels will appear here when your linked member role is Chairperson, Secretary, Treasurer or another office bearer role.</p>
-            <a class="btn btn-outline-secondary" href="/my-workspace">Back to My Workspace</a>
+            <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
         </div>
     }
     else
     {
+        @if (managedMemberships.Count == 1)
+        {
+            <div class="sisonke-alert sisonke-alert-blue mb-4">
+                You currently manage one stokvel. Open the dashboard to continue.
+            </div>
+        }
+
         <div class="managed-stokvel-grid">
             @foreach (var item in managedMemberships)
             {
-                <section class="card border-0 shadow-sm h-100">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between gap-3 align-items-start mb-3">
-                            <div>
-                                <div class="managed-detail-label">Stokvel</div>
-                                <h2 class="managed-card-title">@item.Stokvel.Name</h2>
-                            </div>
-                            <StatusBadge Text="Office Bearer" Type="success" />
+                var role = item.Member.DefaultRole.ToString();
+                <section class="sisonke-card">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <span class="@GetRoleBadgeClass(role)">@GetRoleLabel(role)</span>
+                            <h2 class="managed-card-title mt-1">@item.Stokvel.Name</h2>
+                            <p class="text-muted small mb-0">@Display(item.Member.FullName) &middot; @Display(item.Member.MemberNumber)</p>
                         </div>
+                        <div class="d-flex flex-column align-items-end gap-2">
+                            <StatusBadge
+                                Text="@(item.Stokvel.IsActive ? "Active" : "Inactive")"
+                                Type="@(item.Stokvel.IsActive ? "success" : "secondary")" />
+                            @if (item.Subscription is not null)
+                            {
+                                <span class="sisonke-badge sisonke-badge-blue">@item.Subscription.SubscriptionPlan.Name</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="sisonke-card-body">
 
-                        <div class="managed-card-details">
+                        <div class="managed-card-details mb-4">
                             <div>
                                 <div class="managed-detail-label">Member</div>
                                 <div class="managed-detail-value">@Display(item.Member.FullName)</div>
-                            </div>
-                            <div>
-                                <div class="managed-detail-label">Role</div>
-                                <div class="managed-detail-value">@item.Member.DefaultRole</div>
                             </div>
                             <div>
                                 <div class="managed-detail-label">Member Number</div>
                                 <div class="managed-detail-value">@Display(item.Member.MemberNumber)</div>
                             </div>
                             <div>
+                                <div class="managed-detail-label">Role</div>
+                                <div class="managed-detail-value">@GetRoleLabel(role)</div>
+                            </div>
+                            <div>
                                 <div class="managed-detail-label">Access Type</div>
                                 <div class="managed-detail-value">Office Bearer</div>
                             </div>
+                            <div>
+                                <div class="managed-detail-label">Status</div>
+                                <div class="managed-detail-value">@(item.Stokvel.IsActive ? "Active" : "Inactive")</div>
+                            </div>
+                            <div>
+                                <div class="managed-detail-label">Package</div>
+                                <div class="managed-detail-value">@(item.Subscription?.SubscriptionPlan.Name ?? "—")</div>
+                            </div>
                         </div>
 
-                        <div class="managed-card-actions mt-4">
-                            <a class="btn btn-sm btn-primary" href="@($"/stokvel-dashboard/{item.Stokvel.Id}")">
+                        <div class="managed-detail-label mb-2">Quick Access</div>
+                        <div class="managed-card-actions">
+                            <a class="sisonke-btn sisonke-btn-primary" href="@($"/stokvel-dashboard/{item.Stokvel.Id}")">
                                 Open Management Dashboard
                             </a>
-                            <a class="btn btn-sm btn-outline-primary" href="@($"/members/{item.Stokvel.Id}")">
-                                Manage Members
-                            </a>
-                            <a class="btn btn-sm btn-outline-primary" href="@($"/meetings/{item.Stokvel.Id}")">
-                                Meetings
-                            </a>
-                            <a class="btn btn-sm btn-outline-primary" href="@($"/constitution-builder/{item.Stokvel.Id}")">
-                                Constitution
-                            </a>
+
+                            @if (IsSecretaryRole(role))
+                            {
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/secretary-tasks/{item.Stokvel.Id}")">Secretary Tasks</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/members/{item.Stokvel.Id}")">Members</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/meetings/{item.Stokvel.Id}")">Meetings</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-warnings/{item.Stokvel.Id}")">Warnings</a>
+                            }
+                            else if (IsChairpersonRole(role))
+                            {
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/chairperson-tasks/{item.Stokvel.Id}")">Approval Tasks</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/secretary-tasks/{item.Stokvel.Id}")">Claims</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/constitution-builder/{item.Stokvel.Id}")">Constitution</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-warnings/{item.Stokvel.Id}")">Warnings</a>
+                            }
+                            else if (IsTreasurerRole(role))
+                            {
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/treasurer-tasks/{item.Stokvel.Id}")">Treasurer Tasks</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/finance-summary/{item.Stokvel.Id}")">Finance Summary</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/contribution-capture/{item.Stokvel.Id}")">Contribution Capture</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/finance-summary/{item.Stokvel.Id}")">Member Arrears</a>
+                            }
+                            else if (IsCreatorOrAdminRole(role))
+                            {
+                                <a class="sisonke-btn sisonke-btn-gold" href="@($"/stokvel-dashboard/{item.Stokvel.Id}")">Executive Overview</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/members/{item.Stokvel.Id}")">Manage Members</a>
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-questionnaire/{item.Stokvel.Id}")">Configuration</a>
+                            }
                         </div>
                     </div>
                 </section>
@@ -107,8 +152,8 @@ else
 <style>
     .managed-stokvel-grid {
         display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+        gap: 1.25rem;
+        grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
     }
 
     .managed-card-title {
@@ -120,8 +165,8 @@ else
 
     .managed-card-details {
         display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .75rem 1rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .managed-detail-label {
@@ -146,7 +191,13 @@ else
         gap: .5rem;
     }
 
-    @@media (max-width: 640px) {
+    @@media (max-width: 768px) {
+        .managed-card-details {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @@media (max-width: 480px) {
         .managed-card-details {
             grid-template-columns: 1fr;
         }
@@ -176,17 +227,53 @@ else
 
             if (stokvel is not null && await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id))
             {
-                managedMemberships.Add(new ManagedMembership(member, stokvel));
+                var subscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(stokvel.Id);
+                managedMemberships.Add(new ManagedMembership(member, stokvel, subscription));
             }
         }
 
         isLoading = false;
     }
 
-    private static string Display(string? value)
+    private static string Display(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static string GetRoleLabel(string? role) =>
+        role?.Trim() switch
+        {
+            "Creator" or "Admin" or "StokvelAdmin" => "Creator / Admin",
+            "Chairperson" => "Chairperson",
+            "Secretary" => "Secretary",
+            "Treasurer" => "Treasurer",
+            _ => role ?? "Office Bearer"
+        };
+
+    private static string GetRoleBadgeClass(string? role) =>
+        role?.Trim() switch
+        {
+            "Creator" or "Admin" or "StokvelAdmin" => "sisonke-badge sisonke-badge-red",
+            "Chairperson" => "sisonke-badge sisonke-badge-gold",
+            "Secretary" => "sisonke-badge sisonke-badge-blue",
+            "Treasurer" => "sisonke-badge sisonke-badge-green",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static bool IsCreatorOrAdminRole(string? role)
     {
-        return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
+        var normalizedRole = role?.Trim();
+        return normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+               normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+               normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
     }
 
-    private sealed record ManagedMembership(Member Member, Stokvel Stokvel);
+    private static bool IsChairpersonRole(string? role) =>
+        role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static bool IsSecretaryRole(string? role) =>
+        role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static bool IsTreasurerRole(string? role) =>
+        role?.Trim().Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true;
+
+    private sealed record ManagedMembership(Member Member, Stokvel Stokvel, TenantSubscription? Subscription);
 }

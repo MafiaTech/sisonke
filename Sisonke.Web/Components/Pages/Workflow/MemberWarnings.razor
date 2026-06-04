@@ -1,0 +1,361 @@
+@page "/member-warnings/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject MemberWarningService MemberWarningService
+@inject StokvelService StokvelService
+
+<PageTitle>Member Warnings</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading member warnings...
+    </div>
+}
+else if (!canViewWarnings)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        You do not have access to attendance warnings for this stokvel.
+    </div>
+
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Attendance</span>
+            <h1>Member Warnings</h1>
+            <p>Review attendance-related warnings and executive review items.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/secretary-tasks/{StokvelId}")">Secretary Tasks</a>
+            <a class="sisonke-btn sisonke-btn-primary" href="@($"/stokvel-dashboard/{StokvelId}")">Dashboard</a>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-green mb-4">@successMessage</div>
+    }
+
+    <div class="sisonke-grid sisonke-grid-4 mb-4">
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="warning-summary-label">Open warnings</div>
+                <div class="warning-summary-value">@OpenWarningCount</div>
+            </div>
+        </div>
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="warning-summary-label">Reminders</div>
+                <div class="warning-summary-value">@ReminderCount</div>
+            </div>
+        </div>
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="warning-summary-label">Formal warnings</div>
+                <div class="warning-summary-value">@FormalWarningCount</div>
+            </div>
+        </div>
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="warning-summary-label">Executive review required</div>
+                <div class="warning-summary-value">@ExecutiveReviewCount</div>
+            </div>
+        </div>
+    </div>
+
+    <section class="sisonke-card">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Attendance Warnings</h2>
+                <p>@(stokvel?.Name ?? "Stokvel") warnings for office bearer review.</p>
+            </div>
+            <span class="sisonke-badge sisonke-badge-gold">@FilteredWarnings.Count</span>
+        </div>
+        <div class="sisonke-card-body">
+            <div class="warning-filter-bar mb-4">
+                @foreach (var filter in filters)
+                {
+                    <button class="@GetFilterButtonClass(filter.Value)" type="button" @onclick="() => selectedFilter = filter.Value">
+                        @filter.Label
+                    </button>
+                }
+            </div>
+
+            @if (FilteredWarnings.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-green mb-0">No attendance warnings match this filter.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Member name</th>
+                                <th>Member number</th>
+                                <th>Warning type</th>
+                                <th>Reason</th>
+                                <th>Absence count</th>
+                                <th>Related meeting</th>
+                                <th>Created date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var warning in FilteredWarnings)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@DisplayOrDash(warning.Member?.FullName)</td>
+                                    <td>@DisplayOrDash(warning.Member?.MemberNumber)</td>
+                                    <td>
+                                        <span class="@GetWarningBadgeClass(warning.WarningType)">@GetWarningTypeLabel(warning.WarningType)</span>
+                                        @if (warning.WarningType == WarningExecutiveReviewRequired)
+                                        {
+                                            <div class="sisonke-alert sisonke-alert-gold mt-2 mb-0">
+                                                Suspension is not automatic. Executive committee must review attendance history and decide manually.
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>@DisplayOrDash(warning.Reason)</td>
+                                    <td>@warning.AbsenceCount</td>
+                                    <td>
+                                        <div>@DisplayOrDash(warning.Meeting?.Title)</div>
+                                        <div class="text-muted small">@(warning.Meeting?.MeetingDate.ToString("dd MMM yyyy") ?? "-")</div>
+                                    </td>
+                                    <td>@warning.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                    <td><span class="@GetStatusBadgeClass(warning.Status)">@warning.Status</span></td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                            <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{warning.MemberId}")">View Member Profile</a>
+                                            @if (warning.Status == StatusOpen)
+                                            {
+                                                <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="() => AcknowledgeWarningAsync(warning.Id)">
+                                                    Acknowledge Warning
+                                                </button>
+                                            }
+                                            @if (warning.Status != StatusResolved)
+                                            {
+                                                <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="() => ResolveWarningAsync(warning.Id)">
+                                                    Resolve Warning
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+<style>
+    .warning-summary-label {
+        color: var(--muted, var(--sk-text-muted));
+        font-size: .75rem;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+
+    .warning-summary-value {
+        color: var(--forest, var(--sk-green-700));
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1.1;
+        margin-top: .35rem;
+    }
+
+    .warning-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+</style>
+
+@code {
+    private const string StatusOpen = "Open";
+    private const string StatusAcknowledged = "Acknowledged";
+    private const string StatusResolved = "Resolved";
+    private const string WarningReminder = "Reminder";
+    private const string WarningFormal = "FormalWarning";
+    private const string WarningExecutiveReviewRequired = "ExecutiveReviewRequired";
+
+    private readonly (string Label, string Value)[] filters =
+    [
+        ("All", "All"),
+        ("Open", StatusOpen),
+        ("Reminder", WarningReminder),
+        ("Formal Warning", WarningFormal),
+        ("Executive Review Required", WarningExecutiveReviewRequired),
+        ("Resolved", StatusResolved),
+        ("Acknowledged", StatusAcknowledged)
+    ];
+
+    private Stokvel? stokvel;
+    private Member? linkedMember;
+    private List<MemberWarning> warnings = [];
+    private bool isLoading = true;
+    private bool canViewWarnings;
+    private string selectedFilter = "All";
+    private string? successMessage;
+
+    private int OpenWarningCount => warnings.Count(warning => warning.Status == StatusOpen);
+    private int ReminderCount => warnings.Count(warning => warning.WarningType == WarningReminder);
+    private int FormalWarningCount => warnings.Count(warning => warning.WarningType == WarningFormal);
+    private int ExecutiveReviewCount => warnings.Count(warning => warning.WarningType == WarningExecutiveReviewRequired);
+
+    private List<MemberWarning> FilteredWarnings =>
+        selectedFilter switch
+        {
+            "All" => warnings,
+            StatusOpen => warnings.Where(warning => warning.Status == StatusOpen).ToList(),
+            StatusAcknowledged => warnings.Where(warning => warning.Status == StatusAcknowledged).ToList(),
+            StatusResolved => warnings.Where(warning => warning.Status == StatusResolved).ToList(),
+            WarningReminder => warnings.Where(warning => warning.WarningType == WarningReminder).ToList(),
+            WarningFormal => warnings.Where(warning => warning.WarningType == WarningFormal).ToList(),
+            WarningExecutiveReviewRequired => warnings.Where(warning => warning.WarningType == WarningExecutiveReviewRequired).ToList(),
+            _ => warnings
+        };
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        canViewWarnings = false;
+        successMessage = null;
+        warnings = [];
+        linkedMember = null;
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var canViewSecretaryTasks = await MemberAccessService.CanViewSecretaryTasksAsync(userId, StokvelId);
+        var canViewChairpersonTasks = await MemberAccessService.CanViewChairpersonTasksAsync(userId, StokvelId);
+        canViewWarnings = canViewSecretaryTasks || canViewChairpersonTasks;
+        linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
+
+        if (canViewWarnings)
+        {
+            await LoadWarningsAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task LoadWarningsAsync()
+    {
+        warnings = await MemberWarningService.GetWarningsByStokvelIdAsync(StokvelId);
+    }
+
+    private async Task AcknowledgeWarningAsync(Guid warningId)
+    {
+        if (linkedMember is null)
+        {
+            return;
+        }
+
+        var acknowledged = await MemberWarningService.AcknowledgeWarningAsync(
+            warningId,
+            linkedMember.Id,
+            "Acknowledged by office bearer.");
+
+        if (acknowledged)
+        {
+            successMessage = "Warning acknowledged.";
+            await LoadWarningsAsync();
+        }
+    }
+
+    private async Task ResolveWarningAsync(Guid warningId)
+    {
+        if (linkedMember is null)
+        {
+            return;
+        }
+
+        var resolved = await MemberWarningService.ResolveWarningAsync(
+            warningId,
+            linkedMember.Id,
+            "Resolved by office bearer.");
+
+        if (resolved)
+        {
+            successMessage = "Warning resolved.";
+            selectedFilter = StatusResolved;
+            await LoadWarningsAsync();
+        }
+    }
+
+    private string GetFilterButtonClass(string filterValue)
+    {
+        return selectedFilter == filterValue
+            ? "sisonke-btn sisonke-btn-gold"
+            : "sisonke-btn sisonke-btn-outline";
+    }
+
+    private static string DisplayOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string GetWarningTypeLabel(string warningType)
+    {
+        return warningType switch
+        {
+            WarningExecutiveReviewRequired => "Executive Review Required",
+            WarningFormal => "Formal Warning",
+            WarningReminder => "Reminder",
+            _ => warningType
+        };
+    }
+
+    private static string GetWarningBadgeClass(string warningType)
+    {
+        return warningType switch
+        {
+            WarningExecutiveReviewRequired => "sisonke-badge sisonke-badge-red",
+            WarningFormal => "sisonke-badge sisonke-badge-gold",
+            WarningReminder => "sisonke-badge sisonke-badge-blue",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            StatusOpen => "sisonke-badge sisonke-badge-gold",
+            StatusAcknowledged => "sisonke-badge sisonke-badge-blue",
+            StatusResolved => "sisonke-badge sisonke-badge-green",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+}

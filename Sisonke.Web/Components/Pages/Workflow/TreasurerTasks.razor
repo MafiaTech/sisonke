@@ -48,6 +48,7 @@ else
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+            <a class="sisonke-btn sisonke-btn-outline" href="#payout-audit">Payout Audit</a>
             <a class="sisonke-btn sisonke-btn-gold" href="@($"/finance-summary/{StokvelId}")">Finance Summary Report</a>
             <a class="sisonke-btn sisonke-btn-primary" href="@($"/members/{StokvelId}")">Open Members</a>
         </div>
@@ -176,6 +177,76 @@ else
         </div>
     </div>
 
+    <div id="payout-audit" class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Recent Payout Activity</h2>
+                    <p>Recently captured claim payout actions.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-gold">@recentPayoutActivity.Count Recent</span>
+            </div>
+
+            @if (recentPayoutActivity.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                    No claim payout activity has been recorded yet.
+                </div>
+
+                @if (canManagePayments)
+                {
+                    @* TODO: Remove after pilot data stabilisation. *@
+                    <button class="sisonke-btn sisonke-btn-outline mt-3" type="button" @onclick="BackfillPayoutAuditTrailAsync" disabled="@isBackfillingPayoutAudits">
+                        @(isBackfillingPayoutAudits ? "Backfilling..." : "Backfill Payout Audit Trail")
+                    </button>
+                }
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date/time</th>
+                                <th>Claim reference</th>
+                                <th>Member</th>
+                                <th>Action</th>
+                                <th>Amount</th>
+                                <th>Reference</th>
+                                <th>Captured by</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var audit in recentPayoutActivity)
+                            {
+                                <tr>
+                                    <td class="text-muted small">@audit.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                    <td class="fw-semibold">@GetClaimReference(audit)</td>
+                                    <td>@(audit.Member?.FullName ?? "Member unavailable")</td>
+                                    <td><span class="sisonke-badge sisonke-badge-gold">@audit.Action</span></td>
+                                    <td>@FormatZAR(audit.NewPayoutAmount)</td>
+                                    <td>@(audit.PayoutReference ?? "-")</td>
+                                    <td>@(audit.CapturedByMember?.FullName ?? "-")</td>
+                                    <td>
+                                        <a class="sisonke-btn sisonke-btn-outline" href="@($"/claim/{audit.FuneralClaimId}")">Open Claim</a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(payoutAuditBackfillMessage))
+            {
+                <div class="sisonke-alert sisonke-alert-green mt-3 mb-0">
+                    @payoutAuditBackfillMessage
+                </div>
+            }
+        </div>
+    </div>
+
     <div class="sisonke-grid sisonke-grid-2">
         <div class="sisonke-card">
             <div class="sisonke-card-body">
@@ -239,10 +310,13 @@ else
 
 @code {
     private bool isLoading = true;
+    private bool isBackfillingPayoutAudits;
     private bool canViewTreasurerTasks;
     private bool canManagePayments;
+    private Guid? loggedInTreasurerMemberId;
     private List<MemberFine> outstandingFines = [];
     private List<FuneralClaim> approvedClaimsAwaitingPayout = [];
+    private List<ClaimPayoutAudit> recentPayoutActivity = [];
     private List<MemberContribution> currentMonthContributions = [];
     private ContributionMonthSummaryDto currentMonthContributionSummary = new();
     private string CurrentMonthLabel => DateTime.Today.ToString("MMMM yyyy");
@@ -256,12 +330,16 @@ else
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
+        isBackfillingPayoutAudits = false;
         canViewTreasurerTasks = false;
         canManagePayments = false;
+        loggedInTreasurerMemberId = null;
         outstandingFines = [];
         approvedClaimsAwaitingPayout = [];
+        recentPayoutActivity = [];
         currentMonthContributions = [];
         currentMonthContributionSummary = new();
+        payoutAuditBackfillMessage = null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -281,8 +359,15 @@ else
             return;
         }
 
+        if (canManagePayments)
+        {
+            var treasurerMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
+            loggedInTreasurerMemberId = treasurerMember?.Id;
+        }
+
         outstandingFines = await FineService.GetOutstandingFinesByStokvelIdAsync(StokvelId);
         approvedClaimsAwaitingPayout = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutByStokvelIdAsync(StokvelId);
+        recentPayoutActivity = await FuneralClaimService.GetClaimPayoutAuditsByStokvelIdAsync(StokvelId, 10);
         currentMonthContributions = await ContributionPaymentService.GetMonthlyContributionsAsync(
             StokvelId,
             DateTime.Today.Year,
@@ -294,6 +379,34 @@ else
         isLoading = false;
     }
 
+    private async Task BackfillPayoutAuditTrailAsync()
+    {
+        payoutAuditBackfillMessage = null;
+
+        if (!canManagePayments || loggedInTreasurerMemberId is null)
+        {
+            return;
+        }
+
+        isBackfillingPayoutAudits = true;
+        var addedCount = await FuneralClaimService.BackfillMissingPayoutAuditsAsync(StokvelId, loggedInTreasurerMemberId.Value);
+        recentPayoutActivity = await FuneralClaimService.GetClaimPayoutAuditsByStokvelIdAsync(StokvelId, 10);
+        payoutAuditBackfillMessage = addedCount == 0
+            ? "No missing payout audit records were found."
+            : $"{addedCount} payout audit record{(addedCount == 1 ? string.Empty : "s")} backfilled.";
+        isBackfillingPayoutAudits = false;
+    }
+
     private static string FormatZAR(decimal amount) =>
         amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string FormatZAR(decimal? amount) =>
+        amount?.ToString("C0", new System.Globalization.CultureInfo("en-ZA")) ?? "-";
+
+    private static string GetClaimReference(ClaimPayoutAudit audit)
+    {
+        return audit.FuneralClaimId.ToString("N")[..8].ToUpperInvariant();
+    }
+
+    private string? payoutAuditBackfillMessage;
 }

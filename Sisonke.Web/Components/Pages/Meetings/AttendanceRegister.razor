@@ -11,6 +11,7 @@
 
 @inject MeetingService MeetingService
 @inject MeetingApologyService MeetingApologyService
+@inject MemberWarningService MemberWarningService
 @inject MemberAccessService MemberAccessService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject StokvelService StokvelService
@@ -232,6 +233,7 @@ else
     private List<MeetingAttendance> attendanceRecords = [];
     private Dictionary<Guid, MeetingApology> apologiesByMemberId = [];
     private (int Present, int Absent, int Apologies, int Late) attendanceSummary;
+    private Guid? processedByMemberId;
     private bool isLoading = true;
     private bool canManageAttendance;
     private string? successMessage;
@@ -250,6 +252,7 @@ else
         isLoading = true;
         successMessage = null;
         errorMessage = null;
+        processedByMemberId = null;
 
         meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
 
@@ -267,6 +270,9 @@ else
             var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
             canManageAttendance = !string.IsNullOrWhiteSpace(userId) &&
                 await MemberAccessService.CanManageAttendanceAsync(userId, stokvel.Id);
+            processedByMemberId = string.IsNullOrWhiteSpace(userId)
+                ? null
+                : (await MemberAccessService.GetLinkedMemberForUserAsync(userId, stokvel.Id))?.Id;
 
             if (!canManageAttendance)
             {
@@ -319,8 +325,15 @@ else
             return;
         }
 
+        if (processedByMemberId is null)
+        {
+            errorMessage = "Your member record could not be resolved for warning evaluation.";
+            return;
+        }
+
         attendanceSummary = BuildAttendanceSummary();
-        successMessage = "Attendance updated.";
+        await MemberWarningService.EvaluateAttendanceWarningsAsync(MeetingId, processedByMemberId.Value);
+        successMessage = "Attendance saved and member warnings evaluated.";
     }
 
     private (int Present, int Absent, int Apologies, int Late) BuildAttendanceSummary()

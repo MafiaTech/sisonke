@@ -684,6 +684,17 @@ public class FuneralClaimService(
             return false;
         }
 
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.TenantId == claim.TenantId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
         var capturedByMember = await context.Members
             .Where(member => member.Id == capturedByMemberId)
             .FirstOrDefaultAsync();
@@ -695,16 +706,141 @@ public class FuneralClaimService(
             return false;
         }
 
+        var previousPayoutAmount = claim.PayoutAmount;
+        var previousStatus = claim.Status.ToString();
+        var paidAt = DateTime.UtcNow;
+        var trimmedPayoutReference = payoutReference.Trim();
+        var trimmedPayoutNotes = string.IsNullOrWhiteSpace(payoutNotes) ? null : payoutNotes.Trim();
+
         claim.PayoutAmount = payoutAmount;
-        claim.PayoutReference = payoutReference.Trim();
-        claim.PayoutNotes = string.IsNullOrWhiteSpace(payoutNotes) ? null : payoutNotes.Trim();
+        claim.PayoutReference = trimmedPayoutReference;
+        claim.PayoutNotes = trimmedPayoutNotes;
         claim.PayoutCapturedByMemberId = capturedByMember.Id;
-        claim.PayoutPaidAt = DateTime.UtcNow;
+        claim.PayoutPaidAt = paidAt;
         claim.Status = FuneralClaimStatus.Paid;
+
+        context.ClaimPayoutAudits.Add(new ClaimPayoutAudit
+        {
+            Id = Guid.NewGuid(),
+            FuneralClaimId = claim.Id,
+            MemberId = claim.MemberId,
+            StokvelId = stokvel.Id,
+            Action = "PayoutMarkedPaid",
+            PreviousPayoutAmount = previousPayoutAmount,
+            NewPayoutAmount = payoutAmount,
+            PreviousStatus = previousStatus,
+            NewStatus = claim.Status.ToString(),
+            PayoutReference = trimmedPayoutReference,
+            Notes = trimmedPayoutNotes,
+            CapturedByMemberId = capturedByMember.Id,
+            CreatedAt = paidAt
+        });
 
         await context.SaveChangesAsync();
 
         return true;
+    }
+
+    public async Task<List<ClaimPayoutAudit>> GetClaimPayoutAuditTrailAsync(Guid funeralClaimId)
+    {
+        return await context.ClaimPayoutAudits
+            .Include(audit => audit.Member)
+            .Include(audit => audit.Stokvel)
+            .Include(audit => audit.CapturedByMember)
+            .Where(audit => audit.FuneralClaimId == funeralClaimId)
+            .OrderByDescending(audit => audit.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<List<ClaimPayoutAudit>> GetClaimPayoutAuditsByStokvelIdAsync(Guid stokvelId, int take = 100)
+    {
+        return await context.ClaimPayoutAudits
+            .Include(audit => audit.FuneralClaim)
+            .Include(audit => audit.Member)
+            .Include(audit => audit.CapturedByMember)
+            .Where(audit => audit.StokvelId == stokvelId)
+            .OrderByDescending(audit => audit.CreatedAt)
+            .Take(take)
+            .ToListAsync();
+    }
+
+    public async Task<int> BackfillMissingPayoutAuditsAsync(Guid stokvelId, Guid capturedByMemberId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        var fallbackCapturedByMember = await context.Members
+            .Where(member => member.Id == capturedByMemberId)
+            .FirstOrDefaultAsync();
+
+        if (fallbackCapturedByMember is null || fallbackCapturedByMember.TenantId != stokvel.TenantId)
+        {
+            return 0;
+        }
+
+        var paidClaims = await context.FuneralClaims
+            .Include(claim => claim.Member)
+            .Where(claim =>
+                claim.TenantId == stokvel.TenantId &&
+                claim.PayoutPaidAt != null)
+            .OrderBy(claim => claim.PayoutPaidAt)
+            .ThenBy(claim => claim.CreatedAt)
+            .ToListAsync();
+
+        if (paidClaims.Count == 0)
+        {
+            return 0;
+        }
+
+        var claimIdsWithAudit = await context.ClaimPayoutAudits
+            .Where(audit => audit.StokvelId == stokvelId)
+            .Select(audit => audit.FuneralClaimId)
+            .Distinct()
+            .ToListAsync();
+        var auditedClaimIds = claimIdsWithAudit.ToHashSet();
+
+        var auditsAdded = 0;
+
+        foreach (var claim in paidClaims)
+        {
+            if (auditedClaimIds.Contains(claim.Id))
+            {
+                continue;
+            }
+
+            context.ClaimPayoutAudits.Add(new ClaimPayoutAudit
+            {
+                Id = Guid.NewGuid(),
+                FuneralClaimId = claim.Id,
+                MemberId = claim.MemberId,
+                StokvelId = stokvel.Id,
+                Action = "PayoutMarkedPaid",
+                PreviousStatus = FuneralClaimStatus.Approved.ToString(),
+                NewStatus = claim.Status.ToString(),
+                NewPayoutAmount = claim.PayoutAmount,
+                PayoutReference = claim.PayoutReference,
+                Notes = claim.PayoutNotes,
+                CapturedByMemberId = claim.PayoutCapturedByMemberId ?? capturedByMemberId,
+                CreatedAt = claim.PayoutPaidAt ?? DateTime.UtcNow
+            });
+
+            auditsAdded++;
+        }
+
+        if (auditsAdded > 0)
+        {
+            await context.SaveChangesAsync();
+        }
+
+        return auditsAdded;
     }
 
     public async Task<FuneralClaimDocument?> UploadClaimDocumentAsync(

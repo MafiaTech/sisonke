@@ -11,6 +11,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
     public DbSet<Member> Members => Set<Member>();
+    public DbSet<MemberWarning> MemberWarnings => Set<MemberWarning>();
     public DbSet<NextOfKin> NextOfKinRecords => Set<NextOfKin>();
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
     public DbSet<MemberDependent> MemberDependents => Set<MemberDependent>();
@@ -23,6 +24,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<MemberContribution> MemberContributions => Set<MemberContribution>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<ContributionPaymentAudit> ContributionPaymentAudits => Set<ContributionPaymentAudit>();
+    public DbSet<ClaimPayoutAudit> ClaimPayoutAudits => Set<ClaimPayoutAudit>();
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<MeetingAgendaItem> MeetingAgendaItems => Set<MeetingAgendaItem>();
     public DbSet<MeetingAttendance> MeetingAttendances => Set<MeetingAttendance>();
@@ -83,6 +85,28 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<Member>()
             .HasIndex(m => m.ApplicationUserId);
+
+        builder.Entity<MemberWarning>()
+            .HasOne(w => w.Member)
+            .WithMany()
+            .HasForeignKey(w => w.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberWarning>()
+            .HasOne(w => w.Stokvel)
+            .WithMany()
+            .HasForeignKey(w => w.StokvelId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberWarning>()
+            .HasOne(w => w.Meeting)
+            .WithMany()
+            .HasForeignKey(w => w.MeetingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberWarning>()
+            .HasIndex(w => new { w.MemberId, w.MeetingId, w.WarningType })
+            .IsUnique();
 
         builder.Entity<NextOfKin>()
             .HasOne(n => n.Member)
@@ -217,6 +241,30 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<ContributionPaymentAudit>()
+            .HasOne(a => a.CapturedByMember)
+            .WithMany()
+            .HasForeignKey(a => a.CapturedByMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ClaimPayoutAudit>()
+            .HasOne(a => a.FuneralClaim)
+            .WithMany()
+            .HasForeignKey(a => a.FuneralClaimId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ClaimPayoutAudit>()
+            .HasOne(a => a.Member)
+            .WithMany()
+            .HasForeignKey(a => a.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ClaimPayoutAudit>()
+            .HasOne(a => a.Stokvel)
+            .WithMany()
+            .HasForeignKey(a => a.StokvelId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ClaimPayoutAudit>()
             .HasOne(a => a.CapturedByMember)
             .WithMany()
             .HasForeignKey(a => a.CapturedByMemberId)

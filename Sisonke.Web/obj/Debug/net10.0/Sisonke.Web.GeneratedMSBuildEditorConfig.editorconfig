@@ -403,6 +403,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXb3JrZmxvd1xDaGFpcnBlcnNvblRhc2tzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Workflow/MemberWarnings.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXb3JrZmxvd1xNZW1iZXJXYXJuaW5ncy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke/Sisonke.Web/Components/Pages/Workflow/SecretaryTasks.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXb3JrZmxvd1xTZWNyZXRhcnlUYXNrcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 

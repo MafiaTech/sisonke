@@ -16,6 +16,7 @@
 @inject ConstitutionService ConstitutionService
 @inject MeetingService MeetingService
 @inject MeetingApologyService MeetingApologyService
+@inject MemberWarningService MemberWarningService
 @inject FuneralClaimService FuneralClaimService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
@@ -170,6 +171,12 @@ else
                             <p class="text-muted small mb-3">Recent meetings where attendance appears uncaptured.</p>
                             <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/meetings/{StokvelId}")">Capture Attendance</a>
                         </div>
+                        <div class="executive-task-card task-accent-gold">
+                            <div class="detail-mini-label">Attendance Warnings</div>
+                            <div class="executive-task-count">@openWarningCount</div>
+                            <p class="text-muted small mb-3">Open absence warnings requiring office bearer review.</p>
+                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/member-warnings/{StokvelId}")">Review Warnings</a>
+                        </div>
                         <div class="executive-task-card task-accent-muted">
                             <div class="detail-mini-label">Minutes to Complete</div>
                             <div class="executive-task-count text-muted">Soon</div>
@@ -224,10 +231,10 @@ else
                             <button class="sisonke-btn sisonke-btn-outline executive-task-action" type="button" disabled>Coming Soon</button>
                         </div>
                         <div class="executive-task-card task-accent-red">
-                            <div class="detail-mini-label">Disciplinary Decisions</div>
-                            <div class="executive-task-count text-muted">Soon</div>
-                            <p class="text-muted small mb-3">Escalated member governance decisions will appear here.</p>
-                            <button class="sisonke-btn sisonke-btn-outline executive-task-action" type="button" disabled>Coming Soon</button>
+                            <div class="detail-mini-label">Attendance Warnings</div>
+                            <div class="executive-task-count">@openWarningCount</div>
+                            <p class="text-muted small mb-3">Open absence warnings that may require executive committee review.</p>
+                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/member-warnings/{StokvelId}")">Review Warnings</a>
                         </div>
                         <div class="executive-task-card task-accent-purple">
                             <div class="detail-mini-label">Meeting Decisions</div>
@@ -277,6 +284,12 @@ else
                             <div class="executive-task-count">@attendanceToCaptureCount</div>
                             <p class="text-muted small mb-3">Recent meetings where attendance appears uncaptured.</p>
                             <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/meetings/{StokvelId}")">Capture Attendance</a>
+                        </div>
+                        <div class="executive-task-card task-accent-gold">
+                            <div class="detail-mini-label">Attendance Warnings</div>
+                            <div class="executive-task-count">@openWarningCount</div>
+                            <p class="text-muted small mb-3">Open absence warnings requiring review.</p>
+                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/member-warnings/{StokvelId}")">Review Warnings</a>
                         </div>
                         <div class="executive-task-card task-accent-muted">
                             <div class="detail-mini-label">Minutes to Complete</div>
@@ -877,10 +890,11 @@ else
     private int claimsAwaitingChairpersonApprovalCount;
     private int approvedClaimsAwaitingPayoutCount;
     private int attendanceToCaptureCount;
+    private int openWarningCount;
     private int outstandingFineCount;
-    private int SecretaryTaskTotal => pendingApologyCount + claimsToReviewCount + attendanceToCaptureCount;
+    private int SecretaryTaskTotal => pendingApologyCount + claimsToReviewCount + attendanceToCaptureCount + openWarningCount;
     private int TreasurerTaskTotal => outstandingFineCount + approvedClaimsAwaitingPayoutCount;
-    private int ExecutiveTaskTotal => pendingApologyCount + claimsToReviewCount + claimsAwaitingChairpersonApprovalCount + attendanceToCaptureCount + TreasurerTaskTotal;
+    private int ExecutiveTaskTotal => pendingApologyCount + claimsToReviewCount + claimsAwaitingChairpersonApprovalCount + attendanceToCaptureCount + openWarningCount + TreasurerTaskTotal;
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -914,6 +928,7 @@ else
         claimsAwaitingChairpersonApprovalCount = 0;
         approvedClaimsAwaitingPayoutCount = 0;
         attendanceToCaptureCount = 0;
+        openWarningCount = 0;
         outstandingFineCount = 0;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
@@ -965,6 +980,7 @@ else
         claimsAwaitingChairpersonApprovalCount = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalCountByStokvelIdAsync(StokvelId);
         approvedClaimsAwaitingPayoutCount = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutCountByStokvelIdAsync(StokvelId);
         attendanceToCaptureCount = await MeetingService.GetMeetingsNeedingAttendanceCountByStokvelIdAsync(StokvelId);
+        openWarningCount = (await MemberWarningService.GetOpenWarningsByStokvelIdAsync(StokvelId)).Count;
         openVoteCount = 0;
         isLoading = false;
     }

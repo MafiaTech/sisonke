@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sisonke.Web.Data;
 
@@ -10,9 +11,11 @@ using Sisonke.Web.Data;
 namespace Sisonke.Web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260604142253_AddClaimPayoutAudits")]
+    partial class AddClaimPayoutAudits
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.8");
@@ -1228,60 +1231,6 @@ namespace Sisonke.Web.Migrations
                     b.ToTable("MemberFines");
                 });
 
-            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberWarning", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("AbsenceCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("AcknowledgedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("CreatedByMemberId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("MeetingId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("MemberId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("StokvelId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("WarningType")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MeetingId");
-
-                    b.HasIndex("StokvelId");
-
-                    b.HasIndex("MemberId", "MeetingId", "WarningType")
-                        .IsUnique();
-
-                    b.ToTable("MemberWarnings");
-                });
-
             modelBuilder.Entity("Sisonke.Web.Data.Entities.NextOfKin", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2086,32 +2035,6 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("Member");
 
                     b.Navigation("Tenant");
-                });
-
-            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberWarning", b =>
-                {
-                    b.HasOne("Sisonke.Web.Data.Entities.Meeting", "Meeting")
-                        .WithMany()
-                        .HasForeignKey("MeetingId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
-                        .WithMany()
-                        .HasForeignKey("MemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
-                        .WithMany()
-                        .HasForeignKey("StokvelId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Meeting");
-
-                    b.Navigation("Member");
-
-                    b.Navigation("Stokvel");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.NextOfKin", b =>

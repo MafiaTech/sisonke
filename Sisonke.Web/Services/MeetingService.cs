@@ -420,8 +420,6 @@ public class MeetingService(ApplicationDbContext context)
 
         await context.SaveChangesAsync();
 
-        await EvaluateMemberAttendanceGovernanceAsync(attendance.MemberId);
-
         return attendance;
     }
 
@@ -486,34 +484,8 @@ public class MeetingService(ApplicationDbContext context)
             return false;
         }
 
-        var consecutiveMissedMeetings = await GetConsecutiveMissedMeetingsAsync(memberId);
-        var now = DateTime.UtcNow;
-
-        if (consecutiveMissedMeetings >= 4)
-        {
-            member.GovernanceStatus = MemberGovernanceStatus.Suspended;
-            member.SuspendedAt ??= now;
-            member.GovernanceStatusChangedAt = now;
-            member.GovernanceStatusReason = "Member missed 4 consecutive meetings.";
-        }
-        else if (consecutiveMissedMeetings >= 3)
-        {
-            member.GovernanceStatus = MemberGovernanceStatus.Warning;
-            member.LastWarningIssuedAt ??= now;
-            member.GovernanceStatusChangedAt = now;
-            member.GovernanceStatusReason = "Member missed 3 consecutive meetings.";
-        }
-        else if (
-            member.GovernanceStatus == MemberGovernanceStatus.Warning &&
-            member.GovernanceStatusReason == "Member missed 3 consecutive meetings.")
-        {
-            member.GovernanceStatus = MemberGovernanceStatus.Active;
-            member.GovernanceStatusChangedAt = now;
-            member.GovernanceStatusReason = null;
-        }
-
-        await context.SaveChangesAsync();
-
+        // Attendance warnings are now handled by MemberWarningService.
+        // Suspension must remain a manual executive/office bearer decision.
         return true;
     }
 

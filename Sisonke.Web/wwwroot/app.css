@@ -5,9 +5,9 @@
 /* ── Design tokens ──────────────────────────────────────── */
 :root {
     --sisonke-sidebar-width: 220px;
-    --sisonke-content-max-width: 1320px;
-    --sisonke-content-padding-x: 32px;
-    --sisonke-content-padding-y: 28px;
+    --sisonke-content-max-width: 1440px;
+    --sisonke-content-padding-x: 2.5rem;
+    --sisonke-content-padding-y: 2rem;
 
     /* Green scale */
     --sk-green-900:   #0d2218;
@@ -2637,19 +2637,19 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .sisonke-grid-2 {
     display: grid;
-    gap: 1rem;
+    gap: 1.25rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .sisonke-grid-3 {
     display: grid;
-    gap: 1rem;
+    gap: 1.25rem;
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .sisonke-grid-4 {
     display: grid;
-    gap: 1rem;
+    gap: 1.25rem;
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -2715,7 +2715,7 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .executive-task-grid {
     display: grid;
-    gap: 1rem;
+    gap: 1.25rem;
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -2758,6 +2758,17 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .executive-task-action {
     width: 100%;
+}
+
+@media (max-width: 1024px) {
+    .sisonke-grid-3,
+    .sisonke-grid-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .executive-task-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 700px) {
@@ -2831,22 +2842,25 @@ a, .btn-link { color: var(--sk-green-700); }
 }
 
 /* ── Standard centered content pages ────────────────────── */
+/* .sisonke-page-shell is the canonical name; .sisonke-content is the alias used in MainLayout */
 .sisonke-content,
 .sisonke-content-wide,
 .sisonke-content-narrow,
-.sisonke-page-container {
+.sisonke-page-container,
+.sisonke-page-shell {
     margin: 0 auto;
     padding: var(--sisonke-content-padding-y) var(--sisonke-content-padding-x) 60px;
     width: 100%;
 }
 
 .sisonke-content,
-.sisonke-page-container {
+.sisonke-page-container,
+.sisonke-page-shell {
     max-width: var(--sisonke-content-max-width);
 }
 
 .sisonke-content-wide {
-    max-width: 1480px;
+    max-width: 1540px;
 }
 
 .sisonke-content-narrow {
@@ -3132,7 +3146,8 @@ a, .btn-link { color: var(--sk-green-700); }
     .sisonke-content,
     .sisonke-content-wide,
     .sisonke-content-narrow,
-    .sisonke-page-container {
+    .sisonke-page-container,
+    .sisonke-page-shell {
         max-width: 100%;
         padding: 16px;
     }

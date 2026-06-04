@@ -10,6 +10,7 @@
 @inject FineService FineService
 @inject FuneralClaimService FuneralClaimService
 @inject MemberService MemberService
+@inject MemberWarningService MemberWarningService
 @inject OperatingRuleService OperatingRuleService
 @inject StokvelService StokvelService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -495,6 +496,66 @@ else
             </div>
         </div>
 
+        @if (canManageMemberStatus)
+        {
+            <div class="col-12">
+                <div class="sisonke-card">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>Attendance Warnings</h2>
+                            <p>Attendance warnings visible to office bearers.</p>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                            <span class="sisonke-badge sisonke-badge-gold">@memberWarnings.Count</span>
+                            @if (stokvel is not null)
+                            {
+                                <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-warnings/{stokvel.Id}")">View All Warnings</a>
+                            }
+                        </div>
+                    </div>
+                    <div class="sisonke-card-body">
+                        @if (memberWarnings.Count == 0)
+                        {
+                            <div class="sisonke-alert sisonke-alert-green mb-0">No member warnings recorded.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="sisonke-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Warning type</th>
+                                            <th>Reason</th>
+                                            <th>Status</th>
+                                            <th>Created date</th>
+                                            <th>Absence count</th>
+                                            <th>Related meeting</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var warning in memberWarnings)
+                                        {
+                                            <tr>
+                                                <td><span class="@GetWarningBadgeClass(warning.WarningType)">@GetWarningTypeLabel(warning.WarningType)</span></td>
+                                                <td>@DisplayOrDash(warning.Reason)</td>
+                                                <td><span class="@GetWarningStatusBadgeClass(warning.Status)">@warning.Status</span></td>
+                                                <td>@warning.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                                <td>@warning.AbsenceCount</td>
+                                                <td>
+                                                    <div>@DisplayOrDash(warning.Meeting?.Title)</div>
+                                                    <div class="text-muted small">@(warning.Meeting?.MeetingDate.ToString("dd MMM yyyy") ?? "-")</div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
         <!-- Fines -->
         <div class="col-12">
             <div class="card">
@@ -711,6 +772,7 @@ else
     private List<MemberDependent> dependents = [];
     private List<MemberFine> memberFines = [];
     private List<FuneralClaim> funeralClaims = [];
+    private List<MemberWarning> memberWarnings = [];
     private Dictionary<Guid, FuneralClaim> activeDependentClaims = new();
     private Stokvel? stokvel;
     private int maxNextOfKin;
@@ -743,6 +805,7 @@ else
         canViewFinancials = false;
         successMessage = null;
         warningMessage = null;
+        memberWarnings = [];
         member = await MemberService.GetMemberByIdAsync(MemberId);
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
 
@@ -769,6 +832,7 @@ else
         activeDependentClaims = member is null ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
         memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
         funeralClaims = member is null ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
+        memberWarnings = member is null || !canManageMemberStatus ? [] : await MemberWarningService.GetWarningsByMemberIdAsync(MemberId);
 
         if (member is not null)
         {
@@ -913,4 +977,38 @@ else
             FuneralClaimStatus.Cancelled => "secondary",
             _ => "secondary"
         };
+
+    private static string GetWarningBadgeClass(string warningType)
+    {
+        return warningType switch
+        {
+            "ExecutiveReviewRequired" => "sisonke-badge sisonke-badge-red",
+            "FormalWarning" => "sisonke-badge sisonke-badge-gold",
+            "Reminder" => "sisonke-badge sisonke-badge-blue",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static string GetWarningTypeLabel(string warningType) =>
+        warningType switch
+        {
+            "ExecutiveReviewRequired" => "Executive Review Required",
+            "FormalWarning" => "Formal Warning",
+            "Reminder" => "Reminder",
+            _ => warningType
+        };
+
+    private static string GetWarningStatusBadgeClass(string status) =>
+        status switch
+        {
+            "Open" => "sisonke-badge sisonke-badge-gold",
+            "Acknowledged" => "sisonke-badge sisonke-badge-blue",
+            "Resolved" => "sisonke-badge sisonke-badge-green",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string DisplayOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
 }
