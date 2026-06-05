@@ -29,6 +29,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<MeetingAgendaItem> MeetingAgendaItems => Set<MeetingAgendaItem>();
     public DbSet<MeetingAttendance> MeetingAttendances => Set<MeetingAttendance>();
     public DbSet<MeetingApology> MeetingApologies => Set<MeetingApology>();
+    public DbSet<MeetingMinute> MeetingMinutes => Set<MeetingMinute>();
     public DbSet<MeetingVote> MeetingVotes => Set<MeetingVote>();
     public DbSet<MeetingVoteResponse> MeetingVoteResponses => Set<MeetingVoteResponse>();
     public DbSet<QuestionnaireSection> QuestionnaireSections => Set<QuestionnaireSection>();
@@ -312,6 +313,22 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<MeetingApology>()
             .HasIndex(a => new { a.MeetingId, a.MemberId })
+            .IsUnique();
+
+        builder.Entity<MeetingMinute>()
+            .HasOne(m => m.Meeting)
+            .WithMany()
+            .HasForeignKey(m => m.MeetingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MeetingMinute>()
+            .HasOne(m => m.Stokvel)
+            .WithMany()
+            .HasForeignKey(m => m.StokvelId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MeetingMinute>()
+            .HasIndex(m => m.MeetingId)
             .IsUnique();
 
         builder.Entity<MeetingVote>()

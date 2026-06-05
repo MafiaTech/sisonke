@@ -9,6 +9,7 @@
 @using Sisonke.Web.Services
 
 @inject MeetingService MeetingService
+@inject MeetingMinuteService MeetingMinuteService
 @inject StokvelService StokvelService
 @inject MemberAccessService MemberAccessService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -93,6 +94,60 @@ else
         </div>
     </div>
 
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Meeting Minutes</h2>
+                <p>Generate and manage the official record for this meeting.</p>
+            </div>
+            @if (meetingMinutes is not null)
+            {
+                <span class="@GetMinutesStatusBadgeClass(meetingMinutes.Status)">@meetingMinutes.Status</span>
+            }
+        </div>
+        <div class="sisonke-card-body">
+            @if (meetingMinutes is null)
+            {
+                <div class="sisonke-alert sisonke-alert-blue">
+                    No minutes captured yet.
+                </div>
+
+                @if (canManageMinutes)
+                {
+                    <button type="button" class="sisonke-btn sisonke-btn-primary" @onclick="GenerateDraftMinutesAsync">
+                        Generate Draft Minutes from Agenda
+                    </button>
+                }
+            }
+            else
+            {
+                <div class="@GetMinutesSummaryAlertClass(meetingMinutes.Status)">
+                    @GetMinutesSummaryText(meetingMinutes.Status)
+                </div>
+                <div class="meeting-minutes-summary">
+                    <div>
+                        <div class="meeting-minutes-label">Title</div>
+                        <div class="meeting-minutes-value">@meetingMinutes.Title</div>
+                    </div>
+                    <div>
+                        <div class="meeting-minutes-label">Status</div>
+                        <div class="meeting-minutes-value">@meetingMinutes.Status</div>
+                    </div>
+                    <div>
+                        <div class="meeting-minutes-label">Last updated</div>
+                        <div class="meeting-minutes-value">@((meetingMinutes.UpdatedAt ?? meetingMinutes.CreatedAt).ToLocalTime().ToString("dd MMM yyyy HH:mm"))</div>
+                    </div>
+                </div>
+                @if (canManageMinutes || IsApprovedOrPublished(meetingMinutes.Status))
+                {
+                    <div class="mt-3">
+                        <a class="sisonke-btn sisonke-btn-outline" href="@($"/meeting-minutes/{MeetingId}")">@GetMinutesActionLabel(meetingMinutes.Status)</a>
+                    </div>
+                }
+            }
+        </div>
+    </section>
+
     <div class="card agenda-card">
         <div class="card-body p-4">
             <div class="agenda-card-header">
@@ -176,8 +231,11 @@ else
                                             <textarea id="@($"edit-description-{agendaItem.Id}")" class="form-control" rows="3" @bind="editAgendaDescription"></textarea>
                                         </div>
                                         <div class="col-12">
-                                            <label class="form-label" for="@($"edit-notes-{agendaItem.Id}")">Notes</label>
+                                            <label class="form-label" for="@($"edit-notes-{agendaItem.Id}")">Minutes Notes / Discussion Notes</label>
                                             <textarea id="@($"edit-notes-{agendaItem.Id}")" class="form-control" rows="3" @bind="editAgendaNotes"></textarea>
+                                            <div class="form-text">
+                                                Capture the discussion, resolution or decision for this agenda item. These notes will be used when generating the meeting minutes.
+                                            </div>
                                         </div>
                                         <div class="col-12">
                                             <div class="form-check">
@@ -206,7 +264,10 @@ else
                                     }
                                     @if (!string.IsNullOrWhiteSpace(agendaItem.Notes))
                                     {
-                                        <p class="agenda-item-notes">@agendaItem.Notes</p>
+                                        <p class="agenda-item-notes">
+                                            <strong>Minutes Notes / Discussion Notes:</strong>
+                                            @agendaItem.Notes
+                                        </p>
                                     }
                                 </div>
                                 <div class="agenda-row-actions">
@@ -256,14 +317,39 @@ else
         OnCancel="CancelDeleteMeeting" />
 }
 
+<style>
+    .meeting-minutes-summary {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    }
+
+    .meeting-minutes-label {
+        color: var(--muted, var(--sk-text-muted));
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+
+    .meeting-minutes-value {
+        color: var(--text, var(--sk-text));
+        font-weight: 800;
+        margin-top: .2rem;
+    }
+</style>
+
 @code {
     private Meeting? meeting;
+    private MeetingMinute? meetingMinutes;
+    private Member? linkedMember;
     private string backToMeetingsHref = "/my-stokvels";
     private string? successMessage;
     private string? errorMessage;
     private bool isLoading = true;
     private bool canViewMeeting;
     private bool canManageMeetings;
+    private bool canManageMinutes;
     private bool isAddingAgendaItem;
     private string newAgendaTitle = string.Empty;
     private string? newAgendaDescription;
@@ -288,6 +374,7 @@ else
     private async Task LoadMeetingAsync()
     {
         meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+        meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
 
         if (meeting is not null)
         {
@@ -305,9 +392,33 @@ else
                 {
                     canViewMeeting = await MemberAccessService.CanViewStokvelAsync(userId, stokvel.Id);
                     canManageMeetings = await MemberAccessService.CanManageMeetingsAsync(userId, stokvel.Id);
+                    canManageMinutes = await MemberAccessService.CanManageMinutesAsync(userId, stokvel.Id);
+                    linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, stokvel.Id);
                 }
             }
         }
+    }
+
+    private async Task GenerateDraftMinutesAsync()
+    {
+        if (!canManageMinutes || linkedMember is null)
+        {
+            errorMessage = "Only authorised office bearers can generate meeting minutes.";
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+        meetingMinutes = await MeetingMinuteService.GenerateDraftMinutesAsync(MeetingId, linkedMember.Id);
+
+        if (meetingMinutes is null)
+        {
+            errorMessage = "Draft minutes could not be generated.";
+            return;
+        }
+
+        successMessage = "Draft minutes generated.";
+        NavigationManager.NavigateTo($"/meeting-minutes/{MeetingId}");
     }
 
     private void ShowAddAgendaItemForm()
@@ -531,4 +642,49 @@ else
             "Scheduled" => "info",
             _ => "secondary"
         };
+
+    private static string GetMinutesStatusBadgeClass(string status) =>
+        status switch
+        {
+            "Draft" => "sisonke-badge sisonke-badge-gold",
+            "Submitted" => "sisonke-badge sisonke-badge-blue",
+            "Approved" => "sisonke-badge sisonke-badge-green",
+            "Published" => "sisonke-badge sisonke-badge-green",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string GetMinutesSummaryAlertClass(string status) =>
+        status switch
+        {
+            "Draft" => "sisonke-alert sisonke-alert-gold mb-3",
+            "Submitted" => "sisonke-alert sisonke-alert-blue mb-3",
+            "Approved" => "sisonke-alert sisonke-alert-green mb-3",
+            "Published" => "sisonke-alert sisonke-alert-green mb-3",
+            _ => "sisonke-alert sisonke-alert-blue mb-3"
+        };
+
+    private static string GetMinutesSummaryText(string status) =>
+        status switch
+        {
+            "Draft" => "Draft minutes available.",
+            "Submitted" => "Submitted minutes awaiting approval.",
+            "Approved" => "Approved minutes available.",
+            "Published" => "Approved minutes available.",
+            _ => "Minutes are available."
+        };
+
+    private static string GetMinutesActionLabel(string status) =>
+        status switch
+        {
+            "Draft" => "Continue Editing Minutes",
+            "Submitted" => "Review Submitted Minutes",
+            "Approved" => "View Approved Minutes",
+            "Published" => "View Approved Minutes",
+            _ => "Open Minutes"
+        };
+
+    private static bool IsApprovedOrPublished(string status)
+    {
+        return status is "Approved" or "Published";
+    }
 }

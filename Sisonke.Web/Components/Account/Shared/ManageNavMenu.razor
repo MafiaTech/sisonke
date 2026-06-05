@@ -1,34 +1,34 @@
-﻿@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Identity
 @using Sisonke.Web.Data
 
 @inject SignInManager<ApplicationUser> SignInManager
 
-<ul class="nav nav-pills flex-column">
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage" Match="NavLinkMatch.All">Profile</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/Email">Email</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/ChangePassword">Password</NavLink>
-    </li>
+<nav class="account-nav-list">
+    <NavLink class="account-nav-item" href="Account/Manage" Match="NavLinkMatch.All">
+        <i class="bi bi-person" aria-hidden="true"></i>Profile
+    </NavLink>
+    <NavLink class="account-nav-item" href="Account/Manage/Email">
+        <i class="bi bi-envelope" aria-hidden="true"></i>Email
+    </NavLink>
+    <NavLink class="account-nav-item" href="Account/Manage/ChangePassword">
+        <i class="bi bi-key" aria-hidden="true"></i>Password
+    </NavLink>
     @if (hasExternalLogins)
     {
-        <li class="nav-item">
-            <NavLink class="nav-link" href="Account/Manage/ExternalLogins">External logins</NavLink>
-        </li>
+        <NavLink class="account-nav-item" href="Account/Manage/ExternalLogins">
+            <i class="bi bi-link-45deg" aria-hidden="true"></i>External logins
+        </NavLink>
     }
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/TwoFactorAuthentication">Two-factor authentication</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/Passkeys">Passkeys</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/PersonalData">Personal data</NavLink>
-    </li>
-</ul>
+    <NavLink class="account-nav-item" href="Account/Manage/TwoFactorAuthentication">
+        <i class="bi bi-shield-check" aria-hidden="true"></i>Two-factor authentication
+    </NavLink>
+    <NavLink class="account-nav-item" href="Account/Manage/Passkeys">
+        <i class="bi bi-fingerprint" aria-hidden="true"></i>Passkeys
+    </NavLink>
+    <NavLink class="account-nav-item" href="Account/Manage/PersonalData">
+        <i class="bi bi-archive" aria-hidden="true"></i>Personal data
+    </NavLink>
+</nav>
 
 @code {
     private bool hasExternalLogins;

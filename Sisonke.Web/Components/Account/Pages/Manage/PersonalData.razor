@@ -9,21 +9,24 @@
 <PageTitle>Personal Data</PageTitle>
 
 <StatusMessage />
-<h3>Personal Data</h3>
 
-<div class="row">
-    <div class="col-md-6">
+<div class="account-settings-card">
+    <div class="account-settings-card-head">
+        <h3>Personal data</h3>
+        <p>Download or delete the personal data held on your account.</p>
+    </div>
+    <div class="account-settings-card-body">
         <p>Your account contains personal data that you have given us. This page allows you to download or delete that data.</p>
-        <p>
+        <div class="sisonke-alert sisonke-alert-red mb-4" role="alert">
             <strong>Deleting this data will permanently remove your account, and this cannot be recovered.</strong>
-        </p>
-        <form action="Account/Manage/DownloadPersonalData" method="post">
-            <AntiforgeryToken />
-            <button class="btn btn-primary" type="submit">Download</button>
-        </form>
-        <p>
-            <a href="Account/Manage/DeletePersonalData" class="btn btn-danger">Delete</a>
-        </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <form action="Account/Manage/DownloadPersonalData" method="post">
+                <AntiforgeryToken />
+                <button class="sisonke-btn sisonke-btn-primary" type="submit">Download my data</button>
+            </form>
+            <a href="Account/Manage/DeletePersonalData" class="sisonke-btn sisonke-btn-danger">Delete account</a>
+        </div>
     </div>
 </div>
 

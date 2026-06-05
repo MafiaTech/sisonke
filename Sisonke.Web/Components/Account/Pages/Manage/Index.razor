@@ -10,11 +10,14 @@
 
 <PageTitle>Profile</PageTitle>
 
-<h3>Profile</h3>
 <StatusMessage />
 
-<div class="row">
-    <div class="col-xl-6">
+<div class="account-settings-card">
+    <div class="account-settings-card-head">
+        <h3>Profile</h3>
+        <p>Update your username and contact details.</p>
+    </div>
+    <div class="account-settings-card-body">
         <EditForm Model="Input" FormName="profile" OnValidSubmit="OnValidSubmitAsync" method="post">
             <DataAnnotationsValidator />
             <ValidationSummary class="text-danger" role="alert" />
@@ -27,7 +30,7 @@
                 <label for="Input.PhoneNumber" class="form-label">Phone number</label>
                 <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Save</button>
+            <button type="submit" class="sisonke-btn sisonke-btn-primary w-100">Save changes</button>
         </EditForm>
     </div>
 </div>

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
+using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
@@ -49,12 +50,43 @@ public class MemberAccessService(ApplicationDbContext context)
             normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
     }
 
+    private static bool CanMakeDisciplinaryDecisionRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     private static bool CanManageMeetingsRole(string? role)
     {
         var normalizedRole = role?.Trim();
 
         return normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
             normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanManageMinutesRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanApproveMinutesRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
             normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
             normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
             normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
@@ -300,6 +332,38 @@ public class MemberAccessService(ApplicationDbContext context)
         return member is not null && CanManageMemberStatusRole(member.DefaultRole.ToString());
     }
 
+    public async Task<bool> CanMakeDisciplinaryDecisionAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var member = await context.Members
+            .Where(existingMember =>
+                existingMember.ApplicationUserId == userId &&
+                existingMember.TenantId == stokvel.TenantId &&
+                (existingMember.DefaultRole == SisonkeRole.Chairperson ||
+                    existingMember.DefaultRole == SisonkeRole.Creator ||
+                    existingMember.DefaultRole == SisonkeRole.StokvelAdmin))
+            .OrderBy(existingMember => existingMember.CreatedAt)
+            .ThenBy(existingMember => existingMember.FullName)
+            .FirstOrDefaultAsync();
+
+        return member is not null && CanMakeDisciplinaryDecisionRole(member.DefaultRole.ToString());
+    }
+
     public async Task<bool> CanManageMeetingsAsync(string userId, Guid stokvelId)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -310,6 +374,81 @@ public class MemberAccessService(ApplicationDbContext context)
         var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
 
         return member is not null && CanManageMeetingsRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanManageMinutesAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var member = await context.Members
+            .Where(existingMember =>
+                existingMember.ApplicationUserId == userId &&
+                existingMember.TenantId == stokvel.TenantId &&
+                (existingMember.DefaultRole == SisonkeRole.Secretary ||
+                    existingMember.DefaultRole == SisonkeRole.Chairperson ||
+                    existingMember.DefaultRole == SisonkeRole.Creator ||
+                    existingMember.DefaultRole == SisonkeRole.StokvelAdmin))
+            .OrderBy(existingMember => existingMember.CreatedAt)
+            .ThenBy(existingMember => existingMember.FullName)
+            .FirstOrDefaultAsync();
+
+        return member is not null && CanManageMinutesRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanApproveMinutesAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var member = await context.Members
+            .Where(existingMember =>
+                existingMember.ApplicationUserId == userId &&
+                existingMember.TenantId == stokvel.TenantId &&
+                (existingMember.DefaultRole == SisonkeRole.Chairperson ||
+                    existingMember.DefaultRole == SisonkeRole.Creator ||
+                    existingMember.DefaultRole == SisonkeRole.StokvelAdmin))
+            .OrderBy(existingMember => existingMember.CreatedAt)
+            .ThenBy(existingMember => existingMember.FullName)
+            .FirstOrDefaultAsync();
+
+        return member is not null && CanApproveMinutesRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanViewApprovedMinutesAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        return await GetLinkedMemberForUserAsync(userId, stokvelId) is not null;
     }
 
     public async Task<bool> CanManageAttendanceAsync(string userId, Guid stokvelId)

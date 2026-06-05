@@ -440,6 +440,7 @@ public class FuneralClaimService(
     public async Task<bool> CompleteSecretaryReviewAsync(
         Guid claimId,
         string secretaryNotes,
+        bool recommendApproval,
         Guid reviewedByMemberId)
     {
         if (string.IsNullOrWhiteSpace(secretaryNotes))
@@ -473,7 +474,7 @@ public class FuneralClaimService(
             return false;
         }
 
-        claim.SecretaryRecommendedApproval = true;
+        claim.SecretaryRecommendedApproval = recommendApproval;
         claim.SecretaryReviewNotes = secretaryNotes.Trim();
         claim.SecretaryReviewedByName = reviewer.FullName;
         claim.SecretaryReviewedAt = DateTime.UtcNow;

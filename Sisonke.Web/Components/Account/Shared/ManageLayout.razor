@@ -1,17 +1,19 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @layout Sisonke.Web.Components.Layout.MainLayout
 
-<h1>Manage your account</h1>
+<section class="sisonke-hero-card mb-4">
+    <div>
+        <span class="sisonke-badge sisonke-badge-gold">Security</span>
+        <h1>Account Settings</h1>
+        <p>Manage your profile, email, password and security preferences.</p>
+    </div>
+</section>
 
-<div>
-    <h2>Change your account settings</h2>
-    <hr />
-    <div class="row">
-        <div class="col-lg-3">
-            <ManageNavMenu />
-        </div>
-        <div class="col-lg-9">
-            @Body
-        </div>
+<div class="account-settings-layout">
+    <aside class="account-settings-nav">
+        <ManageNavMenu />
+    </aside>
+    <div class="account-settings-content">
+        @Body
     </div>
 </div>

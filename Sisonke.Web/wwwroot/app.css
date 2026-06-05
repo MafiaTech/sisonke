@@ -3161,3 +3161,278 @@ a, .btn-link { color: var(--sk-green-700); }
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Claim Workflow Timeline ─────────────────────────────── */
+.claim-timeline {
+    align-items: flex-start;
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: .25rem;
+}
+
+.claim-timeline-step {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 120px;
+}
+
+.claim-timeline-top {
+    align-items: center;
+    display: flex;
+    margin-bottom: .75rem;
+}
+
+.claim-timeline-dot {
+    align-items: center;
+    border: 1.5px solid var(--border, #e5e0d3);
+    border-radius: 50%;
+    display: flex;
+    flex-shrink: 0;
+    font-size: .75rem;
+    font-weight: 800;
+    height: 2rem;
+    justify-content: center;
+    width: 2rem;
+    z-index: 1;
+}
+
+.claim-timeline-connector {
+    background: var(--border, #e5e0d3);
+    flex: 1;
+    height: 2px;
+    margin: 0 .25rem;
+}
+
+.claim-timeline-step:last-child .claim-timeline-connector {
+    display: none;
+}
+
+.claim-timeline-title {
+    color: var(--text, #18202f);
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: -.01em;
+    line-height: 1.25;
+    margin-bottom: .35rem;
+}
+
+.claim-timeline-meta {
+    color: var(--muted, #6f7886);
+    display: flex;
+    flex-direction: column;
+    font-size: .73rem;
+    gap: .1rem;
+    margin-top: .35rem;
+}
+
+/* State: complete */
+.claim-timeline-complete .claim-timeline-dot {
+    background: var(--sage-pale, #edf6f1);
+    border-color: rgba(27, 90, 64, .25);
+    color: var(--forest-mid, #1b5a40);
+}
+
+.claim-timeline-complete .claim-timeline-connector {
+    background: var(--forest-mid, #1b5a40);
+}
+
+/* State: pending */
+.claim-timeline-pending .claim-timeline-dot {
+    background: var(--gold-pale, #fff6dc);
+    border-color: rgba(201, 146, 42, .35);
+    color: #8a5c08;
+}
+
+/* State: rejected */
+.claim-timeline-rejected .claim-timeline-dot {
+    background: var(--red-pale, #fff0f0);
+    border-color: rgba(201, 74, 74, .25);
+    color: var(--red, #c94a4a);
+}
+
+/* State: not started */
+.claim-timeline-not-started .claim-timeline-dot {
+    background: #f1f2f4;
+    border-color: var(--border, #e5e0d3);
+    color: var(--muted, #6f7886);
+}
+
+/* Mobile: vertical stack */
+@media (max-width: 768px) {
+    .claim-timeline {
+        flex-direction: column;
+        overflow-x: visible;
+    }
+
+    .claim-timeline-step {
+        flex: none;
+        flex-direction: row;
+        gap: .75rem;
+        min-width: 0;
+    }
+
+    .claim-timeline-top {
+        align-items: center;
+        flex-direction: column;
+        flex-shrink: 0;
+        margin-bottom: 0;
+        width: 2rem;
+    }
+
+    .claim-timeline-connector {
+        flex: none;
+        height: 2rem;
+        margin: .2rem 0 0;
+        width: 2px;
+    }
+
+    .claim-timeline-step:last-child .claim-timeline-connector {
+        display: none;
+    }
+
+    .claim-timeline-body {
+        flex: 1;
+        padding-bottom: 1rem;
+    }
+}
+
+/* ── Account Settings (Identity Manage) Pages ────────────── */
+.account-settings-layout {
+    align-items: start;
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: 220px 1fr;
+}
+
+.account-settings-nav {
+    background: var(--card, #fff);
+    border: 1px solid var(--border, #e5e0d3);
+    border-radius: var(--r-lg, 1rem);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    padding: .625rem;
+    position: sticky;
+    top: 1.5rem;
+}
+
+.account-nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+}
+
+.account-nav-item {
+    align-items: center;
+    border-radius: var(--r-md, .75rem);
+    color: var(--text, #18202f);
+    display: flex;
+    font-size: .875rem;
+    font-weight: 600;
+    gap: .625rem;
+    min-height: 2.5rem;
+    padding: .55rem .85rem;
+    text-decoration: none;
+    transition: background .15s, color .15s;
+}
+
+.account-nav-item:hover {
+    background: var(--sage-pale, #edf6f1);
+    color: var(--forest, #123f2c);
+    text-decoration: none;
+}
+
+.account-nav-item.active {
+    background: var(--gold-pale, #fff6dc);
+    box-shadow: inset 3px 0 0 var(--gold, #c9922a);
+    color: #7b5209;
+    font-weight: 700;
+}
+
+.account-settings-content {
+    min-width: 0;
+}
+
+.account-settings-card {
+    background: var(--card, #fff);
+    border: 1px solid var(--border, #e5e0d3);
+    border-radius: var(--r-lg, 1rem);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.account-settings-card + .account-settings-card {
+    margin-top: 1.25rem;
+}
+
+.account-settings-card-head {
+    border-bottom: 1px solid var(--border, #e5e0d3);
+    padding: 1rem 1.25rem;
+}
+
+.account-settings-card-head h3 {
+    color: var(--text, #18202f);
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 .2rem;
+}
+
+.account-settings-card-head h4 {
+    color: var(--text, #18202f);
+    font-size: .95rem;
+    font-weight: 700;
+    margin: 0 0 .2rem;
+}
+
+.account-settings-card-head p {
+    color: var(--muted, #6f7886);
+    font-size: .875rem;
+    margin: 0;
+}
+
+.account-settings-card-body {
+    max-width: 640px;
+    padding: 1.25rem;
+}
+
+.account-settings-card-body p {
+    color: var(--text, #18202f);
+    font-size: .9375rem;
+    margin-bottom: .75rem;
+}
+
+.account-settings-card-body .d-flex {
+    flex-wrap: wrap;
+    gap: .625rem;
+}
+
+.sisonke-btn-danger {
+    background: var(--red, #c94a4a);
+    border-color: var(--red, #c94a4a);
+    color: #fff;
+}
+
+.sisonke-btn-danger:hover {
+    background: #a83838;
+    border-color: #a83838;
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .account-settings-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .account-settings-nav {
+        position: static;
+    }
+
+    .account-nav-item.active {
+        box-shadow: none;
+    }
+
+    .account-settings-card-body {
+        max-width: 100%;
+    }
+}

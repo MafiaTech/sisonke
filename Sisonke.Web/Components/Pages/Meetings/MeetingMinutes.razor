@@ -1,0 +1,588 @@
+@page "/meeting-minutes/{MeetingId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject MeetingService MeetingService
+@inject MeetingMinuteService MeetingMinuteService
+@inject MemberService MemberService
+@inject StokvelService StokvelService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Meeting Minutes</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading meeting minutes...
+    </div>
+}
+else if (meeting is null)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        Meeting not found.
+    </div>
+}
+else if (!canAccessMinutesPage)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        You do not have access to these meeting minutes.
+    </div>
+
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else if (!canManageMinutes && !MinutesAreApprovedForMembers)
+{
+    <div class="sisonke-alert sisonke-alert-gold" role="alert">
+        Minutes are not yet available to members.
+    </div>
+
+    <a class="sisonke-btn sisonke-btn-outline" href="@($"/meeting/{MeetingId}")">Back to Meeting</a>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="@GetMinutesStatusBadgeClass(meetingMinutes?.Status)">@DisplayOrDash(meetingMinutes?.Status ?? "No minutes")</span>
+            <h1>Meeting Minutes</h1>
+            <p>Capture meeting notes, decisions and action items.</p>
+            <div class="minutes-hero-meta">
+                <span>@meeting.Title</span>
+                <span>@meeting.MeetingDate.ToString("dd MMM yyyy HH:mm")</span>
+                <span>@DisplayOrDash(meeting.Venue)</span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/meeting/{MeetingId}")">Back to Meeting</a>
+            @if (canManageMinutes && meetingMinutes is null && linkedMember is not null)
+            {
+                <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="GenerateDraftMinutesAsync">
+                    Generate Draft Minutes from Agenda
+                </button>
+            }
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-green mb-4">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-gold mb-4">@errorMessage</div>
+    }
+
+    @if (meetingMinutes is not null)
+    {
+        <div class="@GetStatusBannerClass(meetingMinutes.Status)" role="alert">
+            @GetStatusBannerMessage(meetingMinutes.Status)
+        </div>
+    }
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Agenda-linked minutes</h2>
+                <p>Agenda item discussion notes are used to build the decisions section.</p>
+            </div>
+            @if (canManageMinutes && meetingMinutes?.Status == StatusDraft)
+            {
+                <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="RegenerateFromAgendaAsync">
+                    Regenerate From Agenda
+                </button>
+            }
+        </div>
+        <div class="sisonke-card-body">
+            <div class="sisonke-alert sisonke-alert-blue">
+                Minutes are generated from agenda item discussion notes. Update the agenda notes before regenerating minutes.
+            </div>
+
+            @if (meeting.AgendaItems.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-gold mb-0">No agenda items are linked to this meeting yet.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Agenda item</th>
+                                <th>Notes captured</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var agendaItem in meeting.AgendaItems.OrderBy(item => item.DisplayOrder))
+                            {
+                                <tr>
+                                    <td>@agendaItem.DisplayOrder</td>
+                                    <td>
+                                        <div class="fw-semibold">@agendaItem.Title</div>
+                                        @if (!string.IsNullOrWhiteSpace(agendaItem.Description))
+                                        {
+                                            <div class="text-muted small">@agendaItem.Description</div>
+                                        }
+                                    </td>
+                                    <td>@DisplayAgendaNotes(agendaItem.Notes)</td>
+                                    <td><span class="@GetAgendaStatusBadgeClass(agendaItem.IsCompleted)">@GetAgendaStatusLabel(agendaItem.IsCompleted)</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+
+    @if (meetingMinutes is null)
+    {
+        <section class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                    No minutes exist for this meeting yet. Generate a draft to start from the agenda, attendance and apologies.
+                </div>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="sisonke-card">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>@meetingMinutes.Title</h2>
+                    <p>Use the generated context, then complete the meeting record.</p>
+                </div>
+                <span class="@GetMinutesStatusBadgeClass(meetingMinutes.Status)">@meetingMinutes.Status</span>
+            </div>
+            <div class="sisonke-card-body">
+                @if (meetingMinutes.Status == StatusApproved || meetingMinutes.Status == StatusPublished)
+                {
+                    <div class="minutes-approval-summary mb-4">
+                        <div>
+                            <div class="minutes-meta-label">Approved date</div>
+                            <div class="minutes-meta-value">@(meetingMinutes.ApprovedAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm") ?? "-")</div>
+                        </div>
+                        <div>
+                            <div class="minutes-meta-label">Approved by</div>
+                            <div class="minutes-meta-value">@DisplayOrDash(approvedByMember?.FullName)</div>
+                        </div>
+                    </div>
+                }
+
+                <div class="minutes-readonly-grid mb-4">
+                    <div>
+                        <label class="form-label" for="attendance-summary">Attendance summary</label>
+                        <textarea id="attendance-summary" class="form-control" rows="4" readonly>@meetingMinutes.AttendanceSummary</textarea>
+                    </div>
+                    <div>
+                        <label class="form-label" for="apology-summary">Apology summary</label>
+                        <textarea id="apology-summary" class="form-control" rows="4" readonly>@meetingMinutes.ApologySummary</textarea>
+                    </div>
+                </div>
+
+                <div class="minutes-form-grid">
+                    <div>
+                        <label class="form-label" for="opening-notes">Opening notes</label>
+                        <textarea id="opening-notes" class="form-control" rows="4" readonly="@IsReadOnly" @bind="openingNotes"></textarea>
+                    </div>
+                    <div>
+                        <label class="form-label" for="matters-arising">Matters arising</label>
+                        <textarea id="matters-arising" class="form-control" rows="4" readonly="@IsReadOnly" @bind="mattersArising"></textarea>
+                    </div>
+                    <div>
+                        <label class="form-label" for="decisions-taken">Decisions taken</label>
+                        <div class="form-text mb-2">Generated from agenda notes, then editable by the Secretary while minutes are in draft.</div>
+                        <textarea id="decisions-taken" class="form-control" rows="5" readonly="@IsReadOnly" @bind="decisionsTaken"></textarea>
+                    </div>
+                    <div>
+                        <label class="form-label" for="action-items">Action items</label>
+                        <textarea id="action-items" class="form-control" rows="5" readonly="@IsReadOnly" @bind="actionItems"></textarea>
+                    </div>
+                    <div class="minutes-form-wide">
+                        <label class="form-label" for="closing-notes">Closing notes</label>
+                        <textarea id="closing-notes" class="form-control" rows="4" readonly="@IsReadOnly" @bind="closingNotes"></textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mt-4">
+                    @if (canManageMinutes && meetingMinutes.Status == StatusDraft)
+                    {
+                        <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="SaveDraftMinutesAsync">
+                            Save Draft
+                        </button>
+                        <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="SubmitMinutesAsync">
+                            Submit Minutes
+                        </button>
+                        <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="RegenerateFromAgendaAsync">
+                            Regenerate From Agenda
+                        </button>
+                    }
+                    @if (meetingMinutes.Status == StatusSubmitted && canApproveMinutes)
+                    {
+                        <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="ApproveMinutesAsync">
+                            Approve Minutes
+                        </button>
+                    }
+                    <a class="sisonke-btn sisonke-btn-outline" href="@($"/meeting/{MeetingId}")">Back to Meeting</a>
+                </div>
+            </div>
+        </section>
+    }
+}
+
+<style>
+    .minutes-hero-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem .9rem;
+        margin-top: .85rem;
+        color: rgb(255 255 255 / .78);
+        font-size: .9rem;
+    }
+
+    .minutes-readonly-grid,
+    .minutes-form-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .minutes-form-wide {
+        grid-column: 1 / -1;
+    }
+
+    .minutes-approval-summary {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    }
+
+    .minutes-meta-label {
+        color: var(--muted, var(--sk-text-muted));
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+
+    .minutes-meta-value {
+        color: var(--text, var(--sk-text));
+        font-weight: 800;
+        margin-top: .2rem;
+    }
+
+    @@media (max-width: 760px) {
+        .minutes-readonly-grid,
+        .minutes-form-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+@code {
+    private const string StatusDraft = "Draft";
+    private const string StatusSubmitted = "Submitted";
+    private const string StatusApproved = "Approved";
+    private const string StatusPublished = "Published";
+
+    private Meeting? meeting;
+    private MeetingMinute? meetingMinutes;
+    private Member? linkedMember;
+    private Member? approvedByMember;
+    private bool isLoading = true;
+    private bool canAccessMinutesPage;
+    private bool canManageMinutes;
+    private bool canApproveMinutes;
+    private bool canViewApprovedMinutes;
+    private string? successMessage;
+    private string? errorMessage;
+    private string openingNotes = string.Empty;
+    private string mattersArising = string.Empty;
+    private string decisionsTaken = string.Empty;
+    private string actionItems = string.Empty;
+    private string closingNotes = string.Empty;
+
+    private bool IsReadOnly => !canManageMinutes || meetingMinutes?.Status != StatusDraft;
+    private bool MinutesAreApprovedForMembers =>
+        meetingMinutes?.Status == StatusApproved || meetingMinutes?.Status == StatusPublished;
+
+    [Parameter]
+    public Guid MeetingId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        await LoadMinutesContextAsync();
+        isLoading = false;
+    }
+
+    private async Task LoadMinutesContextAsync()
+    {
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+        meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        linkedMember = null;
+        approvedByMember = null;
+        canAccessMinutesPage = false;
+        canManageMinutes = false;
+        canApproveMinutes = false;
+        canViewApprovedMinutes = false;
+
+        if (meeting is null)
+        {
+            return;
+        }
+
+        var stokvel = await StokvelService.GetStokvelByTenantIdAsync(meeting.TenantId);
+
+        if (stokvel is null)
+        {
+            return;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        canManageMinutes = await MemberAccessService.CanManageMinutesAsync(userId, stokvel.Id);
+        canApproveMinutes = await MemberAccessService.CanApproveMinutesAsync(userId, stokvel.Id);
+        canViewApprovedMinutes = await MemberAccessService.CanViewApprovedMinutesAsync(userId, stokvel.Id);
+        canAccessMinutesPage = canManageMinutes || canViewApprovedMinutes;
+        linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, stokvel.Id);
+
+        if (meetingMinutes?.ApprovedByMemberId is not null)
+        {
+            approvedByMember = await MemberService.GetMemberByIdAsync(meetingMinutes.ApprovedByMemberId.Value);
+        }
+
+        PopulateForm();
+    }
+
+    private void PopulateForm()
+    {
+        openingNotes = meetingMinutes?.OpeningNotes ?? string.Empty;
+        mattersArising = meetingMinutes?.MattersArising ?? string.Empty;
+        decisionsTaken = meetingMinutes?.DecisionsTaken ?? string.Empty;
+        actionItems = meetingMinutes?.ActionItems ?? string.Empty;
+        closingNotes = meetingMinutes?.ClosingNotes ?? string.Empty;
+    }
+
+    private async Task GenerateDraftMinutesAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canManageMinutes || linkedMember is null)
+        {
+            errorMessage = "You do not have access to manage meeting minutes.";
+            return;
+        }
+
+        meetingMinutes = await MeetingMinuteService.GenerateDraftMinutesAsync(MeetingId, linkedMember.Id);
+
+        if (meetingMinutes is null)
+        {
+            errorMessage = "Draft minutes could not be generated.";
+            return;
+        }
+
+        PopulateForm();
+        successMessage = "Draft minutes generated.";
+    }
+
+    private async Task SaveDraftMinutesAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canManageMinutes || meetingMinutes is null || linkedMember is null)
+        {
+            return;
+        }
+
+        var saved = await MeetingMinuteService.SaveDraftMinutesAsync(
+            meetingMinutes.Id,
+            openingNotes,
+            mattersArising,
+            decisionsTaken,
+            actionItems,
+            closingNotes,
+            linkedMember.Id);
+
+        if (!saved)
+        {
+            errorMessage = "Draft minutes could not be saved.";
+            return;
+        }
+
+        meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        approvedByMember = meetingMinutes?.ApprovedByMemberId is null
+            ? null
+            : await MemberService.GetMemberByIdAsync(meetingMinutes.ApprovedByMemberId.Value);
+        PopulateForm();
+        successMessage = "Draft minutes saved.";
+    }
+
+    private async Task RegenerateFromAgendaAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canManageMinutes || meetingMinutes is null || linkedMember is null || meetingMinutes.Status != StatusDraft)
+        {
+            return;
+        }
+
+        await MeetingMinuteService.SaveDraftMinutesAsync(
+            meetingMinutes.Id,
+            openingNotes,
+            mattersArising,
+            decisionsTaken,
+            actionItems,
+            closingNotes,
+            linkedMember.Id);
+
+        var regenerated = await MeetingMinuteService.RegenerateDraftFromAgendaAsync(meetingMinutes.Id, linkedMember.Id);
+
+        if (!regenerated)
+        {
+            errorMessage = "Minutes could not be regenerated from the agenda.";
+            return;
+        }
+
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+        meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        approvedByMember = meetingMinutes?.ApprovedByMemberId is null
+            ? null
+            : await MemberService.GetMemberByIdAsync(meetingMinutes.ApprovedByMemberId.Value);
+        PopulateForm();
+        successMessage = "Minutes regenerated from agenda notes.";
+    }
+
+    private async Task SubmitMinutesAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canManageMinutes || meetingMinutes is null || linkedMember is null)
+        {
+            return;
+        }
+
+        var submitted = await MeetingMinuteService.SubmitMinutesAsync(meetingMinutes.Id, linkedMember.Id);
+
+        if (!submitted)
+        {
+            errorMessage = "Minutes could not be submitted.";
+            return;
+        }
+
+        meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        approvedByMember = meetingMinutes?.ApprovedByMemberId is null
+            ? null
+            : await MemberService.GetMemberByIdAsync(meetingMinutes.ApprovedByMemberId.Value);
+        PopulateForm();
+        successMessage = "Minutes submitted for approval.";
+    }
+
+    private async Task ApproveMinutesAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (meetingMinutes is null || linkedMember is null || !canApproveMinutes)
+        {
+            errorMessage = "Only Chairperson, Creator, or Admin can approve submitted minutes.";
+            return;
+        }
+
+        var approved = await MeetingMinuteService.ApproveMinutesAsync(meetingMinutes.Id, linkedMember.Id);
+
+        if (!approved)
+        {
+            errorMessage = "Minutes could not be approved.";
+            return;
+        }
+
+        meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        approvedByMember = meetingMinutes?.ApprovedByMemberId is null
+            ? null
+            : await MemberService.GetMemberByIdAsync(meetingMinutes.ApprovedByMemberId.Value);
+        PopulateForm();
+        successMessage = "Minutes approved.";
+    }
+
+    private static string DisplayOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string DisplayAgendaNotes(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "No notes captured." : value;
+    }
+
+    private static string GetAgendaStatusLabel(bool isCompleted)
+    {
+        return isCompleted ? "Completed" : "Open";
+    }
+
+    private static string GetAgendaStatusBadgeClass(bool isCompleted)
+    {
+        return isCompleted
+            ? "sisonke-badge sisonke-badge-green"
+            : "sisonke-badge sisonke-badge-gold";
+    }
+
+    private static string GetMinutesStatusBadgeClass(string? status)
+    {
+        return status switch
+        {
+            "Draft" => "sisonke-badge sisonke-badge-gold",
+            "Submitted" => "sisonke-badge sisonke-badge-blue",
+            "Approved" => "sisonke-badge sisonke-badge-green",
+            "Published" => "sisonke-badge sisonke-badge-green",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static string GetStatusBannerClass(string status)
+    {
+        return status switch
+        {
+            StatusDraft => "sisonke-alert sisonke-alert-gold mb-4",
+            StatusSubmitted => "sisonke-alert sisonke-alert-blue mb-4",
+            StatusApproved => "sisonke-alert sisonke-alert-green mb-4",
+            StatusPublished => "sisonke-alert sisonke-alert-green mb-4",
+            _ => "sisonke-alert sisonke-alert-blue mb-4"
+        };
+    }
+
+    private static string GetStatusBannerMessage(string status)
+    {
+        return status switch
+        {
+            StatusDraft => "These minutes are still being prepared.",
+            StatusSubmitted => "These minutes are awaiting approval.",
+            StatusApproved => "These minutes have been approved.",
+            StatusPublished => "These minutes have been approved.",
+            _ => "These minutes are being processed."
+        };
+    }
+}

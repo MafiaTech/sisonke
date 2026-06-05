@@ -204,10 +204,29 @@ public class MeetingService(ApplicationDbContext context)
         return GetMeetingsNeedingAttendanceCountByStokvelIdAsync(stokvelId);
     }
 
-    public Task<int> GetMeetingsNeedingMinutesCountByStokvelIdAsync(Guid stokvelId)
+    public async Task<int> GetMeetingsNeedingMinutesCountByStokvelIdAsync(Guid stokvelId)
     {
-        // TODO: Return actual count once meeting minutes completion status is modeled.
-        return Task.FromResult(0);
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        return await context.Meetings
+            .Where(meeting =>
+                meeting.TenantId == stokvel.TenantId &&
+                meeting.Status != MeetingStatus.Cancelled &&
+                meeting.MeetingDate.Date <= DateTime.Today)
+            .CountAsync(meeting =>
+                !context.MeetingMinutes.Any(minutes => minutes.MeetingId == meeting.Id) ||
+                context.MeetingMinutes.Any(minutes =>
+                    minutes.MeetingId == meeting.Id &&
+                    minutes.Status == "Draft"));
     }
 
     public async Task<MeetingAgendaItem?> AddAgendaItemAsync(Guid meetingId, string title, string? description)

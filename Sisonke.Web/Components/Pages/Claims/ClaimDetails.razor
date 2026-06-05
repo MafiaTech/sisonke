@@ -114,6 +114,152 @@ else
         <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
     }
 
+    <!-- Claim Workflow Timeline -->
+    <div class="sisonke-card mb-4">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Claim Workflow</h2>
+                <p>Progress of this claim through each review stage.</p>
+            </div>
+            <span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span>
+        </div>
+        <div class="sisonke-card-body">
+            <div class="claim-timeline">
+
+                @{
+                    var tlSubmitted = claim.SubmittedAt is not null;
+                }
+                <div class="claim-timeline-step @(tlSubmitted ? "claim-timeline-complete" : "claim-timeline-pending")">
+                    <div class="claim-timeline-top">
+                        <div class="claim-timeline-dot">
+                            @if (tlSubmitted) { <i class="bi bi-check-lg" aria-hidden="true"></i> } else { <span>1</span> }
+                        </div>
+                        <div class="claim-timeline-connector"></div>
+                    </div>
+                    <div class="claim-timeline-body">
+                        <div class="claim-timeline-title">Claim Submitted</div>
+                        <span class="@(tlSubmitted ? "sisonke-badge sisonke-badge-green" : "sisonke-badge sisonke-badge-gold")">@(tlSubmitted ? "Complete" : "Pending")</span>
+                        @if (tlSubmitted)
+                        {
+                            <div class="claim-timeline-meta">
+                                @if (claim.SubmittedAt is not null) { <span>@claim.SubmittedAt.Value.ToLocalTime().ToString("dd MMM yyyy")</span> }
+                                @if (!string.IsNullOrWhiteSpace(claim.SubmittedByName)) { <span>By @claim.SubmittedByName</span> }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @{
+                    var tlSecDone = claim.SecretaryReviewedAt is not null;
+                    var tlSecPending = !tlSecDone && tlSubmitted;
+                }
+                <div class="claim-timeline-step @(tlSecDone ? "claim-timeline-complete" : tlSecPending ? "claim-timeline-pending" : "claim-timeline-not-started")">
+                    <div class="claim-timeline-top">
+                        <div class="claim-timeline-dot">
+                            @if (tlSecDone) { <i class="bi bi-check-lg" aria-hidden="true"></i> }
+                            else if (tlSecPending) { <i class="bi bi-hourglass-split" aria-hidden="true"></i> }
+                            else { <span>2</span> }
+                        </div>
+                        <div class="claim-timeline-connector"></div>
+                    </div>
+                    <div class="claim-timeline-body">
+                        <div class="claim-timeline-title">Secretary Review</div>
+                        <span class="@(tlSecDone ? "sisonke-badge sisonke-badge-green" : tlSecPending ? "sisonke-badge sisonke-badge-gold" : "sisonke-badge sisonke-badge-gray")">@(tlSecDone ? "Complete" : tlSecPending ? "Pending" : "Not started")</span>
+                        @if (tlSecDone)
+                        {
+                            <div class="claim-timeline-meta">
+                                @if (claim.SecretaryReviewedAt is not null) { <span>@claim.SecretaryReviewedAt.Value.ToLocalTime().ToString("dd MMM yyyy")</span> }
+                                @if (!string.IsNullOrWhiteSpace(claim.SecretaryReviewedByName)) { <span>By @claim.SecretaryReviewedByName</span> }
+                                @if (claim.SecretaryRecommendedApproval is not null)
+                                {
+                                    <span>@(claim.SecretaryRecommendedApproval.Value ? "Recommended" : "Not recommended")</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @{
+                    var tlChairDone = claim.ChairpersonDecisionAt is not null;
+                    var tlChairRejected = tlChairDone && claim.Status == FuneralClaimStatus.Rejected;
+                    var tlChairApproved = tlChairDone && !tlChairRejected;
+                    var tlChairPending = !tlChairDone && tlSecDone;
+                }
+                <div class="claim-timeline-step @(tlChairRejected ? "claim-timeline-rejected" : tlChairApproved ? "claim-timeline-complete" : tlChairPending ? "claim-timeline-pending" : "claim-timeline-not-started")">
+                    <div class="claim-timeline-top">
+                        <div class="claim-timeline-dot">
+                            @if (tlChairRejected) { <i class="bi bi-x-lg" aria-hidden="true"></i> }
+                            else if (tlChairApproved) { <i class="bi bi-check-lg" aria-hidden="true"></i> }
+                            else if (tlChairPending) { <i class="bi bi-hourglass-split" aria-hidden="true"></i> }
+                            else { <span>3</span> }
+                        </div>
+                        <div class="claim-timeline-connector"></div>
+                    </div>
+                    <div class="claim-timeline-body">
+                        <div class="claim-timeline-title">Chairperson Decision</div>
+                        <span class="@(tlChairRejected ? "sisonke-badge sisonke-badge-red" : tlChairApproved ? "sisonke-badge sisonke-badge-green" : tlChairPending ? "sisonke-badge sisonke-badge-gold" : "sisonke-badge sisonke-badge-gray")">@(tlChairRejected ? "Rejected" : tlChairApproved ? "Approved" : tlChairPending ? "Pending" : "Not started")</span>
+                        @if (tlChairDone)
+                        {
+                            <div class="claim-timeline-meta">
+                                @if (claim.ChairpersonDecisionAt is not null) { <span>@claim.ChairpersonDecisionAt.Value.ToLocalTime().ToString("dd MMM yyyy")</span> }
+                                @if (!string.IsNullOrWhiteSpace(claim.ChairpersonDecisionByName)) { <span>By @claim.ChairpersonDecisionByName</span> }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @{
+                    var tlPayoutDone = claim.PayoutPaidAt is not null;
+                    var tlPayoutPending = !tlPayoutDone && claim.Status == FuneralClaimStatus.Approved;
+                    var tlPayoutNA = claim.Status is FuneralClaimStatus.Rejected or FuneralClaimStatus.Cancelled;
+                }
+                <div class="claim-timeline-step @(tlPayoutDone ? "claim-timeline-complete" : tlPayoutPending ? "claim-timeline-pending" : "claim-timeline-not-started")">
+                    <div class="claim-timeline-top">
+                        <div class="claim-timeline-dot">
+                            @if (tlPayoutDone) { <i class="bi bi-check-lg" aria-hidden="true"></i> }
+                            else if (tlPayoutPending) { <i class="bi bi-hourglass-split" aria-hidden="true"></i> }
+                            else { <span>4</span> }
+                        </div>
+                        <div class="claim-timeline-connector"></div>
+                    </div>
+                    <div class="claim-timeline-body">
+                        <div class="claim-timeline-title">Treasurer Payout</div>
+                        <span class="@(tlPayoutDone ? "sisonke-badge sisonke-badge-green" : tlPayoutNA ? "sisonke-badge sisonke-badge-gray" : tlPayoutPending ? "sisonke-badge sisonke-badge-gold" : "sisonke-badge sisonke-badge-gray")">@(tlPayoutDone ? "Paid" : tlPayoutNA ? "N/A" : tlPayoutPending ? "Pending" : "Not started")</span>
+                        @if (tlPayoutDone)
+                        {
+                            <div class="claim-timeline-meta">
+                                @if (claim.PayoutPaidAt is not null) { <span>@claim.PayoutPaidAt.Value.ToLocalTime().ToString("dd MMM yyyy")</span> }
+                                @if (!string.IsNullOrWhiteSpace(payoutCapturedByMemberName)) { <span>By @payoutCapturedByMemberName</span> }
+                                @if (!string.IsNullOrWhiteSpace(claim.PayoutReference)) { <span>Ref: @claim.PayoutReference</span> }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @{
+                    var tlClosedPaid = claim.Status == FuneralClaimStatus.Paid;
+                    var tlClosedRejected = claim.Status == FuneralClaimStatus.Rejected;
+                    var tlClosedCancelled = claim.Status == FuneralClaimStatus.Cancelled;
+                }
+                <div class="claim-timeline-step @(tlClosedPaid ? "claim-timeline-complete" : tlClosedRejected ? "claim-timeline-rejected" : "claim-timeline-not-started")">
+                    <div class="claim-timeline-top">
+                        <div class="claim-timeline-dot">
+                            @if (tlClosedPaid) { <i class="bi bi-check-lg" aria-hidden="true"></i> }
+                            else if (tlClosedRejected) { <i class="bi bi-x-lg" aria-hidden="true"></i> }
+                            else { <span>5</span> }
+                        </div>
+                        <div class="claim-timeline-connector"></div>
+                    </div>
+                    <div class="claim-timeline-body">
+                        <div class="claim-timeline-title">Closed / Paid</div>
+                        <span class="@(tlClosedPaid ? "sisonke-badge sisonke-badge-green" : tlClosedRejected ? "sisonke-badge sisonke-badge-red" : tlClosedCancelled ? "sisonke-badge sisonke-badge-gray" : "sisonke-badge sisonke-badge-gray")">@(tlClosedPaid ? "Paid" : tlClosedRejected ? "Rejected" : tlClosedCancelled ? "Cancelled" : "Not started")</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
     <div class="sisonke-grid sisonke-grid-2 claim-page-grid">
         <div class="sisonke-card h-100">
             <div class="sisonke-card-body">
@@ -181,6 +327,10 @@ else
                                     <dt>Review status</dt>
                                     <dd><span class="sisonke-badge sisonke-badge-green">Complete</span></dd>
                                 </div>
+                                <div class="claim-dl-row">
+                                    <dt>Recommendation</dt>
+                                    <dd><span class="@GetRecommendationBadgeClass(claim.SecretaryRecommendedApproval)">@GetRecommendationLabel(claim.SecretaryRecommendedApproval)</span></dd>
+                                </div>
                                 <div class="claim-dl-row"><dt>Reviewed by</dt><dd>@(claim.SecretaryReviewedByName ?? "-")</dd></div>
                                 <div class="claim-dl-row"><dt>Reviewed at</dt><dd>@claim.SecretaryReviewedAt.Value.ToString("dd MMM yyyy HH:mm")</dd></div>
                                 <div class="claim-dl-row last"><dt>Notes</dt><dd>@(claim.SecretaryReviewNotes ?? "-")</dd></div>
@@ -193,11 +343,21 @@ else
                                 <DataAnnotationsValidator />
 
                                 <div class="mb-3">
+                                    <label class="form-label" for="secretary-recommendation">Recommendation</label>
+                                    <InputSelect id="secretary-recommendation" class="form-select" @bind-Value="secretaryReviewModel.Recommendation">
+                                        <option value="">Select recommendation</option>
+                                        <option value="true">Yes – Recommend for approval</option>
+                                        <option value="false">No – Do not recommend for approval</option>
+                                    </InputSelect>
+                                </div>
+
+                                <div class="mb-3">
                                     <label class="form-label" for="secretary-review-notes">Review Notes</label>
                                     <InputTextArea id="secretary-review-notes" class="form-control" rows="3" @bind-Value="secretaryReviewModel.ReviewNotes" />
                                 </div>
 
-                                <button class="sisonke-btn sisonke-btn-outline" type="submit" disabled="@string.IsNullOrWhiteSpace(secretaryReviewModel.ReviewNotes)">
+                                <button class="sisonke-btn sisonke-btn-outline" type="submit"
+                                    disabled="@(string.IsNullOrWhiteSpace(secretaryReviewModel.Recommendation) || string.IsNullOrWhiteSpace(secretaryReviewModel.ReviewNotes))">
                                     <i class="bi bi-clipboard-check me-2"></i>Complete Review
                                 </button>
                             </EditForm>
@@ -211,6 +371,13 @@ else
                                 <p>Final claim outcome and decision notes.</p>
                             </div>
                         </div>
+
+                        @if (claim.SecretaryReviewedAt is not null)
+                        {
+                            <div class="sisonke-alert sisonke-alert-@GetRecommendationAlertClass(claim.SecretaryRecommendedApproval) mb-3">
+                                <strong>Secretary recommendation:</strong> @GetRecommendationLabel(claim.SecretaryRecommendedApproval)
+                            </div>
+                        }
 
                         @if (claim.ChairpersonDecisionAt is not null)
                         {
@@ -845,6 +1012,12 @@ else
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(secretaryReviewModel.Recommendation))
+        {
+            errorMessage = "Recommendation is required before completing the secretary review.";
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(secretaryReviewModel.ReviewNotes))
         {
             errorMessage = "Review notes are required before completing the secretary review.";
@@ -865,9 +1038,11 @@ else
             return;
         }
 
+        var recommendation = secretaryReviewModel.Recommendation == "true";
         var reviewCompleted = await FuneralClaimService.CompleteSecretaryReviewAsync(
             ClaimId,
             secretaryReviewModel.ReviewNotes,
+            recommendation,
             secretaryMember.Id);
 
         if (!reviewCompleted)
@@ -1058,6 +1233,30 @@ else
         return status is FuneralClaimStatus.Draft or FuneralClaimStatus.OnHold or FuneralClaimStatus.Submitted;
     }
 
+    private static string GetRecommendationLabel(bool? recommendation) =>
+        recommendation switch
+        {
+            true => "Yes – Recommend for approval",
+            false => "No – Do not recommend for approval",
+            _ => "Not recorded"
+        };
+
+    private static string GetRecommendationBadgeClass(bool? recommendation) =>
+        recommendation switch
+        {
+            true => "sisonke-badge sisonke-badge-green",
+            false => "sisonke-badge sisonke-badge-red",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string GetRecommendationAlertClass(bool? recommendation) =>
+        recommendation switch
+        {
+            true => "green",
+            false => "gold",
+            _ => "blue"
+        };
+
     private static bool IsClaimReviewableBySecretary(FuneralClaim claim)
     {
         return claim.SecretaryReviewedAt is null &&
@@ -1072,6 +1271,7 @@ else
 
     private sealed class SecretaryReviewModel
     {
+        public string? Recommendation { get; set; }
         public string? ReviewNotes { get; set; }
     }
 

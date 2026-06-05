@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -49,6 +50,11 @@ else
     @if (!string.IsNullOrWhiteSpace(successMessage))
     {
         <div class="sisonke-alert sisonke-alert-green mb-4">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-gold mb-4">@errorMessage</div>
     }
 
     <div class="sisonke-grid sisonke-grid-4 mb-4">
@@ -158,6 +164,79 @@ else
                                         </div>
                                     </td>
                                 </tr>
+
+                                @if (warning.WarningType == WarningExecutiveReviewRequired)
+                                {
+                                    <tr>
+                                        <td colspan="9">
+                                            <div class="sisonke-card warning-decision-panel">
+                                                <div class="sisonke-card-head">
+                                                    <div>
+                                                        <h3>Executive Decision Required</h3>
+                                                        <p>Suspension is not automatic. A Chairperson, Creator, or Admin must make the final decision manually.</p>
+                                                    </div>
+                                                    <span class="@GetGovernanceStatusBadgeClass(warning.Member?.GovernanceStatus)">
+                                                        @GetGovernanceStatusLabel(warning.Member?.GovernanceStatus)
+                                                    </span>
+                                                </div>
+                                                <div class="sisonke-card-body">
+                                                    <div class="warning-decision-grid">
+                                                        <div>
+                                                            <div class="warning-detail-label">Member name</div>
+                                                            <div class="warning-detail-value">@DisplayOrDash(warning.Member?.FullName)</div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="warning-detail-label">Warning details</div>
+                                                            <div class="warning-detail-value">@GetWarningTypeLabel(warning.WarningType)</div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="warning-detail-label">Absence count</div>
+                                                            <div class="warning-detail-value">@warning.AbsenceCount</div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="warning-detail-label">Existing member status</div>
+                                                            <div class="warning-detail-value">@GetGovernanceStatusLabel(warning.Member?.GovernanceStatus)</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mt-3">
+                                                        <div class="warning-detail-label">Reason</div>
+                                                        <div>@DisplayOrDash(warning.Reason)</div>
+                                                    </div>
+
+                                                    @if (!string.IsNullOrWhiteSpace(warning.Notes))
+                                                    {
+                                                        <div class="sisonke-alert sisonke-alert-gold mt-3 mb-0">
+                                                            @warning.Notes
+                                                        </div>
+                                                    }
+
+                                                    <div class="mt-3">
+                                                        <label class="form-label" for="@($"decision-notes-{warning.Id}")">Decision notes</label>
+                                                        <textarea
+                                                            id="@($"decision-notes-{warning.Id}")"
+                                                            class="form-control"
+                                                            rows="3"
+                                                            @bind="decisionNotesByWarningId[warning.Id]"
+                                                            placeholder="Record the executive reason or note for this decision."></textarea>
+                                                    </div>
+
+                                                    @if (canMakeDisciplinaryDecision && warning.Status != StatusResolved)
+                                                    {
+                                                        <div class="d-flex flex-wrap gap-2 mt-3">
+                                                            <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="() => KeepMemberActiveAsync(warning.Id)">
+                                                                Keep Member Active
+                                                            </button>
+                                                            <button class="sisonke-btn warning-danger-btn" type="button" @onclick="() => SuspendMemberAsync(warning.Id)">
+                                                                Suspend Member
+                                                            </button>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
                             }
                         </tbody>
                     </table>
@@ -189,6 +268,51 @@ else
         flex-wrap: wrap;
         gap: .5rem;
     }
+
+    .warning-decision-panel {
+        margin: .75rem 0;
+        border-color: rgba(146, 64, 14, .28);
+        background: rgba(255, 251, 235, .45);
+    }
+
+    .warning-decision-panel h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 800;
+    }
+
+    .warning-decision-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    }
+
+    .warning-detail-label {
+        color: var(--muted, var(--sk-text-muted));
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+
+    .warning-detail-value {
+        color: var(--sk-text);
+        font-weight: 700;
+        margin-top: .2rem;
+    }
+
+    .warning-danger-btn {
+        background: #b91c1c;
+        border-color: #b91c1c;
+        color: #fff;
+    }
+
+    .warning-danger-btn:hover,
+    .warning-danger-btn:focus {
+        background: #991b1b;
+        border-color: #991b1b;
+        color: #fff;
+    }
 </style>
 
 @code {
@@ -213,10 +337,13 @@ else
     private Stokvel? stokvel;
     private Member? linkedMember;
     private List<MemberWarning> warnings = [];
+    private Dictionary<Guid, string> decisionNotesByWarningId = [];
     private bool isLoading = true;
     private bool canViewWarnings;
+    private bool canMakeDisciplinaryDecision;
     private string selectedFilter = "All";
     private string? successMessage;
+    private string? errorMessage;
 
     private int OpenWarningCount => warnings.Count(warning => warning.Status == StatusOpen);
     private int ReminderCount => warnings.Count(warning => warning.WarningType == WarningReminder);
@@ -243,8 +370,11 @@ else
     {
         isLoading = true;
         canViewWarnings = false;
+        canMakeDisciplinaryDecision = false;
         successMessage = null;
+        errorMessage = null;
         warnings = [];
+        decisionNotesByWarningId = [];
         linkedMember = null;
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
 
@@ -259,6 +389,7 @@ else
 
         var canViewSecretaryTasks = await MemberAccessService.CanViewSecretaryTasksAsync(userId, StokvelId);
         var canViewChairpersonTasks = await MemberAccessService.CanViewChairpersonTasksAsync(userId, StokvelId);
+        canMakeDisciplinaryDecision = await MemberAccessService.CanMakeDisciplinaryDecisionAsync(userId, StokvelId);
         canViewWarnings = canViewSecretaryTasks || canViewChairpersonTasks;
         linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
 
@@ -273,10 +404,16 @@ else
     private async Task LoadWarningsAsync()
     {
         warnings = await MemberWarningService.GetWarningsByStokvelIdAsync(StokvelId);
+        decisionNotesByWarningId = warnings
+            .Where(warning => warning.WarningType == WarningExecutiveReviewRequired)
+            .ToDictionary(warning => warning.Id, warning => decisionNotesByWarningId.TryGetValue(warning.Id, out var notes) ? notes : string.Empty);
     }
 
     private async Task AcknowledgeWarningAsync(Guid warningId)
     {
+        successMessage = null;
+        errorMessage = null;
+
         if (linkedMember is null)
         {
             return;
@@ -296,6 +433,9 @@ else
 
     private async Task ResolveWarningAsync(Guid warningId)
     {
+        successMessage = null;
+        errorMessage = null;
+
         if (linkedMember is null)
         {
             return;
@@ -312,6 +452,71 @@ else
             selectedFilter = StatusResolved;
             await LoadWarningsAsync();
         }
+    }
+
+    private async Task KeepMemberActiveAsync(Guid warningId)
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canMakeDisciplinaryDecision || linkedMember is null)
+        {
+            errorMessage = "You are not authorised to make disciplinary decisions.";
+            return;
+        }
+
+        var notes = GetDecisionNotes(warningId);
+
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            errorMessage = "Decision notes are required before keeping the member active.";
+            return;
+        }
+
+        var updated = await MemberWarningService.KeepMemberActiveAsync(warningId, linkedMember.Id, notes);
+
+        if (updated)
+        {
+            successMessage = "Executive decision recorded. Member remains active.";
+            selectedFilter = StatusResolved;
+            await LoadWarningsAsync();
+        }
+    }
+
+    private async Task SuspendMemberAsync(Guid warningId)
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canMakeDisciplinaryDecision || linkedMember is null)
+        {
+            errorMessage = "You are not authorised to make disciplinary decisions.";
+            return;
+        }
+
+        var notes = GetDecisionNotes(warningId);
+
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            errorMessage = "A suspension reason is required before suspending the member.";
+            return;
+        }
+
+        var updated = await MemberWarningService.SuspendMemberFromWarningAsync(warningId, linkedMember.Id, notes);
+
+        if (updated)
+        {
+            successMessage = "Executive decision recorded. Member suspended.";
+            selectedFilter = StatusResolved;
+            await LoadWarningsAsync();
+        }
+    }
+
+    private string GetDecisionNotes(Guid warningId)
+    {
+        return decisionNotesByWarningId.TryGetValue(warningId, out var notes)
+            ? notes
+            : string.Empty;
     }
 
     private string GetFilterButtonClass(string filterValue)
@@ -355,6 +560,24 @@ else
             StatusOpen => "sisonke-badge sisonke-badge-gold",
             StatusAcknowledged => "sisonke-badge sisonke-badge-blue",
             StatusResolved => "sisonke-badge sisonke-badge-green",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static string GetGovernanceStatusLabel(MemberGovernanceStatus? governanceStatus)
+    {
+        return governanceStatus?.ToString() ?? "Unknown";
+    }
+
+    private static string GetGovernanceStatusBadgeClass(MemberGovernanceStatus? governanceStatus)
+    {
+        return governanceStatus switch
+        {
+            MemberGovernanceStatus.Active => "sisonke-badge sisonke-badge-green",
+            MemberGovernanceStatus.Warning => "sisonke-badge sisonke-badge-gold",
+            MemberGovernanceStatus.Suspended => "sisonke-badge sisonke-badge-red",
+            MemberGovernanceStatus.Expelled => "sisonke-badge sisonke-badge-gray",
+            MemberGovernanceStatus.Deceased => "sisonke-badge sisonke-badge-red",
             _ => "sisonke-badge sisonke-badge-gray"
         };
     }

@@ -183,7 +183,7 @@ public class MemberWarningService(ApplicationDbContext context)
     public async Task<bool> ResolveWarningAsync(Guid warningId, Guid resolvedByMemberId, string? notes)
     {
         var warning = await context.MemberWarnings
-            .SingleOrDefaultAsync(existingWarning => existingWarning.Id == warningId);
+            .FirstOrDefaultAsync(existingWarning => existingWarning.Id == warningId);
 
         if (warning is null)
         {
@@ -191,7 +191,7 @@ public class MemberWarningService(ApplicationDbContext context)
         }
 
         var resolvedByMember = await context.Members
-            .SingleOrDefaultAsync(member => member.Id == resolvedByMemberId);
+            .FirstOrDefaultAsync(member => member.Id == resolvedByMemberId);
 
         if (resolvedByMember is null)
         {
@@ -200,6 +200,82 @@ public class MemberWarningService(ApplicationDbContext context)
 
         warning.Status = StatusResolved;
         warning.Notes = AppendNote(warning.Notes, notes);
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<bool> KeepMemberActiveAsync(Guid warningId, Guid decidedByMemberId, string decisionNotes)
+    {
+        if (string.IsNullOrWhiteSpace(decisionNotes))
+        {
+            return false;
+        }
+
+        var warning = await context.MemberWarnings
+            .Include(existingWarning => existingWarning.Member)
+            .FirstOrDefaultAsync(existingWarning => existingWarning.Id == warningId);
+
+        if (warning?.Member is null)
+        {
+            return false;
+        }
+
+        var decidedByMember = await context.Members
+            .FirstOrDefaultAsync(member => member.Id == decidedByMemberId);
+
+        if (decidedByMember is null)
+        {
+            return false;
+        }
+
+        warning.Status = StatusResolved;
+        warning.Notes = AppendNote(
+            warning.Notes,
+            $"Executive decision: Member remains active. {decisionNotes.Trim()}");
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<bool> SuspendMemberFromWarningAsync(Guid warningId, Guid decidedByMemberId, string suspensionReason)
+    {
+        if (string.IsNullOrWhiteSpace(suspensionReason))
+        {
+            return false;
+        }
+
+        var warning = await context.MemberWarnings
+            .Include(existingWarning => existingWarning.Member)
+            .FirstOrDefaultAsync(existingWarning => existingWarning.Id == warningId);
+
+        if (warning?.Member is null)
+        {
+            return false;
+        }
+
+        var decidedByMember = await context.Members
+            .FirstOrDefaultAsync(member => member.Id == decidedByMemberId);
+
+        if (decidedByMember is null)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        var reason = suspensionReason.Trim();
+
+        warning.Member.GovernanceStatus = MemberGovernanceStatus.Suspended;
+        warning.Member.Status = MemberStatus.Suspended;
+        warning.Member.GovernanceStatusChangedAt = now;
+        warning.Member.GovernanceStatusReason = reason;
+        warning.Member.SuspendedAt ??= now;
+        warning.Status = StatusResolved;
+        warning.Notes = AppendNote(
+            warning.Notes,
+            $"Executive decision: Member suspended. Reason: {reason}");
 
         await context.SaveChangesAsync();
 

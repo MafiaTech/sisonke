@@ -102,10 +102,11 @@ else
 
     @if (member.GovernanceStatus == MemberGovernanceStatus.Suspended)
     {
+        @* TODO: Later decide how suspended members affect claim eligibility. *@
         <AlertBanner
             Type="warning"
             Title="This member is currently suspended."
-            Message="Any claim linked to this member or their dependents should be placed on hold until the disciplinary committee outcome is completed."
+            Message="This status was set by a manual governance decision."
             Icon="bi bi-exclamation-triangle-fill" />
     }
     else if (member.GovernanceStatus == MemberGovernanceStatus.Expelled)
@@ -124,6 +125,38 @@ else
             Message="Monitor attendance and conduct before approving sensitive actions."
             Icon="bi bi-exclamation-triangle-fill" />
     }
+
+    <section class="sisonke-card mb-3">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Governance Status</h2>
+                <p>Current member standing and attendance warning summary.</p>
+            </div>
+            <span class="@GetGovernanceStatusBadgeClass(member.GovernanceStatus)">
+                @member.GovernanceStatus
+            </span>
+        </div>
+        <div class="sisonke-card-body">
+            <div class="member-governance-summary">
+                <div>
+                    <div class="member-governance-label">Status</div>
+                    <div class="member-governance-value">@GetMemberStandingText()</div>
+                </div>
+                <div>
+                    <div class="member-governance-label">Warning count</div>
+                    <div class="member-governance-value">@memberWarnings.Count</div>
+                </div>
+                <div>
+                    <div class="member-governance-label">Open warnings</div>
+                    <div class="member-governance-value">@OpenMemberWarningCount</div>
+                </div>
+                <div>
+                    <div class="member-governance-label">Last status update</div>
+                    <div class="member-governance-value">@(member.GovernanceStatusChangedAt?.ToString("dd MMM yyyy") ?? "—")</div>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- ── Detail cards ── -->
     <div class="row g-3">
@@ -737,6 +770,24 @@ else
         margin-top: 1.25rem;
         padding-top: 1.25rem;
     }
+    .member-governance-summary {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    }
+    .member-governance-label {
+        color: var(--sk-text-muted);
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+    .member-governance-value {
+        color: var(--sk-text);
+        font-size: 1.1rem;
+        font-weight: 800;
+        margin-top: .2rem;
+    }
     .pdl-row {
         display: flex;
         padding: .625rem 0;
@@ -791,6 +842,8 @@ else
     private bool canViewFines;
     private bool canViewFinancials;
 
+    private int OpenMemberWarningCount => memberWarnings.Count(warning => warning.Status == "Open");
+
     [Parameter]
     public Guid MemberId { get; set; }
 
@@ -832,7 +885,7 @@ else
         activeDependentClaims = member is null ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
         memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
         funeralClaims = member is null ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
-        memberWarnings = member is null || !canManageMemberStatus ? [] : await MemberWarningService.GetWarningsByMemberIdAsync(MemberId);
+        memberWarnings = member is null || (!canManageMemberStatus && !isOwnMemberProfile) ? [] : await MemberWarningService.GetWarningsByMemberIdAsync(MemberId);
 
         if (member is not null)
         {
@@ -933,6 +986,34 @@ else
             MemberGovernanceStatus.Deceased => "danger",
             _ => "secondary"
         };
+
+    private string GetMemberStandingText()
+    {
+        if (member is null)
+        {
+            return "Unknown";
+        }
+
+        return member.GovernanceStatus switch
+        {
+            MemberGovernanceStatus.Suspended => "Suspended",
+            MemberGovernanceStatus.Active => "Active",
+            _ => member.GovernanceStatus.ToString()
+        };
+    }
+
+    private static string GetGovernanceStatusBadgeClass(MemberGovernanceStatus governanceStatus)
+    {
+        return governanceStatus switch
+        {
+            MemberGovernanceStatus.Active => "sisonke-badge sisonke-badge-green",
+            MemberGovernanceStatus.Warning => "sisonke-badge sisonke-badge-gold",
+            MemberGovernanceStatus.Suspended => "sisonke-badge sisonke-badge-red",
+            MemberGovernanceStatus.Expelled => "sisonke-badge sisonke-badge-gray",
+            MemberGovernanceStatus.Deceased => "sisonke-badge sisonke-badge-red",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
 
     private static string GetDependentStatusText(MemberDependent dependent, bool hasActiveClaim)
     {

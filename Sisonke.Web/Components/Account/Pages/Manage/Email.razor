@@ -14,11 +14,14 @@
 
 <PageTitle>Manage email</PageTitle>
 
-<h3>Manage email</h3>
-
 <StatusMessage Message="@message"/>
-<div class="row">
-    <div class="col-xl-6">
+
+<div class="account-settings-card">
+    <div class="account-settings-card-head">
+        <h3>Manage email</h3>
+        <p>Update your email address or send a verification email.</p>
+    </div>
+    <div class="account-settings-card-body">
         <form @onsubmit="OnSendEmailVerificationAsync" @formname="send-verification" id="send-verification-form" method="post">
             <AntiforgeryToken />
         </form>
@@ -48,7 +51,7 @@
                 <label for="Input.NewEmail" class="form-label">New email</label>
                 <ValidationMessage For="() => Input.NewEmail" class="text-danger" />
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Change email</button>
+            <button type="submit" class="sisonke-btn sisonke-btn-primary w-100">Change email</button>
         </EditForm>
     </div>
 </div>
