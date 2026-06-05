@@ -128,6 +128,8 @@ public class MeetingMinuteService(ApplicationDbContext context)
     public async Task<bool> SaveDraftMinutesAsync(
         Guid meetingMinuteId,
         string openingNotes,
+        string attendanceSummary,
+        string apologySummary,
         string mattersArising,
         string decisionsTaken,
         string actionItems,
@@ -144,6 +146,8 @@ public class MeetingMinuteService(ApplicationDbContext context)
         }
 
         minutes.OpeningNotes = openingNotes.Trim();
+        minutes.AttendanceSummary = attendanceSummary.Trim();
+        minutes.ApologySummary = apologySummary.Trim();
         minutes.MattersArising = mattersArising.Trim();
         minutes.DecisionsTaken = decisionsTaken.Trim();
         minutes.ActionItems = actionItems.Trim();

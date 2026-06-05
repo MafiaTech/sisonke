@@ -78,6 +78,7 @@ builder.Services.AddScoped<MeetingMinuteService>();
 builder.Services.AddScoped<MemberWarningService>();
 builder.Services.AddScoped<VotingService>();
 builder.Services.AddScoped<FuneralClaimService>();
+builder.Services.AddScoped<ClaimEligibilityService>();
 builder.Services.AddScoped<MemberAccountLinkingService>();
 builder.Services.AddScoped<MemberAccessService>();
 

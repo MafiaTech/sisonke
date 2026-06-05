@@ -102,7 +102,7 @@ else
             </div>
             @if (meetingMinutes is not null)
             {
-                <span class="@GetMinutesStatusBadgeClass(meetingMinutes.Status)">@meetingMinutes.Status</span>
+                <span class="@GetMinutesStatusBadgeClass(meetingMinutes.Status)">@GetMinutesStatusLabel(meetingMinutes.Status)</span>
             }
         </div>
         <div class="sisonke-card-body">
@@ -651,6 +651,14 @@ else
             "Approved" => "sisonke-badge sisonke-badge-green",
             "Published" => "sisonke-badge sisonke-badge-green",
             _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string GetMinutesStatusLabel(string status) =>
+        status switch
+        {
+            "Submitted" => "Awaiting Approval",
+            "Published" => "Approved",
+            _ => status
         };
 
     private static string GetMinutesSummaryAlertClass(string status) =>

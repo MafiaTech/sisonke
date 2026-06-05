@@ -11,6 +11,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
 @inject FuneralClaimService FuneralClaimService
+@inject MeetingService MeetingService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Chairperson Approval Tasks</PageTitle>
@@ -53,6 +54,10 @@ else
                 <span>Claims awaiting approval</span>
                 <strong>@claimsAwaitingApproval.Count</strong>
             </div>
+            <div>
+                <span>Minutes awaiting approval</span>
+                <strong>@minutesAwaitingApprovalCount</strong>
+            </div>
         </div>
     </section>
 
@@ -68,6 +73,7 @@ else
         }
     </div>
 
+    <div class="sisonke-grid sisonke-grid-2">
     <section class="sisonke-card">
         <div class="sisonke-card-head">
             <div>
@@ -127,12 +133,36 @@ else
             }
         </div>
     </section>
+
+    <section class="sisonke-card">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Minutes Awaiting Approval</h2>
+                <p>Submitted meeting minutes ready for chairperson review.</p>
+            </div>
+            <span class="sisonke-badge sisonke-badge-gold">@minutesAwaitingApprovalCount</span>
+        </div>
+        <div class="sisonke-card-body">
+            @if (minutesAwaitingApprovalCount == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-green mb-0">
+                    No meeting minutes are currently awaiting approval.
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">There are @minutesAwaitingApprovalCount submitted meeting minute(s) awaiting approval.</p>
+                <a class="sisonke-btn sisonke-btn-gold" href="@MeetingsHref">Open Meetings</a>
+            }
+        </div>
+    </section>
+    </div>
 }
 
 <style>
     .chairperson-tasks-hero-meta {
         display: grid;
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: .75rem;
         min-width: min(18rem, 100%);
     }
@@ -161,11 +191,13 @@ else
 
 @code {
     private List<FuneralClaim> claimsAwaitingApproval = [];
+    private int minutesAwaitingApprovalCount;
     private bool isLoading = true;
     private bool canViewChairpersonTasks;
     private bool canViewSecretaryTasks;
     private string DashboardHref => $"/stokvel-dashboard/{StokvelId}";
     private string SecretaryTasksHref => $"/secretary-tasks/{StokvelId}";
+    private string MeetingsHref => $"/meetings/{StokvelId}";
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -174,6 +206,7 @@ else
     {
         isLoading = true;
         claimsAwaitingApproval = [];
+        minutesAwaitingApprovalCount = 0;
         canViewChairpersonTasks = false;
         canViewSecretaryTasks = false;
 
@@ -196,6 +229,7 @@ else
         }
 
         claimsAwaitingApproval = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalByStokvelIdAsync(StokvelId);
+        minutesAwaitingApprovalCount = await MeetingService.GetMinutesAwaitingApprovalCountByStokvelIdAsync(StokvelId);
         isLoading = false;
     }
 

@@ -185,11 +185,11 @@ else
                 <div class="minutes-readonly-grid mb-4">
                     <div>
                         <label class="form-label" for="attendance-summary">Attendance summary</label>
-                        <textarea id="attendance-summary" class="form-control" rows="4" readonly>@meetingMinutes.AttendanceSummary</textarea>
+                        <textarea id="attendance-summary" class="form-control" rows="4" readonly="@IsReadOnly" @bind="attendanceSummary"></textarea>
                     </div>
                     <div>
                         <label class="form-label" for="apology-summary">Apology summary</label>
-                        <textarea id="apology-summary" class="form-control" rows="4" readonly>@meetingMinutes.ApologySummary</textarea>
+                        <textarea id="apology-summary" class="form-control" rows="4" readonly="@IsReadOnly" @bind="apologySummary"></textarea>
                     </div>
                 </div>
 
@@ -310,6 +310,8 @@ else
     private string? successMessage;
     private string? errorMessage;
     private string openingNotes = string.Empty;
+    private string attendanceSummary = string.Empty;
+    private string apologySummary = string.Empty;
     private string mattersArising = string.Empty;
     private string decisionsTaken = string.Empty;
     private string actionItems = string.Empty;
@@ -377,6 +379,8 @@ else
     private void PopulateForm()
     {
         openingNotes = meetingMinutes?.OpeningNotes ?? string.Empty;
+        attendanceSummary = meetingMinutes?.AttendanceSummary ?? string.Empty;
+        apologySummary = meetingMinutes?.ApologySummary ?? string.Empty;
         mattersArising = meetingMinutes?.MattersArising ?? string.Empty;
         decisionsTaken = meetingMinutes?.DecisionsTaken ?? string.Empty;
         actionItems = meetingMinutes?.ActionItems ?? string.Empty;
@@ -419,6 +423,8 @@ else
         var saved = await MeetingMinuteService.SaveDraftMinutesAsync(
             meetingMinutes.Id,
             openingNotes,
+            attendanceSummary,
+            apologySummary,
             mattersArising,
             decisionsTaken,
             actionItems,
@@ -452,6 +458,8 @@ else
         await MeetingMinuteService.SaveDraftMinutesAsync(
             meetingMinutes.Id,
             openingNotes,
+            attendanceSummary,
+            apologySummary,
             mattersArising,
             decisionsTaken,
             actionItems,
@@ -578,10 +586,10 @@ else
     {
         return status switch
         {
-            StatusDraft => "These minutes are still being prepared.",
-            StatusSubmitted => "These minutes are awaiting approval.",
-            StatusApproved => "These minutes have been approved.",
-            StatusPublished => "These minutes have been approved.",
+            StatusDraft => "These minutes are still being prepared by the Secretary.",
+            StatusSubmitted => "These minutes have been submitted and are awaiting approval.",
+            StatusApproved => "These minutes have been approved and are available for viewing.",
+            StatusPublished => "These minutes have been approved and are available for viewing.",
             _ => "These minutes are being processed."
         };
     }

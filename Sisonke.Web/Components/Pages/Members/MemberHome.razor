@@ -16,6 +16,7 @@
 @inject FineService FineService
 @inject FuneralClaimService FuneralClaimService
 @inject MeetingService MeetingService
+@inject MeetingMinuteService MeetingMinuteService
 @inject MeetingApologyService MeetingApologyService
 @inject StokvelService StokvelService
 @inject ContributionPaymentService ContributionPaymentService
@@ -152,6 +153,12 @@ else
 
                                     <div class="member-meeting-actions">
                                         <a class="sisonke-btn sisonke-btn-outline" href="/meeting/@meeting.Id">View</a>
+                                        @if (approvedMinutesByMeetingId.ContainsKey(meeting.Id))
+                                        {
+                                            <a class="sisonke-btn sisonke-btn-primary" href="@($"/meeting-minutes/{meeting.Id}")">
+                                                View Approved Minutes
+                                            </a>
+                                        }
                                         @if (hasApology)
                                         {
                                             <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -697,6 +704,7 @@ else
     private List<FuneralClaim> memberClaims = [];
     private List<MemberDependent> dependents = [];
     private List<Meeting> upcomingMeetings = [];
+    private Dictionary<Guid, MeetingMinute> approvedMinutesByMeetingId = [];
     private Dictionary<Guid, MeetingApology> meetingApologiesByMeetingId = [];
     private List<ContributionPaymentSummary> memberContributions = [];
     private List<ContributionPaymentSummary> recentContributions = [];
@@ -750,6 +758,7 @@ else
         memberClaims = [];
         dependents = [];
         upcomingMeetings = [];
+        approvedMinutesByMeetingId = [];
         meetingApologiesByMeetingId = [];
         memberContributions = [];
         recentContributions = [];
@@ -806,6 +815,11 @@ else
                 (meeting.Status == MeetingStatus.Planned || meeting.Status == MeetingStatus.InProgress))
             .OrderBy(meeting => meeting.MeetingDate)
             .ToList();
+
+        approvedMinutesByMeetingId = (await MeetingMinuteService.GetMinutesByStokvelIdAsync(stokvel.Id))
+            .Where(minutes => minutes.Status is "Approved" or "Published")
+            .GroupBy(minutes => minutes.MeetingId)
+            .ToDictionary(group => group.Key, group => group.First());
 
         foreach (var meeting in upcomingMeetings)
         {

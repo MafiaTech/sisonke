@@ -448,7 +448,25 @@ public class MemberAccessService(ApplicationDbContext context)
             return false;
         }
 
-        return await GetLinkedMemberForUserAsync(userId, stokvelId) is not null;
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        return await context.Members
+            .Where(member =>
+                member.ApplicationUserId == userId &&
+                member.TenantId == stokvel.TenantId &&
+                member.Status == MemberStatus.Active)
+            .OrderBy(member => member.CreatedAt)
+            .ThenBy(member => member.FullName)
+            .FirstOrDefaultAsync() is not null;
     }
 
     public async Task<bool> CanManageAttendanceAsync(string userId, Guid stokvelId)

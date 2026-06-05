@@ -229,6 +229,14 @@ public class MeetingService(ApplicationDbContext context)
                     minutes.Status == "Draft"));
     }
 
+    public async Task<int> GetMinutesAwaitingApprovalCountByStokvelIdAsync(Guid stokvelId)
+    {
+        return await context.MeetingMinutes
+            .CountAsync(minutes =>
+                minutes.StokvelId == stokvelId &&
+                minutes.Status == "Submitted");
+    }
+
     public async Task<MeetingAgendaItem?> AddAgendaItemAsync(Guid meetingId, string title, string? description)
     {
         var meeting = await context.Meetings

@@ -9,8 +9,10 @@
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
 
 @inject FuneralClaimService FuneralClaimService
+@inject ClaimEligibilityService ClaimEligibilityService
 @inject MemberService MemberService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
@@ -112,6 +114,126 @@ else
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
         <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
+    }
+
+    @if (canViewClaimEligibilityAssessment && eligibilityAssessment is not null)
+    {
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Claim Eligibility Assessment</h2>
+                    <p>This assessment supports decision-making. It does not automatically approve or reject the claim.</p>
+                </div>
+                <span class="@GetEligibilityStatusBadgeClass(eligibilityAssessment.EligibilityStatus)">
+                    @FormatEligibilityStatus(eligibilityAssessment.EligibilityStatus)
+                </span>
+            </div>
+            <div class="sisonke-card-body">
+                <div class="table-responsive mb-3">
+                    <table class="sisonke-table mb-0">
+                        <tbody>
+                            <tr>
+                                <th>Member status</th>
+                                <td><span class="@GetBooleanBadgeClass(eligibilityAssessment.IsMemberActive)">@GetEligibilityCheckLabel(eligibilityAssessment.IsMemberActive, "Active", "Requires review")</span></td>
+                            </tr>
+                            <tr>
+                                <th>Suspension status</th>
+                                <td><span class="@GetBooleanBadgeClass(!eligibilityAssessment.IsMemberSuspended)">@(eligibilityAssessment.IsMemberSuspended ? "Suspended" : "Not suspended")</span></td>
+                            </tr>
+                            <tr>
+                                <th>Dependent coverage</th>
+                                <td><span class="@GetBooleanBadgeClass(eligibilityAssessment.IsDependentCovered)">@GetDependentCoverageLabel(eligibilityAssessment)</span></td>
+                            </tr>
+                            <tr>
+                                <th>Waiting period</th>
+                                <td><span class="@GetBooleanBadgeClass(eligibilityAssessment.WaitingPeriodSatisfied)">@GetEligibilityCheckLabel(eligibilityAssessment.WaitingPeriodSatisfied, "Satisfied", "Requires review")</span></td>
+                            </tr>
+                            <tr>
+                                <th>Contribution arrears</th>
+                                <td>
+                                    <span class="@GetBooleanBadgeClass(!eligibilityAssessment.HasOutstandingContributionArrears)">
+                                        @(eligibilityAssessment.HasOutstandingContributionArrears ? FormatCurrency(eligibilityAssessment.OutstandingContributionBalance) : "None found")
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Outstanding fines</th>
+                                <td>
+                                    <span class="@GetBooleanBadgeClass(!eligibilityAssessment.HasOutstandingFines)">
+                                        @(eligibilityAssessment.HasOutstandingFines ? FormatCurrency(eligibilityAssessment.OutstandingFinesBalance) : "None found")
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Required documents</th>
+                                <td><span class="@GetBooleanBadgeClass(eligibilityAssessment.HasRequiredDocuments)">@GetEligibilityCheckLabel(eligibilityAssessment.HasRequiredDocuments, "Death certificate uploaded", "Requires review")</span></td>
+                            </tr>
+                            <tr>
+                                <th>Duplicate active claim</th>
+                                <td><span class="@GetBooleanBadgeClass(!eligibilityAssessment.HasDuplicateActiveClaim)">@(eligibilityAssessment.HasDuplicateActiveClaim ? "Found" : "None found")</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="sisonke-grid sisonke-grid-3 claim-eligibility-grid">
+                    <div>
+                        <h3 class="claim-section-mini-title">Passed checks</h3>
+                        @if (eligibilityAssessment.PassedChecks.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">No passed checks recorded.</p>
+                        }
+                        else
+                        {
+                            <ul class="claim-check-list">
+                                @foreach (var check in eligibilityAssessment.PassedChecks)
+                                {
+                                    <li>@check</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                    <div>
+                        <h3 class="claim-section-mini-title">Failed checks</h3>
+                        @if (eligibilityAssessment.FailedChecks.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">No failed checks recorded.</p>
+                        }
+                        else
+                        {
+                            <ul class="claim-check-list claim-check-list-danger">
+                                @foreach (var check in eligibilityAssessment.FailedChecks)
+                                {
+                                    <li>@check</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                    <div>
+                        <h3 class="claim-section-mini-title">Warnings</h3>
+                        @if (eligibilityAssessment.Warnings.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">No warnings recorded.</p>
+                        }
+                        else
+                        {
+                            <ul class="claim-check-list claim-check-list-warning">
+                                @foreach (var warning in eligibilityAssessment.Warnings)
+                                {
+                                    <li>@warning</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else if (canViewClaim)
+    {
+        <div class="sisonke-alert sisonke-alert-blue mb-4">
+            Your claim is being assessed according to society rules.
+        </div>
     }
 
     <!-- Claim Workflow Timeline -->
@@ -339,6 +461,20 @@ else
 
                         @if (canCompleteSecretaryReview)
                         {
+                            @if (eligibilityAssessment is not null)
+                            {
+                                <div class="sisonke-alert sisonke-alert-@GetEligibilityAlertClass(eligibilityAssessment.EligibilityStatus) mb-3">
+                                    <strong>Eligibility status:</strong> @FormatEligibilityStatus(eligibilityAssessment.EligibilityStatus)
+                                </div>
+
+                                @if (RequiresEligibilityReview(eligibilityAssessment))
+                                {
+                                    <div class="sisonke-alert sisonke-alert-gold mb-3">
+                                        Please review failed checks/warnings before making a recommendation.
+                                    </div>
+                                }
+                            }
+
                             <EditForm Model="@secretaryReviewModel" OnValidSubmit="@SaveSecretaryReviewAsync" FormName="SecretaryReviewForm">
                                 <DataAnnotationsValidator />
 
@@ -390,6 +526,20 @@ else
 
                         @if (canMakeChairpersonDecision)
                         {
+                            @if (eligibilityAssessment is not null)
+                            {
+                                <div class="sisonke-alert sisonke-alert-@GetEligibilityAlertClass(eligibilityAssessment.EligibilityStatus) mb-3">
+                                    <strong>Eligibility status:</strong> @FormatEligibilityStatus(eligibilityAssessment.EligibilityStatus)
+                                </div>
+
+                                @if (RequiresEligibilityReview(eligibilityAssessment))
+                                {
+                                    <div class="sisonke-alert sisonke-alert-gold mb-3">
+                                        This claim has eligibility warnings. Chairperson decision is still required.
+                                    </div>
+                                }
+                            }
+
                             <EditForm Model="@chairpersonDecisionModel" FormName="ChairpersonDecisionForm">
                                 <DataAnnotationsValidator />
 
@@ -729,6 +879,30 @@ else
         margin-top: 1.25rem;
         padding-top: 1.25rem;
     }
+    .claim-eligibility-grid {
+        align-items: flex-start;
+    }
+    .claim-section-mini-title {
+        color: var(--text);
+        font-size: .9rem;
+        font-weight: 700;
+        margin: 0 0 .5rem;
+    }
+    .claim-check-list {
+        color: var(--text);
+        font-size: .9rem;
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+    .claim-check-list li + li {
+        margin-top: .35rem;
+    }
+    .claim-check-list-danger {
+        color: #991b1b;
+    }
+    .claim-check-list-warning {
+        color: #92400e;
+    }
     @@media (max-width: 768px) {
         .claim-dl-row {
             flex-direction: column;
@@ -742,6 +916,7 @@ else
 
 @code {
     private FuneralClaim? claim;
+    private ClaimEligibilityAssessmentDto? eligibilityAssessment;
     private List<ClaimPayoutAudit> payoutAuditTrail = [];
     private SecretaryReviewModel secretaryReviewModel = new();
     private ChairpersonDecisionModel chairpersonDecisionModel = new();
@@ -760,6 +935,7 @@ else
     private bool canSubmitClaim;
     private bool canUploadDocuments;
     private bool canViewPayoutAuditTrail;
+    private bool canViewClaimEligibilityAssessment;
     private bool showApproveConfirmation;
     private bool showRejectConfirmation;
     private string? currentUserId;
@@ -797,7 +973,9 @@ else
         canSubmitClaim = false;
         canUploadDocuments = false;
         canViewPayoutAuditTrail = false;
+        canViewClaimEligibilityAssessment = false;
         payoutAuditTrail = [];
+        eligibilityAssessment = null;
         currentUserId = null;
         currentStokvelId = null;
         payoutCapturedByMemberName = null;
@@ -825,6 +1003,8 @@ else
                     canApproveClaim = await MemberAccessService.CanApproveClaimsAsync(userId, stokvelId.Value);
                     canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, stokvelId.Value);
                     canViewPayoutAuditTrail = await MemberAccessService.CanViewFinancialsAsync(userId, stokvelId.Value);
+                    var canViewFinancials = canViewPayoutAuditTrail;
+                    canViewClaimEligibilityAssessment = canReviewClaim || canApproveClaim || canManagePayments || canViewFinancials || canManageStokvel;
                     canCompleteSecretaryReview = canReviewClaim && IsClaimReviewableBySecretary(claim);
                     canMakeChairpersonDecision = canApproveClaim && IsClaimInChairpersonApprovalStage(claim);
                 }
@@ -860,6 +1040,11 @@ else
             if (canViewPayoutAuditTrail)
             {
                 payoutAuditTrail = await FuneralClaimService.GetClaimPayoutAuditTrailAsync(claim.Id);
+            }
+
+            if (canViewClaimEligibilityAssessment)
+            {
+                eligibilityAssessment = await ClaimEligibilityService.AssessClaimEligibilityAsync(claim.Id);
             }
         }
 
@@ -1217,6 +1402,51 @@ else
         value
             ? "sisonke-badge sisonke-badge-green"
             : "sisonke-badge sisonke-badge-gold";
+
+    private static string GetEligibilityStatusBadgeClass(string? status) =>
+        status switch
+        {
+            "Eligible" => "sisonke-badge sisonke-badge-green",
+            "EligibleWithWarnings" => "sisonke-badge sisonke-badge-gold",
+            "RequiresReview" => "sisonke-badge sisonke-badge-gold",
+            "NotEligible" => "sisonke-badge sisonke-badge-red",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+
+    private static string GetEligibilityAlertClass(string? status) =>
+        status switch
+        {
+            "Eligible" => "green",
+            "NotEligible" => "red",
+            "RequiresReview" or "EligibleWithWarnings" => "gold",
+            _ => "blue"
+        };
+
+    private static string FormatEligibilityStatus(string? status) =>
+        status switch
+        {
+            "Eligible" => "Eligible",
+            "EligibleWithWarnings" => "Eligible with warnings",
+            "NotEligible" => "Not eligible",
+            "RequiresReview" => "Requires review",
+            _ => "Not assessed"
+        };
+
+    private static string GetEligibilityCheckLabel(bool value, string passedLabel, string failedLabel) =>
+        value ? passedLabel : failedLabel;
+
+    private static string GetDependentCoverageLabel(ClaimEligibilityAssessmentDto assessment)
+    {
+        if (!assessment.IsDependentClaim)
+        {
+            return "Not applicable";
+        }
+
+        return assessment.IsDependentCovered ? "Covered" : "Requires review";
+    }
+
+    private static bool RequiresEligibilityReview(ClaimEligibilityAssessmentDto assessment) =>
+        assessment.EligibilityStatus is "NotEligible" or "RequiresReview";
 
     private static string FormatCurrency(decimal? amount)
     {
