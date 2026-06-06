@@ -701,6 +701,12 @@ else
                             <a class="btn btn-outline-secondary btn-sm" href="@($"/upload-constitution/{StokvelId}")">
                                 <i class="bi bi-upload me-1"></i>Upload Existing
                             </a>
+                            @if (linkedMember is not null && IsConstitutionRulesManagerRole(linkedMember.DefaultRole.ToString()))
+                            {
+                                <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-operating-rules/{StokvelId}")">
+                                    <i class="bi bi-sliders me-1"></i>Manage Operating Rules
+                                </a>
+                            }
                         </div>
                     </div>
                 </div>
@@ -1088,5 +1094,16 @@ else
     private static bool IsTreasurerRole(string? role)
     {
         return role?.Trim().Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool IsConstitutionRulesManagerRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true;
     }
 }

@@ -38,6 +38,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<StokvelQuestionnaireAnswer> StokvelQuestionnaireAnswers => Set<StokvelQuestionnaireAnswer>();
     public DbSet<ConstitutionDocument> ConstitutionDocuments => Set<ConstitutionDocument>();
     public DbSet<ConstitutionWizardAnswer> ConstitutionWizardAnswers => Set<ConstitutionWizardAnswer>();
+    public DbSet<StokvelOperatingRules> StokvelOperatingRules => Set<StokvelOperatingRules>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -395,6 +396,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<ConstitutionWizardAnswer>()
             .HasIndex(a => new { a.TenantId, a.QuestionKey })
+            .IsUnique();
+
+        builder.Entity<StokvelOperatingRules>()
+            .HasOne(r => r.Stokvel)
+            .WithOne()
+            .HasForeignKey<StokvelOperatingRules>(r => r.StokvelId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StokvelOperatingRules>()
+            .HasIndex(r => r.StokvelId)
             .IsUnique();
     }
 }

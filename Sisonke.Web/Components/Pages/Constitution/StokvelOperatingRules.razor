@@ -1,0 +1,427 @@
+@page "/stokvel-operating-rules/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject StokvelOperatingRulesService StokvelOperatingRulesService
+@inject StokvelService StokvelService
+
+<PageTitle>Stokvel Operating Rules</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading operating rules...
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
+}
+else if (!canManageRules)
+{
+    <section class="sisonke-card">
+        <div class="sisonke-card-body">
+            <div class="sisonke-alert sisonke-alert-gold mb-3">
+                Only the Creator, Admin, Chairperson or Secretary can manage operating rules.
+            </div>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+        </div>
+    </section>
+}
+else if (rules is null)
+{
+    <AlertBanner Type="warning" Title="Operating rules could not be loaded." Message="" Icon="bi bi-exclamation-triangle-fill" />
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Stokvel Operating Rules</span>
+            <h1>Rules Engine Foundation</h1>
+            <p>@stokvel.Name rules that future modules can read for contributions, claims, attendance, governance, voting and payouts.</p>
+        </div>
+        <div class="rules-hero-meta">
+            <div><span>Stokvel Type</span><strong>@rules.StokvelType</strong></div>
+            <div><span>Last Updated</span><strong>@(rules.UpdatedAt?.ToLocalTime().ToString("dd MMM yyyy") ?? "Not updated")</strong></div>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-green mb-3">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-red mb-3">@errorMessage</div>
+    }
+
+    <div class="sisonke-alert sisonke-alert-blue mb-4">
+        This block creates the reusable operating rules foundation only. Existing business workflows have not been changed to consume these rules yet.
+    </div>
+
+    <EditForm Model="@rules" OnValidSubmit="@SaveRulesAsync" FormName="StokvelOperatingRulesForm">
+        <DataAnnotationsValidator />
+
+        <div class="rules-section-stack">
+            <section class="sisonke-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Stokvel Type and Enabled Modules</h2>
+                        <p>Set the stokvel type and activate the modules that apply to this society.</p>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="rules-grid">
+                        <div class="member-form-field">
+                            <label class="form-label" for="stokvel-type">Stokvel type</label>
+                            <InputText id="stokvel-type" class="form-control" @bind-Value="rules.StokvelType" />
+                        </div>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableMeetings" /><span>Enable meetings</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableAttendanceTracking" /><span>Enable attendance tracking</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableVoting" /><span>Enable voting</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableClaims" /><span>Enable claims / benefits</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableDependents" /><span>Enable dependents / covered lives</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sisonke-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Contribution Rules</h2>
+                        <p>Contribution amount, due date and late-payment settings.</p>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="rules-grid">
+                        <div class="member-form-field">
+                            <label class="form-label" for="monthly-contribution">Monthly contribution amount</label>
+                            <InputNumber id="monthly-contribution" class="form-control" @bind-Value="rules.MonthlyContributionAmount" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="contribution-due-day">Contribution due day</label>
+                            <InputNumber id="contribution-due-day" class="form-control" @bind-Value="rules.ContributionDueDay" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="grace-period-days">Grace period days</label>
+                            <InputNumber id="grace-period-days" class="form-control" @bind-Value="rules.GracePeriodDays" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="late-payment-fine">Late payment fine amount</label>
+                            <InputNumber id="late-payment-fine" class="form-control" @bind-Value="rules.LatePaymentFineAmount" />
+                        </div>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.AllowPartialPayments" /><span>Allow partial payments</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.ChargeLatePaymentFine" /><span>Charge late payment fine</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sisonke-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Dependent / Covered-Life Rules</h2>
+                        <p>Covered lives, waiting periods and dependent identity rules.</p>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="rules-grid">
+                        <div class="member-form-field">
+                            <label class="form-label" for="maximum-dependents">Maximum dependents</label>
+                            <InputNumber id="maximum-dependents" class="form-control" @bind-Value="rules.MaximumDependents" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="member-waiting-period">Member waiting period months</label>
+                            <InputNumber id="member-waiting-period" class="form-control" @bind-Value="rules.MemberWaitingPeriodMonths" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="dependent-waiting-period">Dependent waiting period months</label>
+                            <InputNumber id="dependent-waiting-period" class="form-control" @bind-Value="rules.DependentWaitingPeriodMonths" />
+                        </div>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableDependents" /><span>Enable dependents</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.RequireDependentIdNumber" /><span>Require dependent ID number</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sisonke-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Claim / Benefit Rules</h2>
+                        <p>Benefit claim settings and document requirements.</p>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="rules-grid">
+                        <div class="member-form-field">
+                            <label class="form-label" for="default-claim-payout">Default claim payout amount</label>
+                            <InputNumber id="default-claim-payout" class="form-control" @bind-Value="rules.DefaultClaimPayoutAmount" />
+                        </div>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableClaims" /><span>Enable claims</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.RequireDeathCertificateForClaims" /><span>Require death certificate</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.RequireClaimDocuments" /><span>Require claim documents</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.BlockClaimsIfMemberInArrears" /><span>Block claims if member is in arrears</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.BlockClaimsIfMemberSuspended" /><span>Block claims if member is suspended</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sisonke-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Attendance &amp; Apology Rules</h2>
+                        <p>Attendance tracking, apologies and discipline fine defaults.</p>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="rules-grid">
+                        <div class="member-form-field">
+                            <label class="form-label" for="absence-reminder-threshold">Absence reminder threshold</label>
+                            <InputNumber id="absence-reminder-threshold" class="form-control" @bind-Value="rules.AbsenceReminderThreshold" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="formal-warning-threshold">Formal warning threshold</label>
+                            <InputNumber id="formal-warning-threshold" class="form-control" @bind-Value="rules.FormalWarningThreshold" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="executive-review-threshold">Executive review threshold</label>
+                            <InputNumber id="executive-review-threshold" class="form-control" @bind-Value="rules.ExecutiveReviewThreshold" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="apology-deadline-hours">Apology deadline hours before meeting</label>
+                            <InputNumber id="apology-deadline-hours" class="form-control" @bind-Value="rules.ApologyDeadlineHoursBeforeMeeting" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="late-apology-fine">Late apology fine amount</label>
+                            <InputNumber id="late-apology-fine" class="form-control" @bind-Value="rules.LateApologyFineAmount" />
+                        </div>
+                        <div class="member-form-field">
+                            <label class="form-label" for="absence-without-apology-fine">Absence without apology fine amount</label>
+                            <InputNumber id="absence-without-apology-fine" class="form-control" @bind-Value="rules.AbsenceWithoutApologyFineAmount" />
+                        </div>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.ChargeLateApologyFine" /><span>Charge late apology fine</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.ChargeAbsenceWithoutApologyFine" /><span>Charge absence without apology fine</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sisonke-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Governance &amp; Minutes Rules</h2>
+                        <p>Meeting governance and minutes approval settings.</p>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="rules-grid">
+                        <div class="member-form-field">
+                            <label class="form-label" for="quorum-percentage">Quorum percentage</label>
+                            <InputNumber id="quorum-percentage" class="form-control" @bind-Value="rules.QuorumPercentage" />
+                        </div>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableMeetings" /><span>Enable meetings</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.RequireMinutesApproval" /><span>Require minutes approval</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sisonke-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Voting Rules</h2>
+                        <p>Decision thresholds and voting privacy settings.</p>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="rules-grid">
+                        <div class="member-form-field">
+                            <label class="form-label" for="voting-approval-threshold">Default voting approval threshold</label>
+                            <InputNumber id="voting-approval-threshold" class="form-control" @bind-Value="rules.DefaultVotingApprovalThreshold" />
+                        </div>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableVoting" /><span>Enable voting</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.AllowAnonymousVoting" /><span>Allow anonymous voting</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sisonke-card">
+                <div class="sisonke-card-head">
+                    <div>
+                        <h2>Future Module Flags</h2>
+                        <p>Preparation switches for other stokvel verticals.</p>
+                    </div>
+                </div>
+                <div class="sisonke-card-body">
+                    <div class="rules-grid">
+                        <div class="member-form-field">
+                            <label class="form-label" for="payout-frequency">Payout frequency</label>
+                            <InputText id="payout-frequency" class="form-control" @bind-Value="rules.PayoutFrequency" />
+                        </div>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableRotationalPayouts" /><span>Enable rotational payouts</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.RequireTreasurerConfirmationForPayouts" /><span>Require treasurer confirmation for payouts</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableGroceryModule" /><span>Enable grocery module</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnableInvestmentModule" /><span>Enable investment module</span></label>
+                        <label class="rules-check"><InputCheckbox class="form-check-input" @bind-Value="rules.EnablePropertyModule" /><span>Enable property module</span></label>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="rules-actions">
+            <button class="sisonke-btn sisonke-btn-primary" type="submit">Save Operating Rules</button>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+        </div>
+    </EditForm>
+}
+
+<style>
+    .rules-hero-meta {
+        display: grid;
+        gap: .75rem;
+        min-width: min(22rem, 100%);
+    }
+    .rules-hero-meta div {
+        border: 1px solid rgb(255 255 255 / .25);
+        border-radius: var(--r-md, 8px);
+        padding: .8rem 1rem;
+        background: rgb(255 255 255 / .12);
+    }
+    .rules-hero-meta span {
+        display: block;
+        color: rgb(255 255 255 / .75);
+        font-size: .72rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+    .rules-hero-meta strong { color: #fff; }
+    .rules-section-stack {
+        display: grid;
+        gap: 1rem;
+    }
+    .rules-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+    .rules-check {
+        align-items: center;
+        border: 1px solid var(--sk-border, #e5e7eb);
+        border-radius: 8px;
+        display: flex;
+        gap: .75rem;
+        min-height: 3.25rem;
+        padding: .75rem .9rem;
+    }
+    .rules-check span {
+        color: var(--sk-text, #111827);
+        font-weight: 600;
+    }
+    .rules-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .75rem;
+        margin-top: 1rem;
+    }
+    @@media (max-width: 768px) {
+        .rules-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+@code {
+    private Stokvel? stokvel;
+    private Sisonke.Web.Data.Entities.StokvelOperatingRules? rules;
+    private bool isLoading = true;
+    private bool canManageRules;
+    private Guid? currentMemberId;
+    private string? successMessage;
+    private string? errorMessage;
+
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        successMessage = null;
+        errorMessage = null;
+        canManageRules = false;
+        currentMemberId = null;
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        if (stokvel is null)
+        {
+            isLoading = false;
+            return;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
+        currentMemberId = linkedMember?.Id;
+        canManageRules = IsRulesManagerRole(linkedMember?.DefaultRole.ToString());
+
+        if (canManageRules)
+        {
+            rules = await StokvelOperatingRulesService.GetOrCreateDefaultRulesAsync(
+                StokvelId,
+                stokvel.Type.ToString(),
+                currentMemberId);
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SaveRulesAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canManageRules || rules is null || currentMemberId is null)
+        {
+            errorMessage = "You do not have permission to save operating rules.";
+            return;
+        }
+
+        var saved = await StokvelOperatingRulesService.SaveRulesAsync(rules, currentMemberId.Value);
+
+        if (!saved)
+        {
+            errorMessage = "Operating rules could not be saved.";
+            return;
+        }
+
+        rules = await StokvelOperatingRulesService.GetRulesByStokvelIdAsync(StokvelId);
+        successMessage = "Operating rules saved.";
+    }
+
+    private static bool IsRulesManagerRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true;
+    }
+}

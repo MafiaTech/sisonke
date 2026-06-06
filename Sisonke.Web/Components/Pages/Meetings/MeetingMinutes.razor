@@ -147,6 +147,33 @@ else
         </div>
     </section>
 
+    @if (canManageMinutes && meetingMinutes is not null && meetingMinutes.Status == StatusDraft)
+    {
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>AI Minutes Assist</h2>
+                    <p>Generate formal wording from agenda discussion notes.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-blue">AI</span>
+            </div>
+            <div class="sisonke-card-body">
+                <div class="sisonke-alert sisonke-alert-blue mb-4">
+                    AI assists with drafting only. The Secretary must review the wording before submitting minutes.
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="ImproveDraftWithAiAsync" disabled="@isAiImproving">
+                        @if (isAiImproving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        Improve Draft with AI
+                    </button>
+                </div>
+            </div>
+        </section>
+    }
+
     @if (meetingMinutes is null)
     {
         <section class="sisonke-card">
@@ -309,6 +336,7 @@ else
     private bool canViewApprovedMinutes;
     private string? successMessage;
     private string? errorMessage;
+    private bool isAiImproving;
     private string openingNotes = string.Empty;
     private string attendanceSummary = string.Empty;
     private string apologySummary = string.Empty;
@@ -481,6 +509,37 @@ else
             : await MemberService.GetMemberByIdAsync(meetingMinutes.ApprovedByMemberId.Value);
         PopulateForm();
         successMessage = "Minutes regenerated from agenda notes.";
+    }
+
+    private async Task ImproveDraftWithAiAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canManageMinutes || meetingMinutes is null || linkedMember is null || meetingMinutes.Status != StatusDraft)
+        {
+            return;
+        }
+
+        isAiImproving = true;
+
+        var improved = await MeetingMinuteService.ImproveDraftMinutesWithAiAsync(meetingMinutes.Id, linkedMember.Id);
+
+        isAiImproving = false;
+
+        if (!improved)
+        {
+            errorMessage = "AI minutes generation failed. Please review agenda notes and try again.";
+            return;
+        }
+
+        meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
+        meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        approvedByMember = meetingMinutes?.ApprovedByMemberId is null
+            ? null
+            : await MemberService.GetMemberByIdAsync(meetingMinutes.ApprovedByMemberId.Value);
+        PopulateForm();
+        successMessage = "Draft minutes were improved using AI. Please review before submitting.";
     }
 
     private async Task SubmitMinutesAsync()

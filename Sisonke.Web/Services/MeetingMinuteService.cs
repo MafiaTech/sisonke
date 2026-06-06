@@ -1,12 +1,15 @@
+using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class MeetingMinuteService(ApplicationDbContext context)
+public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration)
 {
     private const string StatusDraft = "Draft";
     private const string StatusSubmitted = "Submitted";
@@ -264,5 +267,245 @@ public class MeetingMinuteService(ApplicationDbContext context)
         });
 
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", decisions);
+    }
+
+    public async Task<bool> ImproveDraftMinutesWithAiAsync(Guid meetingMinuteId, Guid updatedByMemberId)
+    {
+        var minutes = await context.MeetingMinutes
+            .Where(existingMinutes => existingMinutes.Id == meetingMinuteId)
+            .FirstOrDefaultAsync();
+
+        if (minutes is null || minutes.Status != StatusDraft)
+        {
+            return false;
+        }
+
+        var meeting = await context.Meetings
+            .Include(existingMeeting => existingMeeting.AgendaItems)
+            .Where(existingMeeting => existingMeeting.Id == minutes.MeetingId)
+            .FirstOrDefaultAsync();
+
+        if (meeting is null)
+        {
+            return false;
+        }
+
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.TenantId == meeting.TenantId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var apiKey = configuration["Anthropic:ApiKey"];
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+        }
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            return false;
+        }
+
+        var agendaItems = meeting.AgendaItems
+            .OrderBy(agendaItem => agendaItem.DisplayOrder)
+            .ToList();
+
+        var prompt = BuildAiPrompt(stokvel.Name, meeting, agendaItems, minutes.AttendanceSummary, minutes.ApologySummary);
+
+        var requestBody = new
+        {
+            model = "claude-sonnet-4-6",
+            max_tokens = 2048,
+            messages = new[]
+            {
+                new { role = "user", content = prompt }
+            }
+        };
+
+        string responseBody;
+
+        try
+        {
+            using var client = httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("x-api-key", apiKey);
+            client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+
+            var response = await client.PostAsJsonAsync("https://api.anthropic.com/v1/messages", requestBody);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return false;
+            }
+
+            responseBody = await response.Content.ReadAsStringAsync();
+        }
+        catch
+        {
+            return false;
+        }
+
+        string? aiText;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            aiText = doc.RootElement
+                .GetProperty("content")[0]
+                .GetProperty("text")
+                .GetString();
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(aiText))
+        {
+            return false;
+        }
+
+        var cleaned = aiText.Trim();
+
+        if (cleaned.StartsWith("```"))
+        {
+            var newline = cleaned.IndexOf('\n');
+            cleaned = newline >= 0 ? cleaned[(newline + 1)..] : cleaned[3..];
+
+            if (cleaned.EndsWith("```"))
+            {
+                cleaned = cleaned[..^3].Trim();
+            }
+        }
+
+        AiMinutesResult? result;
+
+        try
+        {
+            result = JsonSerializer.Deserialize<AiMinutesResult>(cleaned, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (result is null)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.MattersArising))
+        {
+            minutes.MattersArising = result.MattersArising.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.DecisionsTaken))
+        {
+            minutes.DecisionsTaken = result.DecisionsTaken.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ActionItems))
+        {
+            minutes.ActionItems = result.ActionItems.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ClosingNotes))
+        {
+            minutes.ClosingNotes = result.ClosingNotes.Trim();
+        }
+
+        minutes.UpdatedByMemberId = updatedByMemberId;
+        minutes.UpdatedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
+    private static string BuildAiPrompt(
+        string stokvelName,
+        Meeting meeting,
+        List<MeetingAgendaItem> agendaItems,
+        string attendanceSummary,
+        string apologySummary)
+    {
+        var meetingTitle = !string.IsNullOrWhiteSpace(meeting.Title)
+            ? meeting.Title
+            : !string.IsNullOrWhiteSpace(meeting.Purpose)
+                ? meeting.Purpose
+                : "Meeting";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("You are a formal minutes recorder for a South African stokvel or burial society.");
+        sb.AppendLine("Generate formal, professional meeting minutes based only on the data below.");
+        sb.AppendLine("Return ONLY valid JSON. No markdown fences. No explanation. No preamble.");
+        sb.AppendLine();
+        sb.AppendLine("Required JSON structure:");
+        sb.AppendLine("{");
+        sb.AppendLine("  \"mattersArising\": \"string\",");
+        sb.AppendLine("  \"decisionsTaken\": \"string\",");
+        sb.AppendLine("  \"actionItems\": \"string\",");
+        sb.AppendLine("  \"closingNotes\": \"string\"");
+        sb.AppendLine("}");
+        sb.AppendLine();
+        sb.AppendLine("Rules:");
+        sb.AppendLine("- Use formal South African English.");
+        sb.AppendLine("- The Secretary records minutes. The Chairperson approves separately. Do not conflate these roles.");
+        sb.AppendLine("- If discussion notes for an agenda item are missing, write: Discussion notes were not captured for this item.");
+        sb.AppendLine("- Identify resolutions clearly using the word RESOLVED.");
+        sb.AppendLine("- Identify action items with responsible person and deadline only if mentioned in the notes.");
+        sb.AppendLine("- Do not invent attendees, amounts, decisions, names or dates.");
+        sb.AppendLine("- Use only the data provided. Return only the JSON object.");
+        sb.AppendLine();
+        sb.AppendLine("MEETING DATA:");
+        sb.AppendLine($"Stokvel: {stokvelName}");
+        sb.AppendLine($"Meeting title: {meetingTitle}");
+        sb.AppendLine($"Meeting date: {meeting.MeetingDate:dd MMM yyyy HH:mm}");
+        sb.AppendLine($"Venue: {(string.IsNullOrWhiteSpace(meeting.Venue) ? "Not specified" : meeting.Venue)}");
+        sb.AppendLine();
+        sb.AppendLine($"Attendance summary: {(string.IsNullOrWhiteSpace(attendanceSummary) ? "Not captured." : attendanceSummary)}");
+        sb.AppendLine($"Apology summary: {(string.IsNullOrWhiteSpace(apologySummary) ? "No apologies recorded." : apologySummary)}");
+        sb.AppendLine();
+        sb.AppendLine("AGENDA ITEMS:");
+
+        if (agendaItems.Count == 0)
+        {
+            sb.AppendLine("No agenda items were captured for this meeting.");
+        }
+        else
+        {
+            for (var i = 0; i < agendaItems.Count; i++)
+            {
+                var item = agendaItems[i];
+                sb.AppendLine($"{i + 1}. {item.Title}");
+
+                if (!string.IsNullOrWhiteSpace(item.Description))
+                {
+                    sb.AppendLine($"   Description: {item.Description.Trim()}");
+                }
+
+                sb.AppendLine($"   Discussion notes: {(string.IsNullOrWhiteSpace(item.Notes) ? "Not captured." : item.Notes.Trim())}");
+                sb.AppendLine($"   Status: {(item.IsCompleted ? "Completed" : "Open")}");
+            }
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    private sealed class AiMinutesResult
+    {
+        public string? MattersArising { get; init; }
+        public string? DecisionsTaken { get; init; }
+        public string? ActionItems { get; init; }
+        public string? ClosingNotes { get; init; }
     }
 }

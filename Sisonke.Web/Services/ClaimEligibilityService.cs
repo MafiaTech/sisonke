@@ -158,7 +158,7 @@ public class ClaimEligibilityService(ApplicationDbContext context)
 
         if (assessment.HasOutstandingContributionArrears)
         {
-            assessment.Warnings.Add($"Outstanding contribution balance: {assessment.OutstandingContributionBalance:C}.");
+            assessment.Warnings.Add($"Outstanding contribution balance: {assessment.OutstandingContributionBalance:0.00}.");
         }
         else
         {
@@ -179,7 +179,7 @@ public class ClaimEligibilityService(ApplicationDbContext context)
 
         if (assessment.HasOutstandingFines)
         {
-            assessment.Warnings.Add($"Outstanding fines balance: {assessment.OutstandingFinesBalance:C}.");
+            assessment.Warnings.Add($"Outstanding fines balance: {assessment.OutstandingFinesBalance:0.00}.");
         }
         else
         {
@@ -224,11 +224,11 @@ public class ClaimEligibilityService(ApplicationDbContext context)
         }
         else
         {
-            var subjectName = claim.DeceasedFullName.Trim();
+            var subjectName = claim.DeceasedFullName.Trim().ToUpper();
             duplicateQuery = duplicateQuery.Where(existingClaim =>
                 existingClaim.SubjectType == FuneralClaimSubjectType.Member &&
                 existingClaim.DependentId == null &&
-                existingClaim.DeceasedFullName == subjectName);
+                existingClaim.DeceasedFullName.ToUpper() == subjectName);
         }
 
         assessment.HasDuplicateActiveClaim = await duplicateQuery.AnyAsync();
@@ -253,8 +253,26 @@ public class ClaimEligibilityService(ApplicationDbContext context)
         }
 
         assessment.IsEligible = true;
-        assessment.EligibilityStatus = assessment.Warnings.Count > 0
+
+        if (assessment.Warnings.Count == 0)
+        {
+            assessment.EligibilityStatus = "Eligible";
+            return;
+        }
+
+        assessment.EligibilityStatus = assessment.Warnings.Any(IsManualReviewWarning)
             ? "RequiresReview"
-            : "Eligible";
+            : "EligibleWithWarnings";
+    }
+
+    private static bool IsManualReviewWarning(string warning)
+    {
+        return warning.Contains("suspended", StringComparison.OrdinalIgnoreCase) ||
+            warning.Contains("status requires review", StringComparison.OrdinalIgnoreCase) ||
+            warning.Contains("marked deceased", StringComparison.OrdinalIgnoreCase) ||
+            warning.Contains("waiting period", StringComparison.OrdinalIgnoreCase) ||
+            warning.Contains("eligibility flag", StringComparison.OrdinalIgnoreCase) ||
+            warning.Contains("death certificate", StringComparison.OrdinalIgnoreCase) ||
+            warning.Contains("could not be fully verified", StringComparison.OrdinalIgnoreCase);
     }
 }

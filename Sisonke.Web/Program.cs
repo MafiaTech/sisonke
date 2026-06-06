@@ -72,6 +72,7 @@ builder.Services.AddScoped<FinanceReportService>();
 builder.Services.AddScoped<QuestionnaireService>();
 builder.Services.AddScoped<OperatingRuleService>();
 builder.Services.AddScoped<ConstitutionService>();
+builder.Services.AddScoped<StokvelOperatingRulesService>();
 builder.Services.AddScoped<MeetingService>();
 builder.Services.AddScoped<MeetingApologyService>();
 builder.Services.AddScoped<MeetingMinuteService>();
@@ -81,6 +82,7 @@ builder.Services.AddScoped<FuneralClaimService>();
 builder.Services.AddScoped<ClaimEligibilityService>();
 builder.Services.AddScoped<MemberAccountLinkingService>();
 builder.Services.AddScoped<MemberAccessService>();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
