@@ -28,28 +28,43 @@ builder.Services.AddAuthentication(options =>
     })
     .AddIdentityCookies();
 
-var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-var connectionStringBuilder = new SqliteConnectionStringBuilder(configuredConnectionString);
-var configuredDataSource = connectionStringBuilder.DataSource;
+string connectionString;
 
-if (string.IsNullOrWhiteSpace(configuredDataSource))
+if (builder.Environment.IsDevelopment())
 {
-    throw new InvalidOperationException("Connection string 'DefaultConnection' must include a SQLite Data Source.");
+    var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+    var connectionStringBuilder = new SqliteConnectionStringBuilder(configuredConnectionString);
+    var configuredDataSource = connectionStringBuilder.DataSource;
+
+    if (string.IsNullOrWhiteSpace(configuredDataSource))
+    {
+        throw new InvalidOperationException("Connection string 'DefaultConnection' must include a SQLite Data Source.");
+    }
+
+    var absoluteDatabasePath = Path.IsPathRooted(configuredDataSource)
+        ? Path.GetFullPath(configuredDataSource)
+        : Path.GetFullPath(Path.Combine(
+            string.IsNullOrWhiteSpace(Path.GetDirectoryName(configuredDataSource))
+                ? dataDirectory
+                : builder.Environment.ContentRootPath,
+            configuredDataSource));
+
+    connectionStringBuilder.DataSource = absoluteDatabasePath;
+    connectionString = connectionStringBuilder.ConnectionString;
+
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseSqlite(connectionString));
+}
+else
+{
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found. Supply it via Azure App Service Configuration as ConnectionStrings__DefaultConnection.");
+
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseSqlServer(connectionString));
 }
 
-var absoluteDatabasePath = Path.IsPathRooted(configuredDataSource)
-    ? Path.GetFullPath(configuredDataSource)
-    : Path.GetFullPath(Path.Combine(
-        string.IsNullOrWhiteSpace(Path.GetDirectoryName(configuredDataSource))
-            ? dataDirectory
-            : builder.Environment.ContentRootPath,
-        configuredDataSource));
-
-connectionStringBuilder.DataSource = absoluteDatabasePath;
-var connectionString = connectionStringBuilder.ConnectionString;
-
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
