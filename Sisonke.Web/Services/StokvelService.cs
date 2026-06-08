@@ -35,6 +35,7 @@ public class StokvelService(ApplicationDbContext context)
 
         var trimmedName = name.Trim();
         var createdAt = DateTime.UtcNow;
+        var stokvelCode = await GenerateStokvelCode(trimmedName);
         var tenant = new Tenant
         {
             Id = Guid.NewGuid(),
@@ -50,6 +51,7 @@ public class StokvelService(ApplicationDbContext context)
             TenantId = tenant.Id,
             Tenant = tenant,
             Name = trimmedName,
+            Code = stokvelCode,
             Type = type,
             Province = province,
             TownOrArea = townOrArea,
@@ -77,6 +79,38 @@ public class StokvelService(ApplicationDbContext context)
         await context.SaveChangesAsync();
 
         return stokvel;
+    }
+
+    public async Task<string> GenerateStokvelCode(string stokvelName)
+    {
+        var baseCode = BuildCodeFromName(stokvelName);
+        var code = baseCode;
+        var suffix = 2;
+
+        while (await context.Stokvels.AnyAsync(stokvel => stokvel.Code == code))
+        {
+            code = $"{baseCode}{suffix}";
+            suffix++;
+        }
+
+        return code;
+    }
+
+    public static string NormalizeStokvelCode(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return string.Empty;
+        }
+
+        var normalized = new string(code
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToUpperInvariant)
+            .ToArray());
+
+        return normalized.Length > 6
+            ? normalized[..6]
+            : normalized;
     }
 
     public async Task<List<SubscriptionPlan>> GetPublicSubscriptionPlansAsync()
@@ -251,5 +285,34 @@ public class StokvelService(ApplicationDbContext context)
         return string.IsNullOrWhiteSpace(slug)
             ? $"stokvel-{Guid.NewGuid():N}"[..20]
             : slug;
+    }
+
+    private static string BuildCodeFromName(string stokvelName)
+    {
+        var words = stokvelName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(word => new string(word.Where(char.IsLetterOrDigit).ToArray()))
+            .Where(word => !string.IsNullOrWhiteSpace(word))
+            .ToList();
+
+        var singleWordCode = NormalizeStokvelCode(words.FirstOrDefault() ?? stokvelName);
+        var code = words.Count > 1
+            ? new string(words.Select(word => char.ToUpperInvariant(word[0])).ToArray())
+            : singleWordCode.Length >= 3 ? singleWordCode[..3] : singleWordCode;
+
+        if (code.Length > 6)
+        {
+            code = code[..6];
+        }
+
+        if (code.Length < 3)
+        {
+            var compactName = NormalizeStokvelCode(stokvelName);
+            code = compactName.Length >= 3 ? compactName[..3] : compactName;
+        }
+
+        return string.IsNullOrWhiteSpace(code)
+            ? "STK"
+            : code;
     }
 }

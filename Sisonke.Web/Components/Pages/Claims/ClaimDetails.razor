@@ -51,7 +51,7 @@ else
         <div class="claim-hero-content">
             <span class="sisonke-badge sisonke-badge-gold">Funeral Claim</span>
             <h1>@claim.DeceasedFullName</h1>
-            <p>@claim.SubjectType claim for @claim.Member.FullName</p>
+            <p>@GetClaimReference(claim) · @claim.SubjectType claim for @claim.Member.FullName</p>
             <div class="claim-hero-badges">
                 <span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span>
                 <span class="@GetBooleanBadgeClass(claim.IsWaitingPeriodSatisfied)">Waiting period: @(claim.IsWaitingPeriodSatisfied ? "Satisfied" : "Not satisfied")</span>
@@ -59,6 +59,10 @@ else
             </div>
         </div>
         <div class="claim-hero-meta">
+            <div>
+                <span>Claim Reference</span>
+                <strong>@GetClaimReference(claim)</strong>
+            </div>
             <div>
                 <span>Subject</span>
                 <strong>@claim.SubjectType</strong>
@@ -116,6 +120,19 @@ else
         <AlertBanner Type="danger" Title="@errorMessage" Message="" Icon="bi bi-x-circle-fill" />
     }
 
+    @if (claim.Status == FuneralClaimStatus.Rejected)
+    {
+        <div class="sisonke-alert sisonke-alert-red mb-4">
+            This claim was rejected by the Chairperson. No payout action is available.
+        </div>
+    }
+    else if (canManagePayments && !IsChairpersonApprovedForPayout(claim) && claim.Status != FuneralClaimStatus.Paid)
+    {
+        <div class="sisonke-alert sisonke-alert-blue mb-4">
+            This claim has not yet been approved by the Chairperson. Payout is not available.
+        </div>
+    }
+
     @if (canViewClaimEligibilityAssessment && eligibilityAssessment is not null)
     {
         <div class="sisonke-card mb-4">
@@ -132,6 +149,10 @@ else
                 <div class="table-responsive mb-3">
                     <table class="sisonke-table mb-0">
                         <tbody>
+                            <tr>
+                                <th>Claim subject</th>
+                                <td>@eligibilityAssessment.ClaimSubjectName</td>
+                            </tr>
                             <tr>
                                 <th>Member status</th>
                                 <td><span class="@GetBooleanBadgeClass(eligibilityAssessment.IsMemberActive)">@GetEligibilityCheckLabel(eligibilityAssessment.IsMemberActive, "Active", "Requires review")</span></td>
@@ -171,6 +192,10 @@ else
                             <tr>
                                 <th>Duplicate active claim</th>
                                 <td><span class="@GetBooleanBadgeClass(!eligibilityAssessment.HasDuplicateActiveClaim)">@(eligibilityAssessment.HasDuplicateActiveClaim ? "Found" : "None found")</span></td>
+                            </tr>
+                            <tr>
+                                <th>Assessed at</th>
+                                <td>@eligibilityAssessment.AssessedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
                             </tr>
                         </tbody>
                     </table>
@@ -235,6 +260,78 @@ else
             Your claim is being assessed according to society rules.
         </div>
     }
+
+    <div class="sisonke-card mb-4">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Claim File Checklist</h2>
+                <p>Required documents for claim reference @GetClaimReference(claim)</p>
+            </div>
+            <span class="@GetDocumentChecklistSummaryBadgeClass()">@GetDocumentChecklistSummaryText()</span>
+        </div>
+        <div class="sisonke-card-body">
+            <div class="table-responsive mb-3">
+                <table class="sisonke-table mb-0">
+                    <tbody>
+                        <tr>
+                            <th>Claim reference</th>
+                            <td>@GetClaimReference(claim)</td>
+                        </tr>
+                        <tr>
+                            <th>Claim status</th>
+                            <td><span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span></td>
+                        </tr>
+                        <tr>
+                            <th>Secretary recommendation</th>
+                            <td><span class="@GetRecommendationBadgeClass(claim.SecretaryRecommendedApproval)">@GetRecommendationLabel(claim.SecretaryRecommendedApproval)</span></td>
+                        </tr>
+                        <tr>
+                            <th>Chairperson decision</th>
+                            <td>@GetChairpersonDecisionLabel(claim)</td>
+                        </tr>
+                        <tr>
+                            <th>Treasurer payout reference</th>
+                            <td>@(claim.PayoutReference ?? GetDefaultPayoutReference(claim))</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-responsive">
+                <table class="sisonke-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Document Type</th>
+                            <th>Required</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th>File Name</th>
+                            <th>Uploaded At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in claimDocumentChecklist)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@item.DocumentType</div>
+                                    <div class="text-muted small">@item.Description</div>
+                                    @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                    {
+                                        <div class="text-muted small">@item.Notes</div>
+                                    }
+                                </td>
+                                <td><span class="@GetBooleanBadgeClass(item.IsRequired)">@(item.IsRequired ? "Required" : "Optional")</span></td>
+                                <td><span class="@GetBooleanBadgeClass(item.IsSubmitted)">@(item.IsSubmitted ? "Submitted" : "Missing")</span></td>
+                                <td><span class="@GetDocumentChecklistStatusBadgeClass(item.Status)">@item.Status</span></td>
+                                <td>@(item.FileName ?? "-")</td>
+                                <td>@(item.UploadedAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm") ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <!-- Claim Workflow Timeline -->
     <div class="sisonke-card mb-4">
@@ -304,7 +401,7 @@ else
                 @{
                     var tlChairDone = claim.ChairpersonDecisionAt is not null;
                     var tlChairRejected = tlChairDone && claim.Status == FuneralClaimStatus.Rejected;
-                    var tlChairApproved = tlChairDone && !tlChairRejected;
+                    var tlChairApproved = tlChairDone && claim.Status is (FuneralClaimStatus.Approved or FuneralClaimStatus.Paid);
                     var tlChairPending = !tlChairDone && tlSecDone;
                 }
                 <div class="claim-timeline-step @(tlChairRejected ? "claim-timeline-rejected" : tlChairApproved ? "claim-timeline-complete" : tlChairPending ? "claim-timeline-pending" : "claim-timeline-not-started")">
@@ -332,7 +429,7 @@ else
 
                 @{
                     var tlPayoutDone = claim.PayoutPaidAt is not null;
-                    var tlPayoutPending = !tlPayoutDone && claim.Status == FuneralClaimStatus.Approved;
+                    var tlPayoutPending = !tlPayoutDone && IsChairpersonApprovedForPayout(claim);
                     var tlPayoutNA = claim.Status is FuneralClaimStatus.Rejected or FuneralClaimStatus.Cancelled;
                 }
                 <div class="claim-timeline-step @(tlPayoutDone ? "claim-timeline-complete" : tlPayoutPending ? "claim-timeline-pending" : "claim-timeline-not-started")">
@@ -461,6 +558,13 @@ else
 
                         @if (canCompleteSecretaryReview)
                         {
+                            @if (HasMissingRequiredDocuments)
+                            {
+                                <div class="sisonke-alert sisonke-alert-gold mb-3">
+                                    Some required claim documents are missing. Please review before making a recommendation.
+                                </div>
+                            }
+
                             @if (eligibilityAssessment is not null)
                             {
                                 <div class="sisonke-alert sisonke-alert-@GetEligibilityAlertClass(eligibilityAssessment.EligibilityStatus) mb-3">
@@ -470,7 +574,7 @@ else
                                 @if (RequiresEligibilityReview(eligibilityAssessment))
                                 {
                                     <div class="sisonke-alert sisonke-alert-gold mb-3">
-                                        Please review failed checks/warnings before making a recommendation.
+                                        Please review the eligibility findings before making a recommendation.
                                     </div>
                                 }
                             }
@@ -526,16 +630,23 @@ else
 
                         @if (canMakeChairpersonDecision)
                         {
+                            @if (HasMissingRequiredDocuments)
+                            {
+                                <div class="sisonke-alert sisonke-alert-gold mb-3">
+                                    Required documents may be missing. Chairperson decision is still required.
+                                </div>
+                            }
+
                             @if (eligibilityAssessment is not null)
                             {
                                 <div class="sisonke-alert sisonke-alert-@GetEligibilityAlertClass(eligibilityAssessment.EligibilityStatus) mb-3">
                                     <strong>Eligibility status:</strong> @FormatEligibilityStatus(eligibilityAssessment.EligibilityStatus)
                                 </div>
 
-                                @if (RequiresEligibilityReview(eligibilityAssessment))
+                                @if (HasEligibilityFindings(eligibilityAssessment))
                                 {
                                     <div class="sisonke-alert sisonke-alert-gold mb-3">
-                                        This claim has eligibility warnings. Chairperson decision is still required.
+                                        This claim has eligibility findings. Chairperson decision is still required.
                                     </div>
                                 }
                             }
@@ -570,7 +681,7 @@ else
                                 </div>
                             </div>
 
-                            @if (claim.Status == FuneralClaimStatus.Approved)
+                            @if (claim.Status == FuneralClaimStatus.Approved && claim.ChairpersonDecisionAt is not null)
                             {
                                 <div class="sisonke-alert sisonke-alert-gold mb-3">
                                     This approved claim is awaiting treasurer payout.
@@ -591,7 +702,7 @@ else
                                 <div class="claim-dl-row last"><dt>Captured by</dt><dd>@(payoutCapturedByMemberName ?? "-")</dd></div>
                             </dl>
 
-                            @if (claim.Status == FuneralClaimStatus.Approved && canManagePayments)
+                            @if (CanCapturePayout)
                             {
                                 <EditForm Model="@payoutModel" OnValidSubmit="@MarkPayoutPaidAsync" FormName="ClaimPayoutForm">
                                     <DataAnnotationsValidator />
@@ -681,34 +792,8 @@ else
                     <div class="sisonke-card-head">
                         <div>
                             <h2>Required Documents</h2>
-                            <p>Death Certificate is required before submission. Other documents are optional for now.</p>
+                            <p>Uploaded/submitted documents attached to claim reference @GetClaimReference(claim).</p>
                         </div>
-                    </div>
-
-                    <div class="table-responsive mb-4">
-                        <table class="sisonke-table mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Document</th>
-                                    <th>Requirement</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="fw-semibold">Death Certificate</td>
-                                    <td>Required</td>
-                                    <td>
-                                        <span class="@GetBooleanBadgeClass(hasDeathCertificate)">@(hasDeathCertificate ? "Uploaded" : "Missing")</span>
-                                    </td>
-                                </tr>
-                                <tr><td>BI-1663</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
-                                <tr><td>ID Copy</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
-                                <tr><td>Proof of Membership</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
-                                <tr><td>Proof of Payment</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
-                                <tr><td>Other</td><td>Optional</td><td><span class="sisonke-badge sisonke-badge-gray">Optional</span></td></tr>
-                            </tbody>
-                        </table>
                     </div>
 
                     <div class="sisonke-card-head compact">
@@ -917,6 +1002,7 @@ else
 @code {
     private FuneralClaim? claim;
     private ClaimEligibilityAssessmentDto? eligibilityAssessment;
+    private List<ClaimDocumentChecklistItemDto> claimDocumentChecklist = [];
     private List<ClaimPayoutAudit> payoutAuditTrail = [];
     private SecretaryReviewModel secretaryReviewModel = new();
     private ChairpersonDecisionModel chairpersonDecisionModel = new();
@@ -944,13 +1030,15 @@ else
     private string? successMessage;
     private string? warningMessage;
     private string? errorMessage;
+    private bool HasMissingRequiredDocuments => claimDocumentChecklist.Any(item => item.IsRequired && !item.IsSubmitted);
     private bool CanSubmitPayout => payoutModel.PayoutAmount > 0 && !string.IsNullOrWhiteSpace(payoutModel.PayoutReference);
-    private bool ShouldShowPayoutSection =>
+    private bool CanCapturePayout =>
         claim is not null &&
-        (claim.Status is FuneralClaimStatus.Approved or FuneralClaimStatus.Paid ||
-            claim.PayoutAmount is not null ||
-            claim.PayoutPaidAt is not null ||
-            !string.IsNullOrWhiteSpace(claim.PayoutReference));
+        canManagePayments &&
+        IsChairpersonApprovedForPayout(claim) &&
+        claim.PayoutPaidAt is null;
+    private bool ShouldShowPayoutSection =>
+        CanCapturePayout;
 
     [Parameter]
     public Guid ClaimId { get; set; }
@@ -976,6 +1064,7 @@ else
         canViewClaimEligibilityAssessment = false;
         payoutAuditTrail = [];
         eligibilityAssessment = null;
+        claimDocumentChecklist = [];
         currentUserId = null;
         currentStokvelId = null;
         payoutCapturedByMemberName = null;
@@ -1027,7 +1116,7 @@ else
             payoutModel = new ClaimPayoutModel
             {
                 PayoutAmount = claim.PayoutAmount ?? 0,
-                PayoutReference = claim.PayoutReference,
+                PayoutReference = claim.PayoutReference ?? GetDefaultPayoutReference(claim),
                 PayoutNotes = claim.PayoutNotes
             };
 
@@ -1041,6 +1130,8 @@ else
             {
                 payoutAuditTrail = await FuneralClaimService.GetClaimPayoutAuditTrailAsync(claim.Id);
             }
+
+            claimDocumentChecklist = await FuneralClaimService.GetClaimDocumentChecklistAsync(claim.Id);
 
             if (canViewClaimEligibilityAssessment)
             {
@@ -1105,9 +1196,9 @@ else
             return;
         }
 
-        if (claim is null || claim.Status != FuneralClaimStatus.Approved)
+        if (!CanCapturePayout)
         {
-            errorMessage = "Only approved claims can be marked as paid.";
+            errorMessage = "Only chairperson-approved claims can be marked as paid.";
             return;
         }
 
@@ -1370,6 +1461,64 @@ else
         await LoadClaimAsync();
     }
 
+    private static bool IsChairpersonApprovedForPayout(FuneralClaim claim)
+    {
+        return claim.Status == FuneralClaimStatus.Approved &&
+            claim.ChairpersonDecisionAt is not null &&
+            claim.ApprovedAt is not null;
+    }
+
+    private static string GetClaimReference(FuneralClaim claim)
+    {
+        return string.IsNullOrWhiteSpace(claim.ClaimReference)
+            ? $"CLM-{claim.Id.ToString("N")[..8].ToUpperInvariant()}"
+            : claim.ClaimReference;
+    }
+
+    private static string GetDefaultPayoutReference(FuneralClaim claim)
+    {
+        return $"PAY-{GetClaimReference(claim)}";
+    }
+
+    private static string GetChairpersonDecisionLabel(FuneralClaim claim)
+    {
+        if (claim.ChairpersonDecisionAt is null)
+        {
+            return "Not recorded";
+        }
+
+        return claim.Status == FuneralClaimStatus.Rejected ? "Rejected" : "Approved";
+    }
+
+    private string GetDocumentChecklistSummaryText()
+    {
+        if (claimDocumentChecklist.Count == 0)
+        {
+            return "No checklist";
+        }
+
+        return HasMissingRequiredDocuments ? "Missing Documents" : "Checklist Complete";
+    }
+
+    private string GetDocumentChecklistSummaryBadgeClass()
+    {
+        return HasMissingRequiredDocuments
+            ? "sisonke-badge sisonke-badge-gold"
+            : "sisonke-badge sisonke-badge-green";
+    }
+
+    private static string GetDocumentChecklistStatusBadgeClass(string? status)
+    {
+        return status switch
+        {
+            "Submitted" => "sisonke-badge sisonke-badge-green",
+            "Missing" => "sisonke-badge sisonke-badge-red",
+            "Optional" => "sisonke-badge sisonke-badge-gray",
+            "Coming Soon" => "sisonke-badge sisonke-badge-gold",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
     private static string GetClaimStatusBadgeType(FuneralClaimStatus status) =>
         status switch
         {
@@ -1447,6 +1596,9 @@ else
 
     private static bool RequiresEligibilityReview(ClaimEligibilityAssessmentDto assessment) =>
         assessment.EligibilityStatus is "NotEligible" or "RequiresReview";
+
+    private static bool HasEligibilityFindings(ClaimEligibilityAssessmentDto assessment) =>
+        assessment.EligibilityStatus is "NotEligible" or "RequiresReview" or "EligibleWithWarnings";
 
     private static string FormatCurrency(decimal? amount)
     {

@@ -156,7 +156,7 @@ else
                                 @foreach (var claim in approvedClaimsAwaitingPayout)
                                 {
                                     <tr>
-                                        <td class="fw-semibold">@claim.Id.ToString("N")[..8].ToUpperInvariant()</td>
+                                        <td class="fw-semibold">@GetClaimReference(claim)</td>
                                         <td>@(claim.Member?.FullName ?? "Member unavailable")</td>
                                         <td>
                                             <div>@claim.DeceasedFullName</div>
@@ -405,7 +405,16 @@ else
 
     private static string GetClaimReference(ClaimPayoutAudit audit)
     {
-        return audit.FuneralClaimId.ToString("N")[..8].ToUpperInvariant();
+        return audit.FuneralClaim is not null && !string.IsNullOrWhiteSpace(audit.FuneralClaim.ClaimReference)
+            ? audit.FuneralClaim.ClaimReference
+            : $"CLM-{audit.FuneralClaimId.ToString("N")[..8].ToUpperInvariant()}";
+    }
+
+    private static string GetClaimReference(FuneralClaim claim)
+    {
+        return string.IsNullOrWhiteSpace(claim.ClaimReference)
+            ? $"CLM-{claim.Id.ToString("N")[..8].ToUpperInvariant()}"
+            : claim.ClaimReference;
     }
 
     private string? payoutAuditBackfillMessage;

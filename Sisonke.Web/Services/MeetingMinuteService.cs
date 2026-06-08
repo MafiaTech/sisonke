@@ -76,6 +76,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
         var agendaItems = meeting.AgendaItems
             .OrderBy(agendaItem => agendaItem.DisplayOrder)
             .ToList();
+        var closedVotes = await GetClosedVoteResultsByMeetingIdAsync(meeting.Id);
         var titleSource = string.IsNullOrWhiteSpace(meeting.Title)
             ? meeting.Purpose
             : meeting.Title;
@@ -89,7 +90,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
             AttendanceSummary = BuildAttendanceSummary(attendanceRecords, apologies.Count),
             ApologySummary = BuildApologySummary(apologies),
             MattersArising = string.Empty,
-            DecisionsTaken = BuildAgendaLinkedDecisions(agendaItems),
+            DecisionsTaken = BuildAgendaLinkedDecisions(agendaItems, closedVotes),
             ActionItems = string.Empty,
             ClosingNotes = string.Empty,
             Status = StatusDraft,
@@ -118,8 +119,9 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
             .Where(agendaItem => agendaItem.MeetingId == minutes.MeetingId)
             .OrderBy(agendaItem => agendaItem.DisplayOrder)
             .ToListAsync();
+        var closedVotes = await GetClosedVoteResultsByMeetingIdAsync(minutes.MeetingId);
 
-        minutes.DecisionsTaken = BuildAgendaLinkedDecisions(agendaItems);
+        minutes.DecisionsTaken = BuildAgendaLinkedDecisions(agendaItems, closedVotes);
         minutes.UpdatedByMemberId = updatedByMemberId;
         minutes.UpdatedAt = DateTime.UtcNow;
 
@@ -240,9 +242,9 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
         return summary.ToString().Trim();
     }
 
-    private static string BuildAgendaLinkedDecisions(List<MeetingAgendaItem> agendaItems)
+    private static string BuildAgendaLinkedDecisions(List<MeetingAgendaItem> agendaItems, List<VoteMotion> closedVotes)
     {
-        if (agendaItems.Count == 0)
+        if (agendaItems.Count == 0 && closedVotes.Count == 0)
         {
             return string.Empty;
         }
@@ -266,7 +268,35 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
             return summary.ToString().Trim();
         });
 
-        return string.Join($"{Environment.NewLine}{Environment.NewLine}", decisions);
+        var decisionsText = string.Join($"{Environment.NewLine}{Environment.NewLine}", decisions);
+
+        if (closedVotes.Count == 0)
+        {
+            return decisionsText;
+        }
+
+        var votingResults = new StringBuilder();
+        votingResults.AppendLine("Voting Results:");
+
+        foreach (var vote in closedVotes.OrderBy(vote => vote.ClosedAt ?? vote.CreatedAt))
+        {
+            votingResults.AppendLine($"- {vote.Title}: {vote.ResultSummary ?? "Result summary not available."} Outcome: {vote.DecisionOutcome ?? "Not recorded"}.");
+        }
+
+        return string.IsNullOrWhiteSpace(decisionsText)
+            ? votingResults.ToString().Trim()
+            : $"{decisionsText}{Environment.NewLine}{Environment.NewLine}{votingResults.ToString().Trim()}";
+    }
+
+    private async Task<List<VoteMotion>> GetClosedVoteResultsByMeetingIdAsync(Guid meetingId)
+    {
+        return await context.VoteMotions
+            .Include(vote => vote.MemberVotes)
+            .Where(vote =>
+                vote.MeetingId == meetingId &&
+                vote.Status == "Closed")
+            .OrderBy(vote => vote.ClosedAt ?? vote.CreatedAt)
+            .ToListAsync();
     }
 
     public async Task<bool> ImproveDraftMinutesWithAiAsync(Guid meetingMinuteId, Guid updatedByMemberId)

@@ -1,0 +1,497 @@
+@page "/votes/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.WebUtilities
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject VotingService VotingService
+@inject StokvelService StokvelService
+@inject MeetingService MeetingService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Voting</PageTitle>
+
+@if (isLoading)
+{
+    <div class="sisonke-alert sisonke-alert-blue">Loading votes...</div>
+}
+else if (!canViewVotes)
+{
+    <div class="sisonke-alert sisonke-alert-gold">You do not have access to voting for this stokvel.</div>
+    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Back to My Workspace</a>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Governance</span>
+            <h1>@PageHeading</h1>
+            <p>@PageSubtitle</p>
+            @if (linkedAgendaItem is not null)
+            {
+                <div class="mt-2">
+                    <span class="sisonke-badge sisonke-badge-blue">Linked agenda item: @linkedAgendaItem.Title</span>
+                </div>
+            }
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-green mb-4">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="sisonke-alert sisonke-alert-red mb-4">@errorMessage</div>
+    }
+
+    @if (canManageVotes)
+    {
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Create Yes/No Vote</h2>
+                    <p>Open a governance motion for members to vote on.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-blue">MVP</span>
+            </div>
+            <div class="sisonke-card-body">
+                <EditForm Model="@createVoteModel" OnValidSubmit="@CreateVoteAsync" FormName="CreateVoteForm">
+                    <DataAnnotationsValidator />
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-5">
+                            <label class="form-label" for="vote-title">Title</label>
+                            <InputText id="vote-title" class="form-control" @bind-Value="createVoteModel.Title" />
+                        </div>
+                        <div class="col-12 col-lg-5">
+                            <label class="form-label" for="vote-description">Description</label>
+                            <InputTextArea id="vote-description" class="form-control" rows="2" @bind-Value="createVoteModel.Description" />
+                        </div>
+                        <div class="col-12 col-lg-2 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <InputCheckbox id="vote-anonymous" class="form-check-input" @bind-Value="createVoteModel.IsAnonymous" />
+                                <label class="form-check-label" for="vote-anonymous">Anonymous</label>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="sisonke-btn sisonke-btn-primary mt-3" type="submit"
+                            disabled="@(string.IsNullOrWhiteSpace(createVoteModel.Title))">
+                        Create Yes/No Vote
+                    </button>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <div class="sisonke-grid sisonke-grid-2">
+        <section class="sisonke-card">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Open Votes</h2>
+                    <p>Active motions available for voting.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-green">@openVotes.Count</span>
+            </div>
+            <div class="sisonke-card-body">
+                @if (openVotes.Count == 0)
+                {
+                    <div class="sisonke-alert sisonke-alert-blue mb-0">No open votes are available.</div>
+                }
+                else
+                {
+                    <div class="vote-list">
+                        @foreach (var vote in openVotes)
+                        {
+                            var summary = GetSummary(vote.Id);
+                            var hasVoted = summary?.CurrentUserHasVoted == true;
+
+                            <article class="vote-card">
+                                <div class="d-flex justify-content-between gap-3 flex-wrap">
+                                    <div>
+                                        <h3>@vote.Title</h3>
+                                        <p>@DisplayOrDash(vote.Description)</p>
+                                    </div>
+                                    <span class="@GetVoteStatusBadgeClass(vote.Status)">@vote.Status</span>
+                                </div>
+                                <div class="vote-meta">
+                                    <span>Opened @vote.OpensAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                                    <span>@(vote.IsAnonymous ? "Anonymous results" : "Standard vote")</span>
+                                    <span>@(summary?.TotalVotesCast ?? 0) vote(s) cast</span>
+                                </div>
+
+                                @if (hasVoted)
+                                {
+                                    <div class="sisonke-alert sisonke-alert-green mt-3 mb-0">You have already voted.</div>
+                                }
+                                else if (currentMemberId is not null)
+                                {
+                                    <div class="d-flex flex-wrap gap-2 mt-3">
+                                        @foreach (var option in vote.Options.OrderBy(option => option.SortOrder))
+                                        {
+                                            <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="() => CastVoteAsync(vote.Id, option.Id)">
+                                                Vote @option.OptionText
+                                            </button>
+                                        }
+                                    </div>
+                                }
+
+                                @if (canManageVotes)
+                                {
+                                    <button class="sisonke-btn sisonke-btn-gold mt-3" type="button" @onclick="() => CloseVoteAsync(vote.Id)">
+                                        Close Vote
+                                    </button>
+                                }
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="sisonke-card">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Closed Votes</h2>
+                    <p>Results are visible after a vote is closed.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-gray">@closedVotes.Count</span>
+            </div>
+            <div class="sisonke-card-body">
+                @if (closedVotes.Count == 0)
+                {
+                    <div class="sisonke-alert sisonke-alert-blue mb-0">No closed votes yet.</div>
+                }
+                else
+                {
+                    <div class="vote-list">
+                        @foreach (var vote in closedVotes)
+                        {
+                            var summary = GetSummary(vote.Id);
+
+                            <article class="vote-card">
+                                <div class="d-flex justify-content-between gap-3 flex-wrap">
+                                    <div>
+                                        <h3>@vote.Title</h3>
+                                        <p>@DisplayOrDash(vote.Description)</p>
+                                    </div>
+                                    <span class="@GetVoteStatusBadgeClass(vote.Status)">@vote.Status</span>
+                                </div>
+                                <div class="vote-meta">
+                                    <span>@(vote.ClosedAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm") ?? "Closed")</span>
+                                    <span>@(vote.DecisionOutcome ?? "Outcome pending")</span>
+                                    <span>@(summary?.TotalVotesCast ?? 0) of @(summary?.EligibleMemberCount ?? 0) eligible member(s)</span>
+                                </div>
+
+                                <div class="sisonke-alert sisonke-alert-blue mt-3">
+                                    @(vote.ResultSummary ?? "Results summary not available.")
+                                </div>
+
+                                @if (summary is not null)
+                                {
+                                    <table class="sisonke-table mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Option</th>
+                                                <th>Votes</th>
+                                                <th>Percentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var result in summary.Results)
+                                            {
+                                                <tr>
+                                                    <td>@result.OptionText</td>
+                                                    <td>@result.VoteCount</td>
+                                                    <td>@result.Percentage.ToString("0.#")%</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+
+    @* TODO: Link closed vote results to meeting minutes and executive decision register. *@
+}
+
+<style>
+    .vote-list {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .vote-card {
+        border: 1px solid var(--border, var(--sk-border));
+        border-radius: var(--r-md, .5rem);
+        padding: 1rem;
+        background: var(--card, #fff);
+    }
+
+    .vote-card h3 {
+        margin: 0 0 .25rem;
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--text, var(--sk-text));
+    }
+
+    .vote-card p {
+        margin: 0;
+        color: var(--muted, var(--sk-text-muted));
+        font-size: .9rem;
+    }
+
+    .vote-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem 1rem;
+        margin-top: .75rem;
+        color: var(--muted, var(--sk-text-muted));
+        font-size: .84rem;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    private List<VoteMotion> votes = [];
+    private Dictionary<Guid, VoteMotionSummaryDto> summaries = [];
+    private Meeting? linkedMeeting;
+    private MeetingAgendaItem? linkedAgendaItem;
+    private Member? currentMember;
+    private Guid? currentMemberId;
+    private bool isLoading = true;
+    private bool canViewVotes;
+    private bool canManageVotes;
+    private string? successMessage;
+    private string? errorMessage;
+    private CreateVoteModel createVoteModel = new();
+    private Guid? queryMeetingId;
+    private Guid? queryAgendaItemId;
+
+    private string PageHeading => queryMeetingId is not null ? "Votes for this meeting" : "Voting";
+    private string PageSubtitle => linkedMeeting is not null
+        ? $"{linkedMeeting.Title} · {linkedMeeting.MeetingDate.ToLocalTime():dd MMM yyyy HH:mm}"
+        : "Vote on motions and view closed results.";
+
+    private List<VoteMotion> openVotes => votes
+        .Where(vote => vote.Status == "Open")
+        .OrderBy(vote => vote.OpensAt)
+        .ToList();
+
+    private List<VoteMotion> closedVotes => votes
+        .Where(vote => vote.Status == "Closed")
+        .OrderByDescending(vote => vote.ClosedAt ?? vote.CreatedAt)
+        .ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadVotesAsync();
+    }
+
+    private async Task LoadVotesAsync()
+    {
+        isLoading = true;
+        successMessage = null;
+        errorMessage = null;
+        votes = [];
+        summaries = [];
+        currentMember = null;
+        linkedMeeting = null;
+        linkedAgendaItem = null;
+        currentMemberId = null;
+        canViewVotes = false;
+        canManageVotes = false;
+
+        ReadQueryContext();
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        currentMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
+        currentMemberId = currentMember?.Id;
+        canViewVotes = currentMember is not null;
+        canManageVotes = await MemberAccessService.CanManageVotesAsync(userId, StokvelId);
+
+        if (!canViewVotes)
+        {
+            isLoading = false;
+            return;
+        }
+
+        if (queryMeetingId is not null)
+        {
+            linkedMeeting = await MeetingService.GetMeetingByIdAsync(queryMeetingId.Value);
+        }
+
+        if (queryAgendaItemId is not null)
+        {
+            linkedAgendaItem = linkedMeeting?.AgendaItems.FirstOrDefault(item => item.Id == queryAgendaItemId.Value);
+        }
+
+        votes = queryMeetingId is null
+            ? await VotingService.GetVotesByStokvelIdAsync(StokvelId)
+            : await VotingService.GetVotesByMeetingIdAsync(queryMeetingId.Value);
+
+        foreach (var vote in votes)
+        {
+            var summary = await VotingService.GetVoteSummaryAsync(vote.Id, currentMemberId);
+
+            if (summary is not null)
+            {
+                summaries[vote.Id] = summary;
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private async Task CreateVoteAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canManageVotes || currentMemberId is null)
+        {
+            errorMessage = "You do not have permission to create votes.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(createVoteModel.Title))
+        {
+            errorMessage = "Vote title is required.";
+            return;
+        }
+
+        await VotingService.CreateYesNoVoteAsync(
+            StokvelId,
+            queryMeetingId,
+            queryAgendaItemId,
+            createVoteModel.Title,
+            createVoteModel.Description ?? string.Empty,
+            createVoteModel.IsAnonymous,
+            currentMemberId.Value);
+
+        createVoteModel = new();
+        successMessage = "Vote created.";
+        await LoadVotesAsync();
+    }
+
+    private async Task CastVoteAsync(Guid voteMotionId, Guid voteOptionId)
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (currentMemberId is null)
+        {
+            errorMessage = "Your member record could not be resolved.";
+            return;
+        }
+
+        var cast = await VotingService.CastVoteAsync(voteMotionId, currentMemberId.Value, voteOptionId);
+
+        if (!cast)
+        {
+            errorMessage = "Vote could not be cast. You may have already voted or the vote may be closed.";
+            return;
+        }
+
+        successMessage = "Vote cast.";
+        await LoadVotesAsync();
+    }
+
+    private async Task CloseVoteAsync(Guid voteMotionId)
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!canManageVotes || currentMemberId is null)
+        {
+            errorMessage = "You do not have permission to close votes.";
+            return;
+        }
+
+        var closed = await VotingService.CloseVoteAsync(voteMotionId, currentMemberId.Value);
+
+        if (!closed)
+        {
+            errorMessage = "Vote could not be closed.";
+            return;
+        }
+
+        successMessage = "Vote closed.";
+        await LoadVotesAsync();
+    }
+
+    private VoteMotionSummaryDto? GetSummary(Guid voteMotionId)
+    {
+        return summaries.TryGetValue(voteMotionId, out var summary) ? summary : null;
+    }
+
+    private static string DisplayOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string GetVoteStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Open" => "sisonke-badge sisonke-badge-green",
+            "Closed" => "sisonke-badge sisonke-badge-gray",
+            "Draft" => "sisonke-badge sisonke-badge-gold",
+            "Cancelled" => "sisonke-badge sisonke-badge-red",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private sealed class CreateVoteModel
+    {
+        public string? Title { get; set; }
+        public string? Description { get; set; }
+        public bool IsAnonymous { get; set; }
+    }
+
+    private void ReadQueryContext()
+    {
+        queryMeetingId = null;
+        queryAgendaItemId = null;
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("meetingId", out var meetingIdValues) &&
+            Guid.TryParse(meetingIdValues.FirstOrDefault(), out var meetingId))
+        {
+            queryMeetingId = meetingId;
+        }
+
+        if (query.TryGetValue("agendaItemId", out var agendaItemIdValues) &&
+            Guid.TryParse(agendaItemIdValues.FirstOrDefault(), out var agendaItemId))
+        {
+            queryAgendaItemId = agendaItemId;
+        }
+    }
+
+}

@@ -3,12 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
+using Sisonke.Web.Services.Dto;
 
 namespace Sisonke.Web.Services;
 
 public class FuneralClaimService(
     ApplicationDbContext context,
     OperatingRuleService operatingRuleService,
+    StokvelOperatingRulesService stokvelOperatingRulesService,
     IWebHostEnvironment webHostEnvironment)
 {
     private const long MaxClaimDocumentUploadSize = 10 * 1024 * 1024;
@@ -165,6 +167,8 @@ public class FuneralClaimService(
             .Where(claim =>
                 claim.Member.TenantId == stokvel.TenantId &&
                 claim.Status == FuneralClaimStatus.Approved &&
+                claim.ChairpersonDecisionAt != null &&
+                claim.ApprovedAt != null &&
                 claim.PayoutPaidAt == null)
             .OrderBy(claim => claim.ApprovedAt ?? claim.ChairpersonDecisionAt ?? claim.SubmittedAt ?? claim.CreatedAt)
             .ThenBy(claim => claim.CreatedAt)
@@ -188,6 +192,8 @@ public class FuneralClaimService(
             .CountAsync(claim =>
                 claim.Member.TenantId == stokvel.TenantId &&
                 claim.Status == FuneralClaimStatus.Approved &&
+                claim.ChairpersonDecisionAt != null &&
+                claim.ApprovedAt != null &&
                 claim.PayoutPaidAt == null);
     }
 
@@ -245,6 +251,89 @@ public class FuneralClaimService(
             .AnyAsync(document =>
                 document.FuneralClaimId == claimId &&
                 document.DocumentType == ClaimDocumentType.DeathCertificate);
+    }
+
+    public async Task<List<ClaimDocumentChecklistItemDto>> GetClaimDocumentChecklistAsync(Guid claimId)
+    {
+        var claim = await context.FuneralClaims
+            .Include(existingClaim => existingClaim.Documents)
+            .FirstOrDefaultAsync(existingClaim => existingClaim.Id == claimId);
+
+        if (claim is null)
+        {
+            return [];
+        }
+
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.TenantId == claim.TenantId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        var requireDeathCertificate = true;
+        var requireClaimDocuments = true;
+
+        if (stokvel is not null)
+        {
+            var rules = await stokvelOperatingRulesService.GetOrCreateDefaultRulesAsync(
+                stokvel.Id,
+                stokvel.Type.ToString(),
+                null);
+            requireDeathCertificate = rules.RequireDeathCertificateForClaims;
+            requireClaimDocuments = rules.RequireClaimDocuments;
+        }
+
+        var checklist = new List<ClaimDocumentChecklistItemDto>
+        {
+            BuildChecklistItem(
+                "Death Certificate",
+                "Official death certificate for the deceased person.",
+                requireDeathCertificate,
+                claim.Documents,
+                [ClaimDocumentType.DeathCertificate],
+                ["death", "certificate"]),
+            BuildChecklistItem(
+                "Claim Form",
+                "Completed society claim form for this claim reference.",
+                requireClaimDocuments,
+                claim.Documents,
+                [ClaimDocumentType.Other],
+                ["claim", "form"]),
+            BuildChecklistItem(
+                "Member ID Copy",
+                "Identity document copy for the claiming member.",
+                requireClaimDocuments,
+                claim.Documents,
+                [ClaimDocumentType.IdCopy],
+                ["member", "id"]),
+            BuildChecklistItem(
+                "Deceased ID Copy",
+                "Identity document copy for the deceased person.",
+                requireClaimDocuments,
+                claim.Documents,
+                [ClaimDocumentType.IdCopy],
+                ["deceased", "id"]),
+            BuildChecklistItem(
+                "Bank Confirmation / Payment Details",
+                "Bank confirmation or payment details for payout processing.",
+                requireClaimDocuments,
+                claim.Documents,
+                [ClaimDocumentType.ProofOfPayment],
+                ["bank", "payment", "confirmation"])
+        };
+
+        if (claim.SubjectType == FuneralClaimSubjectType.Dependent)
+        {
+            checklist.Insert(4, BuildChecklistItem(
+                "Proof of Relationship",
+                "Proof that the deceased dependent is covered under this member.",
+                requireClaimDocuments,
+                claim.Documents,
+                [ClaimDocumentType.ProofOfMembership, ClaimDocumentType.Other],
+                ["relationship", "dependent", "cover"]));
+        }
+
+        return checklist;
     }
 
     public async Task<bool> IsWaitingPeriodSatisfiedForMemberAsync(Guid memberId)
@@ -339,6 +428,7 @@ public class FuneralClaimService(
         var status = !isMemberStatusEligible || !isWaitingPeriodSatisfied
             ? FuneralClaimStatus.OnHold
             : FuneralClaimStatus.Draft;
+        var createdAt = DateTime.UtcNow;
 
         var claim = new FuneralClaim
         {
@@ -351,9 +441,10 @@ public class FuneralClaimService(
             DateOfDeath = dateOfDeath,
             ClaimReason = claimReason,
             Status = status,
+            ClaimReference = await GenerateClaimReferenceAsync(member.TenantId, createdAt),
             IsWaitingPeriodSatisfied = isWaitingPeriodSatisfied,
             IsMemberStatusEligible = isMemberStatusEligible,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = createdAt
         };
 
         context.FuneralClaims.Add(claim);
@@ -394,6 +485,11 @@ public class FuneralClaimService(
         if (claim.Status != FuneralClaimStatus.OnHold)
         {
             claim.Status = FuneralClaimStatus.Submitted;
+        }
+
+        if (string.IsNullOrWhiteSpace(claim.ClaimReference))
+        {
+            claim.ClaimReference = await GenerateClaimReferenceAsync(claim.TenantId, claim.CreatedAt);
         }
 
         claim.SubmittedAt = DateTime.UtcNow;
@@ -671,7 +767,7 @@ public class FuneralClaimService(
         string? payoutNotes,
         Guid capturedByMemberId)
     {
-        if (payoutAmount <= 0 || string.IsNullOrWhiteSpace(payoutReference))
+        if (payoutAmount <= 0)
         {
             return false;
         }
@@ -680,7 +776,11 @@ public class FuneralClaimService(
             .Where(existingClaim => existingClaim.Id == claimId)
             .FirstOrDefaultAsync();
 
-        if (claim is null || claim.Status != FuneralClaimStatus.Approved)
+        if (claim is null ||
+            claim.Status != FuneralClaimStatus.Approved ||
+            claim.ChairpersonDecisionAt is null ||
+            claim.ApprovedAt is null ||
+            claim.PayoutPaidAt is not null)
         {
             return false;
         }
@@ -710,7 +810,9 @@ public class FuneralClaimService(
         var previousPayoutAmount = claim.PayoutAmount;
         var previousStatus = claim.Status.ToString();
         var paidAt = DateTime.UtcNow;
-        var trimmedPayoutReference = payoutReference.Trim();
+        var trimmedPayoutReference = string.IsNullOrWhiteSpace(payoutReference)
+            ? BuildDefaultPayoutReference(claim)
+            : payoutReference.Trim();
         var trimmedPayoutNotes = string.IsNullOrWhiteSpace(payoutNotes) ? null : payoutNotes.Trim();
 
         claim.PayoutAmount = payoutAmount;
@@ -917,5 +1019,135 @@ public class FuneralClaimService(
         return claim.SecretaryReviewedAt is not null &&
             claim.ChairpersonDecisionAt is null &&
             claim.Status == FuneralClaimStatus.UnderReview;
+    }
+
+    private static ClaimDocumentChecklistItemDto BuildChecklistItem(
+        string documentType,
+        string description,
+        bool isRequired,
+        ICollection<FuneralClaimDocument> documents,
+        ClaimDocumentType[] matchingTypes,
+        string[] matchingFileNameTerms)
+    {
+        var submittedDocument = documents
+            .OrderByDescending(document => document.UploadedAt)
+            .FirstOrDefault(document =>
+                matchingTypes.Contains(document.DocumentType) ||
+                FileNameMatches(document.OriginalFileName, matchingFileNameTerms));
+        var isSubmitted = submittedDocument is not null;
+
+        return new ClaimDocumentChecklistItemDto
+        {
+            DocumentType = documentType,
+            Description = description,
+            IsRequired = isRequired,
+            IsSubmitted = isSubmitted,
+            Status = isSubmitted ? "Submitted" : isRequired ? "Missing" : "Optional",
+            FileName = submittedDocument?.OriginalFileName,
+            UploadedAt = submittedDocument?.UploadedAt,
+            Notes = isSubmitted
+                ? null
+                : matchingTypes.Contains(ClaimDocumentType.Other) && matchingTypes.Length == 1
+                    ? "Upload as Other or use a clearly named file."
+                    : null
+        };
+    }
+
+    private static bool FileNameMatches(string? fileName, string[] terms)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return false;
+        }
+
+        return terms.Any(term => fileName.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task<string> GenerateClaimReferenceAsync(Guid tenantId, DateTime referenceDate)
+    {
+        var year = referenceDate.Year;
+        var stokvelCode = await GetStokvelReferenceCodeAsync(tenantId);
+        var sequence = await context.FuneralClaims
+            .CountAsync(claim =>
+                claim.TenantId == tenantId &&
+                claim.CreatedAt.Year == year) + 1;
+        var claimReference = FormatClaimReference(stokvelCode, year, sequence);
+
+        while (await context.FuneralClaims.AnyAsync(claim => claim.ClaimReference == claimReference))
+        {
+            sequence++;
+            claimReference = FormatClaimReference(stokvelCode, year, sequence);
+        }
+
+        return claimReference;
+    }
+
+    private async Task<string> GetStokvelReferenceCodeAsync(Guid tenantId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.TenantId == tenantId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return "STK";
+        }
+
+        var normalizedCode = StokvelService.NormalizeStokvelCode(stokvel.Code);
+
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            normalizedCode = BuildFallbackStokvelCode(stokvel.Name);
+        }
+
+        var uniqueCode = normalizedCode;
+        var suffix = 2;
+
+        while (await context.Stokvels.AnyAsync(existingStokvel =>
+            existingStokvel.Id != stokvel.Id &&
+            existingStokvel.Code == uniqueCode))
+        {
+            uniqueCode = $"{normalizedCode}{suffix}";
+            suffix++;
+        }
+
+        stokvel.Code = uniqueCode;
+
+        return uniqueCode;
+    }
+
+    private static string FormatClaimReference(string stokvelCode, int year, int sequence)
+    {
+        return $"CLM-{stokvelCode}-{year}-{sequence:0000}";
+    }
+
+    private static string BuildDefaultPayoutReference(FuneralClaim claim)
+    {
+        return string.IsNullOrWhiteSpace(claim.ClaimReference)
+            ? $"PAY-{claim.Id.ToString("N")[..8].ToUpperInvariant()}"
+            : $"PAY-{claim.ClaimReference}";
+    }
+
+    private static string BuildFallbackStokvelCode(string stokvelName)
+    {
+        var words = stokvelName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(word => new string(word.Where(char.IsLetterOrDigit).ToArray()))
+            .Where(word => !string.IsNullOrWhiteSpace(word))
+            .ToList();
+
+        var compactName = StokvelService.NormalizeStokvelCode(words.FirstOrDefault() ?? stokvelName);
+        var code = words.Count > 1
+            ? new string(words.Select(word => char.ToUpperInvariant(word[0])).ToArray())
+            : compactName.Length >= 3 ? compactName[..3] : compactName;
+
+        if (code.Length > 6)
+        {
+            code = code[..6];
+        }
+
+        return string.IsNullOrWhiteSpace(code) ? "STK" : code;
     }
 }

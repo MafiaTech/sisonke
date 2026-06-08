@@ -311,7 +311,7 @@ else
         successMessage = null;
         errorMessage = null;
 
-        vote = await VotingService.GetVoteByIdAsync(VoteId);
+        vote = await VotingService.GetMeetingVoteByIdAsync(VoteId);
         voteSummary = await VotingService.GetVoteSummaryAsync(VoteId);
         members = [];
         selectedChoices = [];
@@ -357,7 +357,7 @@ else
             return;
         }
 
-        vote = await VotingService.GetVoteByIdAsync(VoteId);
+        vote = await VotingService.GetMeetingVoteByIdAsync(VoteId);
         voteSummary = await VotingService.GetVoteSummaryAsync(VoteId);
 
         if (vote is not null)
@@ -392,7 +392,7 @@ else
             return;
         }
 
-        vote = await VotingService.GetVoteByIdAsync(VoteId);
+        vote = await VotingService.GetMeetingVoteByIdAsync(VoteId);
         voteSummary = await VotingService.GetVoteSummaryAsync(VoteId);
         successMessage = "Vote closed.";
     }

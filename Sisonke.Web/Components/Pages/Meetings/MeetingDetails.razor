@@ -11,6 +11,7 @@
 @inject MeetingService MeetingService
 @inject MeetingMinuteService MeetingMinuteService
 @inject StokvelService StokvelService
+@inject VotingService VotingService
 @inject MemberAccessService MemberAccessService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
@@ -78,6 +79,12 @@ else
                             <a class="btn btn-purple btn-sm" href="@($"/meeting-votes/{MeetingId}")">
                                 <i class="bi bi-check2-square me-1"></i>Voting and Decisions
                             </a>
+                            @if (meetingStokvelId is not null)
+                            {
+                                <a class="btn btn-outline-primary btn-sm" href="@($"/votes/{meetingStokvelId}?meetingId={MeetingId}")">
+                                    <i class="bi bi-check2-square me-1"></i>Open Meeting Votes
+                                </a>
+                            }
                             <a class="btn btn-outline-primary btn-sm" href="@($"/edit-meeting/{MeetingId}")">
                                 <i class="bi bi-pencil-square me-1"></i>Edit Meeting
                             </a>
@@ -144,6 +151,57 @@ else
                         <a class="sisonke-btn sisonke-btn-outline" href="@($"/meeting-minutes/{MeetingId}")">@GetMinutesActionLabel(meetingMinutes.Status)</a>
                     </div>
                 }
+            }
+        </div>
+    </section>
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Meeting Votes</h2>
+                <p>Motions linked to this meeting and its agenda items.</p>
+            </div>
+            <span class="sisonke-badge sisonke-badge-blue">@meetingVotes.Count</span>
+        </div>
+        <div class="sisonke-card-body">
+            @if (meetingVotes.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue mb-3">
+                    No votes have been linked to this meeting yet.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Total votes cast</th>
+                                <th>Result summary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var vote in meetingVotes)
+                            {
+                                <tr>
+                                    <td>@vote.Title</td>
+                                    <td><span class="@GetVoteStatusBadgeClass(vote.Status)">@vote.Status</span></td>
+                                    <td>@vote.MemberVotes.Count</td>
+                                    <td>@(vote.Status == "Closed" ? DisplayOrDash(vote.ResultSummary) : "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (meetingStokvelId is not null)
+            {
+                <a class="sisonke-btn sisonke-btn-outline mt-3" href="@($"/votes/{meetingStokvelId}?meetingId={MeetingId}")">
+                    Open Votes
+                </a>
             }
         </div>
     </section>
@@ -272,6 +330,12 @@ else
                                 </div>
                                 <div class="agenda-row-actions">
                                     <StatusBadge Text="@(agendaItem.IsCompleted ? "Completed" : "Open")" Type="@(agendaItem.IsCompleted ? "success" : "secondary")" />
+                                    @if (canManageVotes && meetingStokvelId is not null)
+                                    {
+                                        <a class="btn btn-outline-primary btn-sm" href="@($"/votes/{meetingStokvelId}?meetingId={MeetingId}&agendaItemId={agendaItem.Id}")">
+                                            <i class="bi bi-check2-square me-1"></i>Create Vote
+                                        </a>
+                                    }
                                     @if (canManageMeetings)
                                     {
                                         <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => MoveAgendaItemUpAsync(agendaItem.Id))">
@@ -342,6 +406,7 @@ else
 @code {
     private Meeting? meeting;
     private MeetingMinute? meetingMinutes;
+    private List<VoteMotion> meetingVotes = [];
     private Member? linkedMember;
     private string backToMeetingsHref = "/my-stokvels";
     private string? successMessage;
@@ -350,6 +415,7 @@ else
     private bool canViewMeeting;
     private bool canManageMeetings;
     private bool canManageMinutes;
+    private bool canManageVotes;
     private bool isAddingAgendaItem;
     private string newAgendaTitle = string.Empty;
     private string? newAgendaDescription;
@@ -361,6 +427,7 @@ else
     private bool showDeleteAgendaItemConfirmation;
     private Guid? selectedAgendaItemId;
     private bool showDeleteMeetingConfirmation;
+    private Guid? meetingStokvelId;
 
     [Parameter]
     public Guid MeetingId { get; set; }
@@ -375,10 +442,12 @@ else
     {
         meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
         meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        meetingVotes = await VotingService.GetVotesByMeetingIdAsync(MeetingId);
 
         if (meeting is not null)
         {
             var stokvel = await StokvelService.GetStokvelByTenantIdAsync(meeting.TenantId);
+            meetingStokvelId = stokvel?.Id;
             backToMeetingsHref = stokvel is null
                 ? "/my-stokvels"
                 : $"/meetings/{stokvel.Id}";
@@ -393,6 +462,7 @@ else
                     canViewMeeting = await MemberAccessService.CanViewStokvelAsync(userId, stokvel.Id);
                     canManageMeetings = await MemberAccessService.CanManageMeetingsAsync(userId, stokvel.Id);
                     canManageMinutes = await MemberAccessService.CanManageMinutesAsync(userId, stokvel.Id);
+                    canManageVotes = await MemberAccessService.CanManageVotesAsync(userId, stokvel.Id);
                     linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, stokvel.Id);
                 }
             }
@@ -694,5 +764,17 @@ else
     private static bool IsApprovedOrPublished(string status)
     {
         return status is "Approved" or "Published";
+    }
+
+    private static string GetVoteStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Open" => "sisonke-badge sisonke-badge-green",
+            "Closed" => "sisonke-badge sisonke-badge-gray",
+            "Draft" => "sisonke-badge sisonke-badge-gold",
+            "Cancelled" => "sisonke-badge sisonke-badge-red",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
     }
 }

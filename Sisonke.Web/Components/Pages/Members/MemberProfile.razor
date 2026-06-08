@@ -6,11 +6,13 @@
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
 
 @inject FineService FineService
 @inject FuneralClaimService FuneralClaimService
 @inject MemberService MemberService
 @inject MemberWarningService MemberWarningService
+@inject MemberGovernanceTimelineService MemberGovernanceTimelineService
 @inject OperatingRuleService OperatingRuleService
 @inject StokvelService StokvelService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -155,6 +157,57 @@ else
                     <div class="member-governance-value">@(member.GovernanceStatusChangedAt?.ToString("dd MMM yyyy") ?? "—")</div>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <section class="sisonke-card mb-3">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Member Governance Timeline</h2>
+                <p>This timeline brings together member activity from claims, contributions, attendance, apologies, voting and governance records.</p>
+            </div>
+            <span class="sisonke-badge sisonke-badge-gray">@visibleTimelineItems.Count event(s)</span>
+        </div>
+        <div class="sisonke-card-body">
+            @if (visibleTimelineItems.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-info mb-0">
+                    No governance timeline activity has been recorded for this member yet.
+                </div>
+            }
+            else
+            {
+                <div class="governance-timeline">
+                    @foreach (var item in visibleTimelineItems)
+                    {
+                        <article class="governance-timeline-item">
+                            <div class="governance-timeline-date">
+                                <span>@FormatTimelineDate(item.EventDate)</span>
+                            </div>
+                            <div class="governance-timeline-content">
+                                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                            <span class="@GetTimelineEventBadgeClass(item.BadgeStyle)">@item.EventType</span>
+                                            <span class="@GetTimelineStatusBadgeClass(item.Status)">@item.Status</span>
+                                        </div>
+                                        <h3 class="governance-timeline-title">@item.Title</h3>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(item.LinkUrl))
+                                    {
+                                        <a class="sisonke-btn sisonke-btn-outline btn-sm" href="@item.LinkUrl">Open</a>
+                                    }
+                                </div>
+                                <p class="governance-timeline-description">@item.Description</p>
+                                @if (!string.IsNullOrWhiteSpace(item.Reference))
+                                {
+                                    <div class="text-muted small">Reference: @item.Reference</div>
+                                }
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
         </div>
     </section>
 
@@ -788,6 +841,42 @@ else
         font-weight: 800;
         margin-top: .2rem;
     }
+    .governance-timeline {
+        display: grid;
+        gap: .85rem;
+    }
+    .governance-timeline-item {
+        display: grid;
+        grid-template-columns: 10rem minmax(0, 1fr);
+        gap: 1rem;
+        align-items: stretch;
+    }
+    .governance-timeline-date {
+        color: var(--sk-text-muted);
+        font-size: .78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        padding-top: .85rem;
+    }
+    .governance-timeline-content {
+        border: 1px solid var(--sk-border);
+        border-radius: .75rem;
+        padding: 1rem;
+        background: #fff;
+    }
+    .governance-timeline-title {
+        margin: 0;
+        color: var(--sk-text);
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0;
+    }
+    .governance-timeline-description {
+        margin: .45rem 0 .35rem;
+        color: var(--sk-text-muted);
+        font-size: .9rem;
+    }
     .pdl-row {
         display: flex;
         padding: .625rem 0;
@@ -815,6 +904,13 @@ else
         .member-profile-identity h1 {
             font-size: 1.45rem;
         }
+        .governance-timeline-item {
+            grid-template-columns: 1fr;
+            gap: .35rem;
+        }
+        .governance-timeline-date {
+            padding-top: 0;
+        }
     }
 </style>
 
@@ -824,6 +920,8 @@ else
     private List<MemberFine> memberFines = [];
     private List<FuneralClaim> funeralClaims = [];
     private List<MemberWarning> memberWarnings = [];
+    private List<MemberGovernanceTimelineItemDto> timelineItems = [];
+    private List<MemberGovernanceTimelineItemDto> visibleTimelineItems = [];
     private Dictionary<Guid, FuneralClaim> activeDependentClaims = new();
     private Stokvel? stokvel;
     private int maxNextOfKin;
@@ -859,6 +957,8 @@ else
         successMessage = null;
         warningMessage = null;
         memberWarnings = [];
+        timelineItems = [];
+        visibleTimelineItems = [];
         member = await MemberService.GetMemberByIdAsync(MemberId);
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
 
@@ -886,6 +986,8 @@ else
         memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
         funeralClaims = member is null ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
         memberWarnings = member is null || (!canManageMemberStatus && !isOwnMemberProfile) ? [] : await MemberWarningService.GetWarningsByMemberIdAsync(MemberId);
+        timelineItems = member is null || stokvel is null ? [] : await MemberGovernanceTimelineService.GetTimelineByMemberIdAsync(MemberId, stokvel.Id);
+        visibleTimelineItems = GetVisibleTimelineItems();
 
         if (member is not null)
         {
@@ -1091,5 +1193,63 @@ else
     private static string DisplayOrDash(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private List<MemberGovernanceTimelineItemDto> GetVisibleTimelineItems()
+    {
+        if (canManageStokvel || canManageMemberStatus || canViewFinancials)
+        {
+            return timelineItems;
+        }
+
+        if (!isOwnMemberProfile)
+        {
+            return [];
+        }
+
+        return timelineItems
+            .Where(item => SafePersonalTimelineTypes.Contains(item.EventType))
+            .ToList();
+    }
+
+    private static readonly HashSet<string> SafePersonalTimelineTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Membership",
+        "Covered Life",
+        "Apology",
+        "Claim",
+        "Payout",
+        "Contribution"
+    };
+
+    private static string FormatTimelineDate(DateTime eventDate)
+    {
+        return eventDate == default || eventDate == DateTime.MinValue
+            ? "Date not recorded"
+            : eventDate.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+    }
+
+    private static string GetTimelineEventBadgeClass(string badgeStyle)
+    {
+        return badgeStyle switch
+        {
+            "green" => "sisonke-badge sisonke-badge-green",
+            "red" => "sisonke-badge sisonke-badge-red",
+            "gold" => "sisonke-badge sisonke-badge-gold",
+            "blue" => "sisonke-badge sisonke-badge-blue",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static string GetTimelineStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Approved" or "Paid" or "Active" or "Present" or "Resolved" => "sisonke-badge sisonke-badge-green",
+            "Rejected" or "Suspended" or "Expelled" or "Absent" or "Unpaid" => "sisonke-badge sisonke-badge-red",
+            "Warning" or "OnHold" or "PartiallyPaid" or "Late" or "Open" => "sisonke-badge sisonke-badge-gold",
+            "Reviewed" or "Submitted" or "Voted" => "sisonke-badge sisonke-badge-blue",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
     }
 }

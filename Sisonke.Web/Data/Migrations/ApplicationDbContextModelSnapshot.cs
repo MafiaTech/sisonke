@@ -629,6 +629,10 @@ namespace Sisonke.Web.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ClaimReference")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -707,6 +711,8 @@ namespace Sisonke.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClaimReference");
 
                     b.HasIndex("DependentId");
 
@@ -1306,6 +1312,40 @@ namespace Sisonke.Web.Migrations
                     b.ToTable("MemberFines");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("VoteMotionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("VoteOptionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("VotedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("VoteOptionId");
+
+                    b.HasIndex("VoteMotionId", "MemberId")
+                        .IsUnique();
+
+                    b.ToTable("MemberVotes");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberWarning", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1547,6 +1587,10 @@ namespace Sisonke.Web.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -1589,6 +1633,8 @@ namespace Sisonke.Web.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Code");
 
                     b.HasIndex("TenantId");
 
@@ -1872,6 +1918,105 @@ namespace Sisonke.Web.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("TenantSubscriptions");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.VoteMotion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("AgendaItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ClosedByMemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ClosesAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreatedByMemberId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DecisionOutcome")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsAnonymous")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("MeetingId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OpensAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResultSummary")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("VoteType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgendaItemId");
+
+                    b.HasIndex("MeetingId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.ToTable("VoteMotions");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.VoteOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OptionText")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("VoteMotionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VoteMotionId");
+
+                    b.ToTable("VoteOptions");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -2334,6 +2479,33 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberVote", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.VoteMotion", "VoteMotion")
+                        .WithMany("MemberVotes")
+                        .HasForeignKey("VoteMotionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.VoteOption", "VoteOption")
+                        .WithMany()
+                        .HasForeignKey("VoteOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("VoteMotion");
+
+                    b.Navigation("VoteOption");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberWarning", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.Meeting", "Meeting")
@@ -2480,6 +2652,42 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.VoteMotion", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.MeetingAgendaItem", "AgendaItem")
+                        .WithMany()
+                        .HasForeignKey("AgendaItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Meeting", "Meeting")
+                        .WithMany()
+                        .HasForeignKey("MeetingId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AgendaItem");
+
+                    b.Navigation("Meeting");
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.VoteOption", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.VoteMotion", "VoteMotion")
+                        .WithMany("Options")
+                        .HasForeignKey("VoteMotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("VoteMotion");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.FuneralClaim", b =>
                 {
                     b.Navigation("Documents");
@@ -2522,6 +2730,13 @@ namespace Sisonke.Web.Migrations
                     b.Navigation("Stokvels");
 
                     b.Navigation("TenantSubscriptions");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.VoteMotion", b =>
+                {
+                    b.Navigation("MemberVotes");
+
+                    b.Navigation("Options");
                 });
 #pragma warning restore 612, 618
         }

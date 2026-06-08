@@ -6,7 +6,10 @@ using Sisonke.Web.Services.Dto;
 
 namespace Sisonke.Web.Services;
 
-public class ClaimEligibilityService(ApplicationDbContext context)
+public class ClaimEligibilityService(
+    ApplicationDbContext context,
+    StokvelOperatingRulesService stokvelOperatingRulesService,
+    FuneralClaimService funeralClaimService)
 {
     public async Task<ClaimEligibilityAssessmentDto?> AssessClaimEligibilityAsync(Guid claimId)
     {
@@ -21,6 +24,51 @@ public class ClaimEligibilityService(ApplicationDbContext context)
             return null;
         }
 
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.TenantId == claim.TenantId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return BuildUnresolvedStokvelAssessment(claim);
+        }
+
+        var rules = await stokvelOperatingRulesService.GetOrCreateDefaultRulesAsync(
+            stokvel.Id,
+            stokvel.Type.ToString(),
+            null);
+
+        var assessment = new ClaimEligibilityAssessmentDto
+        {
+            ClaimId = claim.Id,
+            MemberId = claim.MemberId,
+            DependentId = claim.DependentId,
+            StokvelId = stokvel.Id,
+            MemberName = claim.Member?.FullName ?? string.Empty,
+            ClaimSubjectName = claim.DeceasedFullName,
+            IsDependentClaim = claim.SubjectType == FuneralClaimSubjectType.Dependent,
+            WaitingPeriodSatisfied = claim.IsWaitingPeriodSatisfied,
+            HasRequiredDocuments = HasDeathCertificate(claim),
+            AssessedAt = DateTime.UtcNow
+        };
+
+        AssessClaimsEnabled(rules, assessment);
+        AssessMemberStatus(claim, rules, assessment);
+        AssessDependent(claim, rules, assessment);
+        AssessWaitingPeriod(claim, rules, assessment);
+        await AssessContributionStandingAsync(claim, rules, assessment);
+        await AssessFinesAsync(claim, assessment);
+        await AssessRequiredDocumentsAsync(claim, rules, assessment);
+        await AssessDuplicateClaimsAsync(claim, assessment);
+        FinalizeEligibility(assessment);
+
+        return assessment;
+    }
+
+    private static ClaimEligibilityAssessmentDto BuildUnresolvedStokvelAssessment(FuneralClaim claim)
+    {
         var assessment = new ClaimEligibilityAssessmentDto
         {
             ClaimId = claim.Id,
@@ -30,23 +78,31 @@ public class ClaimEligibilityService(ApplicationDbContext context)
             ClaimSubjectName = claim.DeceasedFullName,
             IsDependentClaim = claim.SubjectType == FuneralClaimSubjectType.Dependent,
             WaitingPeriodSatisfied = claim.IsWaitingPeriodSatisfied,
-            HasRequiredDocuments = claim.Documents.Any(document => document.DocumentType == ClaimDocumentType.DeathCertificate),
+            HasRequiredDocuments = HasDeathCertificate(claim),
             AssessedAt = DateTime.UtcNow
         };
 
-        AssessMemberStatus(claim, assessment);
-        AssessDependent(claim, assessment);
-        AssessWaitingPeriod(claim, assessment);
-        await AssessContributionStandingAsync(claim, assessment);
-        await AssessFinesAsync(claim, assessment);
-        AssessRequiredDocuments(assessment);
-        await AssessDuplicateClaimsAsync(claim, assessment);
+        assessment.FailedChecks.Add("Stokvel operating rules could not be resolved for this claim.");
         FinalizeEligibility(assessment);
 
         return assessment;
     }
 
-    private static void AssessMemberStatus(FuneralClaim claim, ClaimEligibilityAssessmentDto assessment)
+    private static void AssessClaimsEnabled(StokvelOperatingRules rules, ClaimEligibilityAssessmentDto assessment)
+    {
+        if (rules.EnableClaims)
+        {
+            assessment.PassedChecks.Add("Claims are enabled for this stokvel.");
+            return;
+        }
+
+        assessment.FailedChecks.Add("Claims are not enabled for this stokvel type.");
+    }
+
+    private static void AssessMemberStatus(
+        FuneralClaim claim,
+        StokvelOperatingRules rules,
+        ClaimEligibilityAssessmentDto assessment)
     {
         if (claim.Member is null)
         {
@@ -65,27 +121,39 @@ public class ClaimEligibilityService(ApplicationDbContext context)
             !claim.Member.IsDeceased &&
             !assessment.IsMemberSuspended;
 
-        if (assessment.IsMemberActive)
+        if (assessment.IsMemberSuspended)
         {
-            assessment.PassedChecks.Add("Member is active for claim assessment.");
+            if (rules.BlockClaimsIfMemberSuspended)
+            {
+                assessment.FailedChecks.Add("Member is suspended and claim rules block suspended members.");
+            }
+            else
+            {
+                assessment.Warnings.Add("Member is suspended, but rules do not automatically block the claim.");
+            }
+
             return;
         }
 
-        if (assessment.IsMemberSuspended)
+        if (assessment.IsMemberActive)
         {
-            assessment.Warnings.Add("Member is currently suspended and requires executive review before approval.");
+            assessment.PassedChecks.Add("Member is active.");
+            return;
         }
-        else if (claim.Member.IsDeceased || claim.Member.Status == MemberStatus.Deceased || claim.Member.GovernanceStatus == MemberGovernanceStatus.Deceased)
+
+        if (claim.Member.IsDeceased || claim.Member.Status == MemberStatus.Deceased || claim.Member.GovernanceStatus == MemberGovernanceStatus.Deceased)
         {
             assessment.Warnings.Add("Member is marked deceased. Confirm that this claim subject is correct.");
+            return;
         }
-        else
-        {
-            assessment.Warnings.Add($"Member status requires review: {claim.Member.Status} / {claim.Member.GovernanceStatus}.");
-        }
+
+        assessment.Warnings.Add($"Member status requires review: {claim.Member.Status} / {claim.Member.GovernanceStatus}.");
     }
 
-    private static void AssessDependent(FuneralClaim claim, ClaimEligibilityAssessmentDto assessment)
+    private static void AssessDependent(
+        FuneralClaim claim,
+        StokvelOperatingRules rules,
+        ClaimEligibilityAssessmentDto assessment)
     {
         if (!assessment.IsDependentClaim)
         {
@@ -94,10 +162,17 @@ public class ClaimEligibilityService(ApplicationDbContext context)
             return;
         }
 
+        if (!rules.EnableDependents)
+        {
+            assessment.IsDependentCovered = false;
+            assessment.FailedChecks.Add("Dependents are not enabled for this stokvel.");
+            return;
+        }
+
         if (claim.DependentId is null || claim.Dependent is null)
         {
             assessment.IsDependentCovered = false;
-            assessment.FailedChecks.Add("Dependent record could not be found for this claim.");
+            assessment.FailedChecks.Add("Dependent record could not be found.");
             return;
         }
 
@@ -112,7 +187,7 @@ public class ClaimEligibilityService(ApplicationDbContext context)
 
         if (assessment.IsDependentCovered)
         {
-            assessment.PassedChecks.Add("Dependent is linked to this member and appears covered.");
+            assessment.PassedChecks.Add("Dependent is linked to member.");
         }
         else
         {
@@ -120,15 +195,29 @@ public class ClaimEligibilityService(ApplicationDbContext context)
         }
     }
 
-    private static void AssessWaitingPeriod(FuneralClaim claim, ClaimEligibilityAssessmentDto assessment)
+    private static void AssessWaitingPeriod(
+        FuneralClaim claim,
+        StokvelOperatingRules rules,
+        ClaimEligibilityAssessmentDto assessment)
     {
+        var requiredMonths = assessment.IsDependentClaim
+            ? rules.DependentWaitingPeriodMonths
+            : rules.MemberWaitingPeriodMonths;
+
         if (claim.IsWaitingPeriodSatisfied)
         {
-            assessment.PassedChecks.Add("Waiting period is marked as satisfied.");
+            assessment.WaitingPeriodSatisfied = true;
+            assessment.PassedChecks.Add("Waiting period appears satisfied.");
+        }
+        else if (requiredMonths <= 0)
+        {
+            assessment.WaitingPeriodSatisfied = true;
+            assessment.PassedChecks.Add("No waiting period is configured for this claim type.");
         }
         else
         {
-            assessment.Warnings.Add("Waiting period is not marked as satisfied. Chairperson review is required.");
+            assessment.WaitingPeriodSatisfied = false;
+            assessment.Warnings.Add("Waiting period has not been satisfied.");
         }
 
         if (claim.IsMemberStatusEligible)
@@ -141,28 +230,45 @@ public class ClaimEligibilityService(ApplicationDbContext context)
         }
     }
 
-    private async Task AssessContributionStandingAsync(FuneralClaim claim, ClaimEligibilityAssessmentDto assessment)
+    private async Task AssessContributionStandingAsync(
+        FuneralClaim claim,
+        StokvelOperatingRules rules,
+        ClaimEligibilityAssessmentDto assessment)
     {
-        assessment.OutstandingContributionBalance = await context.MemberContributions
-            .Where(contribution =>
-                contribution.MemberId == claim.MemberId &&
-                contribution.TenantId == claim.TenantId &&
-                contribution.OutstandingAmount > 0 &&
-                contribution.Status != PaymentStatus.Paid &&
-                contribution.Status != PaymentStatus.Exempted &&
-                contribution.Status != PaymentStatus.WrittenOff &&
-                contribution.Status != PaymentStatus.Reversed)
-            .SumAsync(contribution => contribution.OutstandingAmount);
+        try
+        {
+            assessment.OutstandingContributionBalance = await context.MemberContributions
+                .Where(contribution =>
+                    contribution.MemberId == claim.MemberId &&
+                    contribution.TenantId == claim.TenantId &&
+                    contribution.OutstandingAmount > 0 &&
+                    contribution.Status != PaymentStatus.Paid &&
+                    contribution.Status != PaymentStatus.Exempted &&
+                    contribution.Status != PaymentStatus.WrittenOff &&
+                    contribution.Status != PaymentStatus.Reversed)
+                .SumAsync(contribution => contribution.OutstandingAmount);
+        }
+        catch (InvalidOperationException)
+        {
+            assessment.Warnings.Add("Contribution standing could not be fully verified.");
+            return;
+        }
 
         assessment.HasOutstandingContributionArrears = assessment.OutstandingContributionBalance > 0;
 
-        if (assessment.HasOutstandingContributionArrears)
+        if (!assessment.HasOutstandingContributionArrears)
         {
-            assessment.Warnings.Add($"Outstanding contribution balance: {assessment.OutstandingContributionBalance:0.00}.");
+            assessment.PassedChecks.Add("No outstanding contribution arrears were found.");
+            return;
+        }
+
+        if (rules.BlockClaimsIfMemberInArrears)
+        {
+            assessment.FailedChecks.Add("Member has outstanding contribution arrears and rules block claims in arrears.");
         }
         else
         {
-            assessment.PassedChecks.Add("No outstanding contribution arrears were found.");
+            assessment.Warnings.Add("Member has outstanding contribution arrears but rules do not automatically block claim.");
         }
     }
 
@@ -179,7 +285,7 @@ public class ClaimEligibilityService(ApplicationDbContext context)
 
         if (assessment.HasOutstandingFines)
         {
-            assessment.Warnings.Add($"Outstanding fines balance: {assessment.OutstandingFinesBalance:0.00}.");
+            assessment.Warnings.Add("Member has outstanding fines.");
         }
         else
         {
@@ -187,15 +293,36 @@ public class ClaimEligibilityService(ApplicationDbContext context)
         }
     }
 
-    private static void AssessRequiredDocuments(ClaimEligibilityAssessmentDto assessment)
+    private async Task AssessRequiredDocumentsAsync(
+        FuneralClaim claim,
+        StokvelOperatingRules rules,
+        ClaimEligibilityAssessmentDto assessment)
     {
-        if (assessment.HasRequiredDocuments)
+        var checklist = await funeralClaimService.GetClaimDocumentChecklistAsync(claim.Id);
+        var missingRequiredDocuments = checklist
+            .Where(item => item.IsRequired && !item.IsSubmitted)
+            .Select(item => item.DocumentType)
+            .ToList();
+
+        assessment.HasRequiredDocuments = missingRequiredDocuments.Count == 0;
+
+        if (missingRequiredDocuments.Count == 0)
         {
-            assessment.PassedChecks.Add("Death certificate has been uploaded.");
+            assessment.PassedChecks.Add("Required documents appear captured.");
+            return;
         }
-        else
+
+        if (rules.RequireDeathCertificateForClaims &&
+            missingRequiredDocuments.Contains("Death Certificate", StringComparer.OrdinalIgnoreCase))
         {
-            assessment.Warnings.Add("Death certificate has not been uploaded.");
+            assessment.FailedChecks.Add("Required death certificate is missing.");
+        }
+
+        if (rules.RequireClaimDocuments)
+        {
+            var missingDocuments = string.Join(", ", missingRequiredDocuments);
+            assessment.Warnings.Add($"Required claim documents may be missing: {missingDocuments}.");
+            return;
         }
     }
 
@@ -235,12 +362,17 @@ public class ClaimEligibilityService(ApplicationDbContext context)
 
         if (assessment.HasDuplicateActiveClaim)
         {
-            assessment.FailedChecks.Add("Another active claim exists for the same claim subject.");
+            assessment.FailedChecks.Add("Duplicate active claim exists for the same subject.");
         }
         else
         {
-            assessment.PassedChecks.Add("No duplicate active claim was found.");
+            assessment.PassedChecks.Add("No duplicate active claim found.");
         }
+    }
+
+    private static bool HasDeathCertificate(FuneralClaim claim)
+    {
+        return claim.Documents.Any(document => document.DocumentType == ClaimDocumentType.DeathCertificate);
     }
 
     private static void FinalizeEligibility(ClaimEligibilityAssessmentDto assessment)
@@ -272,7 +404,6 @@ public class ClaimEligibilityService(ApplicationDbContext context)
             warning.Contains("marked deceased", StringComparison.OrdinalIgnoreCase) ||
             warning.Contains("waiting period", StringComparison.OrdinalIgnoreCase) ||
             warning.Contains("eligibility flag", StringComparison.OrdinalIgnoreCase) ||
-            warning.Contains("death certificate", StringComparison.OrdinalIgnoreCase) ||
             warning.Contains("could not be fully verified", StringComparison.OrdinalIgnoreCase);
     }
 }

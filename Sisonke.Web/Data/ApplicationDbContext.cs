@@ -32,6 +32,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<MeetingMinute> MeetingMinutes => Set<MeetingMinute>();
     public DbSet<MeetingVote> MeetingVotes => Set<MeetingVote>();
     public DbSet<MeetingVoteResponse> MeetingVoteResponses => Set<MeetingVoteResponse>();
+    public DbSet<VoteMotion> VoteMotions => Set<VoteMotion>();
+    public DbSet<VoteOption> VoteOptions => Set<VoteOption>();
+    public DbSet<MemberVote> MemberVotes => Set<MemberVote>();
     public DbSet<QuestionnaireSection> QuestionnaireSections => Set<QuestionnaireSection>();
     public DbSet<QuestionnaireQuestion> QuestionnaireQuestions => Set<QuestionnaireQuestion>();
     public DbSet<QuestionnaireOption> QuestionnaireOptions => Set<QuestionnaireOption>();
@@ -63,6 +66,20 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany(t => t.Stokvels)
             .HasForeignKey(s => s.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Stokvel>()
+            .Property(s => s.Code)
+            .HasMaxLength(20);
+
+        builder.Entity<Stokvel>()
+            .HasIndex(s => s.Code);
+
+        builder.Entity<FuneralClaim>()
+            .Property(c => c.ClaimReference)
+            .HasMaxLength(50);
+
+        builder.Entity<FuneralClaim>()
+            .HasIndex(c => c.ClaimReference);
 
         builder.Entity<TenantSubscription>()
             .HasOne(ts => ts.Tenant)
@@ -352,6 +369,52 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<MeetingVoteResponse>()
             .HasIndex(r => new { r.MeetingVoteId, r.MemberId })
+            .IsUnique();
+
+        builder.Entity<VoteMotion>()
+            .HasOne(v => v.Stokvel)
+            .WithMany()
+            .HasForeignKey(v => v.StokvelId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<VoteMotion>()
+            .HasOne(v => v.Meeting)
+            .WithMany()
+            .HasForeignKey(v => v.MeetingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<VoteMotion>()
+            .HasOne(v => v.AgendaItem)
+            .WithMany()
+            .HasForeignKey(v => v.AgendaItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<VoteOption>()
+            .HasOne(o => o.VoteMotion)
+            .WithMany(v => v.Options)
+            .HasForeignKey(o => o.VoteMotionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MemberVote>()
+            .HasOne(v => v.VoteMotion)
+            .WithMany(m => m.MemberVotes)
+            .HasForeignKey(v => v.VoteMotionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberVote>()
+            .HasOne(v => v.Member)
+            .WithMany()
+            .HasForeignKey(v => v.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberVote>()
+            .HasOne(v => v.VoteOption)
+            .WithMany()
+            .HasForeignKey(v => v.VoteOptionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberVote>()
+            .HasIndex(v => new { v.VoteMotionId, v.MemberId })
             .IsUnique();
 
         builder.Entity<QuestionnaireQuestion>()

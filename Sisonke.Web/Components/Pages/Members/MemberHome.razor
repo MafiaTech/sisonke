@@ -20,6 +20,7 @@
 @inject MeetingApologyService MeetingApologyService
 @inject StokvelService StokvelService
 @inject ContributionPaymentService ContributionPaymentService
+@inject VotingService VotingService
 
 <PageTitle>My Member Dashboard</PageTitle>
 <link rel="stylesheet" href="/css/member-workspace.css" />
@@ -579,6 +580,42 @@ else
             <div class="mw-sec-line"></div>
         </div>
         <div class="mw-g mw-g3 mw-mb26">
+            <div class="mw-card mw-card-accent mw-ca-blue">
+                <div class="mw-card-top">
+                    <div class="mw-card-tl">
+                        <div class="mw-card-ico mw-ico-blue">✓</div>
+                        <span class="mw-card-lbl">Open Votes</span>
+                    </div>
+                    <span class="sisonke-badge sisonke-badge-blue">@openVotes.Count Open</span>
+                </div>
+                <div class="mw-card-body">
+                    @if (openVotes.Count == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-blue mb-3">
+                            No open votes are available right now.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var vote in openVotes.Take(3))
+                        {
+                            <div class="mw-lrow">
+                                <div class="mw-lrow-ico mw-ico-blue">✓</div>
+                                <div class="mw-lrow-detail">
+                                    <div class="mw-lrow-title">@Display(vote.Title)</div>
+                                    <div class="mw-lrow-sub">@vote.OpensAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                                </div>
+                                <span class="sisonke-badge sisonke-badge-green">@vote.Status</span>
+                            </div>
+                        }
+                    }
+                    <div class="mw-div"></div>
+                    <a class="mw-btn mw-btn-outline mw-btn-sm mw-btn-full" href="@($"/votes/{stokvel.Id}")">
+                        View Votes
+                    </a>
+                </div>
+            </div>
+
             <div class="mw-card mw-card-accent mw-ca-ochre">
                 <div class="mw-card-top">
                     <div class="mw-card-tl">
@@ -704,6 +741,7 @@ else
     private List<FuneralClaim> memberClaims = [];
     private List<MemberDependent> dependents = [];
     private List<Meeting> upcomingMeetings = [];
+    private List<VoteMotion> openVotes = [];
     private Dictionary<Guid, MeetingMinute> approvedMinutesByMeetingId = [];
     private Dictionary<Guid, MeetingApology> meetingApologiesByMeetingId = [];
     private List<ContributionPaymentSummary> memberContributions = [];
@@ -758,6 +796,7 @@ else
         memberClaims = [];
         dependents = [];
         upcomingMeetings = [];
+        openVotes = [];
         approvedMinutesByMeetingId = [];
         meetingApologiesByMeetingId = [];
         memberContributions = [];
@@ -820,6 +859,7 @@ else
             .Where(minutes => minutes.Status is "Approved" or "Published")
             .GroupBy(minutes => minutes.MeetingId)
             .ToDictionary(group => group.Key, group => group.First());
+        openVotes = await VotingService.GetOpenVotesForMemberAsync(MemberId, stokvel.Id);
 
         foreach (var meeting in upcomingMeetings)
         {
@@ -902,7 +942,9 @@ else
 
     private static string GetClaimReference(FuneralClaim claim)
     {
-        return $"CLM-{claim.Id.ToString()[..8].ToUpperInvariant()}";
+        return string.IsNullOrWhiteSpace(claim.ClaimReference)
+            ? $"CLM-{claim.Id.ToString("N")[..8].ToUpperInvariant()}"
+            : claim.ClaimReference;
     }
 
     private static string GetMeetingStatusBadgeClass(MeetingStatus status)

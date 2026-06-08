@@ -5,6 +5,7 @@ public class ClaimEligibilityAssessmentDto
     public Guid ClaimId { get; set; }
     public Guid MemberId { get; set; }
     public Guid? DependentId { get; set; }
+    public Guid StokvelId { get; set; }
     public string MemberName { get; set; } = string.Empty;
     public string ClaimSubjectName { get; set; } = string.Empty;
     public bool IsMemberActive { get; set; }

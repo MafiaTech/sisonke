@@ -14,6 +14,7 @@
 @inject MeetingMinuteService MeetingMinuteService
 @inject MemberService MemberService
 @inject StokvelService StokvelService
+@inject VotingService VotingService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Meeting Minutes</PageTitle>
@@ -138,6 +139,50 @@ else
                                     </td>
                                     <td>@DisplayAgendaNotes(agendaItem.Notes)</td>
                                     <td><span class="@GetAgendaStatusBadgeClass(agendaItem.IsCompleted)">@GetAgendaStatusLabel(agendaItem.IsCompleted)</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Voting Results</h2>
+                <p>Closed votes linked to this meeting.</p>
+            </div>
+            <span class="sisonke-badge sisonke-badge-blue">@closedMeetingVotes.Count</span>
+        </div>
+        <div class="sisonke-card-body">
+            @if (closedMeetingVotes.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                    No voting results have been recorded for this meeting.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Motion title</th>
+                                <th>Result summary</th>
+                                <th>Decision outcome</th>
+                                <th>Total votes cast</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var vote in closedMeetingVotes)
+                            {
+                                <tr>
+                                    <td>@vote.Title</td>
+                                    <td>@DisplayOrDash(vote.ResultSummary)</td>
+                                    <td>@DisplayOrDash(vote.DecisionOutcome)</td>
+                                    <td>@vote.MemberVotes.Count</td>
                                 </tr>
                             }
                         </tbody>
@@ -327,6 +372,7 @@ else
 
     private Meeting? meeting;
     private MeetingMinute? meetingMinutes;
+    private List<VoteMotion> closedMeetingVotes = [];
     private Member? linkedMember;
     private Member? approvedByMember;
     private bool isLoading = true;
@@ -363,6 +409,10 @@ else
     {
         meeting = await MeetingService.GetMeetingByIdAsync(MeetingId);
         meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        closedMeetingVotes = (await VotingService.GetVotesByMeetingIdAsync(MeetingId))
+            .Where(vote => vote.Status == "Closed")
+            .OrderBy(vote => vote.ClosedAt ?? vote.CreatedAt)
+            .ToList();
         linkedMember = null;
         approvedByMember = null;
         canAccessMinutesPage = false;

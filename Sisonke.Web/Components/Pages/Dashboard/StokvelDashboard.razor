@@ -18,6 +18,7 @@
 @inject MeetingApologyService MeetingApologyService
 @inject MemberWarningService MemberWarningService
 @inject FuneralClaimService FuneralClaimService
+@inject VotingService VotingService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
@@ -769,11 +770,20 @@ else
                             <p class="stat-value mb-1">@openVoteCount</p>
                             <p class="stat-detail">Open polls</p>
                         }
+                        else
+                        {
+                            <p class="stat-value mb-1">0</p>
+                            <p class="stat-detail">Open polls</p>
+                        }
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <span class="sisonke-badge sisonke-badge-green">@openVoteCount Open</span>
+                            <span class="sisonke-badge sisonke-badge-gray">@closedVoteCount Closed</span>
+                        </div>
                         <p class="text-muted small mb-0 @(openVoteCount > 0 ? "mt-2" : "")" style="line-height:1.65;">
-                            Votes and decisions are managed inside each meeting agenda.
+                            Open governance votes and review closed decisions for this stokvel.
                         </p>
-                        <a class="btn btn-purple btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
-                            <i class="bi bi-check2-square me-1"></i>Open Meetings
+                        <a class="btn btn-purple btn-sm mt-3" href="@($"/votes/{StokvelId}")">
+                            <i class="bi bi-check2-square me-1"></i>Open Voting
                         </a>
                     </div>
                 </div>
@@ -874,6 +884,7 @@ else
     private decimal outstandingFinesTotal;
     private int upcomingMeetingCount;
     private int openVoteCount;
+    private int closedVoteCount;
     private TenantSubscription? activeSubscription;
     private Member? linkedMember;
     private string memberLimitMessage = string.Empty;
@@ -913,6 +924,7 @@ else
         outstandingFinesTotal = 0;
         upcomingMeetingCount = 0;
         openVoteCount = 0;
+        closedVoteCount = 0;
         activeSubscription = null;
         linkedMember = null;
         memberLimitMessage = string.Empty;
@@ -987,7 +999,9 @@ else
         approvedClaimsAwaitingPayoutCount = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutCountByStokvelIdAsync(StokvelId);
         attendanceToCaptureCount = await MeetingService.GetMeetingsNeedingAttendanceCountByStokvelIdAsync(StokvelId);
         openWarningCount = (await MemberWarningService.GetOpenWarningsByStokvelIdAsync(StokvelId)).Count;
-        openVoteCount = 0;
+        var voteMotions = await VotingService.GetVotesByStokvelIdAsync(StokvelId);
+        openVoteCount = voteMotions.Count(vote => vote.Status == "Open");
+        closedVoteCount = voteMotions.Count(vote => vote.Status == "Closed");
         isLoading = false;
     }
 

@@ -82,6 +82,17 @@ public class MemberAccessService(ApplicationDbContext context)
             normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
     }
 
+    private static bool CanManageVotesRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+
+        return normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            normalizedRole?.Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     private static bool CanApproveMinutesRole(string? role)
     {
         var normalizedRole = role?.Trim();
@@ -479,6 +490,18 @@ public class MemberAccessService(ApplicationDbContext context)
         var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
 
         return member is not null && CanManageMeetingsRole(member.DefaultRole.ToString());
+    }
+
+    public async Task<bool> CanManageVotesAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        return member is not null && CanManageVotesRole(member.DefaultRole.ToString());
     }
 
     public async Task<bool> CanViewSecretaryTasksAsync(string userId, Guid stokvelId)

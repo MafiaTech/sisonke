@@ -125,7 +125,7 @@ else
 
         if (meeting is not null)
         {
-            votes = await VotingService.GetVotesByMeetingIdAsync(MeetingId);
+        votes = await VotingService.GetMeetingVotesByMeetingIdAsync(MeetingId);
         }
 
         isLoading = false;

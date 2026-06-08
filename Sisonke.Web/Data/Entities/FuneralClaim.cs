@@ -26,6 +26,9 @@ public class FuneralClaim
 
     public FuneralClaimStatus Status { get; set; } = FuneralClaimStatus.Draft;
 
+    [MaxLength(50)]
+    public string? ClaimReference { get; set; }
+
     [MaxLength(1000)]
     public string? ClaimReason { get; set; }
 

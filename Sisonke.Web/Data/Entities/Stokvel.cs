@@ -14,6 +14,9 @@ public class Stokvel
     [MaxLength(150)]
     public string Name { get; set; } = string.Empty;
 
+    [MaxLength(20)]
+    public string? Code { get; set; }
+
     public StokvelType Type { get; set; }
 
     [MaxLength(100)]
