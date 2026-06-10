@@ -3,6 +3,7 @@
 @implements IDisposable
 
 @inject NavigationManager NavigationManager
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebHostEnvironment
 
 <div class="sisonke-shell sisonke-role-member">
     <NavMenu />
@@ -37,6 +38,14 @@
         </div>
 
         <div class="sisonke-content">
+
+             @if (WebHostEnvironment.EnvironmentName == "Staging" || WebHostEnvironment.EnvironmentName == "Development")
+            {
+                <div class="pilot-banner">
+                    Sisonke Pilot Environment — for controlled user testing only. Do not use for final production records yet.
+                </div>
+            }
+
             @Body
         </div>
     </main>

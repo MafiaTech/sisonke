@@ -74,3 +74,13 @@ main { flex: 1; }
     top: 0.5rem;
     color: #991b1b;
 }
+
+.pilot-banner {
+    background: #fff3cd;
+    color: #664d03;
+    border-bottom: 1px solid #ffecb5;
+    padding: 0.65rem 1rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-align: center;
+}
