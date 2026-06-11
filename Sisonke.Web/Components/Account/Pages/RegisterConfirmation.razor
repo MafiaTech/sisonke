@@ -1,44 +1,121 @@
-﻿@page "/Account/RegisterConfirmation"
+@page "/Account/RegisterConfirmation"
+@layout AuthLayout
 
 @using System.Text
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using Sisonke.Web.Data
+@using Sisonke.Web.Services
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IEmailSender<ApplicationUser> EmailSender
+@inject AuthSettings AuthSettings
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Register confirmation</PageTitle>
+<PageTitle>Account Created — Sisonke</PageTitle>
 
-<h1>Register confirmation</h1>
+<div class="auth-confirm-wrap">
+    <div class="auth-confirm-card">
 
-<StatusMessage Message="@statusMessage" />
+        <div class="auth-logo" style="margin-bottom:20px;">
+            <div class="auth-logo-mark">S</div>
+            <span class="auth-logo-name">Sisonke</span>
+        </div>
 
-<p>
-    Your account has been created. Please confirm your account if required, then continue to view your linked stokvel memberships.
-</p>
+        @if (_error)
+        {
+            <div class="auth-confirm-icon" style="font-size:48px;margin-bottom:12px;">⚠️</div>
+            <h1 class="auth-form-heading" style="text-align:center;">Something went wrong</h1>
+            <p style="text-align:center;color:var(--auth-muted,#7A6E69);margin:0 0 28px;line-height:1.6;">
+                We could not find that account. Please try registering again.
+            </p>
+            <a href="Account/Register" class="auth-btn-primary" style="display:block;text-align:center;text-decoration:none;">
+                Back to Registration
+            </a>
+        }
+        else
+        {
+            <div class="auth-confirm-icon" style="font-size:48px;margin-bottom:12px;">🎉</div>
+            <h1 class="auth-form-heading" style="text-align:center;">Account created!</h1>
 
-@if (emailConfirmationLink is not null)
-{
-    <p>
-        This app does not currently have a real email sender registered, see <a href="https://aka.ms/aspaccountconf">these docs</a> for how to configure a real email sender.
-        Normally this would be emailed: <a href="@emailConfirmationLink">Click here to confirm your account</a>
-    </p>
-}
-else
-{
-    <p role="alert">Please check your email to confirm your account.</p>
-}
+            @if (!AuthSettings.RequireConfirmedAccount)
+            {
+                <!-- Pilot mode: user is already signed in, verification is optional -->
+                <p style="text-align:center;color:var(--auth-muted,#7A6E69);margin:0 0 8px;line-height:1.6;">
+                    Welcome to Sisonke, <strong>@_email</strong>.
+                </p>
+                <p style="text-align:center;color:var(--auth-muted,#7A6E69);margin:0 0 20px;line-height:1.6;">
+                    You can access the app straight away.
+                    A verification email has been sent to your address — please confirm it when you receive it.
+                </p>
+            }
+            else
+            {
+                <!-- Production mode: must verify before signing in -->
+                <p style="text-align:center;color:var(--auth-muted,#7A6E69);margin:0 0 8px;line-height:1.6;">
+                    Your Sisonke account has been created!
+                </p>
+                <p style="text-align:center;color:var(--auth-muted,#7A6E69);margin:0 0 20px;line-height:1.6;">
+                    We've sent a verification link to <strong>@_email</strong>.
+                    Please check your inbox and click the link to activate your account before signing in.
+                </p>
+            }
 
-<p>
-    <a class="btn btn-primary" href="/Account/Login?returnUrl=/my-workspace">Sign in to view My Workspace</a>
-</p>
+            @if (_devConfirmationLink is not null)
+            {
+                <!-- Dev / pilot only — SMTP not configured, show clickable link for testing -->
+                <div class="auth-error-alert"
+                     style="display:block;background:rgba(200,146,42,0.08);border-color:#C9922A;color:#8a6020;margin-bottom:16px;">
+                    <strong>Development mode</strong> — SMTP is not configured.<br />
+                    Use the link below to verify this account:
+                </div>
+                <a href="@_devConfirmationLink"
+                   class="auth-btn-primary"
+                   style="display:block;text-align:center;text-decoration:none;margin-bottom:16px;">
+                    Verify My Email (Dev)
+                </a>
+            }
+
+            @if (!AuthSettings.RequireConfirmedAccount && !string.IsNullOrWhiteSpace(_returnUrl))
+            {
+                <a href="@_returnUrl"
+                   class="auth-btn-primary"
+                   style="display:block;text-align:center;text-decoration:none;margin-bottom:16px;">
+                    Continue to My Workspace →
+                </a>
+            }
+            else if (!AuthSettings.RequireConfirmedAccount)
+            {
+                <a href="/my-workspace"
+                   class="auth-btn-primary"
+                   style="display:block;text-align:center;text-decoration:none;margin-bottom:16px;">
+                    Continue to My Workspace →
+                </a>
+            }
+            else
+            {
+                <a href="Account/Login"
+                   class="auth-btn-primary"
+                   style="display:block;text-align:center;text-decoration:none;margin-bottom:16px;">
+                    Go to Sign In
+                </a>
+            }
+
+            <p class="auth-switch" style="text-align:center;margin-top:12px;">
+                Didn't receive an email?
+                <a href="Account/ResendEmailConfirmation">Resend verification email</a>
+            </p>
+        }
+
+    </div>
+</div>
 
 @code {
-    private string? emailConfirmationLink;
-    private string? statusMessage;
+    private string? _devConfirmationLink;
+    private string? _email;
+    private string? _returnUrl;
+    private bool _error = false;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -57,21 +134,31 @@ else
             return;
         }
 
+        _email = Email;
+        _returnUrl = !string.IsNullOrWhiteSpace(ReturnUrl) &&
+                     Uri.IsWellFormedUriString(ReturnUrl, UriKind.Relative)
+            ? ReturnUrl
+            : null;
+
         var user = await UserManager.FindByEmailAsync(Email);
         if (user is null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            statusMessage = "Error finding user for unspecified email";
+            _error = true;
+            return;
         }
-        else if (EmailSender is IdentityNoOpEmailSender)
+
+        // In dev/pilot when SMTP is not configured, expose a clickable confirmation link
+        // so testers can complete the verification flow without real email.
+        bool smtpConfigured = EmailSender is SisonkeEmailSender s && s.IsSmtpConfigured;
+        if (!smtpConfigured)
         {
-            // Once you add a real email sender, you should remove this code that lets you confirm the account
             var userId = await UserManager.GetUserIdAsync(user);
             var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
             code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-            emailConfirmationLink = NavigationManager.GetUriWithQueryParameters(
+            _devConfirmationLink = NavigationManager.GetUriWithQueryParameters(
                 NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-                new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+                new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
         }
     }
 }

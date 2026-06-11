@@ -1,4 +1,5 @@
-﻿@page "/Account/ConfirmEmail"
+@page "/Account/ConfirmEmail"
+@layout AuthLayout
 
 @using System.Text
 @using Microsoft.AspNetCore.Identity
@@ -7,14 +8,49 @@
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IdentityRedirectManager RedirectManager
+@inject NavigationManager NavigationManager
 
-<PageTitle>Confirm email</PageTitle>
+<PageTitle>Email Confirmed — Sisonke</PageTitle>
 
-<h1>Confirm email</h1>
-<StatusMessage Message="@statusMessage" />
+<div class="auth-confirm-wrap">
+    <div class="auth-confirm-card">
+        <div class="auth-logo" style="margin-bottom:20px;">
+            <div class="auth-logo-mark">S</div>
+            <span class="auth-logo-name">Sisonke</span>
+        </div>
+
+        @if (_confirmed)
+        {
+            <div class="auth-confirm-icon" style="font-size:48px;margin-bottom:12px;">✅</div>
+            <h1 class="auth-form-heading" style="text-align:center;">Email confirmed!</h1>
+            <p style="text-align:center;color:var(--auth-muted,#7A6E69);margin:0 0 28px;line-height:1.6;">
+                Your email address has been successfully verified.<br />
+                You can now sign in to your Sisonke account.
+            </p>
+            <a href="Account/Login" class="auth-btn-primary" style="display:block;text-align:center;text-decoration:none;">
+                Sign In
+            </a>
+        }
+        else
+        {
+            <div class="auth-confirm-icon" style="font-size:48px;margin-bottom:12px;">⚠️</div>
+            <h1 class="auth-form-heading" style="text-align:center;">Confirmation failed</h1>
+            <p style="text-align:center;color:var(--auth-muted,#7A6E69);margin:0 0 28px;line-height:1.6;">
+                We could not confirm your email address. The link may have expired or already been used.
+            </p>
+            <a href="Account/ResendEmailConfirmation" class="auth-btn-primary"
+               style="display:block;text-align:center;text-decoration:none;">
+                Resend Confirmation Email
+            </a>
+            <p class="auth-switch" style="text-align:center;margin-top:20px;">
+                <a href="Account/Login">← Back to Sign In</a>
+            </p>
+        }
+    </div>
+</div>
 
 @code {
-    private string? statusMessage;
+    private bool _confirmed = false;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -37,13 +73,18 @@
         if (user is null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            statusMessage = $"Error loading user with ID {UserId}";
+            return;
         }
-        else
+
+        try
         {
             var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
             var result = await UserManager.ConfirmEmailAsync(user, code);
-            statusMessage = result.Succeeded ? "Thank you for confirming your email." : "Error confirming your email.";
+            _confirmed = result.Succeeded;
+        }
+        catch
+        {
+            _confirmed = false;
         }
     }
 }

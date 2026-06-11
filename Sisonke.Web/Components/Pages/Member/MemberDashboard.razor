@@ -348,15 +348,15 @@ else
                     <div>
                         <div class="sm-profile-detail-row">
                             <span class="sm-profile-detail-label">Phone</span>
-                            <span class="sm-profile-detail-value">@(member.CellphoneNumber ?? "—")</span>
+                            <span class="sm-profile-detail-value">@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</span>
                         </div>
                         <div class="sm-profile-detail-row">
                             <span class="sm-profile-detail-label">Email</span>
-                            <span class="sm-profile-detail-value">@(member.EmailAddress ?? "—")</span>
+                            <span class="sm-profile-detail-value">@SensitiveDataMasker.MaskEmail(member.EmailAddress)</span>
                         </div>
                         <div class="sm-profile-detail-row">
                             <span class="sm-profile-detail-label">ID Number</span>
-                            <span class="sm-profile-detail-value">@(member.IdNumber ?? "—")</span>
+                            <span class="sm-profile-detail-value">@SensitiveDataMasker.MaskIdNumber(member.IdNumber)</span>
                         </div>
                         <div class="sm-profile-detail-row">
                             <span class="sm-profile-detail-label">Joined</span>

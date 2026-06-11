@@ -75,6 +75,16 @@ main[b-42w3ln00or] { flex: 1; }
     top: 0.5rem;
     color: #991b1b;
 }
+
+.pilot-banner[b-42w3ln00or] {
+    background: #fff3cd;
+    color: #664d03;
+    border-bottom: 1px solid #ffecb5;
+    padding: 0.65rem 1rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-align: center;
+}
 /* /Components/Layout/NavMenu.razor.rz.scp.css */
 /* ── Hamburger toggler (mobile) ─────────────────────────── */
 .navbar-toggler[b-t6opjqoptc] {

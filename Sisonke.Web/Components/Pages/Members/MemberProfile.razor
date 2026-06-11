@@ -83,8 +83,8 @@ else
             <div class="member-profile-identity">
                 <h1>@member.FullName</h1>
                 <div class="member-profile-contact">
-                    <span><i class="bi bi-phone me-1"></i>@member.CellphoneNumber</span>
-                    <span><i class="bi bi-envelope me-1"></i>@(member.EmailAddress ?? "No email")</span>
+                    <span><i class="bi bi-phone me-1"></i>@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</span>
+                    <span><i class="bi bi-envelope me-1"></i>@SensitiveDataMasker.MaskEmail(member.EmailAddress)</span>
                     <span><i class="bi bi-geo-alt me-1"></i>@(member.ResidentialArea ?? "No area captured")</span>
                 </div>
                 <div class="member-profile-badges">
@@ -221,9 +221,9 @@ else
                     <div class="card-section-title">Personal Details</div>
                     <dl class="profile-dl">
                         <div class="pdl-row"><dt>Full name</dt><dd>@member.FullName</dd></div>
-                        <div class="pdl-row"><dt>Cellphone</dt><dd>@member.CellphoneNumber</dd></div>
-                        <div class="pdl-row"><dt>Email</dt><dd>@(member.EmailAddress ?? "—")</dd></div>
-                        <div class="pdl-row"><dt>ID number</dt><dd>@(member.IdNumber ?? "—")</dd></div>
+                        <div class="pdl-row"><dt>Cellphone</dt><dd>@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</dd></div>
+                        <div class="pdl-row"><dt>Email</dt><dd>@SensitiveDataMasker.MaskEmail(member.EmailAddress)</dd></div>
+                        <div class="pdl-row"><dt>ID number</dt><dd>@SensitiveDataMasker.MaskIdNumber(member.IdNumber)</dd></div>
                         <div class="pdl-row"><dt>Residential area</dt><dd>@(member.ResidentialArea ?? "—")</dd></div>
                         <div class="pdl-row">
                             <dt>Deceased</dt>
@@ -351,7 +351,7 @@ else
                                         <tr>
                                             <td class="fw-500">@nok.FullName</td>
                                             <td class="text-muted small">@nok.Relationship</td>
-                                            <td class="text-muted small">@nok.CellphoneNumber</td>
+                                            <td class="text-muted small">@SensitiveDataMasker.MaskPhoneNumber(nok.CellphoneNumber)</td>
                                             <td>@if (nok.IsPrimary) { <StatusBadge Text="Primary" Type="info" /> }</td>
                                             <td><a class="btn btn-sm btn-outline-secondary" href="@($"/edit-next-of-kin/{nok.Id}")">Edit</a></td>
                                         </tr>
@@ -396,7 +396,7 @@ else
                                         <tr>
                                             <td class="fw-500">@ben.FullName</td>
                                             <td class="text-muted small">@ben.Relationship</td>
-                                            <td class="text-muted small">@(ben.CellphoneNumber ?? "—")</td>
+                                            <td class="text-muted small">@SensitiveDataMasker.MaskPhoneNumber(ben.CellphoneNumber)</td>
                                             <td>
                                                 <StatusBadge Text="@(ben.IsActive ? "Active" : "Inactive")" Type="@(ben.IsActive ? "success" : "secondary")" />
                                             </td>
@@ -470,8 +470,8 @@ else
                                             <td class="fw-500">@dependent.FullName</td>
                                             <td class="text-muted small">@dependent.Relationship</td>
                                             <td class="text-muted small">@(dependent.DateOfBirth?.ToString("dd MMM yyyy") ?? "—")</td>
-                                            <td class="text-muted small">@(dependent.IdNumber ?? "—")</td>
-                                            <td class="text-muted small">@(dependent.CellphoneNumber ?? "—")</td>
+                                            <td class="text-muted small">@SensitiveDataMasker.MaskIdNumber(dependent.IdNumber)</td>
+                                            <td class="text-muted small">@SensitiveDataMasker.MaskPhoneNumber(dependent.CellphoneNumber)</td>
                                             <td>
                                                 <div class="d-flex flex-column gap-1 align-items-start">
                                                     <StatusBadge Text="@GetDependentStatusText(dependent, hasActiveClaim)" Type="@GetDependentStatusBadgeType(dependent, hasActiveClaim)" />

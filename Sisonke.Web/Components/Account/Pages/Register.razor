@@ -1,4 +1,5 @@
 @page "/Account/Register"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @layout AuthLayout
 
 @using System.ComponentModel.DataAnnotations
@@ -14,16 +15,17 @@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IEmailSender<ApplicationUser> EmailSender
 @inject MemberAccountLinkingService MemberAccountLinkingService
+@inject AuthSettings AuthSettings
+@inject AppSettings AppSettings
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
-@inject IdentityRedirectManager RedirectManager
 
 <PageTitle>Create Account — Sisonke</PageTitle>
 
 <div class="auth-split">
 
     <!-- ══════════════════════════════════════════
-         LEFT — Brand panel (same as login)
+         LEFT — Brand panel
     ══════════════════════════════════════════ -->
     <div class="auth-brand">
 
@@ -104,217 +106,231 @@
             <h1 class="auth-form-heading">Create your account</h1>
             <p class="auth-form-subheading">Get started — it only takes a minute</p>
 
-            <!-- ── Step indicator bar ─────────────────── -->
+            <!-- ── Step indicator bar — driven by _step ─── -->
             <div class="auth-step-bar">
-                <div id="step-dot-1" class="auth-step-dot active">1</div>
-                <div id="step-line-1" class="auth-step-line"></div>
-                <div id="step-dot-2" class="auth-step-dot">2</div>
-                <div id="step-line-2" class="auth-step-line"></div>
-                <div id="step-dot-3" class="auth-step-dot">3</div>
+                <div class="auth-step-dot @(_step > 1 ? "done" : "active")">@(_step > 1 ? "✓" : "1")</div>
+                <div class="auth-step-line @(_step > 1 ? "done" : "")"></div>
+                <div class="auth-step-dot @(_step > 2 ? "done" : _step == 2 ? "active" : "")">@(_step > 2 ? "✓" : "2")</div>
+                <div class="auth-step-line @(_step > 2 ? "done" : "")"></div>
+                <div class="auth-step-dot @(_step == 3 ? "active" : "")">3</div>
             </div>
-            <div id="auth-step-label" class="auth-step-label">Personal Details</div>
+            <div class="auth-step-label">@StepLabel</div>
 
             <!-- Status message -->
             <StatusMessage Message="@Message" />
 
             <!-- ════════════════════════════════════════
-                 THE SINGLE FORM — all steps live inside
+                 THE SINGLE FORM — steps controlled by _step
             ════════════════════════════════════════ -->
-            <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+            <EditForm EditContext="_editContext" OnValidSubmit="RegisterUser" FormName="register">
                 <DataAnnotationsValidator />
-
-                <!-- Validation summary — visible on failed submit -->
-                <ValidationSummary class="auth-error-alert" role="alert" />
 
                 <!-- ──────────────────────────────────────
                      STEP 1 — Personal Details
                 ────────────────────────────────────── -->
-                <div id="register-step-1" class="auth-wizard-step active">
+                @if (_step == 1)
+                {
+                    <div class="auth-wizard-step active">
 
-                    <!-- Full name -->
-                    <div class="auth-field">
-                        <label class="auth-label" for="Input.FullName">Full Name</label>
-                        <div class="auth-input-wrapper">
-                            <span class="auth-input-icon">👤</span>
-                            <InputText @bind-Value="Input.FullName"
-                                       id="Input.FullName"
-                                       class="auth-input"
-                                       autocomplete="name"
-                                       aria-required="true"
-                                       placeholder="e.g. Thabo Nkosi" />
+                        <!-- Full name -->
+                        <div class="auth-field">
+                            <label class="auth-label" for="Input.FullName">Full Name</label>
+                            <div class="auth-input-wrapper">
+                                <span class="auth-input-icon">👤</span>
+                                <InputText @bind-Value="Input.FullName"
+                                           id="Input.FullName"
+                                           class="auth-input"
+                                           autocomplete="name"
+                                           aria-required="true"
+                                           placeholder="e.g. Thabo Nkosi" />
+                            </div>
+                            <ValidationMessage For="() => Input.FullName" class="auth-val-msg" />
                         </div>
-                        <ValidationMessage For="() => Input.FullName" class="auth-val-msg" />
-                    </div>
 
-                    <!-- Email -->
-                    <div class="auth-field">
-                        <label class="auth-label" for="Input.Email">Email Address</label>
-                        <div class="auth-input-wrapper">
-                            <span class="auth-input-icon">✉</span>
-                            <InputText @bind-Value="Input.Email"
-                                       id="Input.Email"
-                                       class="auth-input"
-                                       autocomplete="username"
-                                       aria-required="true"
-                                       placeholder="you@example.com" />
+                        <!-- Email -->
+                        <div class="auth-field">
+                            <label class="auth-label" for="Input.Email">Email Address</label>
+                            <div class="auth-input-wrapper">
+                                <span class="auth-input-icon">✉</span>
+                                <InputText @bind-Value="Input.Email"
+                                           id="Input.Email"
+                                           class="auth-input"
+                                           autocomplete="username"
+                                           aria-required="true"
+                                           placeholder="you@example.com" />
+                            </div>
+                            <ValidationMessage For="() => Input.Email" class="auth-val-msg" />
                         </div>
-                        <ValidationMessage For="() => Input.Email" class="auth-val-msg" />
-                    </div>
 
-                    <!-- ID Number -->
-                    <div class="auth-field">
-                        <label class="auth-label" for="Input.IdNumber">ID Number</label>
-                        <div class="auth-input-wrapper">
-                            <span class="auth-input-icon">🪪</span>
-                            <InputText @bind-Value="Input.IdNumber"
-                                       id="Input.IdNumber"
-                                       class="auth-input"
-                                       autocomplete="off"
-                                       placeholder="13-digit SA ID" />
+                        <!-- ID Number -->
+                        <div class="auth-field">
+                            <label class="auth-label" for="Input.IdNumber">ID Number</label>
+                            <div class="auth-input-wrapper">
+                                <span class="auth-input-icon">🪪</span>
+                                <InputText @bind-Value="Input.IdNumber"
+                                           id="Input.IdNumber"
+                                           class="auth-input"
+                                           autocomplete="off"
+                                           placeholder="13-digit SA ID" />
+                            </div>
+                            <ValidationMessage For="() => Input.IdNumber" class="auth-val-msg" />
                         </div>
-                        <ValidationMessage For="() => Input.IdNumber" class="auth-val-msg" />
-                    </div>
 
-                    <!-- Cellphone number -->
-                    <div class="auth-field">
-                        <label class="auth-label" for="Input.CellphoneNumber">Cellphone Number</label>
-                        <div class="auth-input-wrapper auth-phone-wrap">
-                            <span class="auth-input-icon" style="opacity:0.65;font-size:13px;">🇿🇦 +27</span>
-                            <InputText @bind-Value="Input.CellphoneNumber"
-                                       id="Input.CellphoneNumber"
-                                       class="auth-input phone-input"
-                                       autocomplete="tel"
-                                       placeholder="e.g. 0821234567" />
+                        <!-- Cellphone number -->
+                        <div class="auth-field">
+                            <label class="auth-label" for="Input.CellphoneNumber">Cellphone Number</label>
+                            <div class="auth-input-wrapper auth-phone-wrap">
+                                <span class="auth-input-icon" style="opacity:0.65;font-size:13px;">🇿🇦 +27</span>
+                                <InputText @bind-Value="Input.CellphoneNumber"
+                                           id="Input.CellphoneNumber"
+                                           class="auth-input phone-input"
+                                           autocomplete="tel"
+                                           placeholder="e.g. 0821234567" />
+                            </div>
+                            <ValidationMessage For="() => Input.CellphoneNumber" class="auth-val-msg" />
                         </div>
-                        <ValidationMessage For="() => Input.CellphoneNumber" class="auth-val-msg" />
-                    </div>
 
-                    <!-- Residential area -->
-                    <div class="auth-field">
-                        <label class="auth-label" for="Input.ResidentialArea">Residential Area</label>
-                        <div class="auth-input-wrapper">
-                            <span class="auth-input-icon">📍</span>
-                            <InputText @bind-Value="Input.ResidentialArea"
-                                       id="Input.ResidentialArea"
-                                       class="auth-input"
-                                       autocomplete="address-level2"
-                                       placeholder="e.g. Soweto, Gauteng" />
+                        <!-- Residential area -->
+                        <div class="auth-field">
+                            <label class="auth-label" for="Input.ResidentialArea">Residential Area</label>
+                            <div class="auth-input-wrapper">
+                                <span class="auth-input-icon">📍</span>
+                                <InputText @bind-Value="Input.ResidentialArea"
+                                           id="Input.ResidentialArea"
+                                           class="auth-input"
+                                           autocomplete="address-level2"
+                                           placeholder="e.g. Soweto, Gauteng" />
+                            </div>
+                            <ValidationMessage For="() => Input.ResidentialArea" class="auth-val-msg" />
                         </div>
-                        <ValidationMessage For="() => Input.ResidentialArea" class="auth-val-msg" />
-                    </div>
 
-                    <!-- Continue → Step 2 (type=button — does NOT submit the form) -->
-                    <div style="margin-top: 8px;">
-                        <button type="button" class="auth-btn-primary" onclick="showRegisterStep(2)">
-                            Continue →
-                        </button>
-                    </div>
+                        <!-- Continue → Step 2 -->
+                        <div style="margin-top: 8px;">
+                            <button type="button" class="auth-btn-primary" @onclick="ContinueToStep2">
+                                Continue →
+                            </button>
+                        </div>
 
-                </div>
+                    </div>
+                }
 
                 <!-- ──────────────────────────────────────
                      STEP 2 — Secure Your Account
                 ────────────────────────────────────── -->
-                <div id="register-step-2" class="auth-wizard-step">
+                @if (_step == 2)
+                {
+                    <div class="auth-wizard-step active">
 
-                    <!-- Password -->
-                    <div class="auth-field">
-                        <label class="auth-label" for="Input.Password">Password</label>
-                        <div class="auth-input-wrapper">
-                            <span class="auth-input-icon">🔒</span>
-                            <InputText type="password"
-                                       @bind-Value="Input.Password"
-                                       id="Input.Password"
-                                       class="auth-input has-toggle"
-                                       autocomplete="new-password"
-                                       aria-required="true"
-                                       placeholder="Min. 6 characters"
-                                       oninput="authUpdateStrength(this.value)" />
-                            <button type="button"
-                                    class="auth-pw-toggle"
-                                    onclick="authTogglePw('Input.Password', this)"
-                                    tabindex="-1"
-                                    aria-label="Show password">👁️</button>
-                        </div>
-                        <ValidationMessage For="() => Input.Password" class="auth-val-msg" />
-
-                        <!-- Strength meter -->
-                        <div class="auth-strength">
-                            <div class="auth-strength-bars">
-                                <div class="auth-strength-bar" id="auth-sb-1"></div>
-                                <div class="auth-strength-bar" id="auth-sb-2"></div>
-                                <div class="auth-strength-bar" id="auth-sb-3"></div>
-                                <div class="auth-strength-bar" id="auth-sb-4"></div>
+                        <!-- Password -->
+                        <div class="auth-field">
+                            <label class="auth-label" for="Input.Password">Password</label>
+                            <div class="auth-input-wrapper">
+                                <span class="auth-input-icon">🔒</span>
+                                <InputText type="password"
+                                           @bind-Value="Input.Password"
+                                           id="Input.Password"
+                                           class="auth-input has-toggle"
+                                           autocomplete="new-password"
+                                           aria-required="true"
+                                           placeholder="Min. 8 characters"
+                                           oninput="authUpdateStrength(this.value)" />
+                                <button type="button"
+                                        class="auth-pw-toggle"
+                                        onclick="authTogglePw('Input.Password', this)"
+                                        tabindex="-1"
+                                        aria-label="Show password">👁️</button>
                             </div>
-                            <span class="auth-strength-text" id="auth-strength-label"></span>
+                            <ValidationMessage For="() => Input.Password" class="auth-val-msg" />
+
+                            <!-- Strength meter -->
+                            <div class="auth-strength">
+                                <div class="auth-strength-bars">
+                                    <div class="auth-strength-bar" id="auth-sb-1"></div>
+                                    <div class="auth-strength-bar" id="auth-sb-2"></div>
+                                    <div class="auth-strength-bar" id="auth-sb-3"></div>
+                                    <div class="auth-strength-bar" id="auth-sb-4"></div>
+                                </div>
+                                <span class="auth-strength-text" id="auth-strength-label"></span>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Confirm password -->
-                    <div class="auth-field">
-                        <label class="auth-label" for="Input.ConfirmPassword">Confirm Password</label>
-                        <div class="auth-input-wrapper">
-                            <span class="auth-input-icon">🔒</span>
-                            <InputText type="password"
-                                       @bind-Value="Input.ConfirmPassword"
-                                       id="Input.ConfirmPassword"
-                                       class="auth-input has-toggle"
-                                       autocomplete="new-password"
-                                       aria-required="true"
-                                       placeholder="Repeat your password" />
-                            <button type="button"
-                                    class="auth-pw-toggle"
-                                    onclick="authTogglePw('Input.ConfirmPassword', this)"
-                                    tabindex="-1"
-                                    aria-label="Show confirm password">👁️</button>
+                        <!-- Confirm password -->
+                        <div class="auth-field">
+                            <label class="auth-label" for="Input.ConfirmPassword">Confirm Password</label>
+                            <div class="auth-input-wrapper">
+                                <span class="auth-input-icon">🔒</span>
+                                <InputText type="password"
+                                           @bind-Value="Input.ConfirmPassword"
+                                           id="Input.ConfirmPassword"
+                                           class="auth-input has-toggle"
+                                           autocomplete="new-password"
+                                           aria-required="true"
+                                           placeholder="Repeat your password" />
+                                <button type="button"
+                                        class="auth-pw-toggle"
+                                        onclick="authTogglePw('Input.ConfirmPassword', this)"
+                                        tabindex="-1"
+                                        aria-label="Show confirm password">👁️</button>
+                            </div>
+                            <ValidationMessage For="() => Input.ConfirmPassword" class="auth-val-msg" />
                         </div>
-                        <ValidationMessage For="() => Input.ConfirmPassword" class="auth-val-msg" />
-                    </div>
 
-                    <!-- Password mismatch warning (cosmetic only) -->
-                    <div id="auth-pw-warning" class="auth-pw-warning">
-                        ⚠ Passwords don't match — please check before continuing.
-                    </div>
+                        @if (_passwordMismatch)
+                        {
+                            <div class="auth-pw-warning show">
+                                ⚠ Passwords don't match — please check before continuing.
+                            </div>
+                        }
 
-                    <!-- Step 2 nav: Back | Continue -->
-                    <div class="auth-step-nav" style="margin-top:14px;">
-                        <button type="button" class="auth-btn-back" onclick="showRegisterStep(1)">← Back</button>
-                        <button type="button" class="auth-btn-primary" onclick="authStep2Continue()">Continue →</button>
-                    </div>
+                        <!-- Step 2 nav: Back | Continue -->
+                        <div class="auth-step-nav" style="margin-top:14px;">
+                            <button type="button" class="auth-btn-back" @onclick="() => _step = 1">← Back</button>
+                            <button type="button" class="auth-btn-primary" @onclick="ContinueToStep3">Continue →</button>
+                        </div>
 
-                </div>
+                    </div>
+                }
 
                 <!-- ──────────────────────────────────────
                      STEP 3 — Almost Done
                 ────────────────────────────────────── -->
-                <div id="register-step-3" class="auth-wizard-step">
+                @if (_step == 3)
+                {
+                    <div class="auth-wizard-step active">
 
-                    <!-- Review box -->
-                    <div class="auth-review-box">
-                        <div class="auth-review-label">Full Name</div>
-                        <div class="auth-review-value" id="auth-review-full-name">—</div>
-                        <div class="auth-review-label mt-3">Email</div>
-                        <div class="auth-review-value" id="auth-review-email">—</div>
-                        <div class="auth-review-label mt-3">ID Number</div>
-                        <div class="auth-review-value" id="auth-review-id-number">—</div>
-                        <p class="auth-review-note">
-                            Everything looks good! Click below to create your Sisonke account.
-                            We'll send a confirmation link to your email.
-                        </p>
+                        <!-- Review box populated from C# model -->
+                        <div class="auth-review-box">
+                            <div class="auth-review-label">Full Name</div>
+                            <div class="auth-review-value">@(string.IsNullOrWhiteSpace(Input.FullName) ? "—" : Input.FullName)</div>
+                            <div class="auth-review-label mt-3">Email</div>
+                            <div class="auth-review-value">@(string.IsNullOrWhiteSpace(Input.Email) ? "—" : Input.Email)</div>
+                            <div class="auth-review-label mt-3">ID Number</div>
+                            <div class="auth-review-value">@SensitiveDataMasker.MaskIdNumber(Input.IdNumber)</div>
+                            <p class="auth-review-note">
+                                @if (AuthSettings.RequireConfirmedAccount)
+                                {
+                                    <text>Almost done! Create your account and we'll send a verification link to your email. You must verify before signing in.</text>
+                                }
+                                else
+                                {
+                                    <text>Almost done! You'll be signed in right away. We'll also send a verification email — please confirm it when you receive it.</text>
+                                }
+                            </p>
+                        </div>
+
+                        <!-- REAL submit button -->
+                        <button type="submit" class="auth-btn-primary">Create My Account</button>
+
+                        <div class="auth-step-nav" style="justify-content: flex-start; margin-top: -8px; margin-bottom: 16px;">
+                            <button type="button" class="auth-btn-back" @onclick="() => _step = 2">← Back</button>
+                        </div>
+
                     </div>
-
-                    <!-- REAL submit button -->
-                    <button type="submit" class="auth-btn-primary">Create My Account</button>
-
-                    <div class="auth-step-nav" style="justify-content: flex-start; margin-top: -8px; margin-bottom: 16px;">
-                        <button type="button" class="auth-btn-back" onclick="showRegisterStep(2)">← Back</button>
-                    </div>
-
-                </div>
+                }
 
             </EditForm>
 
-            <!-- External login providers (outside EditForm, same as original) -->
+            <!-- External login providers -->
             <div class="auth-external">
                 <div class="auth-divider" style="margin-top: 4px;"><span>or register with</span></div>
                 <ExternalLoginPicker />
@@ -331,62 +347,6 @@
 
 <script>
 (function () {
-    var labels = ['Personal Details', 'Secure Your Account', 'Almost Done'];
-
-    function showRegisterStep(n) {
-        for (var i = 1; i <= 3; i++) {
-            var panel = document.getElementById('register-step-' + i);
-            if (panel) {
-                panel.classList.toggle('active', i === n);
-            }
-            var dot = document.getElementById('step-dot-' + i);
-            if (dot) {
-                dot.className = 'auth-step-dot' +
-                    (i < n ? ' done' : i === n ? ' active' : '');
-                dot.textContent = i < n ? '✓' : String(i);
-            }
-            if (i < 3) {
-                var line = document.getElementById('step-line-' + i);
-                if (line) {
-                    line.className = 'auth-step-line' + (i < n ? ' done' : '');
-                }
-            }
-        }
-        var lbl = document.getElementById('auth-step-label');
-        if (lbl) lbl.textContent = labels[n - 1];
-
-        if (n === 3) {
-            var fullNameEl = document.getElementById('Input.FullName');
-            var emailEl = document.getElementById('Input.Email');
-            var idNumberEl = document.getElementById('Input.IdNumber');
-            var reviewFullNameEl = document.getElementById('auth-review-full-name');
-            var reviewEl = document.getElementById('auth-review-email');
-            var reviewIdNumberEl = document.getElementById('auth-review-id-number');
-            if (fullNameEl && reviewFullNameEl) {
-                reviewFullNameEl.textContent = fullNameEl.value || '—';
-            }
-            if (emailEl && reviewEl) {
-                reviewEl.textContent = emailEl.value || '—';
-            }
-            if (idNumberEl && reviewIdNumberEl) {
-                reviewIdNumberEl.textContent = idNumberEl.value || '—';
-            }
-        }
-
-        document.getElementById('auth-pw-warning') &&
-            (document.getElementById('auth-pw-warning').className = 'auth-pw-warning');
-    }
-
-    function step2Continue() {
-        var pw  = document.getElementById('Input.Password');
-        var cpw = document.getElementById('Input.ConfirmPassword');
-        var warn = document.getElementById('auth-pw-warning');
-        if (pw && cpw && pw.value && cpw.value && pw.value !== cpw.value) {
-            if (warn) warn.className = 'auth-pw-warning show';
-        }
-        showRegisterStep(3);
-    }
-
     function updateStrength(val) {
         var bars  = [
             document.getElementById('auth-sb-1'),
@@ -424,39 +384,94 @@
         }
     }
 
-    window.showRegisterStep = showRegisterStep;
-    window.authGoToStep      = showRegisterStep;
-    window.authStep2Continue = step2Continue;
     window.authUpdateStrength = updateStrength;
-    window.authTogglePw      = togglePw;
-
-    /* Initialise on load */
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { showRegisterStep(1); });
-    } else {
-        showRegisterStep(1);
-    }
+    window.authTogglePw       = togglePw;
 }());
 </script>
 
 @code {
     private IEnumerable<IdentityError>? identityErrors;
-
-    [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = default!;
+    private int _step = 1;
+    private bool _passwordMismatch = false;
+    private EditContext _editContext = default!;
+    private ValidationMessageStore _messageStore = default!;
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
+    private InputModel Input { get; set; } = default!;
+
     private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+
+    private string StepLabel => _step switch
+    {
+        1 => "Personal Details",
+        2 => "Secure Your Account",
+        3 => "Almost Done",
+        _ => "Personal Details"
+    };
 
     protected override void OnInitialized()
     {
-        Input ??= new();
+        Input = new();
+        _editContext = new EditContext(Input);
+        _messageStore = new ValidationMessageStore(_editContext);
+    }
+
+    private void ContinueToStep2()
+    {
+        _messageStore.Clear();
+        bool valid = ValidateFields(
+            nameof(Input.FullName),
+            nameof(Input.Email),
+            nameof(Input.IdNumber),
+            nameof(Input.CellphoneNumber));
+        if (valid) _step = 2;
+    }
+
+    private void ContinueToStep3()
+    {
+        _passwordMismatch = false;
+        _messageStore.Clear();
+        bool valid = ValidateFields(nameof(Input.Password), nameof(Input.ConfirmPassword));
+        if (valid)
+        {
+            if (!string.IsNullOrEmpty(Input.Password) &&
+                !string.IsNullOrEmpty(Input.ConfirmPassword) &&
+                Input.Password != Input.ConfirmPassword)
+            {
+                _passwordMismatch = true;
+                return;
+            }
+            _step = 3;
+        }
+    }
+
+    private bool ValidateFields(params string[] fieldNames)
+    {
+        bool allValid = true;
+        foreach (var name in fieldNames)
+        {
+            var prop = typeof(InputModel).GetProperty(name)!;
+            var value = prop.GetValue(Input);
+            var ctx = new ValidationContext(Input) { MemberName = name };
+            var results = new List<ValidationResult>();
+            if (!Validator.TryValidateProperty(value, ctx, results))
+            {
+                allValid = false;
+                foreach (var r in results)
+                    _messageStore.Add(_editContext.Field(name), r.ErrorMessage!);
+            }
+        }
+        _editContext.NotifyValidationStateChanged();
+        return allValid;
     }
 
     public async Task RegisterUser(EditContext editContext)
     {
+        _messageStore.Clear();
+        identityErrors = null;
+
         var user = CreateUser();
 
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
@@ -478,16 +493,37 @@
 
         var userId = await UserManager.GetUserIdAsync(user);
         await MemberAccountLinkingService.LinkUserToMembersByIdNumberAsync(userId, Input.IdNumber);
+
+        // Generate confirmation link using the configured public base URL (for Azure hosting).
         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+        var callbackUrl = BuildEmailUrl("Account/ConfirmEmail",
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
 
         await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
 
-        await SignInManager.SignInAsync(user, isPersistent: false);
-        RedirectManager.RedirectTo(GetPostRegistrationRedirectUrl());
+        if (!AuthSettings.RequireConfirmedAccount)
+        {
+            // Pilot mode: sign in immediately — user can access the app without confirming first.
+            // RegisterConfirmation page will show the dev link and a "continue" button.
+            await SignInManager.SignInAsync(user, isPersistent: false);
+        }
+
+        // Always pass through RegisterConfirmation so users see a friendly message and, in dev,
+        // a clickable confirmation link (when SMTP is not configured).
+        var confirmationPageUrl = BuildEmailUrl("Account/RegisterConfirmation",
+            new Dictionary<string, object?> { ["email"] = Input.Email, ["returnUrl"] = GetPostRegistrationRedirectUrl() });
+        NavigationManager.NavigateTo(confirmationPageUrl, forceLoad: true);
+    }
+
+    // Builds an absolute URL for email links. Uses App:PublicBaseUrl when configured so links
+    // work correctly on Azure when behind a reverse proxy.
+    private string BuildEmailUrl(string path, Dictionary<string, object?> parameters)
+    {
+        var baseUri = !string.IsNullOrWhiteSpace(AppSettings.PublicBaseUrl)
+            ? $"{AppSettings.PublicBaseUrl.TrimEnd('/')}/{path}"
+            : NavigationManager.ToAbsoluteUri(path).AbsoluteUri;
+        return NavigationManager.GetUriWithQueryParameters(baseUri, parameters);
     }
 
     private ApplicationUser CreateUser()
@@ -537,7 +573,7 @@
         public string? ResidentialArea { get; set; }
 
         [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 8)]
         [DataType(DataType.Password)]
         [Display(Name = "Password")]
         public string Password { get; set; } = "";

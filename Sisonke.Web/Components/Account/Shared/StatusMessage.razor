@@ -19,6 +19,11 @@
 
     protected override void OnInitialized()
     {
+        // HttpContext is null when this component runs inside an InteractiveServer circuit.
+        // Cookie-based status messages only apply to SSR-rendered auth pages; skip in interactive mode.
+        if (HttpContext is null)
+            return;
+
         messageFromCookie = HttpContext.Request.Cookies[IdentityRedirectManager.StatusCookieName];
 
         if (messageFromCookie is not null)

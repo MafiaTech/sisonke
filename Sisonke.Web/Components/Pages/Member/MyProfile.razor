@@ -84,7 +84,7 @@ else
                 </div>
                 <div class="sm-profile-detail-row">
                     <span class="sm-profile-detail-label">ID Number</span>
-                    <span class="sm-profile-detail-value">@(member.IdNumber ?? "—")</span>
+                    <span class="sm-profile-detail-value">@SensitiveDataMasker.MaskIdNumber(member.IdNumber)</span>
                 </div>
                 <div class="sm-profile-detail-row">
                     <span class="sm-profile-detail-label">Member No.</span>
@@ -130,11 +130,11 @@ else
                 {
                     <div class="sm-profile-detail-row">
                         <span class="sm-profile-detail-label">Cellphone</span>
-                        <span class="sm-profile-detail-value">@(member.CellphoneNumber ?? "—")</span>
+                        <span class="sm-profile-detail-value">@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</span>
                     </div>
                     <div class="sm-profile-detail-row">
                         <span class="sm-profile-detail-label">Email</span>
-                        <span class="sm-profile-detail-value">@(member.EmailAddress ?? "—")</span>
+                        <span class="sm-profile-detail-value">@SensitiveDataMasker.MaskEmail(member.EmailAddress)</span>
                     </div>
                 }
                 else
@@ -198,7 +198,7 @@ else
                                 @nok.FullName
                                 @if (!string.IsNullOrWhiteSpace(nok.CellphoneNumber))
                                 {
-                                    <span style="color:var(--sm-muted);margin-left:8px;">@nok.CellphoneNumber</span>
+                                    <span style="color:var(--sm-muted);margin-left:8px;">@SensitiveDataMasker.MaskPhoneNumber(nok.CellphoneNumber)</span>
                                 }
                             </span>
                         </div>
@@ -230,7 +230,7 @@ else
                                 @ben.FullName
                                 @if (!string.IsNullOrWhiteSpace(ben.IdNumber))
                                 {
-                                    <span style="color:var(--sm-muted);margin-left:8px;font-family:'DM Mono',monospace;font-size:12px;">@ben.IdNumber</span>
+                                    <span style="color:var(--sm-muted);margin-left:8px;font-family:'DM Mono',monospace;font-size:12px;">@SensitiveDataMasker.MaskIdNumber(ben.IdNumber)</span>
                                 }
                             </span>
                         </div>

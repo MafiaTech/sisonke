@@ -1,8 +1,26 @@
-﻿@page "/Account/Lockout"
+@page "/Account/Lockout"
+@layout AuthLayout
 
-<PageTitle>Locked out</PageTitle>
+<PageTitle>Account Locked — Sisonke</PageTitle>
 
-<header>
-    <h1 class="text-danger">Locked out</h1>
-    <p class="text-danger" role="alert">This account has been locked out, please try again later.</p>
-</header>
+<div class="auth-confirm-wrap">
+    <div class="auth-confirm-card">
+        <div class="auth-logo" style="margin-bottom:20px;">
+            <div class="auth-logo-mark">S</div>
+            <span class="auth-logo-name">Sisonke</span>
+        </div>
+        <div class="auth-confirm-icon" style="font-size:48px;margin-bottom:12px;">🔒</div>
+        <h1 class="auth-form-heading" style="text-align:center;">Account temporarily locked</h1>
+        <p style="text-align:center;color:var(--auth-muted,#7A6E69);margin:0 0 28px;line-height:1.6;">
+            Your account has been locked due to too many failed sign-in attempts.<br />
+            Please wait <strong>15 minutes</strong> before trying again.
+        </p>
+        <a href="Account/Login" class="auth-btn-primary" style="display:block;text-align:center;text-decoration:none;">
+            Try Again
+        </a>
+        <p class="auth-switch" style="text-align:center;margin-top:20px;">
+            Forgot your password?
+            <a href="Account/ForgotPassword">Reset it here</a>
+        </p>
+    </div>
+</div>

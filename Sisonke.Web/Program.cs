@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -12,6 +13,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "Data");
 Directory.CreateDirectory(dataDirectory);
+
+// ── Auth, app and email settings (from config / env vars) ────────────────
+var authSettings  = builder.Configuration.GetSection("Auth").Get<AuthSettings>()   ?? new AuthSettings();
+var appSettings   = builder.Configuration.GetSection("App").Get<AppSettings>()     ?? new AppSettings();
+var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings();
+builder.Services.AddSingleton(authSettings);
+builder.Services.AddSingleton(appSettings);
+builder.Services.AddSingleton(emailSettings);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -30,7 +39,7 @@ builder.Services.AddAuthentication(options =>
 
 string connectionString;
 
-if (builder.Environment.IsDevelopment())
+if (builder.Environment.IsDevelopment() || builder.Environment.IsStaging())
 {
     var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
@@ -54,7 +63,9 @@ if (builder.Environment.IsDevelopment())
     connectionString = connectionStringBuilder.ConnectionString;
 
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlite(connectionString));
+        options.UseSqlite(connectionString)
+               .ConfigureWarnings(w =>
+                   w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 }
 else
 {
@@ -69,15 +80,35 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
-        options.SignIn.RequireConfirmedAccount = true;
-        options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
+        // Pilot: RequireConfirmedAccount = false (users can sign in before confirming email).
+        // Production: set Auth__RequireConfirmedAccount = true in Azure App Service config.
+        options.SignIn.RequireConfirmedAccount = authSettings.RequireConfirmedAccount;
+        options.Stores.SchemaVersion = IdentitySchemaVersions.Version2;
+
+        // ── Password policy ──────────────────────────────────────────────
+        options.Password.RequiredLength = 8;
+        options.Password.RequireDigit = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+
+        // ── Account lockout ───────────────────────────────────────────────
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.AllowedForNewUsers = true;
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
-builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+// ── Email sender ─────────────────────────────────────────────────────────
+// SisonkeEmailSender sends real email when SMTP is configured.
+// When SMTP is not configured: logs to console in Development, logs warning in Production.
+// To enable real email, set Email__SmtpHost (and other Email__ keys) in Azure App Service config.
+builder.Services.AddSingleton<SisonkeEmailSender>();
+builder.Services.AddSingleton<IEmailSender<ApplicationUser>>(sp => sp.GetRequiredService<SisonkeEmailSender>());
+
 builder.Services.AddScoped<StokvelService>();
 builder.Services.AddScoped<MemberService>();
 builder.Services.AddScoped<FineService>();
@@ -123,7 +154,6 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
@@ -139,5 +169,7 @@ app.MapRazorComponents<App>()
 app.MapAdditionalIdentityEndpoints();
 
 Console.WriteLine($"Resolved DefaultConnection: {connectionString}");
+Console.WriteLine($"[Sisonke] SMTP configured: {!string.IsNullOrWhiteSpace(emailSettings.SmtpHost)} | RequireConfirmedAccount: {authSettings.RequireConfirmedAccount} | PublicBaseUrl: {appSettings.PublicBaseUrl ?? "(NavigationManager)"}");
+
 
 app.Run();

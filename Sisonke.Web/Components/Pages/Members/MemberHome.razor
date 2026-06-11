@@ -79,11 +79,11 @@ else
                     </div>
                     <div class="mw-htile">
                         <div class="mw-htile-label">ID Number</div>
-                        <div class="mw-htile-val">@Display(member.IdNumber)</div>
+                        <div class="mw-htile-val">@SensitiveDataMasker.MaskIdNumber(member.IdNumber)</div>
                     </div>
                     <div class="mw-htile">
                         <div class="mw-htile-label">Cellphone</div>
-                        <div class="mw-htile-val mw-htile-val--ochre">@Display(member.CellphoneNumber)</div>
+                        <div class="mw-htile-val mw-htile-val--ochre">@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</div>
                     </div>
                 </div>
             </div>
@@ -247,15 +247,15 @@ else
                 </div>
                 <div class="mw-md-cell">
                     <div class="mw-md-lbl">ID Number</div>
-                    <div class="mw-md-val mw-md-val--mono">@Display(member.IdNumber)</div>
+                    <div class="mw-md-val mw-md-val--mono">@SensitiveDataMasker.MaskIdNumber(member.IdNumber)</div>
                 </div>
                 <div class="mw-md-cell">
                     <div class="mw-md-lbl">Telephone</div>
-                    <div class="mw-md-val mw-md-val--mono">@Display(member.CellphoneNumber)</div>
+                    <div class="mw-md-val mw-md-val--mono">@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</div>
                 </div>
                 <div class="mw-md-cell">
                     <div class="mw-md-lbl">Email</div>
-                    <div class="mw-md-val">@Display(member.EmailAddress)</div>
+                    <div class="mw-md-val">@SensitiveDataMasker.MaskEmail(member.EmailAddress)</div>
                 </div>
                 <div class="mw-md-cell">
                     <div class="mw-md-lbl">Residential Area</div>
@@ -670,15 +670,15 @@ else
                 <div class="mw-card-body">
                     <div class="mw-p-row">
                         <span class="mw-p-lbl">Phone</span>
-                        <span class="mw-p-val mw-p-val--mono">@Display(member.CellphoneNumber)</span>
+                        <span class="mw-p-val mw-p-val--mono">@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</span>
                     </div>
                     <div class="mw-p-row">
                         <span class="mw-p-lbl">Email</span>
-                        <span class="mw-p-val">@Display(member.EmailAddress)</span>
+                        <span class="mw-p-val">@SensitiveDataMasker.MaskEmail(member.EmailAddress)</span>
                     </div>
                     <div class="mw-p-row">
                         <span class="mw-p-lbl">ID Number</span>
-                        <span class="mw-p-val mw-p-val--mono">@Display(member.IdNumber)</span>
+                        <span class="mw-p-val mw-p-val--mono">@SensitiveDataMasker.MaskIdNumber(member.IdNumber)</span>
                     </div>
                     <div class="mw-p-row">
                         <span class="mw-p-lbl">Joined</span>

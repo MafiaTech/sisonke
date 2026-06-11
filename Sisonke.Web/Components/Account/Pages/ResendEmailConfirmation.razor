@@ -1,4 +1,5 @@
-﻿@page "/Account/ResendEmailConfirmation"
+@page "/Account/ResendEmailConfirmation"
+@layout AuthLayout
 
 @using System.ComponentModel.DataAnnotations
 @using System.Text
@@ -6,35 +7,102 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using Sisonke.Web.Data
+@using Sisonke.Web.Services
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IEmailSender<ApplicationUser> EmailSender
+@inject AppSettings AppSettings
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Resend email confirmation</PageTitle>
+<PageTitle>Resend Verification Email — Sisonke</PageTitle>
 
-<h1>Resend email confirmation</h1>
-<h2>Enter your email.</h2>
-<hr />
-<StatusMessage Message="@message" />
-<div class="row">
-    <div class="col-md-4">
-        <EditForm Model="Input" FormName="resend-email-confirmation" OnValidSubmit="OnValidSubmitAsync" method="post">
-            <DataAnnotationsValidator />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" aria-required="true" placeholder="name@example.com" />
-                <label for="Input.Email" class="form-label">Email</label>
-                <ValidationMessage For="() => Input.Email" class="text-danger" />
+<div class="auth-split">
+
+    <div class="auth-brand">
+        <div class="auth-circles">
+            <svg width="460" height="460" viewBox="0 0 460 460" fill="none">
+                <circle cx="230" cy="230" r="190" stroke="#C9922A" stroke-width="1.4" stroke-dasharray="9 13" />
+                <circle cx="230" cy="230" r="145" stroke="#C9922A" stroke-width="1"   stroke-dasharray="5 9"  opacity="0.6" />
+                <circle cx="230" cy="230" r="100" stroke="#C9922A" stroke-width="0.8" stroke-dasharray="3 7"  opacity="0.4" />
+                <circle cx="230" cy="230" r="55"  stroke="#C9922A" stroke-width="0.6"                        opacity="0.28" />
+            </svg>
+        </div>
+        <div class="auth-beads">
+            @for (int i = 0; i < 20; i++) { <div class="auth-bead"></div> }
+        </div>
+        <div class="auth-brand-content">
+            <div class="auth-logo">
+                <div class="auth-logo-mark">S</div>
+                <span class="auth-logo-name">Sisonke</span>
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Resend</button>
-        </EditForm>
+            <h2 class="auth-brand-headline">Verify your<br /><em>email address</em><br />to get started.</h2>
+            <p class="auth-brand-sub">
+                Enter your registered email address and we'll resend your verification link.
+            </p>
+        </div>
     </div>
+
+    <div class="auth-form-panel">
+        <div class="auth-form-container">
+
+            <div class="auth-mobile-logo">
+                <div class="auth-mobile-logo-mark">S</div>
+                <span class="auth-mobile-logo-name">Sisonke</span>
+            </div>
+
+            <h1 class="auth-form-heading">Resend verification email</h1>
+            <p class="auth-form-subheading">We'll send a new link to confirm your address</p>
+
+            @if (_sent)
+            {
+                <!-- Always show the same message to prevent user enumeration -->
+                <div class="auth-error-alert"
+                     style="display:block;background:rgba(45,106,79,0.08);border-color:#2D6A4F;color:#1A4A30;">
+                    ✅ <strong>Verification email sent.</strong><br />
+                    If an account exists for that email address, a verification link has been sent.
+                    Please check your inbox (and spam folder).
+                </div>
+
+                <p class="auth-switch" style="margin-top:28px;">
+                    <a href="Account/Login">← Back to Sign In</a>
+                </p>
+            }
+            else
+            {
+                <EditForm Model="Input" FormName="resend-email-confirmation" OnValidSubmit="OnValidSubmitAsync" method="post">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="auth-error-alert" role="alert" />
+
+                    <div class="auth-field">
+                        <label class="auth-label" for="Input.Email">Email Address</label>
+                        <div class="auth-input-wrapper">
+                            <span class="auth-input-icon">✉</span>
+                            <InputText @bind-Value="Input.Email"
+                                       id="Input.Email"
+                                       class="auth-input"
+                                       autocomplete="username"
+                                       aria-required="true"
+                                       placeholder="you@example.com" />
+                        </div>
+                        <ValidationMessage For="() => Input.Email" class="auth-val-msg" />
+                    </div>
+
+                    <button type="submit" class="auth-btn-primary">Send Verification Email</button>
+                </EditForm>
+
+                <p class="auth-switch" style="margin-top:24px;">
+                    Already verified? <a href="Account/Login">Sign in</a>
+                </p>
+            }
+
+        </div>
+    </div>
+
 </div>
 
 @code {
-    private string? message;
+    private bool _sent = false;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = default!;
@@ -47,21 +115,25 @@
     private async Task OnValidSubmitAsync()
     {
         var user = await UserManager.FindByEmailAsync(Input.Email!);
-        if (user is null)
-        {
-            message = "Verification email sent. Please check your email.";
+
+        // Always show the same success message regardless of whether the user exists,
+        // to prevent account enumeration attacks.
+        _sent = true;
+
+        if (user is null || await UserManager.IsEmailConfirmedAsync(user))
             return;
-        }
 
         var userId = await UserManager.GetUserIdAsync(user);
         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
-        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
 
-        message = "Verification email sent. Please check your email.";
+        var confirmBase = !string.IsNullOrWhiteSpace(AppSettings.PublicBaseUrl)
+            ? $"{AppSettings.PublicBaseUrl.TrimEnd('/')}/Account/ConfirmEmail"
+            : NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri;
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(confirmBase,
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
+
+        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
     }
 
     private sealed class InputModel

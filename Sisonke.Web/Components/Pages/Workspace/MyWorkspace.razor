@@ -69,15 +69,15 @@ else
                 </div>
                 <div>
                     <div class="workspace-detail-label">Email</div>
-                    <div class="workspace-detail-value">@(currentUser.Email ?? "-")</div>
+                    <div class="workspace-detail-value">@SensitiveDataMasker.MaskEmail(currentUser.Email)</div>
                 </div>
                 <div>
                     <div class="workspace-detail-label">ID Number</div>
-                    <div class="workspace-detail-value">@(currentUser.IdNumber ?? "-")</div>
+                    <div class="workspace-detail-value">@SensitiveDataMasker.MaskIdNumber(currentUser.IdNumber)</div>
                 </div>
                 <div>
                     <div class="workspace-detail-label">Cellphone Number</div>
-                    <div class="workspace-detail-value">@(currentUser.CellphoneNumber ?? "-")</div>
+                    <div class="workspace-detail-value">@SensitiveDataMasker.MaskPhoneNumber(currentUser.CellphoneNumber)</div>
                 </div>
                 <div>
                     <div class="workspace-detail-label">Residential Area</div>

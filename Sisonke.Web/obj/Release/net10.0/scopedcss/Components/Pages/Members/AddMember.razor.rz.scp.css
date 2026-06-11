@@ -1,0 +1,61 @@
+/* ── Member limit warning card ──────────────────────────── */
+.member-limit-warning[b-qxg81lgd8m] {
+    display: flex;
+    gap: 1.25rem;
+    background: var(--sk-warning-bg);
+    border: 1.5px solid var(--sk-gold);
+    border-radius: var(--sk-radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 10px rgba(245,158,11,.15);
+}
+
+.mlw-icon[b-qxg81lgd8m] {
+    flex-shrink: 0;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--sk-gold-light);
+    border: 1.5px solid var(--sk-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    color: var(--sk-gold-dark);
+}
+
+.mlw-content[b-qxg81lgd8m] { flex: 1; min-width: 0; }
+
+.mlw-title[b-qxg81lgd8m] {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #92400e;
+    margin-bottom: 0.35rem;
+}
+
+.mlw-stat[b-qxg81lgd8m] {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #78350f;
+    margin-bottom: 0.4rem;
+}
+
+.mlw-hint[b-qxg81lgd8m] {
+    font-size: 0.875rem;
+    color: #92400e;
+    opacity: 0.85;
+    margin-bottom: 1rem;
+}
+
+.mlw-actions[b-qxg81lgd8m] {
+    display: flex;
+    gap: 0.625rem;
+    flex-wrap: wrap;
+}
+
+/* ── Form disabled when member limit reached ────────────── */
+.form-faded[b-qxg81lgd8m] {
+    opacity: 0.4;
+    pointer-events: none;
+    user-select: none;
+}

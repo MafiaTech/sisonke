@@ -87,15 +87,15 @@ else
                     </div>
                     <div>
                         <div class="sisonke-detail-label">Email</div>
-                        <div class="sisonke-detail-value">@(currentUser.Email ?? "-")</div>
+                        <div class="sisonke-detail-value">@SensitiveDataMasker.MaskEmail(currentUser.Email)</div>
                     </div>
                     <div>
                         <div class="sisonke-detail-label">ID Number</div>
-                        <div class="sisonke-detail-value">@(currentUser.IdNumber ?? "-")</div>
+                        <div class="sisonke-detail-value">@SensitiveDataMasker.MaskIdNumber(currentUser.IdNumber)</div>
                     </div>
                     <div>
                         <div class="sisonke-detail-label">Cellphone Number</div>
-                        <div class="sisonke-detail-value">@(currentUser.CellphoneNumber ?? "-")</div>
+                        <div class="sisonke-detail-value">@SensitiveDataMasker.MaskPhoneNumber(currentUser.CellphoneNumber)</div>
                     </div>
                     <div>
                         <div class="sisonke-detail-label">Residential Area</div>

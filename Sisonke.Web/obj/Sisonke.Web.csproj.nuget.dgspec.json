@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\mpshe\\Projects\\Sisonke\\Sisonke.Web\\Sisonke.Web.csproj": {}
+    "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.Web.csproj": {}
   },
   "projects": {
-    "C:\\Users\\mpshe\\Projects\\Sisonke\\Sisonke.Web\\Sisonke.Web.csproj": {
+    "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.Web.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mpshe\\Projects\\Sisonke\\Sisonke.Web\\Sisonke.Web.csproj",
+        "projectUniqueName": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.Web.csproj",
         "projectName": "Sisonke.Web",
-        "projectPath": "C:\\Users\\mpshe\\Projects\\Sisonke\\Sisonke.Web\\Sisonke.Web.csproj",
+        "projectPath": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.Web.csproj",
         "packagesPath": "C:\\Users\\mpshe\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mpshe\\Projects\\Sisonke\\Sisonke.Web\\obj\\",
+        "outputPath": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\mpshe\\AppData\\Roaming\\NuGet\\NuGet.Config"

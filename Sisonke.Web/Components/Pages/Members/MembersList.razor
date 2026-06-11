@@ -101,7 +101,7 @@ else
                                     <div class="fw-600">@member.FullName</div>
                                     <div class="text-muted" style="font-size:.75rem">@member.MemberNumber</div>
                                 </td>
-                                <td class="text-muted small">@member.CellphoneNumber</td>
+                                <td class="text-muted small">@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</td>
                                 <td><StatusBadge Text="@member.DefaultRole.ToString()" Type="secondary" /></td>
                                 <td>
                                     @{
