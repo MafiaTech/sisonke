@@ -3,20 +3,8 @@
 @layout AuthLayout
 
 @using System.ComponentModel.DataAnnotations
-@using System.Text
-@using System.Text.Encodings.Web
-@using Microsoft.AspNetCore.Identity
-@using Microsoft.AspNetCore.WebUtilities
-@using Sisonke.Web.Data
 @using Sisonke.Web.Services
 
-@inject UserManager<ApplicationUser> UserManager
-@inject IUserStore<ApplicationUser> UserStore
-@inject SignInManager<ApplicationUser> SignInManager
-@inject IEmailSender<ApplicationUser> EmailSender
-@inject MemberAccountLinkingService MemberAccountLinkingService
-@inject AuthSettings AuthSettings
-@inject AppSettings AppSettings
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 
@@ -106,7 +94,7 @@
             <h1 class="auth-form-heading">Create your account</h1>
             <p class="auth-form-subheading">Get started — it only takes a minute</p>
 
-            <!-- ── Step indicator bar — driven by _step ─── -->
+            <!-- Step indicator bar -->
             <div class="auth-step-bar">
                 <div class="auth-step-dot @(_step > 1 ? "done" : "active")">@(_step > 1 ? "✓" : "1")</div>
                 <div class="auth-step-line @(_step > 1 ? "done" : "")"></div>
@@ -116,14 +104,16 @@
             </div>
             <div class="auth-step-label">@StepLabel</div>
 
-            <!-- Status message -->
-            <StatusMessage Message="@Message" />
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="auth-error-alert" role="alert">@_errorMessage</div>
+            }
 
             <!-- ════════════════════════════════════════
-                 THE SINGLE FORM — steps controlled by _step
+                 Wizard uses Blazor clicks for step validation. Final account
+                 creation uses a normal HTTP POST so Identity can issue cookies.
             ════════════════════════════════════════ -->
-            <EditForm EditContext="_editContext" OnValidSubmit="RegisterUser" FormName="register">
-                <DataAnnotationsValidator />
+            <div>
 
                 <!-- ──────────────────────────────────────
                      STEP 1 — Personal Details
@@ -132,7 +122,6 @@
                 {
                     <div class="auth-wizard-step active">
 
-                        <!-- Full name -->
                         <div class="auth-field">
                             <label class="auth-label" for="Input.FullName">Full Name</label>
                             <div class="auth-input-wrapper">
@@ -144,10 +133,9 @@
                                            aria-required="true"
                                            placeholder="e.g. Thabo Nkosi" />
                             </div>
-                            <ValidationMessage For="() => Input.FullName" class="auth-val-msg" />
+                            @StepError(nameof(Input.FullName))
                         </div>
 
-                        <!-- Email -->
                         <div class="auth-field">
                             <label class="auth-label" for="Input.Email">Email Address</label>
                             <div class="auth-input-wrapper">
@@ -159,10 +147,9 @@
                                            aria-required="true"
                                            placeholder="you@example.com" />
                             </div>
-                            <ValidationMessage For="() => Input.Email" class="auth-val-msg" />
+                            @StepError(nameof(Input.Email))
                         </div>
 
-                        <!-- ID Number -->
                         <div class="auth-field">
                             <label class="auth-label" for="Input.IdNumber">ID Number</label>
                             <div class="auth-input-wrapper">
@@ -173,10 +160,9 @@
                                            autocomplete="off"
                                            placeholder="13-digit SA ID" />
                             </div>
-                            <ValidationMessage For="() => Input.IdNumber" class="auth-val-msg" />
+                            @StepError(nameof(Input.IdNumber))
                         </div>
 
-                        <!-- Cellphone number -->
                         <div class="auth-field">
                             <label class="auth-label" for="Input.CellphoneNumber">Cellphone Number</label>
                             <div class="auth-input-wrapper auth-phone-wrap">
@@ -187,10 +173,9 @@
                                            autocomplete="tel"
                                            placeholder="e.g. 0821234567" />
                             </div>
-                            <ValidationMessage For="() => Input.CellphoneNumber" class="auth-val-msg" />
+                            @StepError(nameof(Input.CellphoneNumber))
                         </div>
 
-                        <!-- Residential area -->
                         <div class="auth-field">
                             <label class="auth-label" for="Input.ResidentialArea">Residential Area</label>
                             <div class="auth-input-wrapper">
@@ -201,10 +186,9 @@
                                            autocomplete="address-level2"
                                            placeholder="e.g. Soweto, Gauteng" />
                             </div>
-                            <ValidationMessage For="() => Input.ResidentialArea" class="auth-val-msg" />
+                            @StepError(nameof(Input.ResidentialArea))
                         </div>
 
-                        <!-- Continue → Step 2 -->
                         <div style="margin-top: 8px;">
                             <button type="button" class="auth-btn-primary" @onclick="ContinueToStep2">
                                 Continue →
@@ -221,7 +205,6 @@
                 {
                     <div class="auth-wizard-step active">
 
-                        <!-- Password -->
                         <div class="auth-field">
                             <label class="auth-label" for="Input.Password">Password</label>
                             <div class="auth-input-wrapper">
@@ -240,9 +223,8 @@
                                         tabindex="-1"
                                         aria-label="Show password">👁️</button>
                             </div>
-                            <ValidationMessage For="() => Input.Password" class="auth-val-msg" />
+                            @StepError(nameof(Input.Password))
 
-                            <!-- Strength meter -->
                             <div class="auth-strength">
                                 <div class="auth-strength-bars">
                                     <div class="auth-strength-bar" id="auth-sb-1"></div>
@@ -254,7 +236,6 @@
                             </div>
                         </div>
 
-                        <!-- Confirm password -->
                         <div class="auth-field">
                             <label class="auth-label" for="Input.ConfirmPassword">Confirm Password</label>
                             <div class="auth-input-wrapper">
@@ -272,7 +253,7 @@
                                         tabindex="-1"
                                         aria-label="Show confirm password">👁️</button>
                             </div>
-                            <ValidationMessage For="() => Input.ConfirmPassword" class="auth-val-msg" />
+                            @StepError(nameof(Input.ConfirmPassword))
                         </div>
 
                         @if (_passwordMismatch)
@@ -282,7 +263,6 @@
                             </div>
                         }
 
-                        <!-- Step 2 nav: Back | Continue -->
                         <div class="auth-step-nav" style="margin-top:14px;">
                             <button type="button" class="auth-btn-back" @onclick="() => _step = 1">← Back</button>
                             <button type="button" class="auth-btn-primary" @onclick="ContinueToStep3">Continue →</button>
@@ -298,7 +278,6 @@
                 {
                     <div class="auth-wizard-step active">
 
-                        <!-- Review box populated from C# model -->
                         <div class="auth-review-box">
                             <div class="auth-review-label">Full Name</div>
                             <div class="auth-review-value">@(string.IsNullOrWhiteSpace(Input.FullName) ? "—" : Input.FullName)</div>
@@ -307,19 +286,27 @@
                             <div class="auth-review-label mt-3">ID Number</div>
                             <div class="auth-review-value">@SensitiveDataMasker.MaskIdNumber(Input.IdNumber)</div>
                             <p class="auth-review-note">
-                                @if (AuthSettings.RequireConfirmedAccount)
-                                {
-                                    <text>Almost done! Create your account and we'll send a verification link to your email. You must verify before signing in.</text>
-                                }
-                                else
-                                {
-                                    <text>Almost done! You'll be signed in right away. We'll also send a verification email — please confirm it when you receive it.</text>
-                                }
+                                Almost done! Click below to create your account. You'll be signed in right away.
                             </p>
                         </div>
 
-                        <!-- REAL submit button -->
-                        <button type="submit" class="auth-btn-primary">Create My Account</button>
+                        <form method="post"
+                              action="@RegisterSubmitAction"
+                              onsubmit="return authDisableRegisterSubmit(this);">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="FullName" value="@Input.FullName" />
+                            <input type="hidden" name="Email" value="@Input.Email" />
+                            <input type="hidden" name="IdNumber" value="@Input.IdNumber" />
+                            <input type="hidden" name="CellphoneNumber" value="@Input.CellphoneNumber" />
+                            <input type="hidden" name="ResidentialArea" value="@Input.ResidentialArea" />
+                            <input type="hidden" name="Password" value="@Input.Password" />
+                            <input type="hidden" name="ConfirmPassword" value="@Input.ConfirmPassword" />
+                            <input type="hidden" name="ReturnUrl" value="@GetPostRegistrationRedirectUrl()" />
+
+                            <button type="submit" class="auth-btn-primary" data-register-submit>
+                                Create My Account
+                            </button>
+                        </form>
 
                         <div class="auth-step-nav" style="justify-content: flex-start; margin-top: -8px; margin-bottom: 16px;">
                             <button type="button" class="auth-btn-back" @onclick="() => _step = 2">← Back</button>
@@ -328,12 +315,6 @@
                     </div>
                 }
 
-            </EditForm>
-
-            <!-- External login providers -->
-            <div class="auth-external">
-                <div class="auth-divider" style="margin-top: 4px;"><span>or register with</span></div>
-                <ExternalLoginPicker />
             </div>
 
             <p class="auth-switch">
@@ -386,22 +367,43 @@
 
     window.authUpdateStrength = updateStrength;
     window.authTogglePw       = togglePw;
+    window.authDisableRegisterSubmit = function (form) {
+        var btn = form && form.querySelector('[data-register-submit]');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Creating account...';
+        }
+        return true;
+    };
 }());
 </script>
 
 @code {
-    private IEnumerable<IdentityError>? identityErrors;
     private int _step = 1;
     private bool _passwordMismatch = false;
-    private EditContext _editContext = default!;
-    private ValidationMessageStore _messageStore = default!;
+    private string? _errorMessage;
+    private Dictionary<string, string> _stepErrors = new();
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private InputModel Input { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "registrationError")]
+    private string? RegistrationError { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    private InputModel Input { get; set; } = new();
+
+    private string RegisterSubmitAction =>
+        $"/Account/RegisterSubmit?returnUrl={Uri.EscapeDataString(GetPostRegistrationRedirectUrl())}";
+
+    protected override void OnInitialized()
+    {
+        _errorMessage = RegistrationError switch
+        {
+            "duplicate" => "An account with this email already exists. Please sign in instead.",
+            { Length: > 0 } => RegistrationError,
+            _ => null
+        };
+    }
 
     private string StepLabel => _step switch
     {
@@ -411,28 +413,50 @@
         _ => "Personal Details"
     };
 
-    protected override void OnInitialized()
+    private RenderFragment StepError(string fieldName) => builder =>
     {
-        Input = new();
-        _editContext = new EditContext(Input);
-        _messageStore = new ValidationMessageStore(_editContext);
-    }
+        if (_stepErrors.TryGetValue(fieldName, out var msg))
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "auth-val-msg");
+            builder.AddContent(2, msg);
+            builder.CloseElement();
+        }
+    };
 
     private void ContinueToStep2()
     {
-        _messageStore.Clear();
+        _stepErrors.Clear();
+        _errorMessage = null;
+        Input.FullName = Input.FullName?.Trim() ?? string.Empty;
+        Input.Email = Input.Email?.Trim() ?? string.Empty;
+        Input.IdNumber = Input.IdNumber?.Trim() ?? string.Empty;
+        Input.CellphoneNumber = Input.CellphoneNumber?.Trim() ?? string.Empty;
+        Input.ResidentialArea = Input.ResidentialArea?.Trim();
+
+        Logger.LogInformation("[Register] Validating step 1 input for {Email}", Input.Email);
         bool valid = ValidateFields(
             nameof(Input.FullName),
             nameof(Input.Email),
             nameof(Input.IdNumber),
             nameof(Input.CellphoneNumber));
-        if (valid) _step = 2;
+        if (valid)
+        {
+            Logger.LogInformation("[Register] Step 1 validation passed for {Email}", Input.Email);
+            _step = 2;
+        }
+        else
+        {
+            Logger.LogWarning("[Register] Step 1 validation failed for {Email}: {Errors}", Input.Email, string.Join(" | ", _stepErrors.Values));
+        }
     }
 
     private void ContinueToStep3()
     {
         _passwordMismatch = false;
-        _messageStore.Clear();
+        _stepErrors.Clear();
+        _errorMessage = null;
+        Logger.LogInformation("[Register] Validating password step for {Email}", Input.Email?.Trim());
         bool valid = ValidateFields(nameof(Input.Password), nameof(Input.ConfirmPassword));
         if (valid)
         {
@@ -441,9 +465,15 @@
                 Input.Password != Input.ConfirmPassword)
             {
                 _passwordMismatch = true;
+                Logger.LogWarning("[Register] Password validation failed for {Email}: confirmation mismatch", Input.Email?.Trim());
                 return;
             }
+            Logger.LogInformation("[Register] Password step validation passed for {Email}", Input.Email?.Trim());
             _step = 3;
+        }
+        else
+        {
+            Logger.LogWarning("[Register] Password step validation failed for {Email}: {Errors}", Input.Email?.Trim(), string.Join(" | ", _stepErrors.Values));
         }
     }
 
@@ -459,93 +489,10 @@
             if (!Validator.TryValidateProperty(value, ctx, results))
             {
                 allValid = false;
-                foreach (var r in results)
-                    _messageStore.Add(_editContext.Field(name), r.ErrorMessage!);
+                _stepErrors[name] = string.Join(" ", results.Select(r => r.ErrorMessage));
             }
         }
-        _editContext.NotifyValidationStateChanged();
         return allValid;
-    }
-
-    public async Task RegisterUser(EditContext editContext)
-    {
-        _messageStore.Clear();
-        identityErrors = null;
-
-        var user = CreateUser();
-
-        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
-        var emailStore = GetEmailStore();
-        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-        user.FullName = Input.FullName;
-        user.IdNumber = Input.IdNumber;
-        user.CellphoneNumber = Input.CellphoneNumber;
-        user.ResidentialArea = Input.ResidentialArea;
-        var result = await UserManager.CreateAsync(user, Input.Password);
-
-        if (!result.Succeeded)
-        {
-            identityErrors = result.Errors;
-            return;
-        }
-
-        Logger.LogInformation("User created a new account with password.");
-
-        var userId = await UserManager.GetUserIdAsync(user);
-        await MemberAccountLinkingService.LinkUserToMembersByIdNumberAsync(userId, Input.IdNumber);
-
-        // Generate confirmation link using the configured public base URL (for Azure hosting).
-        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = BuildEmailUrl("Account/ConfirmEmail",
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
-
-        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
-
-        if (!AuthSettings.RequireConfirmedAccount)
-        {
-            // Pilot mode: sign in immediately — user can access the app without confirming first.
-            // RegisterConfirmation page will show the dev link and a "continue" button.
-            await SignInManager.SignInAsync(user, isPersistent: false);
-        }
-
-        // Always pass through RegisterConfirmation so users see a friendly message and, in dev,
-        // a clickable confirmation link (when SMTP is not configured).
-        var confirmationPageUrl = BuildEmailUrl("Account/RegisterConfirmation",
-            new Dictionary<string, object?> { ["email"] = Input.Email, ["returnUrl"] = GetPostRegistrationRedirectUrl() });
-        NavigationManager.NavigateTo(confirmationPageUrl, forceLoad: true);
-    }
-
-    // Builds an absolute URL for email links. Uses App:PublicBaseUrl when configured so links
-    // work correctly on Azure when behind a reverse proxy.
-    private string BuildEmailUrl(string path, Dictionary<string, object?> parameters)
-    {
-        var baseUri = !string.IsNullOrWhiteSpace(AppSettings.PublicBaseUrl)
-            ? $"{AppSettings.PublicBaseUrl.TrimEnd('/')}/{path}"
-            : NavigationManager.ToAbsoluteUri(path).AbsoluteUri;
-        return NavigationManager.GetUriWithQueryParameters(baseUri, parameters);
-    }
-
-    private ApplicationUser CreateUser()
-    {
-        try
-        {
-            return Activator.CreateInstance<ApplicationUser>();
-        }
-        catch
-        {
-            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
-        }
-    }
-
-    private IUserEmailStore<ApplicationUser> GetEmailStore()
-    {
-        if (!UserManager.SupportsUserEmail)
-        {
-            throw new NotSupportedException("The default UI requires a user store with email support.");
-        }
-        return (IUserEmailStore<ApplicationUser>)UserStore;
     }
 
     private sealed class InputModel

@@ -93,7 +93,7 @@
             }
 
             <div class="nav-item px-0">
-                <form action="Account/Logout" method="post">
+                <form action="Account/Logout" method="post" @formname="logout-form">
                     <AntiforgeryToken />
                     <input type="hidden" name="ReturnUrl" value="@currentUrl" />
                     <button type="submit" class="sisonke-nav-item w-100" style="background:transparent;border:0;text-align:left;">

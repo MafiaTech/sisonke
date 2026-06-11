@@ -7,7 +7,8 @@
       "PowerShell(Get-Process -Id 13768 -ErrorAction SilentlyContinue)",
       "PowerShell(Stop-Process -Id 13768 -Force)",
       "Bash(dotnet run *)",
-      "PowerShell(Stop-Process -Id 25892 -Force -ErrorAction SilentlyContinue)"
+      "PowerShell(Stop-Process -Id 25892 -Force -ErrorAction SilentlyContinue)",
+      "Bash(dotnet clean *)"
     ]
   }
 }
