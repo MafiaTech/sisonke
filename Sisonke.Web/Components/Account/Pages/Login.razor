@@ -159,13 +159,7 @@
                 <!-- Submit -->
                 <button type="submit" class="auth-btn-primary">Sign In</button>
 
-                <!-- Passkey + external divider -->
                 <div class="auth-divider"><span>or continue with</span></div>
-
-                <PasskeySubmit Operation="PasskeyOperation.Request"
-                               Name="Input.Passkey"
-                               EmailName="Input.Email"
-                               class="auth-btn-secondary">🔑 Sign in with a passkey</PasskeySubmit>
 
                 <div class="auth-external">
                     <ExternalLoginPicker />
@@ -236,28 +230,12 @@
 
     public async Task LoginUser()
     {
-        if (!string.IsNullOrEmpty(Input.Passkey?.Error))
+        if (!editContext.Validate())
         {
-            errorMessage = $"Error: {Input.Passkey.Error}";
             return;
         }
 
-        SignInResult result;
-        if (!string.IsNullOrEmpty(Input.Passkey?.CredentialJson))
-        {
-            // When performing passkey sign-in, don't perform form validation.
-            result = await SignInManager.PasskeySignInAsync(Input.Passkey.CredentialJson);
-        }
-        else
-        {
-            // If doing a password sign-in, validate the form.
-            if (!editContext.Validate())
-            {
-                return;
-            }
-
-            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: true);
-        }
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: true);
 
         if (result.Succeeded)
         {
@@ -293,8 +271,6 @@
 
         [Display(Name = "Remember me?")]
         public bool RememberMe { get; set; }
-
-        public PasskeyInputModel? Passkey { get; set; }
     }
 
     private string GetPostLoginRedirectUrl()

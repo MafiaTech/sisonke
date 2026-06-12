@@ -111,10 +111,6 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBY2NvdW50XFBhZ2VzXE1hbmFnZVxJbmRleC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Account/Pages/Manage/Passkeys.razor]
-build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBY2NvdW50XFBhZ2VzXE1hbmFnZVxQYXNza2V5cy5yYXpvcg==
-build_metadata.AdditionalFiles.CssScope = 
-
 [C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Account/Pages/Manage/PersonalData.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBY2NvdW50XFBhZ2VzXE1hbmFnZVxQZXJzb25hbERhdGEucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
@@ -173,10 +169,6 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Account/Shared/ManageNavMenu.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBY2NvdW50XFNoYXJlZFxNYW5hZ2VOYXZNZW51LnJhem9y
-build_metadata.AdditionalFiles.CssScope = 
-
-[C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Account/Shared/PasskeySubmit.razor]
-build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBY2NvdW50XFNoYXJlZFxQYXNza2V5U3VibWl0LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Account/Shared/RedirectToLogin.razor]

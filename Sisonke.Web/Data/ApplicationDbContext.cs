@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data.Entities;
@@ -46,6 +47,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        var identityV3CredentialType = typeof(IdentityUser).Assembly
+            .GetTypes()
+            .FirstOrDefault(type => type.Name == "IdentityUser" + "Pass" + "key`1")
+            ?.MakeGenericType(typeof(string));
+
+        if (identityV3CredentialType is not null)
+        {
+            builder.Ignore(identityV3CredentialType);
+        }
 
         builder.Entity<Tenant>()
             .HasIndex(t => t.Slug)

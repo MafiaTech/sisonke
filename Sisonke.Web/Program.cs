@@ -46,28 +46,47 @@ builder.Services.AddAuthentication(options =>
 
 string connectionString;
 
-if (builder.Environment.IsDevelopment() || builder.Environment.IsStaging())
+var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' not found. " +
+        "SQLite example: 'Data Source=Data/app.db'. " +
+        "Azure SQL example: 'Server=tcp:sql-sisonke-dev.database.windows.net,1433;Initial Catalog=sqldb-sisonke-dev;...'");
+
+// Provider can be forced for EF tooling/Azure via DatabaseProvider=SqlServer.
+// Otherwise infer from the connection string so local SQLite pilot still works.
+var configuredProvider = builder.Configuration["DatabaseProvider"];
+var isSqlServer = string.Equals(configuredProvider, "SqlServer", StringComparison.OrdinalIgnoreCase)
+                  || rawConnectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase);
+var isSqlite = !isSqlServer
+               && (string.Equals(configuredProvider, "Sqlite", StringComparison.OrdinalIgnoreCase)
+                   || rawConnectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase));
+
+if (!isSqlite && !isSqlServer)
 {
-    var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-    var connectionStringBuilder = new SqliteConnectionStringBuilder(configuredConnectionString);
-    var configuredDataSource = connectionStringBuilder.DataSource;
+    throw new InvalidOperationException(
+        "Unable to determine database provider. Set DatabaseProvider to 'Sqlite' or 'SqlServer', " +
+        "or supply a DefaultConnection containing either 'Data Source=' or 'Server='.");
+}
 
-    if (string.IsNullOrWhiteSpace(configuredDataSource))
-    {
-        throw new InvalidOperationException("Connection string 'DefaultConnection' must include a SQLite Data Source.");
-    }
+if (isSqlite)
+{
+    // Resolve relative path to absolute so the file lands in a predictable location.
+    var csb = new SqliteConnectionStringBuilder(rawConnectionString);
+    var dataSource = csb.DataSource;
 
-    var absoluteDatabasePath = Path.IsPathRooted(configuredDataSource)
-        ? Path.GetFullPath(configuredDataSource)
+    if (string.IsNullOrWhiteSpace(dataSource))
+        throw new InvalidOperationException("SQLite connection string must include a non-empty Data Source path.");
+
+    var absolutePath = Path.IsPathRooted(dataSource)
+        ? Path.GetFullPath(dataSource)
         : Path.GetFullPath(Path.Combine(
-            string.IsNullOrWhiteSpace(Path.GetDirectoryName(configuredDataSource))
+            string.IsNullOrWhiteSpace(Path.GetDirectoryName(dataSource))
                 ? dataDirectory
                 : builder.Environment.ContentRootPath,
-            configuredDataSource));
+            dataSource));
 
-    connectionStringBuilder.DataSource = absoluteDatabasePath;
-    connectionString = connectionStringBuilder.ConnectionString;
+    csb.DataSource = absolutePath;
+    connectionString = csb.ConnectionString;
 
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlite(connectionString)
@@ -76,8 +95,7 @@ if (builder.Environment.IsDevelopment() || builder.Environment.IsStaging())
 }
 else
 {
-    connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found. Supply it via Azure App Service Configuration as ConnectionStrings__DefaultConnection.");
+    connectionString = rawConnectionString;
 
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlServer(connectionString));
@@ -211,8 +229,8 @@ app.MapPost("/Account/RegisterSubmit", RegistrationSubmitEndpoint.HandleAsync)
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
 
-Console.WriteLine($"Resolved DefaultConnection: {connectionString}");
-Console.WriteLine($"[Sisonke] SMTP configured: {!string.IsNullOrWhiteSpace(emailSettings.SmtpHost)} | RequireConfirmedAccount: {authSettings.RequireConfirmedAccount} | PublicBaseUrl: {appSettings.PublicBaseUrl ?? "(NavigationManager)"}");
+Console.WriteLine($"[Sisonke] DB provider: {(isSqlite ? "SQLite" : "SQL Server")} | Connection: {connectionString}");
+Console.WriteLine($"[Sisonke] SMTP configured: {!string.IsNullOrWhiteSpace(emailSettings.SmtpHost)} | RequireConfirmedAccount: {authSettings.RequireConfirmedAccount} | SessionTimeout: {authSettings.SessionTimeoutMinutes}m | PublicBaseUrl: {appSettings.PublicBaseUrl ?? "(NavigationManager)"}");
 
 
 app.Run();
