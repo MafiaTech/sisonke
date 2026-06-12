@@ -264,7 +264,7 @@
                         }
 
                         <div class="auth-step-nav" style="margin-top:14px;">
-                            <button type="button" class="auth-btn-back" @onclick="() => _step = 1">← Back</button>
+                            <button type="button" class="auth-btn-back" @onclick="GoBack">← Back</button>
                             <button type="button" class="auth-btn-primary" @onclick="ContinueToStep3">Continue →</button>
                         </div>
 
@@ -286,7 +286,7 @@
                             <div class="auth-review-label mt-3">ID Number</div>
                             <div class="auth-review-value">@SensitiveDataMasker.MaskIdNumber(Input.IdNumber)</div>
                             <p class="auth-review-note">
-                                Almost done! Click below to create your account. You'll be signed in right away.
+                                Click below to create your account.
                             </p>
                         </div>
 
@@ -309,7 +309,7 @@
                         </form>
 
                         <div class="auth-step-nav" style="justify-content: flex-start; margin-top: -8px; margin-bottom: 16px;">
-                            <button type="button" class="auth-btn-back" @onclick="() => _step = 2">← Back</button>
+                            <button type="button" class="auth-btn-back" @onclick="GoBack">← Back</button>
                         </div>
 
                     </div>
@@ -423,6 +423,14 @@
             builder.CloseElement();
         }
     };
+
+    private void GoBack()
+    {
+        _errorMessage = null;
+        _stepErrors.Clear();
+        _passwordMismatch = false;
+        if (_step > 1) _step--;
+    }
 
     private void ContinueToStep2()
     {

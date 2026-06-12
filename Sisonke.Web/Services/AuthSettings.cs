@@ -8,4 +8,11 @@ public class AuthSettings
     /// Azure env var: Auth__RequireConfirmedAccount
     /// </summary>
     public bool RequireConfirmedAccount { get; set; } = false;
+
+    /// <summary>
+    /// Idle session timeout in minutes. Sliding expiry — each request resets the clock.
+    /// After this period of inactivity the auth cookie is rejected and the user must re-login.
+    /// Azure env var: Auth__SessionTimeoutMinutes
+    /// </summary>
+    public int SessionTimeoutMinutes { get; set; } = 60;
 }

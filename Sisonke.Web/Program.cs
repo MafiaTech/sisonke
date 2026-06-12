@@ -22,6 +22,7 @@ Directory.CreateDirectory(dataDirectory);
 // ── Auth, app and email settings (from config / env vars) ────────────────
 var authSettings  = builder.Configuration.GetSection("Auth").Get<AuthSettings>()   ?? new AuthSettings();
 authSettings.RequireConfirmedAccount = builder.Configuration.GetValue("Auth:RequireConfirmedAccount", false);
+authSettings.SessionTimeoutMinutes   = builder.Configuration.GetValue("Auth:SessionTimeoutMinutes", 60);
 var appSettings   = builder.Configuration.GetSection("App").Get<AppSettings>()     ?? new AppSettings();
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings();
 builder.Services.AddSingleton(authSettings);
@@ -118,6 +119,34 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
 // To enable real email, set Email__SmtpHost (and other Email__ keys) in Azure App Service config.
 builder.Services.AddSingleton<SisonkeEmailSender>();
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>>(sp => sp.GetRequiredService<SisonkeEmailSender>());
+
+// ── Session / application cookie ─────────────────────────────────────────
+// SlidingExpiration resets the timeout on each authenticated request.
+// OnRedirectToLogin detects a timed-out non-persistent session (cookie still present
+// in the request but server ticket has expired) and tells Login.razor to show
+// a friendly "session expired" message.
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.ExpireTimeSpan    = TimeSpan.FromMinutes(authSettings.SessionTimeoutMinutes);
+    options.SlidingExpiration = true;
+    options.Cookie.HttpOnly   = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite  = SameSiteMode.Lax;
+    options.LoginPath        = "/Account/Login";
+    options.AccessDeniedPath = "/Account/AccessDenied";
+    options.Events.OnRedirectToLogin = context =>
+    {
+        var uri = context.RedirectUri;
+        // If the auth cookie is in the request but the server rejected it (ticket expired),
+        // the user had an active session that timed out — show the session-expired message.
+        if (context.Request.Cookies.ContainsKey(".AspNetCore.Identity.Application"))
+        {
+            uri = QueryHelpers.AddQueryString(uri, "sessionExpired", "1");
+        }
+        context.Response.Redirect(uri);
+        return Task.CompletedTask;
+    };
+});
 
 builder.Services.AddScoped<StokvelService>();
 builder.Services.AddScoped<MemberService>();

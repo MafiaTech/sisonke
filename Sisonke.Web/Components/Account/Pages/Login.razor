@@ -213,6 +213,9 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
+    [SupplyParameterFromQuery(Name = "sessionExpired")]
+    private string? SessionExpired { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         Input ??= new();
@@ -223,6 +226,11 @@
         {
             // Clear the existing external cookie to ensure a clean login process
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
+            if (string.Equals(SessionExpired, "1"))
+            {
+                errorMessage = "Your session has expired. Please sign in again.";
+            }
         }
     }
 
