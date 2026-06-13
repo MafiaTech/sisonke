@@ -170,6 +170,25 @@ public class MeetingService(ApplicationDbContext context)
                 (meeting.Status == MeetingStatus.Planned || meeting.Status == MeetingStatus.InProgress));
     }
 
+    public async Task<int> GetRecentMeetingCountByStokvelIdAsync(Guid stokvelId, int daysBack = 90)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        var sinceDate = DateTime.Today.AddDays(-Math.Max(1, daysBack));
+
+        return await context.Meetings
+            .CountAsync(meeting =>
+                meeting.TenantId == stokvel.TenantId &&
+                meeting.MeetingDate.Date >= sinceDate &&
+                meeting.Status != MeetingStatus.Cancelled);
+    }
+
     public async Task<int> GetMeetingsNeedingAttendanceCountByStokvelIdAsync(Guid stokvelId)
     {
         var stokvel = await context.Stokvels

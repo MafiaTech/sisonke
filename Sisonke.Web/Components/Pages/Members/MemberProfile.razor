@@ -15,6 +15,7 @@
 @inject MemberGovernanceTimelineService MemberGovernanceTimelineService
 @inject OperatingRuleService OperatingRuleService
 @inject StokvelService StokvelService
+@inject ContributionPaymentService ContributionPaymentService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
 
@@ -68,9 +69,12 @@ else
                     <i class="bi bi-receipt me-1"></i>View Financial Statement
                 </a>
             }
-            <a class="btn btn-primary btn-sm" href="@($"/edit-member/{MemberId}")">
-                <i class="bi bi-pencil me-1"></i>Edit Member
-            </a>
+            @if (canManageStokvel)
+            {
+                <a class="btn btn-primary btn-sm" href="@($"/edit-member/{MemberId}")">
+                    <i class="bi bi-pencil me-1"></i>Edit Member
+                </a>
+            }
         </div>
     </div>
 
@@ -411,6 +415,8 @@ else
             </div>
         </div>
 
+        @if (stokvel?.EnableDependents == true)
+        {
         <!-- Dependents / covered lives -->
         <div class="col-12">
             <div class="card">
@@ -420,7 +426,7 @@ else
                             <div class="card-section-title mb-1">Dependents / Covered Lives</div>
                             <div class="text-muted small">Dependents captured: @dependents.Count of @maxDependents</div>
                         </div>
-                        @if (maxDependents > 0 && dependents.Count < maxDependents)
+                        @if (canManageStokvel && maxDependents > 0 && dependents.Count < maxDependents)
                         {
                             <a class="btn btn-sm btn-primary" href="@($"/add-dependent/{MemberId}")">
                                 <i class="bi bi-plus me-1"></i>Add Dependent
@@ -499,8 +505,14 @@ else
                                                     }
                                                     else
                                                     {
-                                                        <a class="btn btn-sm btn-outline-secondary" href="@($"/edit-dependent/{dependent.Id}")">Edit</a>
-                                                        <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}?dependentId={dependent.Id}")">Create Claim</a>
+                                                        @if (canManageStokvel)
+                                                        {
+                                                            <a class="btn btn-sm btn-outline-secondary" href="@($"/edit-dependent/{dependent.Id}")">Edit</a>
+                                                        }
+                                                        @if (stokvel?.EnableClaims == true && (canManageStokvel || isOwnMemberProfile))
+                                                        {
+                                                            <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}?dependentId={dependent.Id}")">Create Claim</a>
+                                                        }
                                                     }
                                                 </div>
                                             </td>
@@ -513,6 +525,54 @@ else
                 </div>
             </div>
         </div>
+        }
+
+        @if (stokvel?.Archetype == StokvelArchetype.BurialSociety || stokvel?.EnableClaims == true)
+        {
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                        <div>
+                            <div class="card-section-title mb-1">Contribution Readiness</div>
+                            <div class="text-muted small">Basic payment context for claim review.</div>
+                        </div>
+                        @if (stokvel is not null && (canViewFinancials || isOwnMemberProfile))
+                        {
+                            <a class="btn btn-sm btn-outline-primary" href="@($"/member-statement/{MemberId}/{stokvel.Id}")">
+                                <i class="bi bi-receipt me-1"></i>Open Statement
+                            </a>
+                        }
+                    </div>
+
+                    @if (recentContributionSummaries.Count == 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-blue mb-0">
+                            Contribution verification will appear here once payments are captured.
+                        </div>
+                    }
+                    else
+                    {
+                        var latestContribution = recentContributionSummaries.First();
+                        <div class="member-readiness-grid">
+                            <div>
+                                <div class="detail-mini-label">Member contribution status</div>
+                                <div class="detail-mini-value">@latestContribution.Status</div>
+                            </div>
+                            <div>
+                                <div class="detail-mini-label">Outstanding amount</div>
+                                <div class="detail-mini-value">@FormatCurrency(latestContribution.Balance)</div>
+                            </div>
+                            <div>
+                                <div class="detail-mini-label">Last payment date</div>
+                                <div class="detail-mini-value">@(latestContribution.PaidDate?.ToString("dd MMM yyyy") ?? "No payment captured")</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        }
 
         <!-- Claims -->
         <div class="col-12">
@@ -522,9 +582,12 @@ else
                     {
                         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
                             <div class="card-section-title mb-0">Claims</div>
-                            <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}")">
-                                <i class="bi bi-plus me-1"></i>Create Member Claim
-                            </a>
+                            @if (canManageStokvel || isOwnMemberProfile)
+                            {
+                                <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}")">
+                                    <i class="bi bi-plus me-1"></i>Create Member Claim
+                                </a>
+                            }
                         </div>
 
                         @if (member.GovernanceStatus is MemberGovernanceStatus.Suspended or MemberGovernanceStatus.Expelled)
@@ -853,6 +916,11 @@ else
         font-weight: 800;
         margin-top: .2rem;
     }
+    .member-readiness-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    }
     .governance-timeline {
         display: grid;
         gap: .85rem;
@@ -934,6 +1002,7 @@ else
     private List<MemberWarning> memberWarnings = [];
     private List<MemberGovernanceTimelineItemDto> timelineItems = [];
     private List<MemberGovernanceTimelineItemDto> visibleTimelineItems = [];
+    private List<ContributionPaymentSummary> recentContributionSummaries = [];
     private Dictionary<Guid, FuneralClaim> activeDependentClaims = new();
     private Stokvel? stokvel;
     private int maxNextOfKin;
@@ -971,6 +1040,7 @@ else
         memberWarnings = [];
         timelineItems = [];
         visibleTimelineItems = [];
+        recentContributionSummaries = [];
         member = await MemberService.GetMemberByIdAsync(MemberId);
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
 
@@ -997,6 +1067,9 @@ else
         activeDependentClaims = member is null || stokvel?.EnableClaims != true ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
         memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
         funeralClaims = member is null || stokvel?.EnableClaims != true ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
+        recentContributionSummaries = member is null || stokvel is null || (!canViewFinancials && !isOwnMemberProfile)
+            ? []
+            : await ContributionPaymentService.GetRecentContributionsByMemberIdAsync(MemberId);
         memberWarnings = member is null || (!canManageMemberStatus && !isOwnMemberProfile) ? [] : await MemberWarningService.GetWarningsByMemberIdAsync(MemberId);
         timelineItems = member is null || stokvel is null ? [] : await MemberGovernanceTimelineService.GetTimelineByMemberIdAsync(MemberId, stokvel.Id);
         visibleTimelineItems = GetVisibleTimelineItems();
@@ -1205,6 +1278,11 @@ else
     private static string DisplayOrDash(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
     }
 
     private List<MemberGovernanceTimelineItemDto> GetVisibleTimelineItems()

@@ -401,6 +401,78 @@ else
     }
     else
     {
+        @if (stokvel.Archetype == StokvelArchetype.BurialSociety)
+        {
+            <section class="sisonke-card mb-3 burial-readiness-panel">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <span class="sisonke-badge sisonke-badge-green">Burial Society Readiness</span>
+                            <h2 class="mt-2">Funeral support overview</h2>
+                            <p>Manage funeral support, dependents, claims and member contributions.</p>
+                        </div>
+                        <a class="sisonke-btn sisonke-btn-primary" href="@($"/members/{StokvelId}")">
+                            <i class="bi bi-people-fill me-1"></i>Open Members
+                        </a>
+                    </div>
+
+                    <div class="sisonke-alert sisonke-alert-blue mb-3">
+                        New members may be subject to the society waiting period before claims are payable.
+                    </div>
+
+                    <div class="burial-readiness-grid">
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Total Members</div>
+                            <div class="burial-readiness-value">@memberCount</div>
+                            <div class="text-muted small">Active member records in this society.</div>
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Active Dependents / Covered Lives</div>
+                            <div class="burial-readiness-value">@activeDependentCount</div>
+                            <div class="text-muted small">Active, non-deceased dependents linked to members.</div>
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Monthly Contributions Expected</div>
+                            <div class="burial-readiness-value">@FormatZAR(monthlyContributionSummary.ExpectedContributions)</div>
+                            <div class="text-muted small">@DateTime.Today.ToString("MMMM yyyy") expected collections.</div>
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Outstanding Contributions</div>
+                            <div class="burial-readiness-value">@FormatZAR(totalContributionOutstanding)</div>
+                            @if (monthlyContributionSummary.RecordsGenerated == 0)
+                            {
+                                <div class="text-muted small">No contribution records generated yet.</div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small">@monthlyContributionSummary.OverdueCount overdue record(s).</div>
+                            }
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Open Claims</div>
+                            <div class="burial-readiness-value">@openClaimCount</div>
+                            <a class="sisonke-btn sisonke-btn-outline btn-sm mt-2" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Claims Awaiting Review</div>
+                            <div class="burial-readiness-value">@claimsToReviewCount</div>
+                            <div class="text-muted small">Secretary review queue.</div>
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Claims Awaiting Approval</div>
+                            <div class="burial-readiness-value">@claimsAwaitingChairpersonApprovalCount</div>
+                            <a class="sisonke-btn sisonke-btn-outline btn-sm mt-2" href="@($"/chairperson-tasks/{StokvelId}")">Open Approvals</a>
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Recent Meetings</div>
+                            <div class="burial-readiness-value">@recentMeetingCount</div>
+                            <div class="text-muted small">@upcomingMeetingCount upcoming meeting(s).</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
+
         <!-- ══ KPI row ════════════════════════════════════════════ -->
         <div class="row g-3 mb-3">
 
@@ -860,6 +932,29 @@ else
         flex-shrink: 0;
     }
 
+    .burial-readiness-panel .sisonke-card-head {
+        align-items: flex-start;
+    }
+    .burial-readiness-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: .85rem;
+    }
+    .burial-readiness-card {
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        background: #fff;
+        padding: 1rem;
+        min-height: 8.5rem;
+    }
+    .burial-readiness-value {
+        color: var(--sk-text);
+        font-size: 1.45rem;
+        font-weight: 800;
+        line-height: 1.15;
+        margin: .3rem 0 .4rem;
+    }
+
     .sub-plan-display {
         display: flex;
         align-items: center;
@@ -919,9 +1014,12 @@ else
 @code {
     private Stokvel? stokvel;
     private int memberCount;
+    private int activeDependentCount;
     private decimal expectedMonthlyContributions;
     private decimal outstandingFinesTotal;
     private int upcomingMeetingCount;
+    private int recentMeetingCount;
+    private int openClaimCount;
     private int openVoteCount;
     private int closedVoteCount;
     private TenantSubscription? activeSubscription;
@@ -959,9 +1057,12 @@ else
     {
         isLoading = true;
         memberCount = 0;
+        activeDependentCount = 0;
         expectedMonthlyContributions = 0;
         outstandingFinesTotal = 0;
         upcomingMeetingCount = 0;
+        recentMeetingCount = 0;
+        openClaimCount = 0;
         openVoteCount = 0;
         closedVoteCount = 0;
         activeSubscription = null;
@@ -1022,6 +1123,7 @@ else
         memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         memberCount = await MemberService.GetMemberCountByStokvelIdAsync(StokvelId);
+        activeDependentCount = await MemberService.GetActiveDependentCountByStokvelIdAsync(StokvelId);
         expectedMonthlyContributions = await ContributionService.GetExpectedMonthlyContributionsByStokvelIdAsync(StokvelId);
         monthlyContributionSummary = await ContributionPaymentService.GetMonthlyContributionSummaryAsync(
             StokvelId,
@@ -1032,7 +1134,9 @@ else
         outstandingFinesTotal = await FineService.GetOutstandingFinesTotalByStokvelIdAsync(StokvelId);
         outstandingFineCount = await FineService.GetOutstandingFineCountByStokvelIdAsync(StokvelId);
         upcomingMeetingCount = await MeetingService.GetUpcomingMeetingCountByStokvelIdAsync(StokvelId);
+        recentMeetingCount = await MeetingService.GetRecentMeetingCountByStokvelIdAsync(StokvelId);
         pendingApologyCount = await MeetingApologyService.GetPendingApologyCountByStokvelIdAsync(StokvelId);
+        openClaimCount = await FuneralClaimService.GetOpenClaimCountByStokvelIdAsync(StokvelId);
         claimsToReviewCount = await FuneralClaimService.GetClaimsRequiringSecretaryReviewCountByStokvelIdAsync(StokvelId);
         claimsAwaitingChairpersonApprovalCount = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalCountByStokvelIdAsync(StokvelId);
         approvedClaimsAwaitingPayoutCount = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutCountByStokvelIdAsync(StokvelId);

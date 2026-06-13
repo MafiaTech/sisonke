@@ -268,6 +268,16 @@ else
                                 </div>
                             </div>
                         }
+                        else if (model.Archetype == StokvelArchetype.BurialSociety)
+                        {
+                            <div class="sisonke-alert sisonke-alert-green mt-3 d-flex align-items-start gap-2">
+                                <i class="bi bi-heart-fill mt-1" style="flex-shrink:0"></i>
+                                <div>
+                                    <strong>Burial Society</strong> enables funeral claims, dependents and member contributions.
+                                    Rotation and lending features stay off for this stokvel type.
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -957,7 +967,7 @@ else
     private sealed class RegisterStokvelFormModel
     {
         [Required][MaxLength(150)] public string Name { get; set; } = string.Empty;
-        public StokvelArchetype Archetype { get; set; } = StokvelArchetype.Rotational;
+        public StokvelArchetype Archetype { get; set; } = StokvelArchetype.BurialSociety;
         [MaxLength(100)] public string? Province { get; set; }
         [MaxLength(100)] public string? TownOrArea { get; set; }
         public DateTime? EstablishedDate { get; set; }

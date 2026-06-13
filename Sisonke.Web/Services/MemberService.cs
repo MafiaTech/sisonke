@@ -380,6 +380,26 @@ public class MemberService(
             .ToListAsync();
     }
 
+    public async Task<int> GetActiveDependentCountByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null || !stokvel.EnableDependents)
+        {
+            return 0;
+        }
+
+        return await context.MemberDependents
+            .CountAsync(dependent =>
+                dependent.Member.TenantId == stokvel.TenantId &&
+                dependent.IsActive &&
+                !dependent.IsDeceased);
+    }
+
     public async Task<bool> CanAddDependentAsync(Guid memberId)
     {
         var member = await context.Members

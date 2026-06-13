@@ -14,6 +14,7 @@
 @inject FuneralClaimService FuneralClaimService
 @inject ClaimEligibilityService ClaimEligibilityService
 @inject MemberService MemberService
+@inject ContributionPaymentService ContributionPaymentService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
@@ -260,6 +261,41 @@ else
             Your claim is being assessed according to society rules.
         </div>
     }
+
+    <div class="sisonke-card mb-4">
+        <div class="sisonke-card-head">
+            <div>
+                <h2>Contribution Readiness</h2>
+                <p>Basic payment context for this member at claim review.</p>
+            </div>
+        </div>
+        <div class="sisonke-card-body">
+            @if (recentContributionSummaries.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                    Contribution verification will appear here once payments are captured.
+                </div>
+            }
+            else
+            {
+                var latestContribution = recentContributionSummaries.First();
+                <div class="claim-readiness-grid">
+                    <div>
+                        <div class="detail-mini-label">Member contribution status</div>
+                        <div class="detail-mini-value">@latestContribution.Status</div>
+                    </div>
+                    <div>
+                        <div class="detail-mini-label">Outstanding amount</div>
+                        <div class="detail-mini-value">@FormatCurrency(latestContribution.Balance)</div>
+                    </div>
+                    <div>
+                        <div class="detail-mini-label">Last payment date</div>
+                        <div class="detail-mini-value">@(latestContribution.PaidDate?.ToString("dd MMM yyyy") ?? "No payment captured")</div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
 
     <div class="sisonke-card mb-4">
         <div class="sisonke-card-head">
@@ -792,14 +828,7 @@ else
                     <div class="sisonke-card-head">
                         <div>
                             <h2>Required Documents</h2>
-                            <p>Uploaded/submitted documents attached to claim reference @GetClaimReference(claim).</p>
-                        </div>
-                    </div>
-
-                    <div class="sisonke-card-head compact">
-                        <div>
-                            <h2>Documents</h2>
-                            <p>Upload and view supporting claim documents.</p>
+                            <p>Death certificate is required. Upload and view supporting documents for claim reference @GetClaimReference(claim).</p>
                         </div>
                     </div>
 
@@ -967,6 +996,11 @@ else
     .claim-eligibility-grid {
         align-items: flex-start;
     }
+    .claim-readiness-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    }
     .claim-section-mini-title {
         color: var(--text);
         font-size: .9rem;
@@ -1004,6 +1038,7 @@ else
     private ClaimEligibilityAssessmentDto? eligibilityAssessment;
     private List<ClaimDocumentChecklistItemDto> claimDocumentChecklist = [];
     private List<ClaimPayoutAudit> payoutAuditTrail = [];
+    private List<ContributionPaymentSummary> recentContributionSummaries = [];
     private SecretaryReviewModel secretaryReviewModel = new();
     private ChairpersonDecisionModel chairpersonDecisionModel = new();
     private ClaimPayoutModel payoutModel = new();
@@ -1063,6 +1098,7 @@ else
         canViewPayoutAuditTrail = false;
         canViewClaimEligibilityAssessment = false;
         payoutAuditTrail = [];
+        recentContributionSummaries = [];
         eligibilityAssessment = null;
         claimDocumentChecklist = [];
         currentUserId = null;
@@ -1129,6 +1165,11 @@ else
             if (canViewPayoutAuditTrail)
             {
                 payoutAuditTrail = await FuneralClaimService.GetClaimPayoutAuditTrailAsync(claim.Id);
+            }
+
+            if (canViewClaim)
+            {
+                recentContributionSummaries = await ContributionPaymentService.GetRecentContributionsByMemberIdAsync(claim.MemberId);
             }
 
             claimDocumentChecklist = await FuneralClaimService.GetClaimDocumentChecklistAsync(claim.Id);

@@ -38,6 +38,27 @@ public class FuneralClaimService(
             .ToListAsync();
     }
 
+    public async Task<int> GetOpenClaimCountByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null || !stokvel.EnableClaims)
+        {
+            return 0;
+        }
+
+        return await context.FuneralClaims
+            .CountAsync(claim =>
+                claim.Member.TenantId == stokvel.TenantId &&
+                claim.Status != FuneralClaimStatus.Paid &&
+                claim.Status != FuneralClaimStatus.Rejected &&
+                claim.Status != FuneralClaimStatus.Cancelled);
+    }
+
     public async Task<List<FuneralClaim>> GetClaimsByMemberIdAsync(Guid memberId)
     {
         return await context.FuneralClaims

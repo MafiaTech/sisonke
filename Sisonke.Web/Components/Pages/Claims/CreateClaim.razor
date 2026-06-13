@@ -1,7 +1,11 @@
 @page "/create-claim/{MemberId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.EntityFrameworkCore
 @using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
@@ -9,6 +13,8 @@
 @using Sisonke.Web.Services
 
 @inject FuneralClaimService FuneralClaimService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
 @inject IServiceScopeFactory ScopeFactory
 
@@ -33,6 +39,18 @@ else if (stokvel?.EnableClaims != true)
         Type="warning"
         Title="Claims are not enabled for this stokvel type."
         Message="This group can still use the enabled member, contribution, fine and meeting features."
+        Icon="bi bi-exclamation-triangle-fill" />
+
+    <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Member Profile
+    </a>
+}
+else if (!canCreateClaim)
+{
+    <AlertBanner
+        Type="warning"
+        Title="You do not have permission to create a claim for this member."
+        Message="Members can submit their own claims. Office bearers can assist members with claims."
         Icon="bi bi-exclamation-triangle-fill" />
 
     <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
@@ -65,6 +83,12 @@ else
     <div class="form-page">
         <div class="sisonke-card">
             <div class="sisonke-card-body">
+                <div class="sisonke-alert sisonke-alert-blue mb-3">
+                    New members may be subject to the society waiting period before claims are payable.
+                </div>
+                <div class="sisonke-alert sisonke-alert-gold mb-3">
+                    Death certificate is required. Attachment upload will be available on the claim details page after the claim is created.
+                </div>
                 <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="CreateFuneralClaimForm">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="alert alert-danger" />
@@ -157,6 +181,7 @@ else
     private CreateClaimModel model = new();
     private bool isLoading = true;
     private bool saveFailed;
+    private bool canCreateClaim;
     private bool hasAppliedRouteState;
 
     [Parameter]
@@ -171,6 +196,7 @@ else
         member = await LoadMemberAsync();
         stokvel = member is null ? null : await LoadStokvelAsync(member.TenantId);
         dependents = member is null || stokvel?.EnableDependents != true ? [] : await LoadDependentsAsync();
+        canCreateClaim = await CanCreateClaimAsync();
 
         if (!hasAppliedRouteState)
         {
@@ -220,11 +246,36 @@ else
             .FirstOrDefaultAsync();
     }
 
+    private async Task<bool> CanCreateClaimAsync()
+    {
+        if (stokvel is null || member is null)
+        {
+            return false;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        return await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id) ||
+            await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+    }
+
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
 
         if (stokvel?.EnableClaims != true)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        if (!canCreateClaim)
         {
             saveFailed = true;
             return;

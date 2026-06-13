@@ -1,11 +1,17 @@
 @page "/add-dependent/{MemberId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
 @inject MemberService MemberService
 @inject StokvelService StokvelService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Add Dependent</PageTitle>
@@ -29,6 +35,18 @@ else if (stokvel?.EnableDependents != true)
         Type="warning"
         Title="Dependents are not enabled for this stokvel type."
         Message="Covered-life records are only enabled for stokvel archetypes that support dependents."
+        Icon="bi bi-exclamation-triangle-fill" />
+
+    <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Member Profile
+    </a>
+}
+else if (!canManageDependents)
+{
+    <AlertBanner
+        Type="warning"
+        Title="You do not have permission to add dependents for this member."
+        Message="Dependent records are managed by society office bearers."
         Icon="bi bi-exclamation-triangle-fill" />
 
     <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
@@ -165,6 +183,7 @@ else
     };
     private bool isLoading = true;
     private bool saveFailed;
+    private bool canManageDependents;
 
     [Parameter]
     public Guid MemberId { get; set; }
@@ -173,6 +192,7 @@ else
     {
         member = await MemberService.GetMemberByIdAsync(MemberId);
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+        canManageDependents = await CanManageDependentsAsync();
         isLoading = false;
     }
 
@@ -181,6 +201,12 @@ else
         saveFailed = false;
 
         if (stokvel?.EnableDependents != true)
+        {
+            saveFailed = true;
+            return;
+        }
+
+        if (!canManageDependents)
         {
             saveFailed = true;
             return;
@@ -204,5 +230,19 @@ else
         }
 
         NavigationManager.NavigateTo($"/member-profile/{MemberId}");
+    }
+
+    private async Task<bool> CanManageDependentsAsync()
+    {
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return !string.IsNullOrWhiteSpace(userId) &&
+            await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
     }
 }

@@ -1,11 +1,18 @@
 @page "/edit-dependent/{DependentId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
 @inject FuneralClaimService FuneralClaimService
 @inject MemberService MemberService
+@inject StokvelService StokvelService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Edit Dependent</PageTitle>
@@ -22,6 +29,30 @@
 else if (dependent is null)
 {
     <AlertBanner Type="danger" Title="Dependent not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (stokvel?.EnableDependents != true)
+{
+    <AlertBanner
+        Type="warning"
+        Title="Dependents are not enabled for this stokvel type."
+        Message="Covered-life records are only enabled for stokvel archetypes that support dependents."
+        Icon="bi bi-exclamation-triangle-fill" />
+
+    <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{dependent.MemberId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Member Profile
+    </a>
+}
+else if (!canManageDependents)
+{
+    <AlertBanner
+        Type="warning"
+        Title="You do not have permission to edit this dependent."
+        Message="Dependent records are managed by society office bearers."
+        Icon="bi bi-exclamation-triangle-fill" />
+
+    <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{dependent.MemberId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Member Profile
+    </a>
 }
 else
 {
@@ -215,12 +246,14 @@ else
     ];
 
     private MemberDependent? dependent;
+    private Stokvel? stokvel;
     private MemberDependent model = new();
     private FuneralClaim? activeClaim;
     private bool isLoading = true;
     private bool saveFailed;
     private bool deleteFailed;
     private bool showDeleteConfirmation;
+    private bool canManageDependents;
 
     [Parameter]
     public Guid DependentId { get; set; }
@@ -228,7 +261,9 @@ else
     protected override async Task OnInitializedAsync()
     {
         dependent = await MemberService.GetDependentByIdAsync(DependentId);
+        stokvel = dependent?.Member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(dependent.Member.TenantId);
         activeClaim = await FuneralClaimService.GetActiveClaimForDependentAsync(DependentId);
+        canManageDependents = await CanManageDependentsAsync();
 
         if (dependent is not null)
         {
@@ -262,6 +297,12 @@ else
 
         saveFailed = false;
 
+        if (!canManageDependents || stokvel?.EnableDependents != true)
+        {
+            saveFailed = true;
+            return;
+        }
+
         if (model.IsDeceased)
         {
             model.IsActive = false;
@@ -290,6 +331,12 @@ else
 
     private void ShowDeleteConfirmation()
     {
+        if (!canManageDependents)
+        {
+            deleteFailed = true;
+            return;
+        }
+
         deleteFailed = false;
         showDeleteConfirmation = true;
     }
@@ -317,5 +364,19 @@ else
         }
 
         NavigationManager.NavigateTo($"/member-profile/{memberId}");
+    }
+
+    private async Task<bool> CanManageDependentsAsync()
+    {
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return !string.IsNullOrWhiteSpace(userId) &&
+            await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
     }
 }
