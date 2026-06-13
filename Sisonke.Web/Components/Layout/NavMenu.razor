@@ -2,16 +2,13 @@
 
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
 @using Sisonke.Web.Data
-@using Sisonke.Web.Services
+@using Sisonke.Web.Data.Entities
 
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject UserManager<ApplicationUser> UserManager
-@inject MemberAccountLinkingService MemberAccountLinkingService
-@inject MemberAccessService MemberAccessService
-@inject StokvelService StokvelService
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <aside class="@SidebarCssClass">
     <a class="sisonke-sidebar-brand" href="@HomeHref">
@@ -164,8 +161,6 @@
             return;
         }
 
-        currentUser = await UserManager.GetUserAsync(principal);
-        canRegisterStokvel = !string.IsNullOrWhiteSpace(currentUser?.IdNumber);
         isPlatformAdmin = principal.IsInRole("PlatformAdmin");
         isPlatformSupport = principal.IsInRole("PlatformSupport");
 
@@ -176,18 +171,68 @@
             return;
         }
 
-        var memberships = await MemberAccountLinkingService.GetMembershipsForUserAsync(userId);
+        currentUser = await LoadCurrentUserAsync(userId);
+        canRegisterStokvel = !string.IsNullOrWhiteSpace(currentUser?.IdNumber);
+
+        var memberships = await LoadMembershipsAsync(userId);
 
         foreach (var member in memberships)
         {
-            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+            var stokvel = await LoadStokvelByTenantIdAsync(member.TenantId);
 
-            if (stokvel is not null && await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id))
+            if (stokvel is not null && IsOfficeBearerRole(member.DefaultRole.ToString()))
             {
                 hasManagedStokvels = true;
                 return;
             }
         }
+    }
+
+    private async Task<ApplicationUser?> LoadCurrentUserAsync(string currentUserId)
+    {
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        return await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(user => user.Id == currentUserId);
+    }
+
+    private async Task<List<Member>> LoadMembershipsAsync(string currentUserId)
+    {
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        return await context.Members
+            .AsNoTracking()
+            .Include(member => member.Tenant)
+            .Where(member => member.ApplicationUserId == currentUserId)
+            .OrderBy(member => member.FullName)
+            .ToListAsync();
+    }
+
+    private async Task<Stokvel?> LoadStokvelByTenantIdAsync(Guid tenantId)
+    {
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        return await context.Stokvels
+            .AsNoTracking()
+            .Include(stokvel => stokvel.Tenant)
+            .Where(stokvel =>
+                stokvel.TenantId == tenantId &&
+                stokvel.IsActive)
+            .OrderBy(stokvel => stokvel.Name)
+            .FirstOrDefaultAsync();
+    }
+
+    private static bool IsOfficeBearerRole(string? role)
+    {
+        return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Office Bearer", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("OfficeBearer", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private string GetAccountLabel()

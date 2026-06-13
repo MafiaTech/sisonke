@@ -5,7 +5,7 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class StokvelService(ApplicationDbContext context)
+public class StokvelService(IDbContextFactory<ApplicationDbContext> dbFactory)
 {
     public async Task<Stokvel?> RegisterStokvelAsync(
         string name,
@@ -22,6 +22,8 @@ public class StokvelService(ApplicationDbContext context)
             return null;
         }
 
+        await using var context = await dbFactory.CreateDbContextAsync();
+
         var plan = await context.SubscriptionPlans
             .SingleOrDefaultAsync(subscriptionPlan =>
                 subscriptionPlan.Id == subscriptionPlanId &&
@@ -35,12 +37,12 @@ public class StokvelService(ApplicationDbContext context)
 
         var trimmedName = name.Trim();
         var createdAt = DateTime.UtcNow;
-        var stokvelCode = await GenerateStokvelCode(trimmedName);
+        var stokvelCode = await GenerateStokvelCode(context, trimmedName);
         var tenant = new Tenant
         {
             Id = Guid.NewGuid(),
             Name = trimmedName,
-            Slug = await CreateUniqueSlugAsync(trimmedName),
+            Slug = await CreateUniqueSlugAsync(context, trimmedName),
             IsActive = true,
             CreatedAt = createdAt
         };
@@ -83,6 +85,12 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<string> GenerateStokvelCode(string stokvelName)
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
+        return await GenerateStokvelCode(context, stokvelName);
+    }
+
+    private static async Task<string> GenerateStokvelCode(ApplicationDbContext context, string stokvelName)
+    {
         var baseCode = BuildCodeFromName(stokvelName);
         var code = baseCode;
         var suffix = 2;
@@ -115,6 +123,8 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<List<SubscriptionPlan>> GetPublicSubscriptionPlansAsync()
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
+
         return await context.SubscriptionPlans
             .Where(subscriptionPlan =>
                 subscriptionPlan.IsActive &&
@@ -125,6 +135,8 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<SubscriptionPlan?> GetRecommendedSubscriptionPlanAsync(int? expectedMemberCount)
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
+
         if (expectedMemberCount is null || expectedMemberCount < 1)
         {
             return null;
@@ -142,6 +154,8 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<List<Stokvel>> GetAllStokvelsAsync()
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
+
         return await context.Stokvels
             .Include(stokvel => stokvel.Tenant)
             .Where(stokvel => stokvel.IsActive)
@@ -151,6 +165,8 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<Stokvel?> GetStokvelByIdAsync(Guid stokvelId)
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
+
         return await context.Stokvels
             .Include(stokvel => stokvel.Tenant)
             .SingleOrDefaultAsync(stokvel =>
@@ -160,6 +176,8 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<Stokvel?> GetStokvelByTenantIdAsync(Guid tenantId)
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
+
         return await context.Stokvels
             .Include(stokvel => stokvel.Tenant)
             .Where(stokvel =>
@@ -171,26 +189,30 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<TenantSubscription?> GetActiveSubscriptionByStokvelIdAsync(Guid stokvelId)
     {
-        var stokvel = await GetStokvelByIdForLookupAsync(stokvelId);
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        var stokvel = await GetStokvelByIdForLookupAsync(context, stokvelId);
 
         if (stokvel is null)
         {
             return null;
         }
 
-        return await GetLatestActiveSubscriptionByTenantIdAsync(stokvel.TenantId);
+        return await GetLatestActiveSubscriptionByTenantIdAsync(context, stokvel.TenantId);
     }
 
     public async Task<bool> CanAddMemberAsync(Guid stokvelId)
     {
-        var stokvel = await GetStokvelByIdForLookupAsync(stokvelId);
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        var stokvel = await GetStokvelByIdForLookupAsync(context, stokvelId);
 
         if (stokvel is null)
         {
             return false;
         }
 
-        var subscription = await GetLatestActiveSubscriptionByTenantIdAsync(stokvel.TenantId);
+        var subscription = await GetLatestActiveSubscriptionByTenantIdAsync(context, stokvel.TenantId);
 
         if (subscription?.SubscriptionPlan is null)
         {
@@ -212,14 +234,16 @@ public class StokvelService(ApplicationDbContext context)
 
     public async Task<string> GetMemberLimitMessageAsync(Guid stokvelId)
     {
-        var stokvel = await GetStokvelByIdForLookupAsync(stokvelId);
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        var stokvel = await GetStokvelByIdForLookupAsync(context, stokvelId);
 
         if (stokvel is null)
         {
             return "Subscription package could not be found.";
         }
 
-        var subscription = await GetLatestActiveSubscriptionByTenantIdAsync(stokvel.TenantId);
+        var subscription = await GetLatestActiveSubscriptionByTenantIdAsync(context, stokvel.TenantId);
 
         if (subscription?.SubscriptionPlan is null)
         {
@@ -239,7 +263,7 @@ public class StokvelService(ApplicationDbContext context)
         return $"{activeMemberCount} of {subscription.SubscriptionPlan.MaxMembers} members captured on the {subscription.SubscriptionPlan.Name} package.";
     }
 
-    private async Task<Stokvel?> GetStokvelByIdForLookupAsync(Guid stokvelId)
+    private static async Task<Stokvel?> GetStokvelByIdForLookupAsync(ApplicationDbContext context, Guid stokvelId)
     {
         // Duplicate-tolerant lookup for local/demo data.
         return await context.Stokvels
@@ -249,7 +273,7 @@ public class StokvelService(ApplicationDbContext context)
             .FirstOrDefaultAsync();
     }
 
-    private async Task<TenantSubscription?> GetLatestActiveSubscriptionByTenantIdAsync(Guid tenantId)
+    private static async Task<TenantSubscription?> GetLatestActiveSubscriptionByTenantIdAsync(ApplicationDbContext context, Guid tenantId)
     {
         // Duplicate-tolerant lookup for local/demo data.
         return await context.TenantSubscriptions
@@ -261,7 +285,7 @@ public class StokvelService(ApplicationDbContext context)
             .FirstOrDefaultAsync();
     }
 
-    private async Task<string> CreateUniqueSlugAsync(string name)
+    private static async Task<string> CreateUniqueSlugAsync(ApplicationDbContext context, string name)
     {
         var baseSlug = CreateSlug(name);
         var slug = baseSlug;

@@ -2,13 +2,15 @@
 @rendermode InteractiveServer
 
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
-@inject MemberService MemberService
 @inject FuneralClaimService FuneralClaimService
 @inject NavigationManager NavigationManager
+@inject IServiceScopeFactory ScopeFactory
 
 <PageTitle>Create Funeral Claim</PageTitle>
 
@@ -153,8 +155,8 @@ else
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
-        member = await MemberService.GetMemberByIdAsync(MemberId);
-        dependents = member is null ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
+        member = await LoadMemberAsync();
+        dependents = member is null ? [] : await LoadDependentsAsync();
 
         if (!hasAppliedRouteState)
         {
@@ -166,6 +168,29 @@ else
         }
 
         isLoading = false;
+    }
+
+    private async Task<Member?> LoadMemberAsync()
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Members
+            .AsNoTracking()
+            .Include(existingMember => existingMember.Tenant)
+            .FirstOrDefaultAsync(existingMember => existingMember.Id == MemberId);
+    }
+
+    private async Task<List<MemberDependent>> LoadDependentsAsync()
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.MemberDependents
+            .AsNoTracking()
+            .Where(dependent => dependent.MemberId == MemberId)
+            .OrderBy(dependent => dependent.FullName)
+            .ToListAsync();
     }
 
     private async Task HandleValidSubmit()

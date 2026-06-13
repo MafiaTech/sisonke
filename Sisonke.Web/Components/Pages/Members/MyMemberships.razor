@@ -3,18 +3,14 @@
 @attribute [Authorize]
 
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
 @using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
-@inject MemberAccountLinkingService MemberAccountLinkingService
-@inject MemberAccessService MemberAccessService
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject UserManager<ApplicationUser> UserManager
-@inject StokvelService StokvelService
-@inject NavigationManager NavigationManager
+@inject IServiceScopeFactory ScopeFactory
 
 <PageTitle>My Memberships</PageTitle>
 
@@ -279,11 +275,13 @@ else
         if (isLoggedIn)
         {
             userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
-            currentUser = await UserManager.GetUserAsync(user);
-            memberships = string.IsNullOrWhiteSpace(userId)
-                ? []
-                : await MemberAccountLinkingService.GetMembershipsForUserAsync(userId);
-            await LoadMembershipAccessAsync();
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                currentUser = await LoadCurrentUserAsync(userId);
+                memberships = await LoadMembershipsForUserAsync(userId);
+                await LoadMembershipAccessAsync();
+            }
         }
 
         isLoading = false;
@@ -298,10 +296,61 @@ else
             return;
         }
 
-        await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(userId, currentUser.IdNumber);
-        memberships = await MemberAccountLinkingService.GetMembershipsForUserAsync(userId);
+        await RefreshUserMembershipLinksAsync(userId, currentUser.IdNumber);
+        memberships = await LoadMembershipsForUserAsync(userId);
         await LoadMembershipAccessAsync();
         successMessage = "Membership links refreshed.";
+    }
+
+    private async Task<ApplicationUser?> LoadCurrentUserAsync(string currentUserId)
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(user => user.Id == currentUserId);
+    }
+
+    private async Task<List<Member>> LoadMembershipsForUserAsync(string currentUserId)
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Members
+            .AsNoTracking()
+            .Include(member => member.Tenant)
+            .Where(member => member.ApplicationUserId == currentUserId)
+            .OrderBy(member => member.FullName)
+            .ToListAsync();
+    }
+
+    private async Task RefreshUserMembershipLinksAsync(string currentUserId, string? idNumber)
+    {
+        var normalizedIdNumber = NormalizeIdNumber(idNumber);
+
+        if (string.IsNullOrWhiteSpace(currentUserId) || string.IsNullOrEmpty(normalizedIdNumber))
+        {
+            return;
+        }
+
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var membersToCheck = await db.Members
+            .Where(member => member.IdNumber != null)
+            .ToListAsync();
+
+        var matchingMembers = membersToCheck
+            .Where(member => NormalizeIdNumber(member.IdNumber) == normalizedIdNumber)
+            .ToList();
+
+        foreach (var member in matchingMembers)
+        {
+            member.ApplicationUserId = currentUserId;
+        }
+
+        await db.SaveChangesAsync();
     }
 
     private async Task LoadMembershipAccessAsync()
@@ -314,23 +363,35 @@ else
             return;
         }
 
-        foreach (var tenantId in memberships.Select(member => member.TenantId).Distinct())
+        var tenantIds = memberships
+            .Select(member => member.TenantId)
+            .Distinct()
+            .ToList();
+
+        if (tenantIds.Count == 0)
         {
-            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(tenantId);
-
-            if (stokvel is null)
-            {
-                continue;
-            }
-
-            stokvelsByTenantId[tenantId] = stokvel;
+            return;
         }
+
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var stokvels = await db.Stokvels
+            .AsNoTracking()
+            .Include(stokvel => stokvel.Tenant)
+            .Where(stokvel => tenantIds.Contains(stokvel.TenantId) && stokvel.IsActive)
+            .OrderBy(stokvel => stokvel.Name)
+            .ToListAsync();
+
+        stokvelsByTenantId = stokvels
+            .GroupBy(stokvel => stokvel.TenantId)
+            .ToDictionary(group => group.Key, group => group.First());
 
         foreach (var member in memberships)
         {
             var stokvel = GetStokvelForMember(member);
 
-            if (stokvel is not null && await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id))
+            if (stokvel is not null && IsOfficeBearerRole(member.DefaultRole.ToString()))
             {
                 officeBearerMemberIds.Add(member.Id);
             }
@@ -364,6 +425,31 @@ else
     private static string Display(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
+    }
+
+    private static string NormalizeIdNumber(string? idNumber)
+    {
+        if (string.IsNullOrWhiteSpace(idNumber))
+        {
+            return string.Empty;
+        }
+
+        return idNumber
+            .Trim()
+            .Replace(" ", string.Empty)
+            .Replace("-", string.Empty);
+    }
+
+    private static bool IsOfficeBearerRole(string? role)
+    {
+        return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Office Bearer", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("OfficeBearer", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private string GetUserDisplayName()

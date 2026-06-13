@@ -6,13 +6,12 @@
 @using System.Linq
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
-@using Sisonke.Web.Services
 
-@inject StokvelService StokvelService
-@inject MeetingService MeetingService
-@inject MemberAccessService MemberAccessService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IServiceScopeFactory ScopeFactory
 
 <PageTitle>Meetings</PageTitle>
 
@@ -27,7 +26,11 @@
 }
 else if (stokvel is null)
 {
-    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+    <AlertBanner
+        Type="info"
+        Title="No stokvel found yet. Register a stokvel to get started."
+        Message=""
+        Icon="bi bi-info-circle-fill" />
 }
 else if (!canViewMeetings)
 {
@@ -61,7 +64,7 @@ else
 
     @if (meetings.Count == 0)
     {
-        <AlertBanner Type="info" Title="No meetings have been created yet." Message="" Icon="bi bi-info-circle-fill" />
+        <AlertBanner Type="info" Title="No meetings scheduled yet." Message="" Icon="bi bi-info-circle-fill" />
     }
     else
     {
@@ -229,25 +232,75 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+        stokvel = await LoadStokvelAsync();
 
         if (stokvel is not null)
         {
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            canManageMeetings = !string.IsNullOrWhiteSpace(userId) &&
-                await MemberAccessService.CanManageMeetingsAsync(userId, StokvelId);
-            canViewMeetings = !string.IsNullOrWhiteSpace(userId) &&
-                await MemberAccessService.CanViewStokvelAsync(userId, StokvelId);
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                var access = await LoadMeetingAccessAsync(userId);
+                canViewMeetings = access.CanView;
+                canManageMeetings = access.CanManage;
+            }
 
             if (canViewMeetings)
             {
-                meetings = await MeetingService.GetMeetingsByStokvelIdAsync(StokvelId);
+                meetings = await LoadMeetingsAsync(stokvel.TenantId);
             }
         }
 
         isLoading = false;
+    }
+
+    private async Task<Stokvel?> LoadStokvelAsync()
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Stokvels
+            .AsNoTracking()
+            .Include(existingStokvel => existingStokvel.Tenant)
+            .FirstOrDefaultAsync(existingStokvel =>
+                existingStokvel.Id == StokvelId &&
+                existingStokvel.IsActive);
+    }
+
+    private async Task<(bool CanView, bool CanManage)> LoadMeetingAccessAsync(string currentUserId)
+    {
+        if (stokvel is null)
+        {
+            return (false, false);
+        }
+
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var roles = await db.Members
+            .AsNoTracking()
+            .Where(member =>
+                member.ApplicationUserId == currentUserId &&
+                member.TenantId == stokvel.TenantId)
+            .OrderBy(member => member.CreatedAt)
+            .Select(member => member.DefaultRole.ToString())
+            .ToListAsync();
+
+        return (roles.Count > 0, roles.Any(IsOfficeBearerRole));
+    }
+
+    private async Task<List<Meeting>> LoadMeetingsAsync(Guid tenantId)
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Meetings
+            .AsNoTracking()
+            .Include(meeting => meeting.AgendaItems)
+            .Where(meeting => meeting.TenantId == tenantId)
+            .OrderByDescending(meeting => meeting.MeetingDate)
+            .ToListAsync();
     }
 
     private static string DisplayOrDash(string? value)
@@ -329,4 +382,16 @@ else
             "Scheduled"  => "bar-scheduled",
             _ => "bar-planned"
         };
+
+    private static bool IsOfficeBearerRole(string? role)
+    {
+        return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Office Bearer", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("OfficeBearer", StringComparison.OrdinalIgnoreCase) == true;
+    }
 }

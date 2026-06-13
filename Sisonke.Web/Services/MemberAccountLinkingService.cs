@@ -4,7 +4,7 @@ using Sisonke.Web.Data.Entities;
 
 namespace Sisonke.Web.Services;
 
-public class MemberAccountLinkingService(ApplicationDbContext context)
+public class MemberAccountLinkingService(IDbContextFactory<ApplicationDbContext> dbFactory)
 {
     private static string NormalizeIdNumber(string? idNumber)
     {
@@ -21,6 +21,7 @@ public class MemberAccountLinkingService(ApplicationDbContext context)
 
     public async Task<List<Member>> FindMembersByIdNumberAsync(string? idNumber)
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
         var normalizedIdNumber = NormalizeIdNumber(idNumber);
 
         if (string.IsNullOrEmpty(normalizedIdNumber))
@@ -41,6 +42,7 @@ public class MemberAccountLinkingService(ApplicationDbContext context)
 
     public async Task<int> LinkUserToMembersByIdNumberAsync(string userId, string? idNumber)
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
         var normalizedIdNumber = NormalizeIdNumber(idNumber);
 
         if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrEmpty(normalizedIdNumber))
@@ -73,6 +75,7 @@ public class MemberAccountLinkingService(ApplicationDbContext context)
 
     public async Task<List<Member>> GetMembershipsForUserAsync(string userId)
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
         if (string.IsNullOrWhiteSpace(userId))
         {
             return [];
@@ -87,6 +90,7 @@ public class MemberAccountLinkingService(ApplicationDbContext context)
 
     public async Task<bool> IsMemberLinkedToUserAsync(Guid memberId, string userId)
     {
+        await using var context = await dbFactory.CreateDbContextAsync();
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;

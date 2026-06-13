@@ -92,6 +92,11 @@ if (isSqlite)
         options.UseSqlite(connectionString)
                .ConfigureWarnings(w =>
                    w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+    builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+        options.UseSqlite(connectionString)
+               .ConfigureWarnings(w =>
+                   w.Ignore(RelationalEventId.PendingModelChangesWarning)),
+        ServiceLifetime.Scoped);
 }
 else
 {
@@ -99,6 +104,9 @@ else
 
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlServer(connectionString));
+    builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+        options.UseSqlServer(connectionString),
+        ServiceLifetime.Scoped);
 }
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();

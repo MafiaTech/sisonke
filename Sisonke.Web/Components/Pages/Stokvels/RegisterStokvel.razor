@@ -2,10 +2,12 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 
+@using System.Security.Claims
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
 @using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
@@ -18,6 +20,7 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject MemberAccountLinkingService MemberAccountLinkingService
 @inject MemberService MemberService
+@inject IServiceScopeFactory ScopeFactory
 
 <PageTitle>Register New Stokvel</PageTitle>
 
@@ -235,39 +238,50 @@ else
                     </div>
                     <p class="text-muted small mb-3">Choose a plan that fits your expected membership size. Enter the member count above for a recommendation.</p>
 
-                    <div class="row g-3">
-                        @foreach (var plan in subscriptionPlans)
-                        {
-                            var isSelected    = model.SubscriptionPlanId == plan.Id;
-                            var isRecommended = recommendedPlanId == plan.Id;
+                    @if (subscriptionPlans.Count == 0)
+                    {
+                        <AlertBanner
+                            Type="info"
+                            Title="No subscription packages are configured yet."
+                            Message="Please ask the platform administrator to configure packages before registering a stokvel."
+                            Icon="bi bi-info-circle-fill" />
+                    }
+                    else
+                    {
+                        <div class="row g-3">
+                            @foreach (var plan in subscriptionPlans)
+                            {
+                                var isSelected    = model.SubscriptionPlanId == plan.Id;
+                                var isRecommended = recommendedPlanId == plan.Id;
 
-                            <div class="col-12 col-md-4">
-                                <div class="plan-card @(isSelected ? "plan-selected" : "") @(isRecommended ? "plan-recommended" : "") h-100"
-                                     @onclick="@(() => SelectSubscriptionPlan(plan.Id))" style="cursor:pointer;">
-                                    <div class="card-body d-flex flex-column p-3">
-                                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                                            <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
-                                            @if (isRecommended && !isSelected)
-                                            {
-                                                <StatusBadge Text="Recommended" Type="success" />
-                                            }
-                                            @if (isSelected)
-                                            {
-                                                <span class="sisonke-badge sisonke-badge-green">
-                                                    <i class="bi bi-check2 me-1"></i>Selected
-                                                </span>
-                                            }
-                                        </div>
-                                        <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
-                                        <div class="mt-auto">
-                                            <div class="plan-price">@FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span></div>
-                                            <div class="text-muted small">Annual: @FormatCurrency(plan.AnnualPrice)</div>
+                                <div class="col-12 col-md-4">
+                                    <div class="plan-card @(isSelected ? "plan-selected" : "") @(isRecommended ? "plan-recommended" : "") h-100"
+                                         @onclick="@(() => SelectSubscriptionPlan(plan.Id))" style="cursor:pointer;">
+                                        <div class="card-body d-flex flex-column p-3">
+                                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                                <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
+                                                @if (isRecommended && !isSelected)
+                                                {
+                                                    <StatusBadge Text="Recommended" Type="success" />
+                                                }
+                                                @if (isSelected)
+                                                {
+                                                    <span class="sisonke-badge sisonke-badge-green">
+                                                        <i class="bi bi-check2 me-1"></i>Selected
+                                                    </span>
+                                                }
+                                            </div>
+                                            <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
+                                            <div class="mt-auto">
+                                                <div class="plan-price">@FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span></div>
+                                                <div class="text-muted small">Annual: @FormatCurrency(plan.AnnualPrice)</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        }
-                    </div>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
 
@@ -336,7 +350,12 @@ else
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        currentUser = await UserManager.GetUserAsync(authState.User);
+        var userId = authState.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            currentUser = await LoadCurrentUserAsync(userId);
+        }
 
         if (currentUser is not null)
         {
@@ -347,7 +366,7 @@ else
             model.CreatorResidentialArea = currentUser.ResidentialArea;
         }
 
-        subscriptionPlans = await StokvelService.GetPublicSubscriptionPlansAsync();
+        subscriptionPlans = await LoadPublicSubscriptionPlansAsync();
         isLoading = false;
     }
 
@@ -361,7 +380,7 @@ else
     private async Task OnExpectedMemberCountChangedAsync(int? expectedMemberCount)
     {
         model.ExpectedMemberCount = expectedMemberCount;
-        var recommendedPlan = await StokvelService.GetRecommendedSubscriptionPlanAsync(model.ExpectedMemberCount);
+        var recommendedPlan = await LoadRecommendedSubscriptionPlanAsync(model.ExpectedMemberCount);
         recommendedPlanId = recommendedPlan?.Id;
         if (recommendedPlan is not null)
         {
@@ -409,6 +428,51 @@ else
 
         await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(currentUser.Id, model.CreatorIdNumber);
         NavigationManager.NavigateTo($"/stokvel-questionnaire/{createdStokvel.Id}");
+    }
+
+    private async Task<ApplicationUser?> LoadCurrentUserAsync(string currentUserId)
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(user => user.Id == currentUserId);
+    }
+
+    private async Task<List<SubscriptionPlan>> LoadPublicSubscriptionPlansAsync()
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.SubscriptionPlans
+            .AsNoTracking()
+            .Where(subscriptionPlan =>
+                subscriptionPlan.IsActive &&
+                subscriptionPlan.Name != "Pilot")
+            .OrderBy(subscriptionPlan => subscriptionPlan.MinMembers)
+            .ToListAsync();
+    }
+
+    private async Task<SubscriptionPlan?> LoadRecommendedSubscriptionPlanAsync(int? expectedMemberCount)
+    {
+        if (expectedMemberCount is null || expectedMemberCount < 1)
+        {
+            return null;
+        }
+
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.SubscriptionPlans
+            .AsNoTracking()
+            .Where(subscriptionPlan =>
+                subscriptionPlan.IsActive &&
+                subscriptionPlan.Name != "Pilot" &&
+                expectedMemberCount >= subscriptionPlan.MinMembers &&
+                (subscriptionPlan.MaxMembers == null || expectedMemberCount <= subscriptionPlan.MaxMembers))
+            .OrderBy(subscriptionPlan => subscriptionPlan.MinMembers)
+            .FirstOrDefaultAsync();
     }
 
     private sealed class RegisterStokvelFormModel

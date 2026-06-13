@@ -4,13 +4,12 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
-@using Sisonke.Web.Services
 
-@inject MemberService MemberService
-@inject StokvelService StokvelService
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject MemberAccessService MemberAccessService
+@inject IServiceScopeFactory ScopeFactory
 
 <PageTitle>Members</PageTitle>
 
@@ -25,7 +24,11 @@
 }
 else if (stokvel is null)
 {
-    <AlertBanner Type="danger" Title="Stokvel not found." Message="" Icon="bi bi-x-circle-fill" />
+    <AlertBanner
+        Type="info"
+        Title="No stokvel found yet. Register a stokvel to get started."
+        Message=""
+        Icon="bi bi-info-circle-fill" />
 }
 else if (!canManageMembers)
 {
@@ -64,7 +67,7 @@ else
             <div class="ms-empty-icon-ring">
                 <i class="bi bi-people" aria-hidden="true"></i>
             </div>
-            <h2 class="ms-empty-title">No members yet</h2>
+            <h2 class="ms-empty-title">No members captured yet.</h2>
             <p class="ms-empty-text">Add your first member to start capturing profiles, next of kin, beneficiaries and fines.</p>
             <a class="btn btn-primary" href="@($"/add-member/{StokvelId}")">
                 <i class="bi bi-person-plus-fill me-2"></i>Add First Member
@@ -158,7 +161,7 @@ else
         canManageMembers = false;
         members = [];
 
-        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+        stokvel = await LoadStokvelAsync();
 
         if (stokvel is null)
         {
@@ -175,14 +178,63 @@ else
             return;
         }
 
-        canManageMembers = await MemberAccessService.CanManageMembersAsync(userId, StokvelId);
+        canManageMembers = await CanManageMembersAsync(userId);
 
         if (canManageMembers)
         {
-            members = await MemberService.GetMembersByStokvelIdAsync(StokvelId);
+            members = await LoadMembersAsync(stokvel.TenantId);
         }
 
         isLoading = false;
+    }
+
+    private async Task<Stokvel?> LoadStokvelAsync()
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Stokvels
+            .AsNoTracking()
+            .Include(existingStokvel => existingStokvel.Tenant)
+            .FirstOrDefaultAsync(existingStokvel =>
+                existingStokvel.Id == StokvelId &&
+                existingStokvel.IsActive);
+    }
+
+    private async Task<bool> CanManageMembersAsync(string currentUserId)
+    {
+        if (stokvel is null)
+        {
+            return false;
+        }
+
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var role = await db.Members
+            .AsNoTracking()
+            .Where(member =>
+                member.ApplicationUserId == currentUserId &&
+                member.TenantId == stokvel.TenantId)
+            .OrderBy(member => member.CreatedAt)
+            .Select(member => member.DefaultRole.ToString())
+            .FirstOrDefaultAsync();
+
+        return IsOfficeBearerRole(role);
+    }
+
+    private async Task<List<Member>> LoadMembersAsync(Guid tenantId)
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Members
+            .AsNoTracking()
+            .Include(member => member.NextOfKinRecords)
+            .Include(member => member.Beneficiaries)
+            .Where(member => member.TenantId == tenantId)
+            .OrderBy(member => member.FullName)
+            .ToListAsync();
     }
 
     private static string GetInitials(string fullName)
@@ -191,5 +243,17 @@ else
         return parts.Length >= 2
             ? $"{parts[0][0]}{parts[^1][0]}".ToUpperInvariant()
             : fullName.Length > 0 ? fullName[0].ToString().ToUpperInvariant() : "?";
+    }
+
+    private static bool IsOfficeBearerRole(string? role)
+    {
+        return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Treasurer", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Admin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("StokvelAdmin", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Creator", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("Office Bearer", StringComparison.OrdinalIgnoreCase) == true ||
+            role?.Trim().Equals("OfficeBearer", StringComparison.OrdinalIgnoreCase) == true;
     }
 }
