@@ -5,11 +5,14 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class StokvelService(IDbContextFactory<ApplicationDbContext> dbFactory)
+public class StokvelService(
+    IDbContextFactory<ApplicationDbContext> dbFactory,
+    StokvelArchetypeConfigurationService archetypeConfigurationService)
 {
     public async Task<Stokvel?> RegisterStokvelAsync(
         string name,
         StokvelType type,
+        StokvelArchetype archetype,
         string? province,
         string? townOrArea,
         DateTime? establishedDate,
@@ -55,6 +58,7 @@ public class StokvelService(IDbContextFactory<ApplicationDbContext> dbFactory)
             Name = trimmedName,
             Code = stokvelCode,
             Type = type,
+            Archetype = archetype,
             Province = province,
             TownOrArea = townOrArea,
             EstablishedDate = establishedDate,
@@ -65,6 +69,8 @@ public class StokvelService(IDbContextFactory<ApplicationDbContext> dbFactory)
             SetupCompletedAt = null,
             CreatedAt = createdAt
         };
+
+        archetypeConfigurationService.ApplyDefaults(stokvel, archetype);
 
         context.TenantSubscriptions.Add(new TenantSubscription
         {

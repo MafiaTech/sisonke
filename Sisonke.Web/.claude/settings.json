@@ -9,7 +9,10 @@
       "Bash(dotnet run *)",
       "PowerShell(Stop-Process -Id 25892 -Force -ErrorAction SilentlyContinue)",
       "Bash(dotnet clean *)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke-Recovered\\\\Sisonke.Web\" -Directory)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke-Recovered\\\\Sisonke.Web\" -Directory)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke-Recovered\\\\Sisonke.Web\" -Recurse -Filter \"Stokvel.cs\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object FullName)",
+      "Bash(dotnet ef *)"
     ]
   }
 }

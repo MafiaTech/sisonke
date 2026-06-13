@@ -19,6 +19,13 @@ public class QuestionnaireService(ApplicationDbContext context, FineService fine
             .OrderBy(section => section.DisplayOrder)
             .ToListAsync();
 
+        // Deduplicate: keep only the first active section per name (guards against duplicate seed runs)
+        sections = sections
+            .GroupBy(s => s.Name)
+            .Select(g => g.First())
+            .OrderBy(s => s.DisplayOrder)
+            .ToList();
+
         foreach (var section in sections)
         {
             section.Questions = section.Questions

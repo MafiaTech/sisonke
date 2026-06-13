@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 @using Sisonke.Web.Services.Dto
 
@@ -100,6 +101,23 @@ else
         </a>
     </div>
 
+    <!-- ── Archetype awareness banner ── -->
+    @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+    {
+        <div class="sisonke-alert sisonke-alert-blue mb-3 d-flex align-items-center gap-3 flex-wrap">
+            <div>
+                <span class="sisonke-badge sisonke-badge-blue me-2">@GetArchetypeLabel(stokvel.Archetype)</span>
+                <span>@GetArchetypeDescription(stokvel.Archetype)</span>
+            </div>
+            @if (stokvel.EnableRotation)
+            {
+                <a class="sisonke-btn sisonke-btn-outline ms-auto" href="@($"/rotation-schedule/{StokvelId}")">
+                    <i class="bi bi-arrow-repeat me-1"></i>Rotation Schedule
+                </a>
+            }
+        </div>
+    }
+
     @if (linkedMember is not null)
     {
         <section class="card border-0 shadow-sm mb-3">
@@ -148,18 +166,30 @@ else
                             <p class="text-muted small mb-3">Submitted meeting apologies awaiting attendance review.</p>
                             <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Apologies</a>
                         </div>
-                        <div class="executive-task-card task-accent-gold">
-                            <div class="detail-mini-label">Claims to Review</div>
-                            <div class="executive-task-count">@claimsToReviewCount</div>
-                            <p class="text-muted small mb-3">Claims still needing secretary review.</p>
-                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
-                        </div>
-                        <div class="executive-task-card task-accent-green">
-                            <div class="detail-mini-label">Claims Awaiting Approval</div>
-                            <div class="executive-task-count">@claimsAwaitingChairpersonApprovalCount</div>
-                            <p class="text-muted small mb-3">Secretary-reviewed claims ready for final decision.</p>
-                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
-                        </div>
+                        @if (stokvel.EnableClaims)
+                        {
+                            <div class="executive-task-card task-accent-gold">
+                                <div class="detail-mini-label">Claims to Review</div>
+                                <div class="executive-task-count">@claimsToReviewCount</div>
+                                <p class="text-muted small mb-3">Claims still needing secretary review.</p>
+                                <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
+                            </div>
+                            <div class="executive-task-card task-accent-green">
+                                <div class="detail-mini-label">Claims Awaiting Approval</div>
+                                <div class="executive-task-count">@claimsAwaitingChairpersonApprovalCount</div>
+                                <p class="text-muted small mb-3">Secretary-reviewed claims ready for final decision.</p>
+                                <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
+                            </div>
+                        }
+                        @if (stokvel.EnableRotation)
+                        {
+                            <div class="executive-task-card task-accent-blue">
+                                <div class="detail-mini-label">Rotation Schedule</div>
+                                <div class="executive-task-count text-muted">Preview</div>
+                                <p class="text-muted small mb-3">Payout order, next recipient and contribution cycle for this rotational stokvel.</p>
+                                <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/rotation-schedule/{StokvelId}")">View Schedule</a>
+                            </div>
+                        }
                         <div class="executive-task-card task-accent-red">
                             <div class="detail-mini-label">Finance Follow-up</div>
                             <div class="executive-task-count">@TreasurerTaskTotal</div>
@@ -219,12 +249,15 @@ else
                         </div>
                     }
                     <div class="executive-task-grid">
-                        <div class="executive-task-card task-accent-green">
-                            <div class="detail-mini-label">Claims Awaiting Approval</div>
-                            <div class="executive-task-count">@claimsAwaitingChairpersonApprovalCount</div>
-                            <p class="text-muted small mb-3">Secretary-reviewed claims ready for final decision.</p>
-                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
-                        </div>
+                        @if (stokvel.EnableClaims)
+                        {
+                            <div class="executive-task-card task-accent-green">
+                                <div class="detail-mini-label">Claims Awaiting Approval</div>
+                                <div class="executive-task-count">@claimsAwaitingChairpersonApprovalCount</div>
+                                <p class="text-muted small mb-3">Secretary-reviewed claims ready for final decision.</p>
+                                <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
+                            </div>
+                        }
                         <div class="executive-task-card task-accent-gold">
                             <div class="detail-mini-label">Constitution Approval</div>
                             <div class="executive-task-count text-muted">Soon</div>
@@ -274,12 +307,15 @@ else
                             <p class="text-muted small mb-3">Submitted meeting apologies awaiting attendance review.</p>
                             <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Apologies</a>
                         </div>
-                        <div class="executive-task-card task-accent-gold">
-                            <div class="detail-mini-label">Claims to Review</div>
-                            <div class="executive-task-count">@claimsToReviewCount</div>
-                            <p class="text-muted small mb-3">Submitted or on-hold claims still needing secretary review.</p>
-                            <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
-                        </div>
+                        @if (stokvel.EnableClaims)
+                        {
+                            <div class="executive-task-card task-accent-gold">
+                                <div class="detail-mini-label">Claims to Review</div>
+                                <div class="executive-task-count">@claimsToReviewCount</div>
+                                <p class="text-muted small mb-3">Submitted or on-hold claims still needing secretary review.</p>
+                                <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
+                            </div>
+                        }
                         <div class="executive-task-card task-accent-purple">
                             <div class="detail-mini-label">Attendance to Capture</div>
                             <div class="executive-task-count">@attendanceToCaptureCount</div>
@@ -326,12 +362,15 @@ else
                             <p class="text-muted small mb-3">Contribution capture workflow is coming soon.</p>
                             <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/contribution-capture/{StokvelId}")">Capture Contributions</a>
                         </div>
-                        <div class="executive-task-card task-accent-gold">
-                            <div class="detail-mini-label">Approved Claims Awaiting Payout</div>
-                            <div class="executive-task-count">@approvedClaimsAwaitingPayoutCount</div>
-                            <p class="text-muted small mb-3">Approved claims needing finance follow-up.</p>
-                            <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/treasurer-tasks/{StokvelId}")">Open Claims</a>
-                        </div>
+                        @if (stokvel.EnableClaims)
+                        {
+                            <div class="executive-task-card task-accent-gold">
+                                <div class="detail-mini-label">Approved Claims Awaiting Payout</div>
+                                <div class="executive-task-count">@approvedClaimsAwaitingPayoutCount</div>
+                                <p class="text-muted small mb-3">Approved claims needing finance follow-up.</p>
+                                <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/treasurer-tasks/{StokvelId}")">Open Claims</a>
+                            </div>
+                        }
                         <div class="executive-task-card task-accent-blue">
                             <div class="detail-mini-label">Financial Reports</div>
                             <div class="executive-task-count">@FormatPercentage(monthlyContributionSummary.CollectionRatePercentage)</div>
@@ -1120,4 +1159,32 @@ else
             normalizedRole?.Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
             normalizedRole?.Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true;
     }
+
+    private static string GetArchetypeLabel(StokvelArchetype archetype) =>
+        archetype switch
+        {
+            StokvelArchetype.Rotational => "Rotational Stokvel",
+            StokvelArchetype.Grocery => "Grocery Stokvel",
+            StokvelArchetype.SavingsClub => "Savings Club",
+            StokvelArchetype.InvestmentClub => "Investment Club",
+            StokvelArchetype.Education => "Education Stokvel",
+            StokvelArchetype.Borrowing => "Borrowing Stokvel",
+            StokvelArchetype.Travel => "Travel Stokvel",
+            StokvelArchetype.SocialClub => "Social Club",
+            _ => archetype.ToString()
+        };
+
+    private static string GetArchetypeDescription(StokvelArchetype archetype) =>
+        archetype switch
+        {
+            StokvelArchetype.Rotational => "Rotating lump-sum payouts to members in a defined order.",
+            StokvelArchetype.Grocery => "Bulk grocery saving and distribution for members.",
+            StokvelArchetype.SavingsClub => "Year-end or target savings for members.",
+            StokvelArchetype.InvestmentClub => "Pooled long-term investment planning.",
+            StokvelArchetype.Education => "School fees and education-related costs.",
+            StokvelArchetype.Borrowing => "Member lending with interest rules.",
+            StokvelArchetype.Travel => "Group travel savings.",
+            StokvelArchetype.SocialClub => "Events and community activities.",
+            _ => string.Empty
+        };
 }

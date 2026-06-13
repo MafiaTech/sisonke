@@ -6,25 +6,26 @@ namespace Sisonke.Web.Data.Seed;
 
 public static class SisonkeSeedData
 {
-    public static async Task SeedAsync(ApplicationDbContext context)
+    public static async Task SeedAsync(ApplicationDbContext context, ILogger? logger = null)
     {
-        await SeedSubscriptionPlansAsync(context);
-        await SeedPilotTenantsAsync(context);
-        await SeedQuestionnaireAsync(context);
+        await SeedSubscriptionPlansAsync(context, logger);
+        await SeedPilotTenantsAsync(context, logger);
+        await SeedQuestionnaireAsync(context, logger);
     }
 
-    private static async Task SeedSubscriptionPlansAsync(ApplicationDbContext context)
+    private static async Task SeedSubscriptionPlansAsync(ApplicationDbContext context, ILogger? logger)
     {
-        await UpsertSubscriptionPlanAsync(context, "Pilot", null, 1, null, 0, 0);
-        await UpsertSubscriptionPlanAsync(context, "Basic", "Starter", 1, 30, 149, 1490);
-        await UpsertSubscriptionPlanAsync(context, "Standard", "Growth", 31, 50, 279, 2790);
-        await UpsertSubscriptionPlanAsync(context, "Premium", null, 51, null, 459, 4590);
+        await UpsertSubscriptionPlanAsync(context, logger, "Pilot", null, 1, null, 0, 0);
+        await UpsertSubscriptionPlanAsync(context, logger, "Basic", "Starter", 1, 30, 149, 1490);
+        await UpsertSubscriptionPlanAsync(context, logger, "Standard", "Growth", 31, 50, 279, 2790);
+        await UpsertSubscriptionPlanAsync(context, logger, "Premium", null, 51, null, 459, 4590);
 
         await context.SaveChangesAsync();
     }
 
     private static async Task UpsertSubscriptionPlanAsync(
         ApplicationDbContext context,
+        ILogger? logger,
         string name,
         string? legacyName,
         int minMembers,
@@ -50,20 +51,12 @@ public static class SisonkeSeedData
 
             context.SubscriptionPlans.Add(plan);
         }
-
-        foreach (var duplicatePlan in matchingPlans.Where(existingPlan => existingPlan.Id != plan.Id))
+        else if (matchingPlans.Count > 1)
         {
-            var duplicateSubscriptions = await context.TenantSubscriptions
-                .Where(subscription => subscription.SubscriptionPlanId == duplicatePlan.Id)
-                .ToListAsync();
-
-            foreach (var duplicateSubscription in duplicateSubscriptions)
-            {
-                duplicateSubscription.SubscriptionPlanId = plan.Id;
-                duplicateSubscription.SubscriptionPlan = plan;
-            }
-
-            context.SubscriptionPlans.Remove(duplicatePlan);
+            logger?.LogWarning(
+                "Multiple subscription plans found during seed for {PlanName}. Using first existing record {PlanId}.",
+                name,
+                plan.Id);
         }
 
         plan.Name = name;
@@ -74,35 +67,42 @@ public static class SisonkeSeedData
         plan.IsActive = true;
     }
 
-    private static async Task SeedPilotTenantsAsync(ApplicationDbContext context)
+    private static async Task SeedPilotTenantsAsync(ApplicationDbContext context, ILogger? logger)
     {
         var pilotPlan = await context.SubscriptionPlans
-            .SingleAsync(plan => plan.Name == "Pilot");
+            .Where(plan => plan.Name == "Pilot")
+            .OrderBy(plan => plan.Name)
+            .ThenBy(plan => plan.Id)
+            .FirstAsync();
 
         var aganangTenant = await GetOrCreateTenantAsync(
             context,
+            logger,
             "Aganang Burial Society",
             "aganang-burial-society");
 
         var letsGrowTenant = await GetOrCreateTenantAsync(
             context,
+            logger,
             "Let’s Grow Together",
             "lets-grow-together");
 
         await GetOrCreateStokvelAsync(
             context,
+            logger,
             aganangTenant,
             "Aganang Burial Society",
             StokvelType.BurialSociety);
 
         await GetOrCreateStokvelAsync(
             context,
+            logger,
             letsGrowTenant,
             "Let’s Grow Together",
             StokvelType.SavingsStokvel);
 
-        await GetOrCreateTenantSubscriptionAsync(context, aganangTenant, pilotPlan);
-        await GetOrCreateTenantSubscriptionAsync(context, letsGrowTenant, pilotPlan);
+        await GetOrCreateTenantSubscriptionAsync(context, logger, aganangTenant, pilotPlan);
+        await GetOrCreateTenantSubscriptionAsync(context, logger, letsGrowTenant, pilotPlan);
 
         await SeedFineTypesAsync(
             context,
@@ -133,14 +133,28 @@ public static class SisonkeSeedData
 
     private static async Task<Tenant> GetOrCreateTenantAsync(
         ApplicationDbContext context,
+        ILogger? logger,
         string name,
         string slug)
     {
-        var tenant = await context.Tenants
-            .SingleOrDefaultAsync(existingTenant => existingTenant.Slug == slug);
+        var tenants = await context.Tenants
+            .Where(existingTenant => existingTenant.Slug == slug)
+            .OrderBy(existingTenant => existingTenant.CreatedAt)
+            .ThenBy(existingTenant => existingTenant.Id)
+            .ToListAsync();
+
+        var tenant = tenants.FirstOrDefault();
 
         if (tenant is not null)
         {
+            if (tenants.Count > 1)
+            {
+                logger?.LogWarning(
+                    "Multiple tenant records found for slug {Slug} during seed. Using first existing record {TenantId}.",
+                    slug,
+                    tenant.Id);
+            }
+
             return tenant;
         }
 
@@ -159,17 +173,32 @@ public static class SisonkeSeedData
 
     private static async Task<Stokvel> GetOrCreateStokvelAsync(
         ApplicationDbContext context,
+        ILogger? logger,
         Tenant tenant,
         string name,
         StokvelType type)
     {
-        var stokvel = await context.Stokvels
-            .SingleOrDefaultAsync(existingStokvel =>
+        var stokvels = await context.Stokvels
+            .Where(existingStokvel =>
                 existingStokvel.TenantId == tenant.Id &&
-                existingStokvel.Name == name);
+                existingStokvel.Name == name)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Id)
+            .ToListAsync();
+
+        var stokvel = stokvels.FirstOrDefault();
 
         if (stokvel is not null)
         {
+            if (stokvels.Count > 1)
+            {
+                logger?.LogWarning(
+                    "Multiple stokvel records found for tenant/name during seed. Using first existing record. TenantId={TenantId}, Name={StokvelName}, StokvelId={StokvelId}",
+                    tenant.Id,
+                    name,
+                    stokvel.Id);
+            }
+
             return stokvel;
         }
 
@@ -190,16 +219,31 @@ public static class SisonkeSeedData
 
     private static async Task<TenantSubscription> GetOrCreateTenantSubscriptionAsync(
         ApplicationDbContext context,
+        ILogger? logger,
         Tenant tenant,
         SubscriptionPlan pilotPlan)
     {
-        var subscription = await context.TenantSubscriptions
-            .SingleOrDefaultAsync(existingSubscription =>
+        var subscriptions = await context.TenantSubscriptions
+            .Where(existingSubscription =>
                 existingSubscription.TenantId == tenant.Id &&
-                existingSubscription.SubscriptionPlanId == pilotPlan.Id);
+                existingSubscription.SubscriptionPlanId == pilotPlan.Id)
+            .OrderBy(existingSubscription => existingSubscription.StartDate)
+            .ThenBy(existingSubscription => existingSubscription.Id)
+            .ToListAsync();
+
+        var subscription = subscriptions.FirstOrDefault();
 
         if (subscription is not null)
         {
+            if (subscriptions.Count > 1)
+            {
+                logger?.LogWarning(
+                    "Multiple tenant subscription records found during seed. Using first existing record. TenantId={TenantId}, PlanId={PlanId}, SubscriptionId={SubscriptionId}",
+                    tenant.Id,
+                    pilotPlan.Id,
+                    subscription.Id);
+            }
+
             return subscription;
         }
 
@@ -250,40 +294,59 @@ public static class SisonkeSeedData
         }
     }
 
-    private static async Task SeedQuestionnaireAsync(ApplicationDbContext context)
+    private static async Task SeedQuestionnaireAsync(ApplicationDbContext context, ILogger? logger)
     {
+        // Clean up any duplicate active sections from earlier seed runs (keep first per name)
+        var allSections = await context.QuestionnaireSections.ToListAsync();
+        var hadDuplicates = false;
+        foreach (var group in allSections.GroupBy(s => s.Name).Where(g => g.Count() > 1))
+        {
+            foreach (var dupe in group.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Id).Skip(1).Where(s => s.IsActive))
+            {
+                dupe.IsActive = false;
+                hadDuplicates = true;
+            }
+        }
+        if (hadDuplicates) await context.SaveChangesAsync();
+
         var stokvelIdentity = await GetOrCreateQuestionnaireSectionAsync(
             context,
+            logger,
             "Stokvel Identity",
             "Basic information about the stokvel.",
             1);
 
         var membershipRules = await GetOrCreateQuestionnaireSectionAsync(
             context,
+            logger,
             "Membership Rules",
             "Rules that define who can join and how members are managed.",
             2);
 
         var contributionsAndFines = await GetOrCreateQuestionnaireSectionAsync(
             context,
+            logger,
             "Contributions and Fines",
             "Rules for payments, due dates, arrears and fines.",
             3);
 
         var meetingsAndDecisions = await GetOrCreateQuestionnaireSectionAsync(
             context,
+            logger,
             "Meetings and Decisions",
             "Rules for meetings, attendance and decision-making.",
             4);
 
         var claimsAndPayouts = await GetOrCreateQuestionnaireSectionAsync(
             context,
+            logger,
             "Claims and Payouts",
             "Rules for burial claims, savings payouts and approvals.",
             5);
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             stokvelIdentity,
             "What is the main purpose of this stokvel?",
             QuestionType.Text,
@@ -292,6 +355,7 @@ public static class SisonkeSeedData
 
         var stokvelTypeQuestion = await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             stokvelIdentity,
             "Which type of stokvel is this?",
             QuestionType.SingleSelect,
@@ -304,6 +368,7 @@ public static class SisonkeSeedData
 
         var existingConstitutionQuestion = await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             stokvelIdentity,
             "Does this stokvel already have a constitution?",
             QuestionType.SingleSelect,
@@ -316,6 +381,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             membershipRules,
             "Does this stokvel have a joining fee?",
             QuestionType.YesNo,
@@ -324,6 +390,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             membershipRules,
             "What is the joining fee amount?",
             QuestionType.Currency,
@@ -332,6 +399,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             membershipRules,
             "Does this stokvel have a cooling period?",
             QuestionType.YesNo,
@@ -340,6 +408,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             membershipRules,
             "How many months is the cooling period?",
             QuestionType.Number,
@@ -348,6 +417,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             membershipRules,
             "What is the maximum number of next of kin records allowed per member?",
             QuestionType.Number,
@@ -356,6 +426,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             membershipRules,
             "What is the maximum number of beneficiaries allowed per member?",
             QuestionType.Number,
@@ -364,6 +435,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             membershipRules,
             "What is the maximum number of dependents allowed per member?",
             QuestionType.Number,
@@ -373,6 +445,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             contributionsAndFines,
             "How much must each member contribute?",
             QuestionType.Currency,
@@ -381,6 +454,7 @@ public static class SisonkeSeedData
 
         var contributionFrequencyQuestion = await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             contributionsAndFines,
             "How often must members contribute?",
             QuestionType.SingleSelect,
@@ -393,6 +467,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             contributionsAndFines,
             "What day of the month are contributions due?",
             QuestionType.Number,
@@ -401,6 +476,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             contributionsAndFines,
             "Are partial payments allowed?",
             QuestionType.YesNo,
@@ -409,6 +485,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             contributionsAndFines,
             "Is there a fine for late payment?",
             QuestionType.YesNo,
@@ -417,6 +494,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             contributionsAndFines,
             "What is the late payment fine amount?",
             QuestionType.Currency,
@@ -425,6 +503,7 @@ public static class SisonkeSeedData
 
         var meetingFrequencyQuestion = await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             meetingsAndDecisions,
             "How often does the stokvel meet?",
             QuestionType.SingleSelect,
@@ -437,6 +516,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             meetingsAndDecisions,
             "Is meeting attendance compulsory?",
             QuestionType.YesNo,
@@ -445,6 +525,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             meetingsAndDecisions,
             "What is the fine for late coming to meetings?",
             QuestionType.Currency,
@@ -453,6 +534,7 @@ public static class SisonkeSeedData
 
         var decisionApprovalQuestion = await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             meetingsAndDecisions,
             "How should decisions be approved?",
             QuestionType.SingleSelect,
@@ -465,6 +547,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             claimsAndPayouts,
             "Are claims or payouts allowed?",
             QuestionType.YesNo,
@@ -473,6 +556,7 @@ public static class SisonkeSeedData
 
         var claimApprovalQuestion = await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             claimsAndPayouts,
             "Who approves claims or payouts?",
             QuestionType.SingleSelect,
@@ -485,6 +569,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             claimsAndPayouts,
             "What is the waiting period in months before a new member or dependent can claim?",
             QuestionType.Number,
@@ -494,6 +579,7 @@ public static class SisonkeSeedData
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
+            logger,
             claimsAndPayouts,
             "What documents are required for a claim or payout?",
             QuestionType.Text,
@@ -505,15 +591,29 @@ public static class SisonkeSeedData
 
     private static async Task<QuestionnaireSection> GetOrCreateQuestionnaireSectionAsync(
         ApplicationDbContext context,
+        ILogger? logger,
         string name,
         string description,
         int displayOrder)
     {
-        var section = await context.QuestionnaireSections
-            .SingleOrDefaultAsync(existingSection => existingSection.Name == name);
+        var sections = await context.QuestionnaireSections
+            .Where(existingSection => existingSection.Name == name)
+            .OrderBy(existingSection => existingSection.DisplayOrder)
+            .ThenBy(existingSection => existingSection.Id)
+            .ToListAsync();
+
+        var section = sections.FirstOrDefault();
 
         if (section is not null)
         {
+            if (sections.Count > 1)
+            {
+                logger?.LogWarning(
+                    "Multiple questionnaire sections found during seed for {SectionName}. Using first existing record {SectionId}.",
+                    name,
+                    section.Id);
+            }
+
             return section;
         }
 
@@ -533,6 +633,7 @@ public static class SisonkeSeedData
 
     private static async Task<QuestionnaireQuestion> GetOrCreateQuestionnaireQuestionAsync(
         ApplicationDbContext context,
+        ILogger? logger,
         QuestionnaireSection section,
         string questionText,
         QuestionType questionType,
@@ -540,13 +641,27 @@ public static class SisonkeSeedData
         int displayOrder,
         string? helpText = null)
     {
-        var question = await context.QuestionnaireQuestions
-            .SingleOrDefaultAsync(existingQuestion =>
+        var questions = await context.QuestionnaireQuestions
+            .Where(existingQuestion =>
                 existingQuestion.QuestionnaireSectionId == section.Id &&
-                existingQuestion.QuestionText == questionText);
+                existingQuestion.QuestionText == questionText)
+            .OrderBy(existingQuestion => existingQuestion.DisplayOrder)
+            .ThenBy(existingQuestion => existingQuestion.Id)
+            .ToListAsync();
+
+        var question = questions.FirstOrDefault();
 
         if (question is not null)
         {
+            if (questions.Count > 1)
+            {
+                logger?.LogWarning(
+                    "Multiple questionnaire questions found during seed for section/question. Using first existing record. SectionId={SectionId}, QuestionText={QuestionText}, QuestionId={QuestionId}",
+                    section.Id,
+                    questionText,
+                    question.Id);
+            }
+
             return question;
         }
 

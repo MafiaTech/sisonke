@@ -1582,6 +1582,9 @@ namespace Sisonke.Web.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("Archetype")
+                        .HasColumnType("int");
+
                     b.Property<string>("Code")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
@@ -1592,6 +1595,33 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("EnableClaims")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EnableDependents")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EnableEducationPayouts")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EnableInventory")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EnableInvestmentTracking")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EnableLending")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EnableRotation")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EnableSocialEvents")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EnableTravelPlanning")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("EstablishedDate")
                         .HasColumnType("datetime2");

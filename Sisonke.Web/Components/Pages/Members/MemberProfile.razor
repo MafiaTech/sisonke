@@ -518,65 +518,77 @@ else
         <div class="col-12">
             <div class="card">
                 <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
-                        <div class="card-section-title mb-0">Claims</div>
-                        <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}")">
-                            <i class="bi bi-plus me-1"></i>Create Member Claim
-                        </a>
-                    </div>
-
-                    @if (member.GovernanceStatus is MemberGovernanceStatus.Suspended or MemberGovernanceStatus.Expelled)
+                    @if (stokvel?.EnableClaims == true)
                     {
-                        <div class="alert alert-warning" role="alert">
-                            This member's governance status means new claims may be placed on hold.
+                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                            <div class="card-section-title mb-0">Claims</div>
+                            <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}")">
+                                <i class="bi bi-plus me-1"></i>Create Member Claim
+                            </a>
                         </div>
-                    }
 
-                    @if (funeralClaims.Count == 0)
-                    {
-                        <p class="text-muted small mb-0">No funeral claims captured yet.</p>
+                        @if (member.GovernanceStatus is MemberGovernanceStatus.Suspended or MemberGovernanceStatus.Expelled)
+                        {
+                            <div class="alert alert-warning" role="alert">
+                                This member's governance status means new claims may be placed on hold.
+                            </div>
+                        }
+
+                        @if (funeralClaims.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">No funeral claims captured yet.</p>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Deceased</th>
+                                            <th>Subject</th>
+                                            <th>Date of death</th>
+                                            <th>Status</th>
+                                            <th>Waiting period</th>
+                                            <th>Member eligible</th>
+                                            <th>Documents</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var claim in funeralClaims)
+                                        {
+                                            <tr>
+                                                <td class="fw-500">@claim.DeceasedFullName</td>
+                                                <td class="text-muted small">@claim.SubjectType</td>
+                                                <td class="text-muted small">@(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "—")</td>
+                                                <td>
+                                                    <StatusBadge Text="@claim.Status.ToString()" Type="@GetClaimStatusBadgeType(claim.Status)" />
+                                                </td>
+                                                <td>
+                                                    <StatusBadge Text="@(claim.IsWaitingPeriodSatisfied ? "Yes" : "No")" Type="@(claim.IsWaitingPeriodSatisfied ? "success" : "warning")" />
+                                                </td>
+                                                <td>
+                                                    <StatusBadge Text="@(claim.IsMemberStatusEligible ? "Yes" : "No")" Type="@(claim.IsMemberStatusEligible ? "success" : "warning")" />
+                                                </td>
+                                                <td class="text-muted small">@claim.Documents.Count</td>
+                                                <td>
+                                                    <a class="btn btn-sm btn-outline-secondary" href="@($"/claim/{claim.Id}")">View</a>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
                     }
                     else
                     {
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Deceased</th>
-                                        <th>Subject</th>
-                                        <th>Date of death</th>
-                                        <th>Status</th>
-                                        <th>Waiting period</th>
-                                        <th>Member eligible</th>
-                                        <th>Documents</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var claim in funeralClaims)
-                                    {
-                                        <tr>
-                                            <td class="fw-500">@claim.DeceasedFullName</td>
-                                            <td class="text-muted small">@claim.SubjectType</td>
-                                            <td class="text-muted small">@(claim.DateOfDeath?.ToString("dd MMM yyyy") ?? "—")</td>
-                                            <td>
-                                                <StatusBadge Text="@claim.Status.ToString()" Type="@GetClaimStatusBadgeType(claim.Status)" />
-                                            </td>
-                                            <td>
-                                                <StatusBadge Text="@(claim.IsWaitingPeriodSatisfied ? "Yes" : "No")" Type="@(claim.IsWaitingPeriodSatisfied ? "success" : "warning")" />
-                                            </td>
-                                            <td>
-                                                <StatusBadge Text="@(claim.IsMemberStatusEligible ? "Yes" : "No")" Type="@(claim.IsMemberStatusEligible ? "success" : "warning")" />
-                                            </td>
-                                            <td class="text-muted small">@claim.Documents.Count</td>
-                                            <td>
-                                                <a class="btn btn-sm btn-outline-secondary" href="@($"/claim/{claim.Id}")">View</a>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                        <div class="card-section-title mb-2">Claims</div>
+                        <AlertBanner
+                            Type="warning"
+                            Title="Claims are not enabled for this stokvel type."
+                            Message="This group can still use the enabled member, contribution, fine and meeting features."
+                            Icon="bi bi-exclamation-triangle-fill" />
                     }
                 </div>
             </div>
@@ -981,10 +993,10 @@ else
         maxNextOfKin = stokvel is null ? 0 : await OperatingRuleService.GetMaxNextOfKinAsync(stokvel.Id);
         maxBeneficiaries = stokvel is null ? 0 : await OperatingRuleService.GetMaxBeneficiariesAsync(stokvel.Id);
         maxDependents = stokvel is null ? 0 : await OperatingRuleService.GetMaxDependentsAsync(stokvel.Id);
-        dependents = member is null ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
-        activeDependentClaims = member is null ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
+        dependents = member is null || stokvel?.EnableDependents != true ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
+        activeDependentClaims = member is null || stokvel?.EnableClaims != true ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
         memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
-        funeralClaims = member is null ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
+        funeralClaims = member is null || stokvel?.EnableClaims != true ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
         memberWarnings = member is null || (!canManageMemberStatus && !isOwnMemberProfile) ? [] : await MemberWarningService.GetWarningsByMemberIdAsync(MemberId);
         timelineItems = member is null || stokvel is null ? [] : await MemberGovernanceTimelineService.GetTimelineByMemberIdAsync(MemberId, stokvel.Id);
         visibleTimelineItems = GetVisibleTimelineItems();

@@ -29,15 +29,18 @@ else if (stokvel is null)
 else
 {
     <!-- ── Page header ── -->
-    <div class="page-header">
-        <div class="page-header-text">
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold me-2">@GetArchetypeLabel(stokvel.Archetype)</span>
             <h1>Quick Stokvel Setup</h1>
-            <p class="page-subtitle">@stokvel.Name — Complete the key details to configure this stokvel for management.</p>
+            <p>@stokvel.Name — Together we save. Together we grow.</p>
         </div>
-        <a class="btn btn-outline-secondary btn-sm" href="@BackLinkHref">
-            <i class="bi bi-chevron-left me-1"></i>@BackLinkText
-        </a>
-    </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@BackLinkHref">
+                <i class="bi bi-arrow-left me-2"></i>@BackLinkText
+            </a>
+        </div>
+    </section>
 
     <!-- Feedback banners -->
     @if (!string.IsNullOrWhiteSpace(successMessage))
@@ -93,96 +96,102 @@ else
     <!-- ── Step content ── -->
     @if (currentStep < 4)
     {
-        <div class="row g-3">
+        @if (!CurrentStepSections.Any())
+        {
+            <div class="sisonke-alert sisonke-alert-blue">
+                <i class="bi bi-info-circle me-2"></i>
+                This step has no questions for your stokvel type. Click <strong>Next</strong> to continue.
+            </div>
+        }
+
+        <div class="d-flex flex-column gap-3">
             @foreach (var section in CurrentStepSections)
             {
-                <div class="col-12 col-md-6">
-                    <div class="card h-100">
-                        <div class="card-body p-4">
-                            <div class="form-section-title">@section.Name</div>
-                            @if (!string.IsNullOrWhiteSpace(section.Description))
-                            {
-                                <p class="text-muted small mb-3">@section.Description</p>
-                            }
+                <div class="sisonke-card">
+                    <div class="sisonke-card-body">
+                        <div class="form-section-title">@section.Name</div>
+                        @if (!string.IsNullOrWhiteSpace(section.Description))
+                        {
+                            <p class="text-muted small mb-3">@section.Description</p>
+                        }
 
-                            @foreach (var question in section.Questions)
-                            {
-                                <div class="mb-3">
-                                    <label class="form-label" for="@GetQuestionInputId(question.Id)">
-                                        @question.QuestionText
-                                        @if (question.IsRequired)
-                                        {
-                                            <span class="text-danger">*</span>
-                                        }
-                                    </label>
-
-                                    @if (!string.IsNullOrWhiteSpace(question.HelpText))
+                        @foreach (var question in GetApplicableQuestions(section))
+                        {
+                            <div class="mb-3">
+                                <label class="form-label" for="@GetQuestionInputId(question.Id)">
+                                    @question.QuestionText
+                                    @if (question.IsRequired)
                                     {
-                                        <div class="form-text mb-1">@question.HelpText</div>
+                                        <span class="text-danger">*</span>
                                     }
+                                </label>
 
-                                    @switch (question.QuestionType)
-                                    {
-                                        case QuestionType.Number:
-                                            <InputNumber id="@GetQuestionInputId(question.Id)" class="form-control" TValue="int?"
-                                                Value="@GetIntAnswer(question.Id)"
-                                                ValueChanged="@((int? v) => SetAnswer(question.Id, v?.ToString()))"
-                                                ValueExpression="@(() => intValueExpression)" />
-                                            break;
-                                        case QuestionType.Currency:
-                                            <div class="input-group">
-                                                <span class="input-group-text">R</span>
-                                                <InputNumber id="@GetQuestionInputId(question.Id)" class="form-control" TValue="decimal?"
-                                                    Value="@GetDecimalAnswer(question.Id)"
-                                                    ValueChanged="@((decimal? v) => SetAnswer(question.Id, v?.ToString()))"
-                                                    ValueExpression="@(() => decimalValueExpression)" />
-                                            </div>
-                                            break;
-                                        case QuestionType.Date:
-                                            <InputDate id="@GetQuestionInputId(question.Id)" class="form-control" TValue="DateTime?"
-                                                Value="@GetDateAnswer(question.Id)"
-                                                ValueChanged="@((DateTime? v) => SetAnswer(question.Id, v?.ToString("yyyy-MM-dd")))"
-                                                ValueExpression="@(() => dateValueExpression)" />
-                                            break;
-                                        case QuestionType.YesNo:
-                                            <InputSelect id="@GetQuestionInputId(question.Id)" class="form-select" TValue="string"
-                                                Value="@GetAnswer(question.Id)"
-                                                ValueChanged="@((string? v) => SetAnswer(question.Id, v))"
-                                                ValueExpression="@(() => stringValueExpression)">
-                                                <option value="">Select an answer</option>
-                                                <option value="Yes">Yes</option>
-                                                <option value="No">No</option>
-                                            </InputSelect>
-                                            break;
-                                        case QuestionType.SingleSelect:
-                                            <InputSelect id="@GetQuestionInputId(question.Id)" class="form-select" TValue="string"
-                                                Value="@GetAnswer(question.Id)"
-                                                ValueChanged="@((string? v) => SetAnswer(question.Id, v))"
-                                                ValueExpression="@(() => stringValueExpression)">
-                                                <option value="">Select an answer</option>
-                                                @foreach (var option in question.Options)
-                                                {
-                                                    <option value="@(option.OptionValue ?? option.OptionText)">@option.OptionText</option>
-                                                }
-                                            </InputSelect>
-                                            break;
-                                        case QuestionType.MultiSelect:
-                                            <InputText id="@GetQuestionInputId(question.Id)" class="form-control"
-                                                Value="@GetAnswer(question.Id)"
-                                                ValueChanged="@((string? v) => SetAnswer(question.Id, v))"
-                                                ValueExpression="@(() => stringValueExpression)" />
-                                            <div class="form-text">Enter comma-separated values.</div>
-                                            break;
-                                        default:
-                                            <InputText id="@GetQuestionInputId(question.Id)" class="form-control"
-                                                Value="@GetAnswer(question.Id)"
-                                                ValueChanged="@((string? v) => SetAnswer(question.Id, v))"
-                                                ValueExpression="@(() => stringValueExpression)" />
-                                            break;
-                                    }
-                                </div>
-                            }
-                        </div>
+                                @if (!string.IsNullOrWhiteSpace(question.HelpText))
+                                {
+                                    <div class="form-text mb-1">@question.HelpText</div>
+                                }
+
+                                @switch (question.QuestionType)
+                                {
+                                    case QuestionType.Number:
+                                        <InputNumber id="@GetQuestionInputId(question.Id)" class="form-control" TValue="int?"
+                                            Value="@GetIntAnswer(question.Id)"
+                                            ValueChanged="@((int? v) => SetAnswer(question.Id, v?.ToString()))"
+                                            ValueExpression="@(() => intValueExpression)" />
+                                        break;
+                                    case QuestionType.Currency:
+                                        <div class="input-group">
+                                            <span class="input-group-text">R</span>
+                                            <InputNumber id="@GetQuestionInputId(question.Id)" class="form-control" TValue="decimal?"
+                                                Value="@GetDecimalAnswer(question.Id)"
+                                                ValueChanged="@((decimal? v) => SetAnswer(question.Id, v?.ToString()))"
+                                                ValueExpression="@(() => decimalValueExpression)" />
+                                        </div>
+                                        break;
+                                    case QuestionType.Date:
+                                        <InputDate id="@GetQuestionInputId(question.Id)" class="form-control" TValue="DateTime?"
+                                            Value="@GetDateAnswer(question.Id)"
+                                            ValueChanged="@((DateTime? v) => SetAnswer(question.Id, v?.ToString("yyyy-MM-dd")))"
+                                            ValueExpression="@(() => dateValueExpression)" />
+                                        break;
+                                    case QuestionType.YesNo:
+                                        <InputSelect id="@GetQuestionInputId(question.Id)" class="form-select" TValue="string"
+                                            Value="@GetAnswer(question.Id)"
+                                            ValueChanged="@((string? v) => SetAnswer(question.Id, v))"
+                                            ValueExpression="@(() => stringValueExpression)">
+                                            <option value="">Select an answer</option>
+                                            <option value="Yes">Yes</option>
+                                            <option value="No">No</option>
+                                        </InputSelect>
+                                        break;
+                                    case QuestionType.SingleSelect:
+                                        <InputSelect id="@GetQuestionInputId(question.Id)" class="form-select" TValue="string"
+                                            Value="@GetAnswer(question.Id)"
+                                            ValueChanged="@((string? v) => SetAnswer(question.Id, v))"
+                                            ValueExpression="@(() => stringValueExpression)">
+                                            <option value="">Select an answer</option>
+                                            @foreach (var option in question.Options)
+                                            {
+                                                <option value="@(option.OptionValue ?? option.OptionText)">@option.OptionText</option>
+                                            }
+                                        </InputSelect>
+                                        break;
+                                    case QuestionType.MultiSelect:
+                                        <InputText id="@GetQuestionInputId(question.Id)" class="form-control"
+                                            Value="@GetAnswer(question.Id)"
+                                            ValueChanged="@((string? v) => SetAnswer(question.Id, v))"
+                                            ValueExpression="@(() => stringValueExpression)" />
+                                        <div class="form-text">Enter comma-separated values.</div>
+                                        break;
+                                    default:
+                                        <InputText id="@GetQuestionInputId(question.Id)" class="form-control"
+                                            Value="@GetAnswer(question.Id)"
+                                            ValueChanged="@((string? v) => SetAnswer(question.Id, v))"
+                                            ValueExpression="@(() => stringValueExpression)" />
+                                        break;
+                                }
+                            </div>
+                        }
                     </div>
                 </div>
             }
@@ -210,11 +219,11 @@ else
                     </div>
                 </div>
 
-                @foreach (var section in sections)
+                @foreach (var section in ReviewSections)
                 {
                     <div class="review-section mb-3">
                         <div class="review-section-title">@section.Name</div>
-                        @foreach (var question in section.Questions)
+                        @foreach (var question in GetApplicableQuestions(section))
                         {
                             <div class="review-row">
                                 <span class="review-q">@question.QuestionText</span>
@@ -330,7 +339,68 @@ else
     private string BackLinkText => stokvel?.IsSetupComplete == true ? "Back to Dashboard" : "Back to My Stokvels";
 
     private List<QuestionnaireSection> CurrentStepSections =>
-        sections.Where(s => GetSectionStep(s.Name) == currentStep).ToList();
+        sections
+            .Where(s => GetSectionStep(s.Name) == currentStep && IsSectionApplicable(s))
+            .ToList();
+
+    private IEnumerable<QuestionnaireSection> ReviewSections =>
+        sections.Where(IsSectionApplicable);
+
+    private bool IsSectionApplicable(QuestionnaireSection section) =>
+        section.Name switch
+        {
+            "Claims and Payouts" => stokvel?.EnableClaims == true,
+            _ => true
+        };
+
+    private IEnumerable<QuestionnaireQuestion> GetApplicableQuestions(QuestionnaireSection section)
+    {
+        if (stokvel?.EnableDependents == true && stokvel?.EnableClaims == true)
+            return section.Questions;
+
+        return section.Questions
+            .Where(q =>
+                !q.QuestionText.Contains("beneficiaries", StringComparison.OrdinalIgnoreCase) &&
+                !q.QuestionText.Contains("dependents", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void PrePopulateAutoAnswers()
+    {
+        if (stokvel is null) return;
+
+        foreach (var section in sections)
+        {
+            if (!IsSectionApplicable(section))
+            {
+                foreach (var q in section.Questions.Where(q => q.IsRequired))
+                {
+                    if (!answers.TryGetValue(q.Id, out var existing) || string.IsNullOrWhiteSpace(existing))
+                        answers[q.Id] = "N/A";
+                }
+                continue;
+            }
+
+            var applicableIds = GetApplicableQuestions(section).Select(q => q.Id).ToHashSet();
+            foreach (var q in section.Questions.Where(q => q.IsRequired && !applicableIds.Contains(q.Id)))
+            {
+                if (!answers.TryGetValue(q.Id, out var existing) || string.IsNullOrWhiteSpace(existing))
+                    answers[q.Id] = "N/A";
+            }
+        }
+    }
+
+    private void RecomputeLocalCompletion()
+    {
+        var required = sections
+            .Where(IsSectionApplicable)
+            .SelectMany(GetApplicableQuestions)
+            .Where(q => q.IsRequired)
+            .ToList();
+
+        completionPercentage = required.Count == 0
+            ? 100
+            : required.Count(q => !string.IsNullOrWhiteSpace(GetAnswer(q.Id))) * 100 / required.Count;
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -345,7 +415,8 @@ else
         {
             sections = await QuestionnaireService.GetActiveQuestionnaireAsync();
             answers  = await QuestionnaireService.GetAnswersByStokvelIdAsync(StokvelId);
-            completionPercentage = await QuestionnaireService.GetCompletionPercentageAsync(StokvelId);
+            PrePopulateAutoAnswers();
+            RecomputeLocalCompletion();
         }
 
         isLoading = false;
@@ -380,10 +451,11 @@ else
         errorMessage = null;
         showSubmitConfirmation = false;
 
+        PrePopulateAutoAnswers();
         var saved = await QuestionnaireService.SaveAnswersAsync(StokvelId, answers);
         if (!saved) { errorMessage = "Could not save questionnaire."; return; }
 
-        completionPercentage = await QuestionnaireService.GetCompletionPercentageAsync(StokvelId);
+        RecomputeLocalCompletion();
         successMessage = "Setup draft saved successfully.";
     }
 
@@ -402,18 +474,20 @@ else
         successMessage = null;
         errorMessage = null;
 
+        // Save auto-populated answers first so the service's completion check passes
+        PrePopulateAutoAnswers();
+        await QuestionnaireService.SaveAnswersAsync(StokvelId, answers);
+
         var submitted = await QuestionnaireService.SubmitRegistrationAsync(StokvelId);
 
         if (!submitted)
         {
             showSubmitConfirmation = false;
             errorMessage = "Registration could not be submitted. Please complete all required questions.";
-            completionPercentage = await QuestionnaireService.GetCompletionPercentageAsync(StokvelId);
+            RecomputeLocalCompletion();
             return;
         }
 
-        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
-        completionPercentage = await QuestionnaireService.GetCompletionPercentageAsync(StokvelId);
         showSubmitConfirmation = false;
         successMessage = "Registration submitted successfully. This stokvel is now ready for management.";
         NavigationManager.NavigateTo($"/stokvel-dashboard/{StokvelId}");
@@ -435,6 +509,21 @@ else
 
     private static string GetStepName(int step) =>
         step switch { 1 => "Basics", 2 => "Money", 3 => "Rules", 4 => "Sign-off", _ => string.Empty };
+
+    private static string GetArchetypeLabel(StokvelArchetype archetype) =>
+        archetype switch
+        {
+            StokvelArchetype.BurialSociety  => "Burial Society",
+            StokvelArchetype.Rotational     => "Rotational Stokvel",
+            StokvelArchetype.Grocery        => "Grocery Stokvel",
+            StokvelArchetype.SavingsClub    => "Savings Club",
+            StokvelArchetype.InvestmentClub => "Investment Club",
+            StokvelArchetype.Education      => "Education Stokvel",
+            StokvelArchetype.Borrowing      => "Borrowing Stokvel",
+            StokvelArchetype.Travel         => "Travel Stokvel",
+            StokvelArchetype.SocialClub     => "Social Club",
+            _                               => "Stokvel"
+        };
 
     private string GetStepClass(int step)
     {

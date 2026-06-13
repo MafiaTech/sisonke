@@ -27,6 +27,18 @@ else if (member is null)
 {
     <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
 }
+else if (stokvel?.EnableClaims != true)
+{
+    <AlertBanner
+        Type="warning"
+        Title="Claims are not enabled for this stokvel type."
+        Message="This group can still use the enabled member, contribution, fine and meeting features."
+        Icon="bi bi-exclamation-triangle-fill" />
+
+    <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Member Profile
+    </a>
+}
 else
 {
     <section class="sisonke-hero-card mb-4">
@@ -140,6 +152,7 @@ else
 
 @code {
     private Member? member;
+    private Stokvel? stokvel;
     private List<MemberDependent> dependents = [];
     private CreateClaimModel model = new();
     private bool isLoading = true;
@@ -156,7 +169,8 @@ else
     {
         isLoading = true;
         member = await LoadMemberAsync();
-        dependents = member is null ? [] : await LoadDependentsAsync();
+        stokvel = member is null ? null : await LoadStokvelAsync(member.TenantId);
+        dependents = member is null || stokvel?.EnableDependents != true ? [] : await LoadDependentsAsync();
 
         if (!hasAppliedRouteState)
         {
@@ -193,9 +207,28 @@ else
             .ToListAsync();
     }
 
+    private async Task<Stokvel?> LoadStokvelAsync(Guid tenantId)
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.Stokvels
+            .AsNoTracking()
+            .Where(existingStokvel => existingStokvel.TenantId == tenantId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+    }
+
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
+
+        if (stokvel?.EnableClaims != true)
+        {
+            saveFailed = true;
+            return;
+        }
 
         var selectedDependentId = model.SubjectType == FuneralClaimSubjectType.Dependent
             ? model.SelectedDependentId

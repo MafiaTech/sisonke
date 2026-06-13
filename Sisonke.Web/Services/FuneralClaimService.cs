@@ -19,9 +19,12 @@ public class FuneralClaimService(
     public async Task<List<FuneralClaim>> GetClaimsByStokvelIdAsync(Guid stokvelId)
     {
         var stokvel = await context.Stokvels
-            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
 
-        if (stokvel is null)
+        if (stokvel is null || !stokvel.EnableClaims)
         {
             return [];
         }
@@ -384,9 +387,25 @@ public class FuneralClaimService(
     {
         var member = await context.Members
             .Include(existingMember => existingMember.Tenant)
-            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+            .FirstOrDefaultAsync(existingMember => existingMember.Id == memberId);
 
         if (member is null)
+        {
+            return null;
+        }
+
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.TenantId == member.TenantId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel?.EnableClaims != true)
+        {
+            return null;
+        }
+
+        if (subjectType == FuneralClaimSubjectType.Dependent && !stokvel.EnableDependents)
         {
             return null;
         }

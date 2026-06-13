@@ -194,6 +194,7 @@ builder.Services.AddScoped<FuneralClaimService>();
 builder.Services.AddScoped<ClaimEligibilityService>();
 builder.Services.AddScoped<MemberAccountLinkingService>();
 builder.Services.AddScoped<MemberAccessService>();
+builder.Services.AddScoped<StokvelArchetypeConfigurationService>();
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
@@ -201,13 +202,25 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var seedDataEnabled = builder.Configuration.GetValue("SeedData:Enabled", true);
 
     await context.Database.MigrateAsync();
-    await SisonkeSeedData.SeedAsync(context);
 
-    if (app.Environment.IsDevelopment())
+    if (builder.Configuration.GetValue("AdminSeed:Enabled", false))
     {
-        await SisonkeDemoDataSeeder.SeedAsync(scope.ServiceProvider);
+        await SeedAdminUserAsync(scope.ServiceProvider, builder.Configuration);
+    }
+
+    if (seedDataEnabled)
+    {
+        var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("SisonkeSeedData");
+        await SisonkeSeedData.SeedAsync(context, seedLogger);
+
+        if (app.Environment.IsDevelopment())
+        {
+            await SisonkeDemoDataSeeder.SeedAsync(scope.ServiceProvider);
+        }
     }
 }
 
@@ -237,11 +250,108 @@ app.MapPost("/Account/RegisterSubmit", RegistrationSubmitEndpoint.HandleAsync)
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
 
-Console.WriteLine($"[Sisonke] DB provider: {(isSqlite ? "SQLite" : "SQL Server")} | Connection: {connectionString}");
+Console.WriteLine($"[Sisonke] DB provider: {(isSqlite ? "SQLite" : "SQL Server")} | Connection: {MaskConnectionString(connectionString)}");
 Console.WriteLine($"[Sisonke] SMTP configured: {!string.IsNullOrWhiteSpace(emailSettings.SmtpHost)} | RequireConfirmedAccount: {authSettings.RequireConfirmedAccount} | SessionTimeout: {authSettings.SessionTimeoutMinutes}m | PublicBaseUrl: {appSettings.PublicBaseUrl ?? "(NavigationManager)"}");
 
 
 app.Run();
+
+static string MaskConnectionString(string value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return "(empty)";
+    }
+
+    try
+    {
+        var builder = new System.Data.Common.DbConnectionStringBuilder
+        {
+            ConnectionString = value
+        };
+
+        foreach (var key in new[] { "Password", "Pwd", "User ID", "UID" })
+        {
+            if (builder.ContainsKey(key))
+            {
+                builder[key] = "***";
+            }
+        }
+
+        return builder.ConnectionString;
+    }
+    catch
+    {
+        return "(configured)";
+    }
+}
+
+static async Task SeedAdminUserAsync(IServiceProvider serviceProvider, IConfiguration configuration)
+{
+    var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("AdminSeed");
+    var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var email = configuration["AdminSeed:Email"]?.Trim();
+    var password = configuration["AdminSeed:Password"];
+    const string roleName = "PlatformAdmin";
+
+    if (string.IsNullOrWhiteSpace(email))
+    {
+        throw new InvalidOperationException("AdminSeed is enabled but AdminSeed:Email is not configured.");
+    }
+
+    if (string.IsNullOrWhiteSpace(password))
+    {
+        throw new InvalidOperationException("AdminSeed is enabled but AdminSeed:Password is not configured.");
+    }
+
+    if (!await roleManager.RoleExistsAsync(roleName))
+    {
+        logger.LogInformation("Creating admin seed role {RoleName}.", roleName);
+        var roleResult = await roleManager.CreateAsync(new IdentityRole(roleName));
+        if (!roleResult.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Could not create admin seed role {roleName}: {string.Join(", ", roleResult.Errors.Select(error => error.Description))}");
+        }
+    }
+
+    var user = await userManager.FindByEmailAsync(email);
+    if (user is null)
+    {
+        logger.LogInformation("Creating admin seed user {Email}.", email);
+        user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true,
+            FullName = "Pilot Admin"
+        };
+
+        var createResult = await userManager.CreateAsync(user, password);
+        if (!createResult.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Could not create admin seed user {email}: {string.Join(", ", createResult.Errors.Select(error => error.Description))}");
+        }
+    }
+    else
+    {
+        logger.LogInformation("Admin seed user {Email} already exists; not overwriting user fields.", email);
+    }
+
+    if (!await userManager.IsInRoleAsync(user, roleName))
+    {
+        logger.LogInformation("Adding admin seed user {Email} to role {RoleName}.", email, roleName);
+        var roleAddResult = await userManager.AddToRoleAsync(user, roleName);
+        if (!roleAddResult.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Could not add admin seed user {email} to role {roleName}: {string.Join(", ", roleAddResult.Errors.Select(error => error.Description))}");
+        }
+    }
+}
 
 internal static class RegistrationSubmitEndpoint
 {

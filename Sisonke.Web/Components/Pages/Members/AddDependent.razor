@@ -5,6 +5,7 @@
 @using Sisonke.Web.Services
 
 @inject MemberService MemberService
+@inject StokvelService StokvelService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Add Dependent</PageTitle>
@@ -21,6 +22,18 @@
 else if (member is null)
 {
     <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (stokvel?.EnableDependents != true)
+{
+    <AlertBanner
+        Type="warning"
+        Title="Dependents are not enabled for this stokvel type."
+        Message="Covered-life records are only enabled for stokvel archetypes that support dependents."
+        Icon="bi bi-exclamation-triangle-fill" />
+
+    <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Member Profile
+    </a>
 }
 else
 {
@@ -145,6 +158,7 @@ else
     ];
 
     private Member? member;
+    private Stokvel? stokvel;
     private MemberDependent model = new()
     {
         Relationship = "Child"
@@ -158,12 +172,19 @@ else
     protected override async Task OnInitializedAsync()
     {
         member = await MemberService.GetMemberByIdAsync(MemberId);
+        stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
         isLoading = false;
     }
 
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
+
+        if (stokvel?.EnableDependents != true)
+        {
+            saveFailed = true;
+            return;
+        }
 
         var dependent = new MemberDependent
         {

@@ -45,12 +45,12 @@ warn: Microsoft.EntityFrameworkCore.Model.Validation[30000]
 warn: Microsoft.EntityFrameworkCore.Model.Validation[30000]
       No store type was specified for the decimal property 'MonthlyPrice' on entity type 'SubscriptionPlan'. This will cause values to be silently truncated if they do not fit in the default precision and scale. Explicitly specify the SQL server column type that can accommodate all the values in 'OnModelCreating' using 'HasColumnType', specify precision and scale using 'HasPrecision', or configure a value converter using 'HasConversion'.
 info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (49ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      Executed DbCommand (44ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
       SELECT 1
 info: Microsoft.EntityFrameworkCore.Migrations[20411]
       Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.
 info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (38ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      Executed DbCommand (42ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
       DECLARE @result int;
       EXEC @result = sp_getapplock @Resource = '__EFMigrationsLock', @LockOwner = 'Session', @LockMode = 'Exclusive';
       SELECT @result
@@ -65,13 +65,13 @@ info: Microsoft.EntityFrameworkCore.Database.Command[20101]
           );
       END;
 info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      Executed DbCommand (8ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
       SELECT 1
 info: Microsoft.EntityFrameworkCore.Database.Command[20101]
       Executed DbCommand (8ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
       SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
 info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (17ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      Executed DbCommand (9ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
       SELECT [MigrationId], [ProductVersion]
       FROM [__EFMigrationsHistory]
       ORDER BY [MigrationId];
@@ -83,259 +83,7 @@ info: Microsoft.EntityFrameworkCore.Database.Command[20101]
       EXEC @result = sp_releaseapplock @Resource = '__EFMigrationsLock', @LockOwner = 'Session';
       SELECT @result
 info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (56ms) [Parameters=[@name='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (34ms) [Parameters=[@name='?' (Size = 100), @legacyName='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = @name OR [s].[Name] = @legacyName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@name='?' (Size = 100), @legacyName='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = @name OR [s].[Name] = @legacyName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@name='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = N'Pilot'
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (28ms) [Parameters=[@slug='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [t].[Id], [t].[CreatedAt], [t].[IsActive], [t].[Name], [t].[Slug], [t].[UpdatedAt]
-      FROM [Tenants] AS [t]
-      WHERE [t].[Slug] = @slug
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@slug='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [t].[Id], [t].[CreatedAt], [t].[IsActive], [t].[Name], [t].[Slug], [t].[UpdatedAt]
-      FROM [Tenants] AS [t]
-      WHERE [t].[Slug] = @slug
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@tenant_Id='?' (DbType = Guid), @name='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [s].[Id], [s].[Code], [s].[CreatedAt], [s].[Description], [s].[EstablishedDate], [s].[ExpectedMemberCount], [s].[IsActive], [s].[IsSetupComplete], [s].[Name], [s].[Province], [s].[SetupCompletedAt], [s].[TenantId], [s].[TownOrArea], [s].[Type]
-      FROM [Stokvels] AS [s]
-      WHERE [s].[TenantId] = @tenant_Id AND [s].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@tenant_Id='?' (DbType = Guid), @name='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [s].[Id], [s].[Code], [s].[CreatedAt], [s].[Description], [s].[EstablishedDate], [s].[ExpectedMemberCount], [s].[IsActive], [s].[IsSetupComplete], [s].[Name], [s].[Province], [s].[SetupCompletedAt], [s].[TenantId], [s].[TownOrArea], [s].[Type]
-      FROM [Stokvels] AS [s]
-      WHERE [s].[TenantId] = @tenant_Id AND [s].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@tenant_Id='?' (DbType = Guid), @pilotPlan_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [t].[Id], [t].[EndDate], [t].[IsTrial], [t].[NextBillingDate], [t].[StartDate], [t].[Status], [t].[SubscriptionPlanId], [t].[TenantId]
-      FROM [TenantSubscriptions] AS [t]
-      WHERE [t].[TenantId] = @tenant_Id AND [t].[SubscriptionPlanId] = @pilotPlan_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (547ms) [Parameters=[@tenant_Id='?' (DbType = Guid), @pilotPlan_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [t].[Id], [t].[EndDate], [t].[IsTrial], [t].[NextBillingDate], [t].[StartDate], [t].[Status], [t].[SubscriptionPlanId], [t].[TenantId]
-      FROM [TenantSubscriptions] AS [t]
-      WHERE [t].[TenantId] = @tenant_Id AND [t].[SubscriptionPlanId] = @pilotPlan_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@tenant_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [f].[Name]
-      FROM [FineTypes] AS [f]
-      WHERE [f].[TenantId] = @tenant_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@tenant_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [f].[Name]
-      FROM [FineTypes] AS [f]
-      WHERE [f].[TenantId] = @tenant_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (27ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?' (DbType = DateTime2), @p2='?' (DbType = Boolean), @p3='?' (DbType = DateTime2), @p4='?' (DbType = DateTime2), @p5='?' (DbType = Int32), @p6='?' (DbType = Guid), @p7='?' (DbType = Guid), @p8='?' (DbType = Guid), @p9='?' (DbType = DateTime2), @p10='?' (DbType = Boolean), @p11='?' (DbType = DateTime2), @p12='?' (DbType = DateTime2), @p13='?' (DbType = Int32), @p14='?' (DbType = Guid), @p15='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      INSERT INTO [TenantSubscriptions] ([Id], [EndDate], [IsTrial], [NextBillingDate], [StartDate], [Status], [SubscriptionPlanId], [TenantId])
-      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7),
-      (@p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15);
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (9ms) [Parameters=[@name='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[Description], [q].[DisplayOrder], [q].[IsActive], [q].[Name]
-      FROM [QuestionnaireSections] AS [q]
-      WHERE [q].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@name='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[Description], [q].[DisplayOrder], [q].[IsActive], [q].[Name]
-      FROM [QuestionnaireSections] AS [q]
-      WHERE [q].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (19ms) [Parameters=[@name='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[Description], [q].[DisplayOrder], [q].[IsActive], [q].[Name]
-      FROM [QuestionnaireSections] AS [q]
-      WHERE [q].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (9ms) [Parameters=[@name='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[Description], [q].[DisplayOrder], [q].[IsActive], [q].[Name]
-      FROM [QuestionnaireSections] AS [q]
-      WHERE [q].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (10ms) [Parameters=[@name='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[Description], [q].[DisplayOrder], [q].[IsActive], [q].[Name]
-      FROM [QuestionnaireSections] AS [q]
-      WHERE [q].[Name] = @name
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@question_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [q].[OptionText]
-      FROM [QuestionnaireOptions] AS [q]
-      WHERE [q].[QuestionnaireQuestionId] = @question_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@question_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [q].[OptionText]
-      FROM [QuestionnaireOptions] AS [q]
-      WHERE [q].[QuestionnaireQuestionId] = @question_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (9ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (20ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (17ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (9ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (12ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (9ms) [Parameters=[@question_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [q].[OptionText]
-      FROM [QuestionnaireOptions] AS [q]
-      WHERE [q].[QuestionnaireQuestionId] = @question_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (17ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (14ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (13ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@question_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [q].[OptionText]
-      FROM [QuestionnaireOptions] AS [q]
-      WHERE [q].[QuestionnaireQuestionId] = @question_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (9ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (24ms) [Parameters=[@question_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [q].[OptionText]
-      FROM [QuestionnaireOptions] AS [q]
-      WHERE [q].[QuestionnaireQuestionId] = @question_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (14ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (16ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (18ms) [Parameters=[@question_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [q].[OptionText]
-      FROM [QuestionnaireOptions] AS [q]
-      WHERE [q].[QuestionnaireQuestionId] = @question_Id
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (10ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (550ms) [Parameters=[@section_Id='?' (DbType = Guid), @questionText='?' (Size = 500)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [q].[Id], [q].[DisplayOrder], [q].[HelpText], [q].[IsActive], [q].[IsRequired], [q].[QuestionText], [q].[QuestionType], [q].[QuestionnaireSectionId], [q].[StokvelType]
-      FROM [QuestionnaireQuestions] AS [q]
-      WHERE [q].[QuestionnaireSectionId] = @section_Id AND [q].[QuestionText] = @questionText
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (20ms) [Parameters=[@normalizedName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[Id], [a].[ConcurrencyStamp], [a].[Name], [a].[NormalizedName]
-      FROM [AspNetRoles] AS [a]
-      WHERE [a].[NormalizedName] = @normalizedName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (11ms) [Parameters=[@normalizedName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      Executed DbCommand (68ms) [Parameters=[@normalizedName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
       SELECT TOP(1) [a].[Id], [a].[ConcurrencyStamp], [a].[Name], [a].[NormalizedName]
       FROM [AspNetRoles] AS [a]
       WHERE [a].[NormalizedName] = @normalizedName
@@ -344,366 +92,19 @@ info: Microsoft.EntityFrameworkCore.Database.Command[20101]
       SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
       FROM [AspNetUsers] AS [a]
       WHERE [a].[NormalizedEmail] = @normalizedEmail
+info: AdminSeed[0]
+      Admin seed user admin@sisonketest.co.za already exists; not overwriting user fields.
 info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (11ms) [Parameters=[@normalizedUserName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedUserName] = @normalizedUserName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (12ms) [Parameters=[@p18='?' (Size = 450), @p0='?' (DbType = Int32), @p1='?' (Size = 30), @p2='?' (Size = 4000), @p19='?' (Size = 4000), @p3='?' (Size = 256), @p4='?' (DbType = Boolean), @p5='?' (Size = 150), @p6='?' (Size = 30), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 256), @p10='?' (Size = 256), @p11='?' (Size = 4000), @p12='?' (Size = 256), @p13='?' (DbType = Boolean), @p14='?' (Size = 250), @p15='?' (Size = 4000), @p16='?' (DbType = Boolean), @p17='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [AspNetUsers] SET [AccessFailedCount] = @p0, [CellphoneNumber] = @p1, [ConcurrencyStamp] = @p2, [Email] = @p3, [EmailConfirmed] = @p4, [FullName] = @p5, [IdNumber] = @p6, [LockoutEnabled] = @p7, [LockoutEnd] = @p8, [NormalizedEmail] = @p9, [NormalizedUserName] = @p10, [PasswordHash] = @p11, [PhoneNumber] = @p12, [PhoneNumberConfirmed] = @p13, [ResidentialArea] = @p14, [SecurityStamp] = @p15, [TwoFactorEnabled] = @p16, [UserName] = @p17
-      OUTPUT 1
-      WHERE [Id] = @p18 AND [ConcurrencyStamp] = @p19;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedRoleName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      Executed DbCommand (12ms) [Parameters=[@normalizedRoleName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
       SELECT TOP(2) [a].[Id], [a].[ConcurrencyStamp], [a].[Name], [a].[NormalizedName]
       FROM [AspNetRoles] AS [a]
       WHERE [a].[NormalizedName] = @normalizedRoleName
 info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@p='?' (Size = 450), @p1='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
+      Executed DbCommand (13ms) [Parameters=[@p='?' (Size = 450), @p1='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
       SELECT TOP(1) [a].[UserId], [a].[RoleId]
       FROM [AspNetUserRoles] AS [a]
       WHERE [a].[UserId] = @p AND [a].[RoleId] = @p1
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@normalizedUserName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedUserName] = @normalizedUserName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (12ms) [Parameters=[@p18='?' (Size = 450), @p0='?' (DbType = Int32), @p1='?' (Size = 30), @p2='?' (Size = 4000), @p19='?' (Size = 4000), @p3='?' (Size = 256), @p4='?' (DbType = Boolean), @p5='?' (Size = 150), @p6='?' (Size = 30), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 256), @p10='?' (Size = 256), @p11='?' (Size = 4000), @p12='?' (Size = 256), @p13='?' (DbType = Boolean), @p14='?' (Size = 250), @p15='?' (Size = 4000), @p16='?' (DbType = Boolean), @p17='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [AspNetUsers] SET [AccessFailedCount] = @p0, [CellphoneNumber] = @p1, [ConcurrencyStamp] = @p2, [Email] = @p3, [EmailConfirmed] = @p4, [FullName] = @p5, [IdNumber] = @p6, [LockoutEnabled] = @p7, [LockoutEnd] = @p8, [NormalizedEmail] = @p9, [NormalizedUserName] = @p10, [PasswordHash] = @p11, [PhoneNumber] = @p12, [PhoneNumberConfirmed] = @p13, [ResidentialArea] = @p14, [SecurityStamp] = @p15, [TwoFactorEnabled] = @p16, [UserName] = @p17
-      OUTPUT 1
-      WHERE [Id] = @p18 AND [ConcurrencyStamp] = @p19;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedRoleName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[ConcurrencyStamp], [a].[Name], [a].[NormalizedName]
-      FROM [AspNetRoles] AS [a]
-      WHERE [a].[NormalizedName] = @normalizedRoleName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@p='?' (Size = 450), @p1='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[UserId], [a].[RoleId]
-      FROM [AspNetUserRoles] AS [a]
-      WHERE [a].[UserId] = @p AND [a].[RoleId] = @p1
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedUserName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedUserName] = @normalizedUserName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (12ms) [Parameters=[@p18='?' (Size = 450), @p0='?' (DbType = Int32), @p1='?' (Size = 30), @p2='?' (Size = 4000), @p19='?' (Size = 4000), @p3='?' (Size = 256), @p4='?' (DbType = Boolean), @p5='?' (Size = 150), @p6='?' (Size = 30), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 256), @p10='?' (Size = 256), @p11='?' (Size = 4000), @p12='?' (Size = 256), @p13='?' (DbType = Boolean), @p14='?' (Size = 250), @p15='?' (Size = 4000), @p16='?' (DbType = Boolean), @p17='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [AspNetUsers] SET [AccessFailedCount] = @p0, [CellphoneNumber] = @p1, [ConcurrencyStamp] = @p2, [Email] = @p3, [EmailConfirmed] = @p4, [FullName] = @p5, [IdNumber] = @p6, [LockoutEnabled] = @p7, [LockoutEnd] = @p8, [NormalizedEmail] = @p9, [NormalizedUserName] = @p10, [PasswordHash] = @p11, [PhoneNumber] = @p12, [PhoneNumberConfirmed] = @p13, [ResidentialArea] = @p14, [SecurityStamp] = @p15, [TwoFactorEnabled] = @p16, [UserName] = @p17
-      OUTPUT 1
-      WHERE [Id] = @p18 AND [ConcurrencyStamp] = @p19;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (36ms) [Parameters=[@normalizedUserName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedUserName] = @normalizedUserName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (12ms) [Parameters=[@p18='?' (Size = 450), @p0='?' (DbType = Int32), @p1='?' (Size = 30), @p2='?' (Size = 4000), @p19='?' (Size = 4000), @p3='?' (Size = 256), @p4='?' (DbType = Boolean), @p5='?' (Size = 150), @p6='?' (Size = 30), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 256), @p10='?' (Size = 256), @p11='?' (Size = 4000), @p12='?' (Size = 256), @p13='?' (DbType = Boolean), @p14='?' (Size = 250), @p15='?' (Size = 4000), @p16='?' (DbType = Boolean), @p17='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [AspNetUsers] SET [AccessFailedCount] = @p0, [CellphoneNumber] = @p1, [ConcurrencyStamp] = @p2, [Email] = @p3, [EmailConfirmed] = @p4, [FullName] = @p5, [IdNumber] = @p6, [LockoutEnabled] = @p7, [LockoutEnd] = @p8, [NormalizedEmail] = @p9, [NormalizedUserName] = @p10, [PasswordHash] = @p11, [PhoneNumber] = @p12, [PhoneNumberConfirmed] = @p13, [ResidentialArea] = @p14, [SecurityStamp] = @p15, [TwoFactorEnabled] = @p16, [UserName] = @p17
-      OUTPUT 1
-      WHERE [Id] = @p18 AND [ConcurrencyStamp] = @p19;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedUserName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedUserName] = @normalizedUserName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (12ms) [Parameters=[@p18='?' (Size = 450), @p0='?' (DbType = Int32), @p1='?' (Size = 30), @p2='?' (Size = 4000), @p19='?' (Size = 4000), @p3='?' (Size = 256), @p4='?' (DbType = Boolean), @p5='?' (Size = 150), @p6='?' (Size = 30), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 256), @p10='?' (Size = 256), @p11='?' (Size = 4000), @p12='?' (Size = 256), @p13='?' (DbType = Boolean), @p14='?' (Size = 250), @p15='?' (Size = 4000), @p16='?' (DbType = Boolean), @p17='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [AspNetUsers] SET [AccessFailedCount] = @p0, [CellphoneNumber] = @p1, [ConcurrencyStamp] = @p2, [Email] = @p3, [EmailConfirmed] = @p4, [FullName] = @p5, [IdNumber] = @p6, [LockoutEnabled] = @p7, [LockoutEnd] = @p8, [NormalizedEmail] = @p9, [NormalizedUserName] = @p10, [PasswordHash] = @p11, [PhoneNumber] = @p12, [PhoneNumberConfirmed] = @p13, [ResidentialArea] = @p14, [SecurityStamp] = @p15, [TwoFactorEnabled] = @p16, [UserName] = @p17
-      OUTPUT 1
-      WHERE [Id] = @p18 AND [ConcurrencyStamp] = @p19;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (10ms) [Parameters=[@normalizedUserName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedUserName] = @normalizedUserName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (14ms) [Parameters=[@p18='?' (Size = 450), @p0='?' (DbType = Int32), @p1='?' (Size = 30), @p2='?' (Size = 4000), @p19='?' (Size = 4000), @p3='?' (Size = 256), @p4='?' (DbType = Boolean), @p5='?' (Size = 150), @p6='?' (Size = 30), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 256), @p10='?' (Size = 256), @p11='?' (Size = 4000), @p12='?' (Size = 256), @p13='?' (DbType = Boolean), @p14='?' (Size = 250), @p15='?' (Size = 4000), @p16='?' (DbType = Boolean), @p17='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [AspNetUsers] SET [AccessFailedCount] = @p0, [CellphoneNumber] = @p1, [ConcurrencyStamp] = @p2, [Email] = @p3, [EmailConfirmed] = @p4, [FullName] = @p5, [IdNumber] = @p6, [LockoutEnabled] = @p7, [LockoutEnd] = @p8, [NormalizedEmail] = @p9, [NormalizedUserName] = @p10, [PasswordHash] = @p11, [PhoneNumber] = @p12, [PhoneNumberConfirmed] = @p13, [ResidentialArea] = @p14, [SecurityStamp] = @p15, [TwoFactorEnabled] = @p16, [UserName] = @p17
-      OUTPUT 1
-      WHERE [Id] = @p18 AND [ConcurrencyStamp] = @p19;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (13ms) [Parameters=[@normalizedUserName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedUserName] = @normalizedUserName
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@normalizedEmail='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(2) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
-      FROM [AspNetUsers] AS [a]
-      WHERE [a].[NormalizedEmail] = @normalizedEmail
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (13ms) [Parameters=[@p18='?' (Size = 450), @p0='?' (DbType = Int32), @p1='?' (Size = 30), @p2='?' (Size = 4000), @p19='?' (Size = 4000), @p3='?' (Size = 256), @p4='?' (DbType = Boolean), @p5='?' (Size = 150), @p6='?' (Size = 30), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 256), @p10='?' (Size = 256), @p11='?' (Size = 4000), @p12='?' (Size = 256), @p13='?' (DbType = Boolean), @p14='?' (Size = 250), @p15='?' (Size = 4000), @p16='?' (DbType = Boolean), @p17='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [AspNetUsers] SET [AccessFailedCount] = @p0, [CellphoneNumber] = @p1, [ConcurrencyStamp] = @p2, [Email] = @p3, [EmailConfirmed] = @p4, [FullName] = @p5, [IdNumber] = @p6, [LockoutEnabled] = @p7, [LockoutEnd] = @p8, [NormalizedEmail] = @p9, [NormalizedUserName] = @p10, [PasswordHash] = @p11, [PhoneNumber] = @p12, [PhoneNumberConfirmed] = @p13, [ResidentialArea] = @p14, [SecurityStamp] = @p15, [TwoFactorEnabled] = @p16, [UserName] = @p17
-      OUTPUT 1
-      WHERE [Id] = @p18 AND [ConcurrencyStamp] = @p19;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@userId='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
-      SELECT [a0].[Name]
-      FROM [AspNetUserRoles] AS [a]
-      INNER JOIN [AspNetRoles] AS [a0] ON [a].[RoleId] = [a0].[Id]
-      WHERE [a].[UserId] = @userId
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@userId='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
-      SELECT [a0].[Name]
-      FROM [AspNetUserRoles] AS [a]
-      INNER JOIN [AspNetRoles] AS [a0] ON [a].[RoleId] = [a0].[Id]
-      WHERE [a].[UserId] = @userId
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (22ms) [Parameters=[@name='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = @name
-      ORDER BY [s].[MinMembers], [s].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (11ms) [Parameters=[@name='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = @name
-      ORDER BY [s].[MinMembers], [s].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@name='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = @name
-      ORDER BY [s].[MinMembers], [s].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (36ms) [Parameters=[@name='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [s].[Id], [s].[AnnualPrice], [s].[IsActive], [s].[MaxMembers], [s].[MinMembers], [s].[MonthlyPrice], [s].[Name]
-      FROM [SubscriptionPlans] AS [s]
-      WHERE [s].[Name] = @name
-      ORDER BY [s].[MinMembers], [s].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (46ms) [Parameters=[@name='?' (Size = 150), @slug='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [s].[Id], [s].[Code], [s].[CreatedAt], [s].[Description], [s].[EstablishedDate], [s].[ExpectedMemberCount], [s].[IsActive], [s].[IsSetupComplete], [s].[Name], [s].[Province], [s].[SetupCompletedAt], [s].[TenantId], [s].[TownOrArea], [s].[Type], [t].[Id], [t].[CreatedAt], [t].[IsActive], [t].[Name], [t].[Slug], [t].[UpdatedAt]
-      FROM [Stokvels] AS [s]
-      INNER JOIN [Tenants] AS [t] ON [s].[TenantId] = [t].[Id]
-      WHERE [s].[Name] = @name OR [t].[Slug] = @slug OR [t].[Name] = @name
-      ORDER BY [s].[CreatedAt], [s].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (52ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [t].[Id], [t].[EndDate], [t].[IsTrial], [t].[NextBillingDate], [t].[StartDate], [t].[Status], [t].[SubscriptionPlanId], [t].[TenantId]
-      FROM [TenantSubscriptions] AS [t]
-      WHERE [t].[TenantId] = @tenantId AND [t].[Status] = 2
-      ORDER BY [t].[StartDate] DESC, [t].[Id] DESC
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (16ms) [Parameters=[@p2='?' (DbType = Guid), @p0='?' (DbType = Boolean), @p1='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [TenantSubscriptions] SET [IsTrial] = @p0, [SubscriptionPlanId] = @p1
-      OUTPUT 1
-      WHERE [Id] = @p2;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@name='?' (Size = 150), @slug='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [s].[Id], [s].[Code], [s].[CreatedAt], [s].[Description], [s].[EstablishedDate], [s].[ExpectedMemberCount], [s].[IsActive], [s].[IsSetupComplete], [s].[Name], [s].[Province], [s].[SetupCompletedAt], [s].[TenantId], [s].[TownOrArea], [s].[Type], [t].[Id], [t].[CreatedAt], [t].[IsActive], [t].[Name], [t].[Slug], [t].[UpdatedAt]
-      FROM [Stokvels] AS [s]
-      INNER JOIN [Tenants] AS [t] ON [s].[TenantId] = [t].[Id]
-      WHERE [s].[Name] = @name OR [t].[Slug] = @slug OR [t].[Name] = @name
-      ORDER BY [s].[CreatedAt], [s].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [t].[Id], [t].[EndDate], [t].[IsTrial], [t].[NextBillingDate], [t].[StartDate], [t].[Status], [t].[SubscriptionPlanId], [t].[TenantId]
-      FROM [TenantSubscriptions] AS [t]
-      WHERE [t].[TenantId] = @tenantId AND [t].[Status] = 2
-      ORDER BY [t].[StartDate] DESC, [t].[Id] DESC
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (35ms) [Parameters=[@p2='?' (DbType = Guid), @p0='?' (DbType = Boolean), @p1='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SET IMPLICIT_TRANSACTIONS OFF;
-      SET NOCOUNT ON;
-      UPDATE [TenantSubscriptions] SET [IsTrial] = @p0, [SubscriptionPlanId] = @p1
-      OUTPUT 1
-      WHERE [Id] = @p2;
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (10ms) [Parameters=[@name='?' (Size = 150), @slug='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [s].[Id], [s].[Code], [s].[CreatedAt], [s].[Description], [s].[EstablishedDate], [s].[ExpectedMemberCount], [s].[IsActive], [s].[IsSetupComplete], [s].[Name], [s].[Province], [s].[SetupCompletedAt], [s].[TenantId], [s].[TownOrArea], [s].[Type], [t].[Id], [t].[CreatedAt], [t].[IsActive], [t].[Name], [t].[Slug], [t].[UpdatedAt]
-      FROM [Stokvels] AS [s]
-      INNER JOIN [Tenants] AS [t] ON [s].[TenantId] = [t].[Id]
-      WHERE [s].[Name] = @name OR [t].[Slug] = @slug OR [t].[Name] = @name
-      ORDER BY [s].[CreatedAt], [s].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [t].[Id], [t].[EndDate], [t].[IsTrial], [t].[NextBillingDate], [t].[StartDate], [t].[Status], [t].[SubscriptionPlanId], [t].[TenantId]
-      FROM [TenantSubscriptions] AS [t]
-      WHERE [t].[TenantId] = @tenantId AND [t].[Status] = 2
-      ORDER BY [t].[StartDate] DESC, [t].[Id] DESC
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (11ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid), @normalizedIdNumber='?' (Size = 30)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[ApplicationUserId], [m].[CellphoneNumber], [m].[CoolingPeriodEndDate], [m].[CreatedAt], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[DefaultRole], [m].[EmailAddress], [m].[ExpelledAt], [m].[FullName], [m].[GovernanceStatus], [m].[GovernanceStatusChangedAt], [m].[GovernanceStatusReason], [m].[IdNumber], [m].[IsDeceased], [m].[IsInCoolingPeriod], [m].[JoiningDate], [m].[LastWarningIssuedAt], [m].[MemberNumber], [m].[ResidentialArea], [m].[Status], [m].[SuspendedAt], [m].[TenantId]
-      FROM [Members] AS [m]
-      WHERE [m].[TenantId] = @stokvel_TenantId AND [m].[IdNumber] IS NOT NULL AND REPLACE(REPLACE([m].[IdNumber], N' ', N''), N'-', N'') = @normalizedIdNumber
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid), @normalizedIdNumber='?' (Size = 30)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[ApplicationUserId], [m].[CellphoneNumber], [m].[CoolingPeriodEndDate], [m].[CreatedAt], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[DefaultRole], [m].[EmailAddress], [m].[ExpelledAt], [m].[FullName], [m].[GovernanceStatus], [m].[GovernanceStatusChangedAt], [m].[GovernanceStatusReason], [m].[IdNumber], [m].[IsDeceased], [m].[IsInCoolingPeriod], [m].[JoiningDate], [m].[LastWarningIssuedAt], [m].[MemberNumber], [m].[ResidentialArea], [m].[Status], [m].[SuspendedAt], [m].[TenantId]
-      FROM [Members] AS [m]
-      WHERE [m].[TenantId] = @stokvel_TenantId AND [m].[IdNumber] IS NOT NULL AND REPLACE(REPLACE([m].[IdNumber], N' ', N''), N'-', N'') = @normalizedIdNumber
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid), @normalizedIdNumber='?' (Size = 30)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[ApplicationUserId], [m].[CellphoneNumber], [m].[CoolingPeriodEndDate], [m].[CreatedAt], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[DefaultRole], [m].[EmailAddress], [m].[ExpelledAt], [m].[FullName], [m].[GovernanceStatus], [m].[GovernanceStatusChangedAt], [m].[GovernanceStatusReason], [m].[IdNumber], [m].[IsDeceased], [m].[IsInCoolingPeriod], [m].[JoiningDate], [m].[LastWarningIssuedAt], [m].[MemberNumber], [m].[ResidentialArea], [m].[Status], [m].[SuspendedAt], [m].[TenantId]
-      FROM [Members] AS [m]
-      WHERE [m].[TenantId] = @stokvel_TenantId AND [m].[IdNumber] IS NOT NULL AND REPLACE(REPLACE([m].[IdNumber], N' ', N''), N'-', N'') = @normalizedIdNumber
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid), @normalizedIdNumber='?' (Size = 30)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[ApplicationUserId], [m].[CellphoneNumber], [m].[CoolingPeriodEndDate], [m].[CreatedAt], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[DefaultRole], [m].[EmailAddress], [m].[ExpelledAt], [m].[FullName], [m].[GovernanceStatus], [m].[GovernanceStatusChangedAt], [m].[GovernanceStatusReason], [m].[IdNumber], [m].[IsDeceased], [m].[IsInCoolingPeriod], [m].[JoiningDate], [m].[LastWarningIssuedAt], [m].[MemberNumber], [m].[ResidentialArea], [m].[Status], [m].[SuspendedAt], [m].[TenantId]
-      FROM [Members] AS [m]
-      WHERE [m].[TenantId] = @stokvel_TenantId AND [m].[IdNumber] IS NOT NULL AND REPLACE(REPLACE([m].[IdNumber], N' ', N''), N'-', N'') = @normalizedIdNumber
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (7ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid), @normalizedIdNumber='?' (Size = 30)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[ApplicationUserId], [m].[CellphoneNumber], [m].[CoolingPeriodEndDate], [m].[CreatedAt], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[DefaultRole], [m].[EmailAddress], [m].[ExpelledAt], [m].[FullName], [m].[GovernanceStatus], [m].[GovernanceStatusChangedAt], [m].[GovernanceStatusReason], [m].[IdNumber], [m].[IsDeceased], [m].[IsInCoolingPeriod], [m].[JoiningDate], [m].[LastWarningIssuedAt], [m].[MemberNumber], [m].[ResidentialArea], [m].[Status], [m].[SuspendedAt], [m].[TenantId]
-      FROM [Members] AS [m]
-      WHERE [m].[TenantId] = @stokvel_TenantId AND [m].[IdNumber] IS NOT NULL AND REPLACE(REPLACE([m].[IdNumber], N' ', N''), N'-', N'') = @normalizedIdNumber
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (6ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid), @normalizedIdNumber='?' (Size = 30)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[ApplicationUserId], [m].[CellphoneNumber], [m].[CoolingPeriodEndDate], [m].[CreatedAt], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[DefaultRole], [m].[EmailAddress], [m].[ExpelledAt], [m].[FullName], [m].[GovernanceStatus], [m].[GovernanceStatusChangedAt], [m].[GovernanceStatusReason], [m].[IdNumber], [m].[IsDeceased], [m].[IsInCoolingPeriod], [m].[JoiningDate], [m].[LastWarningIssuedAt], [m].[MemberNumber], [m].[ResidentialArea], [m].[Status], [m].[SuspendedAt], [m].[TenantId]
-      FROM [Members] AS [m]
-      WHERE [m].[TenantId] = @stokvel_TenantId AND [m].[IdNumber] IS NOT NULL AND REPLACE(REPLACE([m].[IdNumber], N' ', N''), N'-', N'') = @normalizedIdNumber
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid), @normalizedIdNumber='?' (Size = 30)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[ApplicationUserId], [m].[CellphoneNumber], [m].[CoolingPeriodEndDate], [m].[CreatedAt], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[DefaultRole], [m].[EmailAddress], [m].[ExpelledAt], [m].[FullName], [m].[GovernanceStatus], [m].[GovernanceStatusChangedAt], [m].[GovernanceStatusReason], [m].[IdNumber], [m].[IsDeceased], [m].[IsInCoolingPeriod], [m].[JoiningDate], [m].[LastWarningIssuedAt], [m].[MemberNumber], [m].[ResidentialArea], [m].[Status], [m].[SuspendedAt], [m].[TenantId]
-      FROM [Members] AS [m]
-      WHERE [m].[TenantId] = @stokvel_TenantId AND [m].[IdNumber] IS NOT NULL AND REPLACE(REPLACE([m].[IdNumber], N' ', N''), N'-', N'') = @normalizedIdNumber
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@member_Id='?' (DbType = Guid), @fullName='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[CellphoneNumber], [m].[CreatedAt], [m].[DateOfBirth], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[FullName], [m].[IdNumber], [m].[IsActive], [m].[IsDeceased], [m].[MemberId], [m].[Relationship]
-      FROM [MemberDependents] AS [m]
-      WHERE [m].[MemberId] = @member_Id AND [m].[FullName] = @fullName
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (9ms) [Parameters=[@member_Id='?' (DbType = Guid), @fullName='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[CellphoneNumber], [m].[CreatedAt], [m].[DateOfBirth], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[FullName], [m].[IdNumber], [m].[IsActive], [m].[IsDeceased], [m].[MemberId], [m].[Relationship]
-      FROM [MemberDependents] AS [m]
-      WHERE [m].[MemberId] = @member_Id AND [m].[FullName] = @fullName
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (9ms) [Parameters=[@member_Id='?' (DbType = Guid), @fullName='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [m].[Id], [m].[CellphoneNumber], [m].[CreatedAt], [m].[DateOfBirth], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[FullName], [m].[IdNumber], [m].[IsActive], [m].[IsDeceased], [m].[MemberId], [m].[Relationship]
-      FROM [MemberDependents] AS [m]
-      WHERE [m].[MemberId] = @member_Id AND [m].[FullName] = @fullName
-      ORDER BY [m].[CreatedAt], [m].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@tenantId='?' (DbType = Guid), @name='?' (Size = 100)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [f].[Id], [f].[CreatedAt], [f].[DefaultAmount], [f].[Description], [f].[IsActive], [f].[Name], [f].[TenantId]
-      FROM [FineTypes] AS [f]
-      WHERE [f].[TenantId] = @tenantId AND [f].[Name] = @name
-      ORDER BY [f].[CreatedAt], [f].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@member_Id='?' (DbType = Guid), @fineType_Id='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT CASE
-          WHEN EXISTS (
-              SELECT 1
-              FROM [MemberFines] AS [m]
-              WHERE [m].[MemberId] = @member_Id AND [m].[FineTypeId] = @fineType_Id AND [m].[Reason] = N'Demo late coming fine') THEN CAST(1 AS bit)
-          ELSE CAST(0 AS bit)
-      END
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT [m1].[Id], [m1].[CreatedAt], [m1].[MeetingDate], [m1].[Purpose], [m1].[Status], [m1].[TenantId], [m1].[Title], [m1].[Venue], [m0].[Id], [m0].[Description], [m0].[DisplayOrder], [m0].[IsCompleted], [m0].[MeetingId], [m0].[Notes], [m0].[Title]
-      FROM (
-          SELECT TOP(1) [m].[Id], [m].[CreatedAt], [m].[MeetingDate], [m].[Purpose], [m].[Status], [m].[TenantId], [m].[Title], [m].[Venue]
-          FROM [Meetings] AS [m]
-          WHERE [m].[TenantId] = @stokvel_TenantId AND [m].[Title] = N'Monthly General Meeting'
-          ORDER BY [m].[CreatedAt], [m].[Id]
-      ) AS [m1]
-      LEFT JOIN [MeetingAgendaItems] AS [m0] ON [m1].[Id] = [m0].[MeetingId]
-      ORDER BY [m1].[CreatedAt], [m1].[Id]
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (8ms) [Parameters=[@stokvel_TenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
-      SELECT TOP(1) [c].[Id], [c].[ApprovedAt], [c].[Content], [c].[ContentType], [c].[CreatedAt], [c].[FileSizeBytes], [c].[IsApproved], [c].[IsUploadedDocument], [c].[OriginalFileName], [c].[StoredFilePath], [c].[TenantId], [c].[Title], [c].[VersionNumber]
-      FROM [ConstitutionDocuments] AS [c]
-      WHERE [c].[TenantId] = @stokvel_TenantId
-      ORDER BY [c].[CreatedAt] DESC
-info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-      Executed DbCommand (14ms) [Parameters=[@member_Id='?' (DbType = Guid), @dependent_Id='?' (DbType = Guid), @dependent_FullName='?' (Size = 150)], CommandType='Text', CommandTimeout='30']
-      SELECT CASE
-          WHEN EXISTS (
-              SELECT 1
-              FROM [FuneralClaims] AS [f]
-              WHERE [f].[MemberId] = @member_Id AND [f].[DependentId] = @dependent_Id AND [f].[DeceasedFullName] = @dependent_FullName) THEN CAST(1 AS bit)
-          ELSE CAST(0 AS bit)
-      END
-[Sisonke] DB provider: SQL Server | Connection: Server=tcp:sql-sisonke-dev.database.windows.net,1433;Initial Catalog=sqldb-sisonke-dev;Persist Security Info=False;User ID=CloudSAfd498011;Password=@MyS!s0nk3D@t@b@s3@2026Cr3@t3d;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+[Sisonke] DB provider: SQL Server | Connection: server=tcp:sql-sisonke-dev.database.windows.net,1433;initial catalog=sqldb-sisonke-dev;persist security info=False;user id=***;password=***;multipleactiveresultsets=False;encrypt=True;trustservercertificate=False;connection timeout=30
 [Sisonke] SMTP configured: False | RequireConfirmedAccount: False | SessionTimeout: 60m | PublicBaseUrl: https://localhost:5001
 info: Microsoft.Hosting.Lifetime[14]
       Now listening on: http://localhost:5230
@@ -713,3 +114,48 @@ info: Microsoft.Hosting.Lifetime[0]
       Hosting environment: Development
 info: Microsoft.Hosting.Lifetime[0]
       Content root path: C:\Users\mpshe\Projects\Sisonke-Recovered\Sisonke.Web
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (10ms) [Parameters=[@p='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
+      FROM [AspNetUsers] AS [a]
+      WHERE [a].[Id] = @p
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (8ms) [Parameters=[@user_Id='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
+      SELECT [a].[Id], [a].[ClaimType], [a].[ClaimValue], [a].[UserId]
+      FROM [AspNetUserClaims] AS [a]
+      WHERE [a].[UserId] = @user_Id
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (10ms) [Parameters=[@userId='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
+      SELECT [a0].[Name]
+      FROM [AspNetUserRoles] AS [a]
+      INNER JOIN [AspNetRoles] AS [a0] ON [a].[RoleId] = [a0].[Id]
+      WHERE [a].[UserId] = @userId
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (13ms) [Parameters=[@normalizedName='?' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [a].[Id], [a].[ConcurrencyStamp], [a].[Name], [a].[NormalizedName]
+      FROM [AspNetRoles] AS [a]
+      WHERE [a].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (8ms) [Parameters=[@role_Id='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
+      SELECT [a].[ClaimType], [a].[ClaimValue]
+      FROM [AspNetRoleClaims] AS [a]
+      WHERE [a].[RoleId] = @role_Id
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (13ms) [Parameters=[@currentUserId='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
+      FROM [AspNetUsers] AS [a]
+      WHERE [a].[Id] = @currentUserId
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (11ms) [Parameters=[@currentUserId='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
+      SELECT [m].[Id], [m].[ApplicationUserId], [m].[CellphoneNumber], [m].[CoolingPeriodEndDate], [m].[CreatedAt], [m].[DeathReportedAt], [m].[DeceasedDate], [m].[DefaultRole], [m].[EmailAddress], [m].[ExpelledAt], [m].[FullName], [m].[GovernanceStatus], [m].[GovernanceStatusChangedAt], [m].[GovernanceStatusReason], [m].[IdNumber], [m].[IsDeceased], [m].[IsInCoolingPeriod], [m].[JoiningDate], [m].[LastWarningIssuedAt], [m].[MemberNumber], [m].[ResidentialArea], [m].[Status], [m].[SuspendedAt], [m].[TenantId], [t].[Id], [t].[CreatedAt], [t].[IsActive], [t].[Name], [t].[Slug], [t].[UpdatedAt]
+      FROM [Members] AS [m]
+      INNER JOIN [Tenants] AS [t] ON [m].[TenantId] = [t].[Id]
+      WHERE [m].[ApplicationUserId] = @currentUserId
+      ORDER BY [m].[FullName]
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (114ms) [Parameters=[@currentUserId='?' (Size = 450)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [a].[Id], [a].[AccessFailedCount], [a].[CellphoneNumber], [a].[ConcurrencyStamp], [a].[Email], [a].[EmailConfirmed], [a].[FullName], [a].[IdNumber], [a].[LockoutEnabled], [a].[LockoutEnd], [a].[NormalizedEmail], [a].[NormalizedUserName], [a].[PasswordHash], [a].[PhoneNumber], [a].[PhoneNumberConfirmed], [a].[ResidentialArea], [a].[SecurityStamp], [a].[TwoFactorEnabled], [a].[UserName]
+      FROM [AspNetUsers] AS [a]
+      WHERE [a].[Id] = @currentUserId

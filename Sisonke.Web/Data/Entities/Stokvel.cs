@@ -19,6 +19,26 @@ public class Stokvel
 
     public StokvelType Type { get; set; }
 
+    public StokvelArchetype Archetype { get; set; } = StokvelArchetype.BurialSociety;
+
+    public bool EnableClaims { get; set; } = true;
+
+    public bool EnableDependents { get; set; } = true;
+
+    public bool EnableRotation { get; set; }
+
+    public bool EnableLending { get; set; }
+
+    public bool EnableInventory { get; set; }
+
+    public bool EnableInvestmentTracking { get; set; }
+
+    public bool EnableEducationPayouts { get; set; }
+
+    public bool EnableTravelPlanning { get; set; }
+
+    public bool EnableSocialEvents { get; set; }
+
     [MaxLength(100)]
     public string? Province { get; set; }
 

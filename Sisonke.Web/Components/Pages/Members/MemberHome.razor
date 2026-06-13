@@ -191,10 +191,13 @@ else
                 <span class="member-quick-action-icon">👤</span>
                 <span>My Profile</span>
             </a>
-            <a class="member-quick-action-tile" href="/create-claim/@MemberId">
-                <span class="member-quick-action-icon">📋</span>
-                <span>Create Claim</span>
-            </a>
+            @if (stokvel.EnableClaims)
+            {
+                <a class="member-quick-action-tile" href="/create-claim/@MemberId">
+                    <span class="member-quick-action-icon">📋</span>
+                    <span>Create Claim</span>
+                </a>
+            }
             <a class="member-quick-action-tile" href="#member-contributions">
                 <span class="member-quick-action-icon">💰</span>
                 <span>Contributions</span>
@@ -616,23 +619,26 @@ else
                 </div>
             </div>
 
-            <div class="mw-card mw-card-accent mw-ca-ochre">
-                <div class="mw-card-top">
-                    <div class="mw-card-tl">
-                        <div class="mw-card-ico mw-ico-ochre">🏠</div>
-                        <span class="mw-card-lbl">My Payout / Host Turn</span>
+            @if (stokvel.EnableRotation)
+            {
+                <div class="mw-card mw-card-accent mw-ca-ochre">
+                    <div class="mw-card-top">
+                        <div class="mw-card-tl">
+                            <div class="mw-card-ico mw-ico-ochre">🏠</div>
+                            <span class="mw-card-lbl">My Payout / Host Turn</span>
+                        </div>
                     </div>
-                </div>
-                <div class="mw-card-body">
-                    <div class="mw-alert mw-alert-warn">
-                        <div class="mw-alert-icon">ℹ</div>
-                        <div>
-                            <div class="mw-alert-title">Coming Soon</div>
-                            <div class="mw-alert-body">Payout and host rotation coming soon.</div>
+                    <div class="mw-card-body">
+                        <div class="mw-alert mw-alert-warn">
+                            <div class="mw-alert-icon">ℹ</div>
+                            <div>
+                                <div class="mw-alert-title">Coming Soon</div>
+                                <div class="mw-alert-body">Payout and host rotation coming soon.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            }
 
         </div>
 
@@ -838,8 +844,8 @@ else
         }
 
         memberFines = await FineService.GetMemberFinesAsync(MemberId);
-        memberClaims = await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
-        dependents = await MemberService.GetDependentsByMemberIdAsync(MemberId);
+        memberClaims = stokvel.EnableClaims ? await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId) : [];
+        dependents = stokvel.EnableDependents ? await MemberService.GetDependentsByMemberIdAsync(MemberId) : [];
         memberContributions = await ContributionPaymentService.GetContributionsByMemberIdAsync(MemberId);
         overdueContributions = await ContributionPaymentService.GetOverdueContributionsByMemberIdAsync(MemberId);
         currentMonthContribution = memberContributions.FirstOrDefault(contribution =>

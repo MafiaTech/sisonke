@@ -137,14 +137,25 @@ else
                         <InputText id="stokvel-name" class="form-control" placeholder="e.g. Mahlalela Burial Society" @bind-Value="model.Name" />
                     </div>
 
-                    <div class="member-form-field">
-                        <label class="form-label" for="stokvel-type">Stokvel type</label>
-                        <InputSelect id="stokvel-type" class="form-select" @bind-Value="model.Type">
-                            @foreach (var stokvelType in Enum.GetValues<StokvelType>())
-                            {
-                                <option value="@stokvelType">@stokvelType</option>
-                            }
-                        </InputSelect>
+                    <div class="member-form-field register-form-wide">
+                        <label class="form-label">What type of group are you creating?</label>
+                        <InputRadioGroup @bind-Value="model.Archetype">
+                            <div class="archetype-grid">
+                                @foreach (var option in archetypeOptions)
+                                {
+                                    <label class="archetype-card @(model.Archetype == option.Archetype ? "archetype-card-selected" : "") @(option.IsComingSoon ? "archetype-card-soon" : "")">
+                                        <InputRadio class="form-check-input" Value="@option.Archetype" disabled="@option.IsComingSoon" />
+                                        <span class="archetype-card-body">
+                                            <span class="archetype-title">@option.Title</span>
+                                            <span class="archetype-description">@option.Description</span>
+                                            <span class="@GetArchetypeBadgeClass(option)">
+                                                @option.StatusText
+                                            </span>
+                                        </span>
+                                    </label>
+                                }
+                            </div>
+                        </InputRadioGroup>
                     </div>
 
                     <div class="member-form-field">
@@ -329,6 +340,52 @@ else
         grid-column: 1 / -1;
     }
 
+    .archetype-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: .75rem;
+    }
+
+    .archetype-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: .65rem;
+        align-items: flex-start;
+        min-height: 9.5rem;
+        padding: .9rem;
+        border: 1px solid var(--sk-border);
+        border-radius: var(--r-md);
+        background: #fff;
+        cursor: pointer;
+    }
+
+    .archetype-card-selected {
+        border-color: var(--sk-green-700);
+        box-shadow: 0 0 0 .18rem rgb(27 94 32 / .12);
+    }
+
+    .archetype-card-soon {
+        opacity: .72;
+        cursor: not-allowed;
+    }
+
+    .archetype-card-body,
+    .archetype-title,
+    .archetype-description {
+        display: block;
+    }
+
+    .archetype-title {
+        color: var(--sk-text);
+        font-weight: 800;
+    }
+
+    .archetype-description {
+        color: var(--sk-text-muted);
+        font-size: .875rem;
+        margin: .25rem 0 .5rem;
+    }
+
     @@media (max-width: 768px) {
         .register-creator-summary {
             grid-template-columns: 1fr;
@@ -346,6 +403,18 @@ else
     private bool saveFailed;
     private bool packageSelectionFailed;
     private bool isLoading = true;
+    private readonly List<ArchetypeOption> archetypeOptions =
+    [
+        new(StokvelArchetype.BurialSociety, "Burial Society", "Manage funeral support, dependents, claims and member contributions.", "Fully supported", false),
+        new(StokvelArchetype.Rotational, "Rotational Stokvel", "Members contribute regularly and the full pot is paid to one member in turn.", "Setup available", false),
+        new(StokvelArchetype.Grocery, "Grocery Stokvel", "Members pool contributions to buy bulk groceries and distribute to the group.", "Setup available", false),
+        new(StokvelArchetype.SavingsClub, "Savings Club", "Save towards year-end, school fees, holidays or shared goals.", "Setup available", false),
+        new(StokvelArchetype.InvestmentClub, "Investment Club", "For pooled long-term investment planning", "Coming soon", true),
+        new(StokvelArchetype.Education, "Education Stokvel", "For school fees and education-related costs", "Coming soon", true),
+        new(StokvelArchetype.Borrowing, "Borrowing Stokvel", "For member lending and interest rules", "Coming soon", true),
+        new(StokvelArchetype.Travel, "Travel Stokvel", "For group travel savings", "Coming soon", true),
+        new(StokvelArchetype.SocialClub, "Social Club", "For events and community activities", "Coming soon", true)
+    ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -405,7 +474,7 @@ else
         if (model.SubscriptionPlanId is null) { packageSelectionFailed = true; return; }
 
         var createdStokvel = await StokvelService.RegisterStokvelAsync(
-            model.Name, model.Type, model.Province, model.TownOrArea,
+            model.Name, MapArchetypeToStokvelType(model.Archetype), model.Archetype, model.Province, model.TownOrArea,
             model.EstablishedDate, model.ExpectedMemberCount,
             model.SubscriptionPlanId.Value, model.Description);
 
@@ -478,7 +547,7 @@ else
     private sealed class RegisterStokvelFormModel
     {
         [Required][MaxLength(150)] public string Name { get; set; } = string.Empty;
-        public StokvelType Type { get; set; } = StokvelType.BurialSociety;
+        public StokvelArchetype Archetype { get; set; } = StokvelArchetype.BurialSociety;
         [MaxLength(100)] public string? Province { get; set; }
         [MaxLength(100)] public string? TownOrArea { get; set; }
         public DateTime? EstablishedDate { get; set; }
@@ -502,4 +571,33 @@ else
     {
         return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
     }
+
+    private static StokvelType MapArchetypeToStokvelType(StokvelArchetype archetype) =>
+        archetype switch
+        {
+            StokvelArchetype.BurialSociety => StokvelType.BurialSociety,
+            StokvelArchetype.Rotational => StokvelType.SavingsStokvel,
+            StokvelArchetype.Grocery => StokvelType.GroceryStokvel,
+            StokvelArchetype.InvestmentClub => StokvelType.InvestmentStokvel,
+            StokvelArchetype.SavingsClub => StokvelType.SavingsStokvel,
+            StokvelArchetype.Education => StokvelType.SavingsStokvel,
+            StokvelArchetype.Borrowing => StokvelType.LoanStokvel,
+            StokvelArchetype.Travel => StokvelType.SavingsStokvel,
+            StokvelArchetype.SocialClub => StokvelType.SocialClub,
+            _ => StokvelType.BurialSociety
+        };
+
+    private static string GetArchetypeBadgeClass(ArchetypeOption option) =>
+        option.IsComingSoon
+            ? "sisonke-badge sisonke-badge-gray"
+            : option.Archetype == StokvelArchetype.BurialSociety
+                ? "sisonke-badge sisonke-badge-green"
+                : "sisonke-badge sisonke-badge-gold";
+
+    private sealed record ArchetypeOption(
+        StokvelArchetype Archetype,
+        string Title,
+        string Description,
+        string StatusText,
+        bool IsComingSoon);
 }
