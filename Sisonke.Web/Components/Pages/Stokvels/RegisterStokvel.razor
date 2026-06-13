@@ -39,358 +39,728 @@ else if (currentUser is null)
 }
 else
 {
-    <section class="sisonke-hero-card mb-4">
-        <div>
-            <span class="sisonke-badge sisonke-badge-gold">Organisation Registration</span>
-            <h1>Register a New Stokvel</h1>
-            <p>Create a stokvel and become the first office bearer.</p>
-        </div>
-        <div class="register-creator-summary">
-            <div><span>Full name</span><strong>@Display(currentUser.FullName)</strong></div>
-            <div><span>Email</span><strong>@SensitiveDataMasker.MaskEmail(currentUser.Email)</strong></div>
-            <div><span>ID Number</span><strong>@SensitiveDataMasker.MaskIdNumber(currentUser.IdNumber)</strong></div>
-            <div><span>Cellphone</span><strong>@SensitiveDataMasker.MaskPhoneNumber(currentUser.CellphoneNumber)</strong></div>
-        </div>
-    </section>
-
-    <div class="mb-4">
-        <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
-            <i class="bi bi-arrow-left me-2"></i>Back to Workspace
-        </a>
-    </div>
-}
-
-@if (!isLoading && currentUser is not null && saveFailed)
-{
-    <AlertBanner Type="danger" Title="Unable to register stokvel." Message="Please check the details and try again." Icon="bi bi-x-circle-fill" />
-}
-
-@if (!isLoading && currentUser is not null && packageSelectionFailed)
-{
-    <AlertBanner Type="danger" Title="Please select a subscription package." Message="" Icon="bi bi-x-circle-fill" />
-}
-
-@if (!isLoading && currentUser is not null)
-{
-    <div class="form-page">
-        <div class="sisonke-card mb-3">
-            <div class="sisonke-card-body">
-                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
-                    <div>
-                        <div class="form-section-title">Review & Create</div>
-                        <p class="text-muted mb-0">
-                            Use this page to create a new stokvel or society. You will become the first office bearer for this stokvel.
-                        </p>
-                    </div>
-                    <div class="text-lg-end">
-                        <div class="text-muted small">Organisation registration</div>
-                        <span class="sisonke-badge sisonke-badge-green">Office bearer setup</span>
-                    </div>
-                </div>
-
-                <div class="row g-3 mt-3">
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <div class="detail-mini-label">Full name</div>
-                        <div class="fw-600">@Display(currentUser.FullName)</div>
-                    </div>
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <div class="detail-mini-label">Email</div>
-                        <div class="fw-600">@SensitiveDataMasker.MaskEmail(currentUser.Email)</div>
-                    </div>
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <div class="detail-mini-label">ID number</div>
-                        <div class="fw-600">@SensitiveDataMasker.MaskIdNumber(currentUser.IdNumber)</div>
-                    </div>
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <div class="detail-mini-label">Cellphone</div>
-                        <div class="fw-600">@SensitiveDataMasker.MaskPhoneNumber(currentUser.CellphoneNumber)</div>
-                    </div>
-                </div>
+    <!-- ── Wizard header ── -->
+    <div class="rw-wizard-header mb-4">
+        <div class="rw-brand">
+            <div class="rw-brand-mark"><i class="bi bi-piggy-bank-fill"></i></div>
+            <div>
+                <div class="rw-brand-name">Sisonke</div>
+                <div class="rw-brand-tagline">Together we save. Together we grow.</div>
             </div>
         </div>
 
-        @if (string.IsNullOrWhiteSpace(currentUser.IdNumber))
+        <div class="rw-steps">
+            <div class="rw-step @(currentWizardStep == 1 ? "rw-step-active" : currentWizardStep > 1 ? "rw-step-done" : "")">
+                <div class="rw-step-circle">
+                    @if (currentWizardStep > 1) { <i class="bi bi-check-lg"></i> } else { <span>1</span> }
+                </div>
+                <div class="rw-step-label">User Details</div>
+            </div>
+            <div class="rw-step-connector @(currentWizardStep > 1 ? "rw-step-connector-done" : "")"></div>
+            <div class="rw-step @(currentWizardStep == 2 ? "rw-step-active" : currentWizardStep > 2 ? "rw-step-done" : "")">
+                <div class="rw-step-circle">
+                    @if (currentWizardStep > 2) { <i class="bi bi-check-lg"></i> } else { <span>2</span> }
+                </div>
+                <div class="rw-step-label">Stokvel Type</div>
+            </div>
+            <div class="rw-step-connector @(currentWizardStep > 2 ? "rw-step-connector-done" : "")"></div>
+            <div class="rw-step @(currentWizardStep == 3 ? "rw-step-active" : "")">
+                <div class="rw-step-circle"><span>3</span></div>
+                <div class="rw-step-label">Review</div>
+            </div>
+        </div>
+
+        <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
+            <i class="bi bi-arrow-left me-2"></i>Cancel
+        </a>
+    </div>
+
+    <!-- ── Feedback banners ── -->
+    @if (saveFailed)
+    {
+        <AlertBanner Type="danger" Title="Unable to register stokvel." Message="Please check the details and try again." Icon="bi bi-x-circle-fill" />
+    }
+    @if (!string.IsNullOrWhiteSpace(wizardValidationMessage))
+    {
+        <AlertBanner Type="warning" Title="@wizardValidationMessage" Message="" Icon="bi bi-exclamation-triangle-fill" />
+    }
+
+    <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
+        <DataAnnotationsValidator />
+
+        <!-- ══════════════ STEP 1 — User Details ══════════════ -->
+        @if (currentWizardStep == 1)
         {
-            <div class="sisonke-alert sisonke-alert-gold">
-                Your ID number is not captured on your account. Please update your profile before registering a stokvel.
+            <div class="rw-step-panel">
+                <div class="rw-step-title">
+                    <h1>Stokvel Details</h1>
+                    <p>Tell us about your stokvel and who will be the first office bearer.</p>
+                </div>
+
+                @if (string.IsNullOrWhiteSpace(currentUser.IdNumber))
+                {
+                    <div class="sisonke-alert sisonke-alert-gold mb-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Your ID number is not on your account. Please update your profile before registering a stokvel.
+                    </div>
+                }
+
+                <!-- Stokvel identity -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <h2>Stokvel Identity</h2>
+                                <p>Give your stokvel a name and describe its purpose.</p>
+                            </div>
+                        </div>
+                        <div class="sisonke-grid sisonke-grid-2">
+                            <div class="member-form-field">
+                                <label class="form-label" for="stokvel-name">
+                                    Stokvel name <span class="text-danger">*</span>
+                                </label>
+                                <InputText id="stokvel-name" class="form-control" placeholder="e.g. Mahlalela Burial Society" @bind-Value="model.Name" />
+                                <ValidationMessage For="@(() => model.Name)" class="text-danger small" />
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="expected-member-count">Expected total members</label>
+                                <InputNumber id="expected-member-count" class="form-control" TValue="int?"
+                                    Value="@model.ExpectedMemberCount"
+                                    ValueChanged="@((int? v) => OnExpectedMemberCountChangedAsync(v))"
+                                    ValueExpression="@(() => model.ExpectedMemberCount)" />
+                                <div class="form-text">Helps Sisonke recommend the right plan.</div>
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="province">Province</label>
+                                <select id="province" class="form-select" value="@model.Province" @onchange="OnProvinceChanged">
+                                    <option value="">— Select province —</option>
+                                    @foreach (var province in provinces)
+                                    {
+                                        <option value="@province">@province</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="town-or-area">Town or area</label>
+                                <select id="town-or-area" class="form-select" @bind="model.TownOrArea" disabled="@(!towns.Any())">
+                                    <option value="">— Select town/area —</option>
+                                    @foreach (var town in towns)
+                                    {
+                                        <option value="@town">@town</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="established-date">Established date</label>
+                                <InputDate id="established-date" class="form-control" @bind-Value="model.EstablishedDate" />
+                            </div>
+                            <div class="member-form-field register-form-wide">
+                                <label class="form-label" for="description">
+                                    Description <span class="text-muted fw-normal">(optional)</span>
+                                </label>
+                                <InputTextArea id="description" class="form-control" rows="2"
+                                    placeholder="Brief description of the stokvel's purpose and goals."
+                                    @bind-Value="model.Description" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Office bearer -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <h2>Office Bearer Details</h2>
+                                <p>You will be linked to this stokvel as the first office bearer and creator.</p>
+                            </div>
+                            <div class="rw-creator-pill">
+                                <i class="bi bi-person-check-fill me-1"></i>
+                                @SensitiveDataMasker.MaskEmail(currentUser.Email)
+                            </div>
+                        </div>
+                        <div class="sisonke-grid sisonke-grid-2">
+                            <div class="member-form-field">
+                                <label class="form-label" for="creator-full-name">
+                                    Full name <span class="text-danger">*</span>
+                                </label>
+                                <InputText id="creator-full-name" class="form-control" @bind-Value="model.CreatorFullName" />
+                                <ValidationMessage For="@(() => model.CreatorFullName)" class="text-danger small" />
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="creator-cellphone">
+                                    Cellphone <span class="text-danger">*</span>
+                                </label>
+                                <InputText id="creator-cellphone" class="form-control" placeholder="e.g. 0821234567" @bind-Value="model.CreatorCellphoneNumber" />
+                                <ValidationMessage For="@(() => model.CreatorCellphoneNumber)" class="text-danger small" />
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="creator-email">Email address</label>
+                                <InputText id="creator-email" class="form-control" @bind-Value="model.CreatorEmail" />
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="creator-id-number">SA ID number</label>
+                                <InputText id="creator-id-number" class="form-control" placeholder="13-digit SA ID" @bind-Value="model.CreatorIdNumber" />
+                                <div class="form-text">Links this record to your login account.</div>
+                            </div>
+                            <div class="member-form-field register-form-wide">
+                                <label class="form-label" for="creator-area">Residential area</label>
+                                <InputText id="creator-area" class="form-control" placeholder="e.g. Soweto, Gauteng" @bind-Value="model.CreatorResidentialArea" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rw-step-actions">
+                    <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Cancel</a>
+                    <button type="button" class="sisonke-btn sisonke-btn-primary rw-btn-next" @onclick="GoToStep2">
+                        Continue to Stokvel Type <i class="bi bi-arrow-right ms-2"></i>
+                    </button>
+                </div>
             </div>
         }
 
-        <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
-            <DataAnnotationsValidator />
-            <ValidationSummary class="alert alert-danger" />
-
-        <!-- ── Section: Stokvel identity ── -->
-        <div class="sisonke-card mb-3">
-            <div class="sisonke-card-body">
-                <div class="sisonke-card-head">
-                    <div>
-                        <h2>Stokvel Details</h2>
-                        <p>Capture the organisation name, type and expected membership size.</p>
-                    </div>
+        <!-- ══════════════ STEP 2 — Stokvel Type & Package ══════════════ -->
+        @if (currentWizardStep == 2)
+        {
+            <div class="rw-step-panel">
+                <div class="rw-step-title">
+                    <h1>Choose Your Stokvel Type</h1>
+                    <p>Select the type that best describes how your group will save and share money.</p>
                 </div>
-                <div class="sisonke-grid sisonke-grid-2">
-                    <div class="member-form-field">
-                        <label class="form-label" for="stokvel-name">
-                            Stokvel name <span class="text-danger">*</span>
-                        </label>
-                        <InputText id="stokvel-name" class="form-control" placeholder="e.g. Mahlalela Burial Society" @bind-Value="model.Name" />
-                    </div>
 
-                    <div class="member-form-field register-form-wide">
-                        <label class="form-label">What type of group are you creating?</label>
+                <!-- Archetype selector -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
                         <InputRadioGroup @bind-Value="model.Archetype">
                             <div class="archetype-grid">
                                 @foreach (var option in archetypeOptions)
                                 {
-                                    <label class="archetype-card @(model.Archetype == option.Archetype ? "archetype-card-selected" : "") @(option.IsComingSoon ? "archetype-card-soon" : "")">
-                                        <InputRadio class="form-check-input" Value="@option.Archetype" disabled="@option.IsComingSoon" />
-                                        <span class="archetype-card-body">
-                                            <span class="archetype-title">@option.Title</span>
-                                            <span class="archetype-description">@option.Description</span>
-                                            <span class="@GetArchetypeBadgeClass(option)">
-                                                @option.StatusText
-                                            </span>
-                                        </span>
+                                    var isSelected = model.Archetype == option.Archetype && !option.IsComingSoon;
+                                    <label class="archetype-card @(isSelected ? "archetype-card-selected" : "") @(option.IsComingSoon ? "archetype-card-soon" : "")">
+                                        <InputRadio class="visually-hidden" Value="@option.Archetype" disabled="@option.IsComingSoon" />
+                                        <div class="archetype-card-top">
+                                            <div class="archetype-icon-wrap">
+                                                <i class="bi @option.Icon"></i>
+                                            </div>
+                                            @if (isSelected)
+                                            {
+                                                <div class="archetype-check">
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="archetype-title">@option.Title</div>
+                                        <div class="archetype-description">@option.Description</div>
+                                        <span class="@GetArchetypeBadgeClass(option)">@option.StatusText</span>
                                     </label>
                                 }
                             </div>
                         </InputRadioGroup>
-                    </div>
 
-                    <div class="member-form-field">
-                        <label class="form-label" for="expected-member-count">Expected total members</label>
-                        <InputNumber id="expected-member-count" class="form-control" TValue="int?"
-                            Value="@model.ExpectedMemberCount"
-                            ValueChanged="@((int? v) => OnExpectedMemberCountChangedAsync(v))"
-                            ValueExpression="@(() => model.ExpectedMemberCount)" />
-                        <div class="form-text">Helps Sisonke recommend the right package and track member capture progress.</div>
-                    </div>
-
-                    <div class="member-form-field">
-                        <label class="form-label" for="established-date">Established date</label>
-                        <InputDate id="established-date" class="form-control" @bind-Value="model.EstablishedDate" />
-                    </div>
-
-                    <div class="member-form-field">
-                        <label class="form-label" for="province">Province</label>
-                        <select id="province" class="form-select" value="@model.Province" @onchange="OnProvinceChanged">
-                            <option value="">— Select province —</option>
-                            @foreach (var province in provinces)
-                            {
-                                <option value="@province">@province</option>
-                            }
-                        </select>
-                    </div>
-
-                    <div class="member-form-field">
-                        <label class="form-label" for="town-or-area">Town or area</label>
-                        <select id="town-or-area" class="form-select" @bind="model.TownOrArea" disabled="@(!towns.Any())">
-                            <option value="">— Select town/area —</option>
-                            @foreach (var town in towns)
-                            {
-                                <option value="@town">@town</option>
-                            }
-                        </select>
-                    </div>
-
-                    <div class="member-form-field register-form-wide">
-                        <label class="form-label" for="description">Description <span class="text-muted fw-normal">(optional)</span></label>
-                        <InputTextArea id="description" class="form-control" rows="3" placeholder="Brief description of the stokvel's purpose and goals." @bind-Value="model.Description" />
-                    </div>
-                </div>
-            </div>
-        </div>
-
-            <!-- ── Section: Creator details ── -->
-            <div class="sisonke-card mb-3">
-                <div class="sisonke-card-body">
-                    <div class="sisonke-card-head">
-                        <div>
-                            <h2>Review & Create</h2>
-                            <p>You will be linked to this stokvel as the creator so you can complete setup and manage the organisation.</p>
-                        </div>
-                    </div>
-                    <div class="sisonke-grid sisonke-grid-2">
-                        <div class="member-form-field">
-                            <label class="form-label" for="creator-full-name">Full name <span class="text-danger">*</span></label>
-                            <InputText id="creator-full-name" class="form-control" @bind-Value="model.CreatorFullName" />
-                        </div>
-                        <div class="member-form-field">
-                            <label class="form-label" for="creator-cellphone">Cellphone number <span class="text-danger">*</span></label>
-                            <InputText id="creator-cellphone" class="form-control" placeholder="e.g. 0821234567" @bind-Value="model.CreatorCellphoneNumber" />
-                        </div>
-                        <div class="member-form-field">
-                            <label class="form-label" for="creator-email">Email address</label>
-                            <InputText id="creator-email" class="form-control" @bind-Value="model.CreatorEmail" />
-                        </div>
-                        <div class="member-form-field">
-                            <label class="form-label" for="creator-id-number">SA ID number</label>
-                            <InputText id="creator-id-number" class="form-control" placeholder="13-digit SA ID" @bind-Value="model.CreatorIdNumber" />
-                            <div class="form-text">Used to link this office bearer record to your login account.</div>
-                        </div>
-                        <div class="member-form-field register-form-wide">
-                            <label class="form-label" for="creator-area">Residential area</label>
-                            <InputText id="creator-area" class="form-control" placeholder="e.g. Soweto, Gauteng" @bind-Value="model.CreatorResidentialArea" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Section: Subscription package ── -->
-            <div class="sisonke-card mb-3">
-                <div class="sisonke-card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="form-section-title mb-0">Membership Size & Package</div>
-                        @if (model.SubscriptionPlanId is null)
+                        @if (model.Archetype == StokvelArchetype.Rotational)
                         {
-                            <span class="text-danger small fw-semibold">Selection required</span>
+                            <div class="sisonke-alert sisonke-alert-blue mt-3 d-flex align-items-start gap-2">
+                                <i class="bi bi-lightbulb-fill mt-1" style="flex-shrink:0"></i>
+                                <div>
+                                    <strong>Rotational Stokvels</strong> help members track contributions, payout order and next recipient transparently.
+                                    Members contribute regularly and the full pot is paid to one member in turn.
+                                </div>
+                            </div>
                         }
                     </div>
-                    <p class="text-muted small mb-3">Choose a plan that fits your expected membership size. Enter the member count above for a recommendation.</p>
+                </div>
 
-                    @if (subscriptionPlans.Count == 0)
-                    {
-                        <AlertBanner
-                            Type="info"
-                            Title="No subscription packages are configured yet."
-                            Message="Please ask the platform administrator to configure packages before registering a stokvel."
-                            Icon="bi bi-info-circle-fill" />
-                    }
-                    else
-                    {
-                        <div class="row g-3">
-                            @foreach (var plan in subscriptionPlans)
+                <!-- Subscription plans -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <h2>Choose Your Plan</h2>
+                                <p>Select the package that fits your expected membership size.</p>
+                            </div>
+                            @if (packageSelectionFailed)
                             {
-                                var isSelected    = model.SubscriptionPlanId == plan.Id;
-                                var isRecommended = recommendedPlanId == plan.Id;
+                                <span class="text-danger small fw-semibold">Plan selection required</span>
+                            }
+                        </div>
 
-                                <div class="col-12 col-md-4">
-                                    <div class="plan-card @(isSelected ? "plan-selected" : "") @(isRecommended ? "plan-recommended" : "") h-100"
-                                         @onclick="@(() => SelectSubscriptionPlan(plan.Id))" style="cursor:pointer;">
-                                        <div class="card-body d-flex flex-column p-3">
-                                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                                                <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
-                                                @if (isRecommended && !isSelected)
+                        @if (subscriptionPlans.Count == 0)
+                        {
+                            <AlertBanner Type="info" Title="No subscription packages are configured yet."
+                                Message="Please ask the platform administrator to configure packages."
+                                Icon="bi bi-info-circle-fill" />
+                        }
+                        else
+                        {
+                            <div class="row g-3">
+                                @foreach (var plan in subscriptionPlans)
+                                {
+                                    var isPlanSelected = model.SubscriptionPlanId == plan.Id;
+                                    var isPopular      = IsMostPopularPlan(plan.Name);
+                                    var features       = GetPlanFeatures(plan.Name);
+
+                                    <div class="col-12 col-md-4">
+                                        <div class="plan-card @(isPlanSelected ? "plan-selected" : "") @(isPopular && !isPlanSelected ? "plan-recommended" : "") @(isPopular ? "plan-popular-wrap" : "") h-100"
+                                             @onclick="@(() => SelectSubscriptionPlan(plan.Id))">
+                                            <div class="card-body p-4 d-flex flex-column">
+                                                @if (isPopular)
                                                 {
-                                                    <StatusBadge Text="Recommended" Type="success" />
+                                                    <div class="text-center mb-2">
+                                                        <span class="sisonke-badge sisonke-badge-gold">Most Popular</span>
+                                                    </div>
                                                 }
-                                                @if (isSelected)
-                                                {
-                                                    <span class="sisonke-badge sisonke-badge-green">
-                                                        <i class="bi bi-check2 me-1"></i>Selected
-                                                    </span>
-                                                }
-                                            </div>
-                                            <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
-                                            <div class="mt-auto">
-                                                <div class="plan-price">@FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span></div>
-                                                <div class="text-muted small">Annual: @FormatCurrency(plan.AnnualPrice)</div>
+                                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                                    <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
+                                                    @if (isPlanSelected)
+                                                    {
+                                                        <i class="bi bi-check-circle-fill" style="color:var(--sk-success);font-size:1.1rem;flex-shrink:0"></i>
+                                                    }
+                                                </div>
+                                                <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
+                                                <div class="plan-price mb-3">
+                                                    @FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span>
+                                                </div>
+                                                <ul class="plan-features mt-auto mb-0">
+                                                    @foreach (var feat in features)
+                                                    {
+                                                        <li>
+                                                            <i class="bi bi-check2 me-2" style="color:var(--sk-success)"></i>@feat
+                                                        </li>
+                                                    }
+                                                </ul>
                                             </div>
                                         </div>
                                     </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="rw-step-actions">
+                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="GoBackToStep1">
+                        <i class="bi bi-arrow-left me-2"></i>Back to User Details
+                    </button>
+                    <button type="button" class="sisonke-btn sisonke-btn-primary rw-btn-next" @onclick="GoToStep3">
+                        Continue to Review <i class="bi bi-arrow-right ms-2"></i>
+                    </button>
+                </div>
+            </div>
+        }
+
+        <!-- ══════════════ STEP 3 — Final Review ══════════════ -->
+        @if (currentWizardStep == 3)
+        {
+            <div class="rw-step-panel">
+                <div class="rw-step-title">
+                    <h1>Review &amp; Confirm</h1>
+                    <p>Check the details before creating your stokvel.</p>
+                </div>
+
+                <ValidationSummary class="alert alert-danger mb-3" />
+
+                <!-- Type + plan summary row -->
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <div class="sisonke-card h-100">
+                            <div class="sisonke-card-body">
+                                <div class="detail-mini-label mb-2">Stokvel Type</div>
+                                @if (SelectedArchetypeOption is not null)
+                                {
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <div class="rw-review-icon">
+                                            <i class="bi @SelectedArchetypeOption.Icon"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-700">@SelectedArchetypeOption.Title</div>
+                                            <span class="@GetArchetypeBadgeClass(SelectedArchetypeOption)">@SelectedArchetypeOption.StatusText</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-muted small mb-0">@SelectedArchetypeOption.Description</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="sisonke-card h-100">
+                            <div class="sisonke-card-body">
+                                <div class="detail-mini-label mb-2">Selected Plan</div>
+                                @if (SelectedPlan is not null)
+                                {
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <div class="fw-700">@SelectedPlan.Name</div>
+                                        @if (IsMostPopularPlan(SelectedPlan.Name))
+                                        {
+                                            <span class="sisonke-badge sisonke-badge-gold">Most Popular</span>
+                                        }
+                                    </div>
+                                    <div class="plan-price" style="font-size:1.35rem">
+                                        @FormatCurrency(SelectedPlan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span>
+                                    </div>
+                                    <p class="text-muted small mt-1 mb-0">@GetMemberRangeText(SelectedPlan)</p>
+                                }
+                                else
+                                {
+                                    <span class="text-danger small">No plan selected — go back to Step 2.</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stokvel details summary -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="form-section-title mb-3">Stokvel Details</div>
+                        <div class="row g-3">
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Stokvel Name</div>
+                                <div class="fw-600">@Display(model.Name)</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Province</div>
+                                <div class="fw-600">@Display(model.Province)</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Town / Area</div>
+                                <div class="fw-600">@Display(model.TownOrArea)</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Expected Members</div>
+                                <div class="fw-600">@(model.ExpectedMemberCount?.ToString() ?? "Not specified")</div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(model.Description))
+                            {
+                                <div class="col-12">
+                                    <div class="detail-mini-label">Description</div>
+                                    <div class="text-muted small">@model.Description</div>
                                 </div>
                             }
                         </div>
-                    }
+                    </div>
+                </div>
+
+                <!-- Creator summary -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="form-section-title mb-3">Office Bearer</div>
+                        <div class="row g-3">
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Full Name</div>
+                                <div class="fw-600">@Display(model.CreatorFullName)</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Cellphone</div>
+                                <div class="fw-600">@SensitiveDataMasker.MaskPhoneNumber(model.CreatorCellphoneNumber)</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Email</div>
+                                <div class="fw-600">@SensitiveDataMasker.MaskEmail(model.CreatorEmail)</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">ID Number</div>
+                                <div class="fw-600">@SensitiveDataMasker.MaskIdNumber(model.CreatorIdNumber)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rw-step-actions">
+                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="GoBackToStep2">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Stokvel Type
+                    </button>
+                    <button class="sisonke-btn sisonke-btn-primary rw-btn-next" type="submit">
+                        <i class="bi bi-check-circle me-2"></i>Register Stokvel
+                    </button>
                 </div>
             </div>
-
-            <!-- ── Submit ── -->
-            <div class="d-flex gap-2 flex-wrap">
-                <button class="sisonke-btn sisonke-btn-primary" type="submit">
-                    <i class="bi bi-check-circle me-2"></i>Register Stokvel
-                </button>
-                <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Cancel</a>
-            </div>
-        </EditForm>
-    </div>
+        }
+    </EditForm>
 }
 
 <style>
-    .register-creator-summary {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: .75rem;
-        min-width: min(28rem, 100%);
-        padding: 1rem;
-        border: 1px solid rgb(255 255 255 / .28);
-        border-radius: var(--r-md);
-        background: rgb(255 255 255 / .12);
-    }
+/* ── Wizard header ──────────────── */
+.rw-wizard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    padding: 1.25rem 1.75rem;
+    background: #fff;
+    border-radius: var(--sk-radius-lg);
+    box-shadow: var(--sk-shadow-sm);
+    border: 1px solid var(--sk-border);
+}
 
-    .register-creator-summary div {
-        display: grid;
-        gap: .15rem;
-    }
+.rw-brand {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-shrink: 0;
+}
 
-    .register-creator-summary span {
-        color: rgb(255 255 255 / .78);
-        font-size: .72rem;
-        text-transform: uppercase;
-        letter-spacing: .08em;
-    }
+.rw-brand-mark {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--sk-radius-sm);
+    background: var(--sk-green-800);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
 
-    .register-creator-summary strong {
-        color: #fff;
-        font-size: .92rem;
-    }
+.rw-brand-name {
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--sk-green-800);
+    line-height: 1.1;
+}
 
-    .register-form-wide {
-        grid-column: 1 / -1;
-    }
+.rw-brand-tagline {
+    font-size: .72rem;
+    color: var(--sk-text-muted);
+    letter-spacing: .03em;
+}
 
-    .archetype-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-        gap: .75rem;
-    }
+/* ── Step indicators ─────────────── */
+.rw-steps {
+    display: flex;
+    align-items: flex-start;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+    max-width: 560px;
+}
 
-    .archetype-card {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: .65rem;
-        align-items: flex-start;
-        min-height: 9.5rem;
-        padding: .9rem;
-        border: 1px solid var(--sk-border);
-        border-radius: var(--r-md);
-        background: #fff;
-        cursor: pointer;
-    }
+.rw-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .35rem;
+    flex-shrink: 0;
+}
 
-    .archetype-card-selected {
-        border-color: var(--sk-green-700);
-        box-shadow: 0 0 0 .18rem rgb(27 94 32 / .12);
-    }
+.rw-step-circle {
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    border: 2px solid var(--sk-border-dark);
+    background: #fff;
+    color: var(--sk-text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .875rem;
+    font-weight: 700;
+    transition: all .2s;
+    flex-shrink: 0;
+}
 
-    .archetype-card-soon {
-        opacity: .72;
-        cursor: not-allowed;
-    }
+.rw-step-label {
+    font-size: .76rem;
+    font-weight: 600;
+    color: var(--sk-text-muted);
+    white-space: nowrap;
+}
 
-    .archetype-card-body,
-    .archetype-title,
-    .archetype-description {
-        display: block;
-    }
+.rw-step-connector {
+    flex: 1;
+    height: 2px;
+    background: var(--sk-border);
+    margin-bottom: 1.45rem;
+    min-width: 2rem;
+    max-width: 7rem;
+    transition: background .25s;
+}
 
-    .archetype-title {
-        color: var(--sk-text);
-        font-weight: 800;
-    }
+.rw-step-connector-done { background: var(--sk-success); }
 
-    .archetype-description {
-        color: var(--sk-text-muted);
-        font-size: .875rem;
-        margin: .25rem 0 .5rem;
-    }
+.rw-step-active .rw-step-circle {
+    background: var(--sk-green-800);
+    border-color: var(--sk-green-800);
+    color: #fff;
+}
+.rw-step-active .rw-step-label {
+    color: var(--sk-green-800);
+    font-weight: 700;
+}
 
-    @@media (max-width: 768px) {
-        .register-creator-summary {
-            grid-template-columns: 1fr;
-        }
-    }
+.rw-step-done .rw-step-circle {
+    background: var(--sk-success);
+    border-color: var(--sk-success);
+    color: #fff;
+}
+
+/* ── Step content ─────────────────── */
+.rw-step-panel { max-width: 900px; }
+
+.rw-step-title { margin-bottom: 1.5rem; }
+.rw-step-title h1 {
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--sk-text);
+    margin-bottom: .3rem;
+}
+.rw-step-title p { color: var(--sk-text-muted); margin: 0; }
+
+.rw-step-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: .5rem;
+    padding-bottom: 2rem;
+}
+
+.rw-btn-next { min-width: 12rem; }
+
+.rw-creator-pill {
+    display: inline-flex;
+    align-items: center;
+    background: var(--sk-green-50);
+    color: var(--sk-green-700);
+    border: 1px solid var(--sk-green-100);
+    border-radius: 999px;
+    padding: .25rem .85rem;
+    font-size: .8rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+/* ── Archetype cards ─────────────── */
+.archetype-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .875rem;
+}
+
+.archetype-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    padding: 1.1rem;
+    border: 2px solid var(--sk-border);
+    border-radius: var(--sk-radius);
+    background: #fff;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, transform .12s;
+    min-height: 10.5rem;
+}
+
+.archetype-card:hover:not(.archetype-card-soon) {
+    border-color: var(--sk-green-600);
+    box-shadow: var(--sk-shadow);
+    transform: translateY(-1px);
+}
+
+.archetype-card-selected {
+    border-color: var(--sk-green-800) !important;
+    box-shadow: 0 0 0 3px rgba(27,67,50,.12), var(--sk-shadow) !important;
+    background: var(--sk-green-50) !important;
+}
+
+.archetype-card-soon {
+    opacity: .58;
+    cursor: not-allowed;
+    background: #fafafa;
+}
+
+.archetype-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: .2rem;
+}
+
+.archetype-icon-wrap {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: var(--sk-radius-sm);
+    background: var(--sk-green-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    color: var(--sk-green-800);
+    flex-shrink: 0;
+}
+
+.archetype-card-soon .archetype-icon-wrap {
+    background: #e9eaec;
+    color: #9ca3af;
+}
+
+.archetype-check {
+    color: var(--sk-green-800);
+    font-size: 1.15rem;
+}
+
+.archetype-title {
+    font-weight: 700;
+    font-size: .92rem;
+    color: var(--sk-text);
+}
+
+.archetype-description {
+    font-size: .8rem;
+    color: var(--sk-text-muted);
+    line-height: 1.4;
+    flex: 1;
+}
+
+/* ── Plan feature list ───────────── */
+.plan-features {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: .875rem;
+    color: var(--sk-text-muted);
+}
+
+.plan-features li { padding: .2rem 0; }
+
+.plan-popular-wrap {
+    position: relative;
+}
+
+/* ── Review step ─────────────────── */
+.rw-review-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--sk-radius-sm);
+    background: var(--sk-green-50);
+    border: 1px solid var(--sk-green-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--sk-green-800);
+    flex-shrink: 0;
+}
+
+/* ── Responsive ──────────────────── */
+@@media (max-width: 1024px) {
+    .archetype-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@@media (max-width: 640px) {
+    .archetype-grid { grid-template-columns: 1fr; }
+    .rw-steps { display: none; }
+    .rw-wizard-header { padding: 1rem; flex-wrap: wrap; }
+    .rw-btn-next { min-width: auto; flex: 1; }
+}
+
+.fw-600 { font-weight: 600; }
+.fw-700 { font-weight: 700; }
+.register-form-wide { grid-column: 1 / -1; }
 </style>
 
 @code {
@@ -403,17 +773,74 @@ else
     private bool saveFailed;
     private bool packageSelectionFailed;
     private bool isLoading = true;
+    private int currentWizardStep = 1;
+    private string? wizardValidationMessage;
+
+    private ArchetypeOption? SelectedArchetypeOption =>
+        archetypeOptions.FirstOrDefault(a => a.Archetype == model.Archetype);
+
+    private SubscriptionPlan? SelectedPlan =>
+        model.SubscriptionPlanId is null ? null
+        : subscriptionPlans.FirstOrDefault(p => p.Id == model.SubscriptionPlanId);
+
+    private void GoToStep2()
+    {
+        wizardValidationMessage = null;
+        packageSelectionFailed = false;
+
+        if (string.IsNullOrWhiteSpace(model.Name))
+        {
+            wizardValidationMessage = "Please enter a stokvel name to continue.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(model.CreatorFullName))
+        {
+            wizardValidationMessage = "Please enter the office bearer's full name to continue.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(model.CreatorCellphoneNumber))
+        {
+            wizardValidationMessage = "Please enter the office bearer's cellphone number to continue.";
+            return;
+        }
+        currentWizardStep = 2;
+    }
+
+    private void GoToStep3()
+    {
+        wizardValidationMessage = null;
+        if (model.SubscriptionPlanId is null)
+        {
+            packageSelectionFailed = true;
+            return;
+        }
+        packageSelectionFailed = false;
+        currentWizardStep = 3;
+    }
+
+    private void GoBackToStep1()
+    {
+        wizardValidationMessage = null;
+        currentWizardStep = 1;
+    }
+
+    private void GoBackToStep2()
+    {
+        wizardValidationMessage = null;
+        currentWizardStep = 2;
+    }
+
     private readonly List<ArchetypeOption> archetypeOptions =
     [
-        new(StokvelArchetype.BurialSociety, "Burial Society", "Manage funeral support, dependents, claims and member contributions.", "Fully supported", false),
-        new(StokvelArchetype.Rotational, "Rotational Stokvel", "Members contribute regularly and the full pot is paid to one member in turn.", "Setup available", false),
-        new(StokvelArchetype.Grocery, "Grocery Stokvel", "Members pool contributions to buy bulk groceries and distribute to the group.", "Setup available", false),
-        new(StokvelArchetype.SavingsClub, "Savings Club", "Save towards year-end, school fees, holidays or shared goals.", "Setup available", false),
-        new(StokvelArchetype.InvestmentClub, "Investment Club", "For pooled long-term investment planning", "Coming soon", true),
-        new(StokvelArchetype.Education, "Education Stokvel", "For school fees and education-related costs", "Coming soon", true),
-        new(StokvelArchetype.Borrowing, "Borrowing Stokvel", "For member lending and interest rules", "Coming soon", true),
-        new(StokvelArchetype.Travel, "Travel Stokvel", "For group travel savings", "Coming soon", true),
-        new(StokvelArchetype.SocialClub, "Social Club", "For events and community activities", "Coming soon", true)
+        new(StokvelArchetype.Rotational,    "Rotational Stokvel",  "Members contribute regularly and the full pot is paid to one member in turn.",    "Demo ready",  false, "bi-arrow-repeat"),
+        new(StokvelArchetype.BurialSociety, "Burial Society",       "Manage funeral support, dependents, claims and member contributions.",              "Full support", false, "bi-heart-fill"),
+        new(StokvelArchetype.SavingsClub,   "Savings Club",         "Save towards year-end, school fees, holidays or shared goals.",                     "Basic setup",  false, "bi-piggy-bank-fill"),
+        new(StokvelArchetype.Grocery,       "Grocery Stokvel",      "Plan bulk grocery contributions, purchases and distribution.",                      "Coming soon",  true,  "bi-bag-fill"),
+        new(StokvelArchetype.InvestmentClub,"Investment Club",      "Pool funds for long-term wealth and asset growth.",                                 "Coming soon",  true,  "bi-graph-up"),
+        new(StokvelArchetype.Education,     "Education Stokvel",    "Save for school fees, uniforms, stationery and education costs.",                   "Coming soon",  true,  "bi-mortarboard-fill"),
+        new(StokvelArchetype.Borrowing,     "Borrowing Stokvel",    "Manage member borrowing, limits, interest and repayments.",                        "Coming soon",  true,  "bi-cash-coin"),
+        new(StokvelArchetype.Travel,        "Travel Stokvel",       "Save together for group trips, holidays and travel goals.",                         "Coming soon",  true,  "bi-airplane"),
+        new(StokvelArchetype.SocialClub,    "Social Club",          "Manage events, celebrations and community activities.",                             "Coming soon",  true,  "bi-people-fill")
     ];
 
     protected override async Task OnInitializedAsync()
@@ -470,8 +897,7 @@ else
         packageSelectionFailed = false;
 
         if (currentUser is null) { saveFailed = true; return; }
-
-        if (model.SubscriptionPlanId is null) { packageSelectionFailed = true; return; }
+        if (model.SubscriptionPlanId is null) { packageSelectionFailed = true; currentWizardStep = 2; return; }
 
         var createdStokvel = await StokvelService.RegisterStokvelAsync(
             model.Name, MapArchetypeToStokvelType(model.Archetype), model.Archetype, model.Province, model.TownOrArea,
@@ -489,11 +915,7 @@ else
             model.CreatorIdNumber,
             model.CreatorResidentialArea);
 
-        if (creatorMember is null)
-        {
-            saveFailed = true;
-            return;
-        }
+        if (creatorMember is null) { saveFailed = true; return; }
 
         await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(currentUser.Id, model.CreatorIdNumber);
         NavigationManager.NavigateTo($"/stokvel-questionnaire/{createdStokvel.Id}");
@@ -503,51 +925,39 @@ else
     {
         await using var scope = ScopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        return await db.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(user => user.Id == currentUserId);
+        return await db.Users.AsNoTracking().FirstOrDefaultAsync(user => user.Id == currentUserId);
     }
 
     private async Task<List<SubscriptionPlan>> LoadPublicSubscriptionPlansAsync()
     {
         await using var scope = ScopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
         return await db.SubscriptionPlans
             .AsNoTracking()
-            .Where(subscriptionPlan =>
-                subscriptionPlan.IsActive &&
-                subscriptionPlan.Name != "Pilot")
-            .OrderBy(subscriptionPlan => subscriptionPlan.MinMembers)
+            .Where(p => p.IsActive && p.Name != "Pilot")
+            .OrderBy(p => p.MinMembers)
             .ToListAsync();
     }
 
     private async Task<SubscriptionPlan?> LoadRecommendedSubscriptionPlanAsync(int? expectedMemberCount)
     {
-        if (expectedMemberCount is null || expectedMemberCount < 1)
-        {
-            return null;
-        }
-
+        if (expectedMemberCount is null || expectedMemberCount < 1) return null;
         await using var scope = ScopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
         return await db.SubscriptionPlans
             .AsNoTracking()
-            .Where(subscriptionPlan =>
-                subscriptionPlan.IsActive &&
-                subscriptionPlan.Name != "Pilot" &&
-                expectedMemberCount >= subscriptionPlan.MinMembers &&
-                (subscriptionPlan.MaxMembers == null || expectedMemberCount <= subscriptionPlan.MaxMembers))
-            .OrderBy(subscriptionPlan => subscriptionPlan.MinMembers)
+            .Where(p =>
+                p.IsActive && p.Name != "Pilot" &&
+                expectedMemberCount >= p.MinMembers &&
+                (p.MaxMembers == null || expectedMemberCount <= p.MaxMembers))
+            .OrderBy(p => p.MinMembers)
             .FirstOrDefaultAsync();
     }
 
     private sealed class RegisterStokvelFormModel
     {
         [Required][MaxLength(150)] public string Name { get; set; } = string.Empty;
-        public StokvelArchetype Archetype { get; set; } = StokvelArchetype.BurialSociety;
+        public StokvelArchetype Archetype { get; set; } = StokvelArchetype.Rotational;
         [MaxLength(100)] public string? Province { get; set; }
         [MaxLength(100)] public string? TownOrArea { get; set; }
         public DateTime? EstablishedDate { get; set; }
@@ -567,37 +977,47 @@ else
     private static string GetMemberRangeText(SubscriptionPlan plan) =>
         plan.MaxMembers is null ? $"{plan.MinMembers}+ members" : $"{plan.MinMembers}–{plan.MaxMembers} members";
 
-    private static string Display(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
-    }
+    private static string Display(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
+
+    private static bool IsMostPopularPlan(string? planName) =>
+        string.Equals(planName, "standard", StringComparison.OrdinalIgnoreCase);
+
+    private static IReadOnlyList<string> GetPlanFeatures(string? planName) =>
+        planName?.ToLowerInvariant() switch
+        {
+            "basic"    => ["Up to 20 members", "Basic reporting", "Mobile app access", "Email support"],
+            "standard" => ["Up to 50 members", "Advanced reporting", "Mobile app access", "Priority email support", "Data backup"],
+            "premium"  => ["Up to 100 members", "Advanced reporting & analytics", "Mobile app access", "Priority support (email & phone)", "Data backup & export"],
+            _          => []
+        };
 
     private static StokvelType MapArchetypeToStokvelType(StokvelArchetype archetype) =>
         archetype switch
         {
-            StokvelArchetype.BurialSociety => StokvelType.BurialSociety,
-            StokvelArchetype.Rotational => StokvelType.SavingsStokvel,
-            StokvelArchetype.Grocery => StokvelType.GroceryStokvel,
+            StokvelArchetype.BurialSociety  => StokvelType.BurialSociety,
+            StokvelArchetype.Rotational     => StokvelType.SavingsStokvel,
+            StokvelArchetype.Grocery        => StokvelType.GroceryStokvel,
             StokvelArchetype.InvestmentClub => StokvelType.InvestmentStokvel,
-            StokvelArchetype.SavingsClub => StokvelType.SavingsStokvel,
-            StokvelArchetype.Education => StokvelType.SavingsStokvel,
-            StokvelArchetype.Borrowing => StokvelType.LoanStokvel,
-            StokvelArchetype.Travel => StokvelType.SavingsStokvel,
-            StokvelArchetype.SocialClub => StokvelType.SocialClub,
-            _ => StokvelType.BurialSociety
+            StokvelArchetype.SavingsClub    => StokvelType.SavingsStokvel,
+            StokvelArchetype.Education      => StokvelType.SavingsStokvel,
+            StokvelArchetype.Borrowing      => StokvelType.LoanStokvel,
+            StokvelArchetype.Travel         => StokvelType.SavingsStokvel,
+            StokvelArchetype.SocialClub     => StokvelType.SocialClub,
+            _                               => StokvelType.BurialSociety
         };
 
     private static string GetArchetypeBadgeClass(ArchetypeOption option) =>
-        option.IsComingSoon
-            ? "sisonke-badge sisonke-badge-gray"
-            : option.Archetype == StokvelArchetype.BurialSociety
-                ? "sisonke-badge sisonke-badge-green"
-                : "sisonke-badge sisonke-badge-gold";
+        option.IsComingSoon                               ? "sisonke-badge sisonke-badge-gray"  :
+        option.Archetype == StokvelArchetype.Rotational   ? "sisonke-badge sisonke-badge-blue"  :
+        option.Archetype == StokvelArchetype.BurialSociety? "sisonke-badge sisonke-badge-green" :
+        "sisonke-badge sisonke-badge-gold";
 
     private sealed record ArchetypeOption(
         StokvelArchetype Archetype,
         string Title,
         string Description,
         string StatusText,
-        bool IsComingSoon);
+        bool IsComingSoon,
+        string Icon = "bi-grid");
 }
