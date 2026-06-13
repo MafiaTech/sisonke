@@ -299,6 +299,36 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+app.MapGet("/health", async (
+    ApplicationDbContext context,
+    IWebHostEnvironment environment) =>
+{
+    var timestampUtc = DateTimeOffset.UtcNow;
+
+    if (!await context.Database.CanConnectAsync())
+    {
+        return Results.Json(
+            new
+            {
+                status = "Unhealthy",
+                database = "Unavailable",
+                message = "Database connection failed",
+                timestampUtc
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    return Results.Json(new
+    {
+        status = "Healthy",
+        app = "Sisonke.Web",
+        environment = environment.EnvironmentName,
+        databaseProvider = isSqlite ? "SQLite" : "SqlServer",
+        database = "Connected",
+        timestampUtc
+    });
+});
+
 app.MapPost("/Account/RegisterSubmit", RegistrationSubmitEndpoint.HandleAsync)
     .DisableAntiforgery()
     .WithName("RegisterSubmit");
