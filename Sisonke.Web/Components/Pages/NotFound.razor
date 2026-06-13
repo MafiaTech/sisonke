@@ -1,5 +1,26 @@
-﻿@page "/not-found"
+@page "/{*Path}"
 @layout MainLayout
+@using Microsoft.AspNetCore.Components
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 
-<h3>Not Found</h3>
-<p>Sorry, the content you are looking for does not exist.</p>
+<PageTitle>Page not found</PageTitle>
+
+<div class="not-found-page">
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gray">404</span>
+            <h1>Page not found</h1>
+            <p>The page you are looking for could not be found.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
+                <i class="bi bi-house-fill me-2"></i>Go to My Workspace
+            </a>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter]
+    public string? Path { get; set; }
+}

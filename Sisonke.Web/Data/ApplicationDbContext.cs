@@ -481,5 +481,69 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<StokvelOperatingRules>()
             .HasIndex(r => r.StokvelId)
             .IsUnique();
+
+        // ── Performance indexes ───────────────────────────────────────────────
+        // Stokvel lookup by tenant (dashboards, admin lists)
+        builder.Entity<Stokvel>()
+            .HasIndex(s => s.TenantId);
+
+        // Member lookup by tenant (member lists, contribution queries)
+        builder.Entity<Member>()
+            .HasIndex(m => m.TenantId);
+
+        // Contribution queries by member and by tenant+member composite
+        builder.Entity<MemberContribution>()
+            .HasIndex(mc => mc.MemberId);
+
+        builder.Entity<MemberContribution>()
+            .HasIndex(mc => new { mc.TenantId, mc.MemberId });
+
+        // Claims filtered by tenant + status (dashboard outstanding claims)
+        builder.Entity<FuneralClaim>()
+            .HasIndex(c => new { c.TenantId, c.Status });
+
+        // Meetings filtered by tenant + date (upcoming meetings widget)
+        builder.Entity<Meeting>()
+            .HasIndex(m => new { m.TenantId, m.MeetingDate });
+
+        // ── Money precision: HasPrecision(18,2) for all decimal currency fields ─
+        builder.Entity<SubscriptionPlan>()
+            .Property(p => p.MonthlyPrice).HasPrecision(18, 2);
+        builder.Entity<SubscriptionPlan>()
+            .Property(p => p.AnnualPrice).HasPrecision(18, 2);
+
+        builder.Entity<FineType>()
+            .Property(f => f.DefaultAmount).HasPrecision(18, 2);
+
+        builder.Entity<ContributionRule>()
+            .Property(r => r.Amount).HasPrecision(18, 2);
+        builder.Entity<ContributionRule>()
+            .Property(r => r.LatePaymentFineAmount).HasPrecision(18, 2);
+
+        builder.Entity<MemberFine>()
+            .Property(f => f.Amount).HasPrecision(18, 2);
+
+        builder.Entity<MemberContribution>()
+            .Property(mc => mc.ExpectedAmount).HasPrecision(18, 2);
+        builder.Entity<MemberContribution>()
+            .Property(mc => mc.PaidAmount).HasPrecision(18, 2);
+        builder.Entity<MemberContribution>()
+            .Property(mc => mc.OutstandingAmount).HasPrecision(18, 2);
+
+        builder.Entity<Payment>()
+            .Property(p => p.Amount).HasPrecision(18, 2);
+
+        builder.Entity<FuneralClaim>()
+            .Property(c => c.PayoutAmount).HasPrecision(18, 2);
+
+        builder.Entity<ContributionPaymentAudit>()
+            .Property(a => a.PreviousAmountPaid).HasPrecision(18, 2);
+        builder.Entity<ContributionPaymentAudit>()
+            .Property(a => a.NewAmountPaid).HasPrecision(18, 2);
+
+        builder.Entity<ClaimPayoutAudit>()
+            .Property(a => a.PreviousPayoutAmount).HasPrecision(18, 2);
+        builder.Entity<ClaimPayoutAudit>()
+            .Property(a => a.NewPayoutAmount).HasPrecision(18, 2);
     }
 }

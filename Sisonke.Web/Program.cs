@@ -195,32 +195,88 @@ builder.Services.AddScoped<ClaimEligibilityService>();
 builder.Services.AddScoped<MemberAccountLinkingService>();
 builder.Services.AddScoped<MemberAccessService>();
 builder.Services.AddScoped<StokvelArchetypeConfigurationService>();
+builder.Services.AddScoped<DashboardQueryService>();
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    var seedDataEnabled = builder.Configuration.GetValue("SeedData:Enabled", true);
+    var startupLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Sisonke.Startup");
 
-    await context.Database.MigrateAsync();
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    // SeedData:Enabled defaults to FALSE so live/migrated databases are never seeded accidentally.
+    // Set SeedData__Enabled=true explicitly in development or staging when demo data is needed.
+    var seedDataEnabled = builder.Configuration.GetValue("SeedData:Enabled", false);
+
+    startupLogger.LogInformation("[Startup] DB provider: {Provider} | SeedData: {SeedEnabled} | AdminSeed: {AdminSeedEnabled}",
+        isSqlite ? "SQLite" : "SQL Server",
+        seedDataEnabled,
+        builder.Configuration.GetValue("AdminSeed:Enabled", false));
+
+    try
+    {
+        startupLogger.LogInformation("[Startup] Applying pending migrations...");
+        await context.Database.MigrateAsync();
+        startupLogger.LogInformation("[Startup] Migrations applied successfully.");
+    }
+    catch (Exception ex)
+    {
+        startupLogger.LogCritical(ex, "[Startup] Database migration failed. The application cannot start safely.");
+        throw;
+    }
 
     if (builder.Configuration.GetValue("AdminSeed:Enabled", false))
     {
-        await SeedAdminUserAsync(scope.ServiceProvider, builder.Configuration);
+        try
+        {
+            startupLogger.LogInformation("[Startup] Running admin user seed...");
+            await SeedAdminUserAsync(scope.ServiceProvider, builder.Configuration);
+            startupLogger.LogInformation("[Startup] Admin user seed completed.");
+        }
+        catch (Exception ex)
+        {
+            startupLogger.LogError(ex, "[Startup] Admin user seed failed.");
+            throw;
+        }
     }
 
     if (seedDataEnabled)
     {
-        var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
-            .CreateLogger("SisonkeSeedData");
-        await SisonkeSeedData.SeedAsync(context, seedLogger);
+        try
+        {
+            startupLogger.LogInformation("[Startup] Running base seed data...");
+            var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("SisonkeSeedData");
+            await SisonkeSeedData.SeedAsync(context, seedLogger);
+            startupLogger.LogInformation("[Startup] Base seed data completed.");
+        }
+        catch (Exception ex)
+        {
+            startupLogger.LogError(ex, "[Startup] Base seed data failed.");
+            throw;
+        }
 
         if (app.Environment.IsDevelopment())
         {
-            await SisonkeDemoDataSeeder.SeedAsync(scope.ServiceProvider);
+            try
+            {
+                startupLogger.LogInformation("[Startup] Running demo data seeder (Development only)...");
+                await SisonkeDemoDataSeeder.SeedAsync(scope.ServiceProvider);
+                startupLogger.LogInformation("[Startup] Demo data seeder completed.");
+            }
+            catch (Exception ex)
+            {
+                startupLogger.LogError(ex, "[Startup] Demo data seeder failed.");
+                throw;
+            }
         }
+    }
+    else
+    {
+        startupLogger.LogInformation("[Startup] Seed data is disabled (SeedData:Enabled=false). Skipping.");
     }
 }
 
