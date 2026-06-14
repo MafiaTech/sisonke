@@ -216,17 +216,7 @@
         canRegisterStokvel = !string.IsNullOrWhiteSpace(currentUser?.IdNumber);
 
         var memberships = await LoadMembershipsAsync(userId);
-
-        foreach (var member in memberships)
-        {
-            var stokvel = await LoadStokvelByTenantIdAsync(member.TenantId);
-
-            if (stokvel is not null && IsOfficeBearerRole(member.DefaultRole.ToString()))
-            {
-                hasManagedStokvels = true;
-                return;
-            }
-        }
+        hasManagedStokvels = memberships.Any(member => IsOfficeBearerRole(member.DefaultRole.ToString()));
     }
 
     private async Task<ApplicationUser?> LoadCurrentUserAsync(string currentUserId)
@@ -250,21 +240,7 @@
             .ToListAsync();
     }
 
-    private async Task<Stokvel?> LoadStokvelByTenantIdAsync(Guid tenantId)
-    {
-        await using var context = await DbFactory.CreateDbContextAsync();
-
-        return await context.Stokvels
-            .AsNoTracking()
-            .Include(stokvel => stokvel.Tenant)
-            .Where(stokvel =>
-                stokvel.TenantId == tenantId &&
-                stokvel.IsActive)
-            .OrderBy(stokvel => stokvel.Name)
-            .FirstOrDefaultAsync();
-    }
-
-    private static bool IsOfficeBearerRole(string? role)
+private static bool IsOfficeBearerRole(string? role)
     {
         return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
             role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||

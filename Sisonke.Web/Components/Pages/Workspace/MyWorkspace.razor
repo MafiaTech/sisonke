@@ -381,13 +381,10 @@ else
         await using var scope = ScopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        var membersToCheck = await db.Members
-            .Where(member => member.IdNumber != null)
+        var rawId = idNumber!.Trim();
+        var matchingMembers = await db.Members
+            .Where(member => member.IdNumber == normalizedIdNumber || member.IdNumber == rawId)
             .ToListAsync();
-
-        var matchingMembers = membersToCheck
-            .Where(member => NormalizeIdNumber(member.IdNumber) == normalizedIdNumber)
-            .ToList();
 
         foreach (var member in matchingMembers)
         {

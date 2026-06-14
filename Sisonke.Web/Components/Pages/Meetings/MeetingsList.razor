@@ -9,6 +9,7 @@
 @using Microsoft.EntityFrameworkCore
 @using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IServiceScopeFactory ScopeFactory
@@ -64,7 +65,25 @@ else
 
     @if (meetings.Count == 0)
     {
-        <AlertBanner Type="info" Title="No meetings scheduled yet." Message="" Icon="bi bi-info-circle-fill" />
+        <div class="meetings-empty-state">
+            <div class="meetings-empty-icon">
+                <i class="bi bi-calendar2-week"></i>
+            </div>
+            <div>
+                <div class="meetings-empty-title">No meetings recorded yet.</div>
+                <p class="meetings-empty-text">
+                    @(stokvel?.Archetype == StokvelArchetype.BurialSociety
+                        ? "Create your first burial society meeting."
+                        : "Schedule your first meeting to get started.")
+                </p>
+                @if (canManageMeetings)
+                {
+                    <a class="btn btn-purple btn-sm mt-2" href="@($"/create-meeting/{StokvelId}")">
+                        <i class="bi bi-plus-circle me-1"></i>Schedule Meeting
+                    </a>
+                }
+            </div>
+        </div>
     }
     else
     {

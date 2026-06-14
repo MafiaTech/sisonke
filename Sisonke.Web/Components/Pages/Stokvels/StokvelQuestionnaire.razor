@@ -96,6 +96,17 @@ else
     <!-- ── Step content ── -->
     @if (currentStep < 4)
     {
+        @if (currentStep == 1 && stokvel is not null)
+        {
+            <div class="sisonke-alert sisonke-alert-green mb-3 d-flex align-items-start gap-2">
+                <i class="bi bi-check-circle-fill flex-shrink-0 mt-1"></i>
+                <div>
+                    <strong>Stokvel type already confirmed:</strong> @GetArchetypeLabel(stokvel.Archetype).
+                    This was set when you registered. The stokvel type question below has been pre-filled — you can still adjust it if needed.
+                </div>
+            </div>
+        }
+
         @if (!CurrentStepSections.Any())
         {
             <div class="sisonke-alert sisonke-alert-blue">
@@ -368,6 +379,24 @@ else
     {
         if (stokvel is null) return;
 
+        // Pre-fill "Which type of stokvel is this?" from the registered archetype
+        // so users don't have to answer the same question twice.
+        var archetypeAnswer = MapArchetypeToQuestionnaireAnswer(stokvel.Archetype);
+        if (!string.IsNullOrEmpty(archetypeAnswer))
+        {
+            foreach (var section in sections)
+            {
+                var typeQuestion = section.Questions.FirstOrDefault(q =>
+                    q.QuestionText.Contains("Which type of stokvel", StringComparison.OrdinalIgnoreCase));
+                if (typeQuestion is not null)
+                {
+                    if (!answers.TryGetValue(typeQuestion.Id, out var existing) || string.IsNullOrWhiteSpace(existing))
+                        answers[typeQuestion.Id] = archetypeAnswer;
+                    break;
+                }
+            }
+        }
+
         foreach (var section in sections)
         {
             if (!IsSectionApplicable(section))
@@ -388,6 +417,18 @@ else
             }
         }
     }
+
+    private static string MapArchetypeToQuestionnaireAnswer(StokvelArchetype archetype) =>
+        archetype switch
+        {
+            StokvelArchetype.BurialSociety  => "Burial Society",
+            StokvelArchetype.SavingsClub    => "Savings Stokvel",
+            StokvelArchetype.Rotational     => "Savings Stokvel",
+            StokvelArchetype.Grocery        => "Grocery Stokvel",
+            StokvelArchetype.InvestmentClub => "Investment Stokvel",
+            StokvelArchetype.SocialClub     => "Social Club",
+            _                               => string.Empty
+        };
 
     private void RecomputeLocalCompletion()
     {
