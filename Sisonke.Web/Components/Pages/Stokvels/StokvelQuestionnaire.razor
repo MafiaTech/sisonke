@@ -524,13 +524,16 @@ else
         if (!submitted)
         {
             showSubmitConfirmation = false;
-            errorMessage = "Registration could not be submitted. Please complete all required questions.";
+            var missingFields = await QuestionnaireService.GetMissingSetupFieldNamesAsync(StokvelId);
+            errorMessage = missingFields.Count > 0
+                ? $"Setup could not be completed. Please complete: {string.Join(", ", missingFields)}."
+                : "Setup could not be completed. Please complete all required questions.";
             RecomputeLocalCompletion();
             return;
         }
 
         showSubmitConfirmation = false;
-        successMessage = "Registration submitted successfully. This stokvel is now ready for management.";
+        successMessage = "Setup completed successfully. This stokvel is now ready for management.";
         NavigationManager.NavigateTo($"/stokvel-dashboard/{StokvelId}");
     }
 

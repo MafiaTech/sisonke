@@ -84,7 +84,7 @@ else
         <AlertBanner
             Type="warning"
             Title="Waiting period has not been satisfied."
-            Message="This claim should remain on hold."
+            Message="This claim should remain on hold until the society waiting period is satisfied or an office bearer records an exception."
             Icon="bi bi-exclamation-triangle-fill" />
     }
 
@@ -102,7 +102,7 @@ else
         <AlertBanner
             Type="warning"
             Title="Death Certificate is required before this claim can be submitted."
-            Message=""
+            Message="Upload the official death certificate in the claim file checklist before submitting this claim for secretary review."
             Icon="bi bi-exclamation-triangle-fill" />
     }
 
@@ -273,7 +273,7 @@ else
             @if (recentContributionSummaries.Count == 0)
             {
                 <div class="sisonke-alert sisonke-alert-blue mb-0">
-                    Contribution verification will appear here once payments are captured.
+                    No contributions captured for this month.
                 </div>
             }
             else
@@ -316,6 +316,10 @@ else
                         <tr>
                             <th>Claim status</th>
                             <td><span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span></td>
+                        </tr>
+                        <tr>
+                            <th>Required death certificate guidance</th>
+                            <td>@(hasDeathCertificate ? "Death certificate uploaded." : "Upload the official death certificate before submitting or approving this claim.")</td>
                         </tr>
                         <tr>
                             <th>Secretary recommendation</th>

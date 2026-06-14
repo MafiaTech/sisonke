@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
 @inject MemberService MemberService
@@ -29,12 +30,12 @@ else if (member is null)
 {
     <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
 }
-else if (stokvel?.EnableDependents != true)
+else if (!IsDependentsAvailable)
 {
     <AlertBanner
         Type="warning"
-        Title="Dependents are not enabled for this stokvel type."
-        Message="Covered-life records are only enabled for stokvel archetypes that support dependents."
+        Title="Covered lives are not enabled for this stokvel type."
+        Message="@GetDependentsDisabledMessage()"
         Icon="bi bi-exclamation-triangle-fill" />
 
     <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
@@ -184,6 +185,8 @@ else
     private bool isLoading = true;
     private bool saveFailed;
     private bool canManageDependents;
+    private bool IsDependentsAvailable => stokvel is not null &&
+        (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableDependents);
 
     [Parameter]
     public Guid MemberId { get; set; }
@@ -200,7 +203,7 @@ else
     {
         saveFailed = false;
 
-        if (stokvel?.EnableDependents != true)
+        if (!IsDependentsAvailable)
         {
             saveFailed = true;
             return;
@@ -244,5 +247,12 @@ else
 
         return !string.IsNullOrWhiteSpace(userId) &&
             await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
+    }
+
+    private string GetDependentsDisabledMessage()
+    {
+        return stokvel?.Archetype == StokvelArchetype.Rotational
+            ? "Covered lives belong to Burial Society workflows. This rotational stokvel can still use members, contributions, meetings and rotation schedule features."
+            : "Covered lives are a Burial Society feature. Enable dependents in the stokvel setup if this group requires them.";
     }
 }

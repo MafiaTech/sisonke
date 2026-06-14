@@ -33,12 +33,12 @@ else if (member is null)
 {
     <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
 }
-else if (stokvel?.EnableClaims != true)
+else if (!IsClaimsAvailable)
 {
     <AlertBanner
         Type="warning"
         Title="Claims are not enabled for this stokvel type."
-        Message="This group can still use the enabled member, contribution, fine and meeting features."
+        Message="@GetClaimsDisabledMessage()"
         Icon="bi bi-exclamation-triangle-fill" />
 
     <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
@@ -84,10 +84,13 @@ else
         <div class="sisonke-card">
             <div class="sisonke-card-body">
                 <div class="sisonke-alert sisonke-alert-blue mb-3">
-                    New members may be subject to the society waiting period before claims are payable.
+                    Waiting period: new members or newly covered lives may be subject to the society waiting period before claims are payable.
                 </div>
                 <div class="sisonke-alert sisonke-alert-gold mb-3">
-                    Death certificate is required. Attachment upload will be available on the claim details page after the claim is created.
+                    Required death certificate guidance: create the claim first, then upload the official death certificate on the claim details page before submitting it for review.
+                </div>
+                <div class="sisonke-alert sisonke-alert-blue mb-3">
+                    Contribution status will be checked on the claim details page once the claim is created.
                 </div>
                 <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="CreateFuneralClaimForm">
                     <DataAnnotationsValidator />
@@ -183,6 +186,10 @@ else
     private bool saveFailed;
     private bool canCreateClaim;
     private bool hasAppliedRouteState;
+    private bool IsClaimsAvailable => stokvel is not null &&
+        (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableClaims);
+    private bool IsDependentsAvailable => stokvel is not null &&
+        (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableDependents);
 
     [Parameter]
     public Guid MemberId { get; set; }
@@ -195,7 +202,7 @@ else
         isLoading = true;
         member = await LoadMemberAsync();
         stokvel = member is null ? null : await LoadStokvelAsync(member.TenantId);
-        dependents = member is null || stokvel?.EnableDependents != true ? [] : await LoadDependentsAsync();
+        dependents = member is null || !IsDependentsAvailable ? [] : await LoadDependentsAsync();
         canCreateClaim = await CanCreateClaimAsync();
 
         if (!hasAppliedRouteState)
@@ -269,7 +276,7 @@ else
     {
         saveFailed = false;
 
-        if (stokvel?.EnableClaims != true)
+        if (!IsClaimsAvailable)
         {
             saveFailed = true;
             return;
@@ -299,6 +306,13 @@ else
         }
 
         NavigationManager.NavigateTo($"/claim/{claim.Id}");
+    }
+
+    private string GetClaimsDisabledMessage()
+    {
+        return stokvel?.Archetype == StokvelArchetype.Rotational
+            ? "Claims belong to Burial Society workflows. This rotational stokvel can still use members, contributions, meetings and rotation schedule features."
+            : "This group can still use the enabled member, contribution, fine and meeting features.";
     }
 
     private sealed class CreateClaimModel

@@ -24,7 +24,7 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null || !stokvel.EnableClaims)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return [];
         }
@@ -46,7 +46,7 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null || !stokvel.EnableClaims)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return 0;
         }
@@ -77,7 +77,7 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return [];
         }
@@ -104,7 +104,7 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return 0;
         }
@@ -131,7 +131,7 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return [];
         }
@@ -158,7 +158,7 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return 0;
         }
@@ -179,7 +179,7 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return [];
         }
@@ -207,7 +207,7 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return 0;
         }
@@ -421,12 +421,12 @@ public class FuneralClaimService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel?.EnableClaims != true)
+        if (stokvel is null || !IsClaimsAvailable(stokvel))
         {
             return null;
         }
 
-        if (subjectType == FuneralClaimSubjectType.Dependent && !stokvel.EnableDependents)
+        if (subjectType == FuneralClaimSubjectType.Dependent && !IsDependentsAvailable(stokvel))
         {
             return null;
         }
@@ -1059,6 +1059,16 @@ public class FuneralClaimService(
         return claim.SecretaryReviewedAt is not null &&
             claim.ChairpersonDecisionAt is null &&
             claim.Status == FuneralClaimStatus.UnderReview;
+    }
+
+    private static bool IsClaimsAvailable(Stokvel stokvel)
+    {
+        return stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableClaims;
+    }
+
+    private static bool IsDependentsAvailable(Stokvel stokvel)
+    {
+        return stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableDependents;
     }
 
     private static ClaimDocumentChecklistItemDto BuildChecklistItem(

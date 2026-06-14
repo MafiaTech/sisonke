@@ -424,24 +424,43 @@ else
                         <div class="burial-readiness-card">
                             <div class="detail-mini-label">Total Members</div>
                             <div class="burial-readiness-value">@memberCount</div>
-                            <div class="text-muted small">Active member records in this society.</div>
+                            <div class="text-muted small">All member records captured in this society.</div>
                         </div>
                         <div class="burial-readiness-card">
-                            <div class="detail-mini-label">Active Dependents / Covered Lives</div>
+                            <div class="detail-mini-label">Active Members</div>
+                            <div class="burial-readiness-value">@activeMemberCount</div>
+                            <div class="text-muted small">Members in good standing for society workflow.</div>
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Covered Lives / Dependents</div>
                             <div class="burial-readiness-value">@activeDependentCount</div>
-                            <div class="text-muted small">Active, non-deceased dependents linked to members.</div>
+                            @if (activeDependentCount == 0)
+                            {
+                                <div class="text-muted small">No dependents captured yet.</div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small">Active, non-deceased dependents linked to members.</div>
+                            }
                         </div>
                         <div class="burial-readiness-card">
-                            <div class="detail-mini-label">Monthly Contributions Expected</div>
+                            <div class="detail-mini-label">Expected Monthly Contributions</div>
                             <div class="burial-readiness-value">@FormatZAR(monthlyContributionSummary.ExpectedContributions)</div>
-                            <div class="text-muted small">@DateTime.Today.ToString("MMMM yyyy") expected collections.</div>
+                            @if (monthlyContributionSummary.RecordsGenerated == 0)
+                            {
+                                <div class="text-muted small">No contributions captured for this month.</div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small">@DateTime.Today.ToString("MMMM yyyy") expected collections.</div>
+                            }
                         </div>
                         <div class="burial-readiness-card">
                             <div class="detail-mini-label">Outstanding Contributions</div>
                             <div class="burial-readiness-value">@FormatZAR(totalContributionOutstanding)</div>
                             @if (monthlyContributionSummary.RecordsGenerated == 0)
                             {
-                                <div class="text-muted small">No contribution records generated yet.</div>
+                                <div class="text-muted small">No contributions captured for this month.</div>
                             }
                             else
                             {
@@ -451,22 +470,51 @@ else
                         <div class="burial-readiness-card">
                             <div class="detail-mini-label">Open Claims</div>
                             <div class="burial-readiness-value">@openClaimCount</div>
-                            <a class="sisonke-btn sisonke-btn-outline btn-sm mt-2" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
+                            @if (openClaimCount == 0)
+                            {
+                                <div class="text-muted small">No claims submitted yet.</div>
+                            }
+                            else
+                            {
+                                <a class="sisonke-btn sisonke-btn-outline btn-sm mt-2" href="@($"/secretary-tasks/{StokvelId}")">Review Claims</a>
+                            }
                         </div>
                         <div class="burial-readiness-card">
-                            <div class="detail-mini-label">Claims Awaiting Review</div>
+                            <div class="detail-mini-label">Claims Awaiting Secretary Review</div>
                             <div class="burial-readiness-value">@claimsToReviewCount</div>
-                            <div class="text-muted small">Secretary review queue.</div>
+                            @if (claimsToReviewCount == 0)
+                            {
+                                <div class="text-muted small">No claims awaiting review.</div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small">Secretary review queue.</div>
+                                <a class="sisonke-btn sisonke-btn-outline btn-sm mt-2" href="@($"/secretary-tasks/{StokvelId}")">Review</a>
+                            }
                         </div>
                         <div class="burial-readiness-card">
-                            <div class="detail-mini-label">Claims Awaiting Approval</div>
+                            <div class="detail-mini-label">Claims Awaiting Chairperson Approval</div>
                             <div class="burial-readiness-value">@claimsAwaitingChairpersonApprovalCount</div>
-                            <a class="sisonke-btn sisonke-btn-outline btn-sm mt-2" href="@($"/chairperson-tasks/{StokvelId}")">Open Approvals</a>
+                            @if (claimsAwaitingChairpersonApprovalCount == 0)
+                            {
+                                <div class="text-muted small">No claims awaiting approval.</div>
+                            }
+                            else
+                            {
+                                <a class="sisonke-btn sisonke-btn-outline btn-sm mt-2" href="@($"/chairperson-tasks/{StokvelId}")">Open Approvals</a>
+                            }
                         </div>
                         <div class="burial-readiness-card">
                             <div class="detail-mini-label">Recent Meetings</div>
                             <div class="burial-readiness-value">@recentMeetingCount</div>
-                            <div class="text-muted small">@upcomingMeetingCount upcoming meeting(s).</div>
+                            @if (recentMeetingCount == 0)
+                            {
+                                <div class="text-muted small">No meetings recorded yet.</div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small">@upcomingMeetingCount upcoming meeting(s).</div>
+                            }
                         </div>
                     </div>
                 </div>
@@ -517,7 +565,7 @@ else
                         @if (monthlyContributionSummary.RecordsGenerated == 0)
                         {
                             <div class="sisonke-alert sisonke-alert-blue mt-3 mb-0">
-                                No contribution records generated for this month yet.
+                                No contributions captured for this month.
                             </div>
                         }
                         else
@@ -655,7 +703,7 @@ else
                     @if (monthlyContributionSummary.RecordsGenerated == 0)
                     {
                         <div class="sisonke-alert sisonke-alert-blue mb-0">
-                            No contribution records have been generated for this month yet.
+                            No contributions captured for this month.
                             @if (canManagePayments)
                             {
                                 <div class="mt-2">
@@ -1014,6 +1062,7 @@ else
 @code {
     private Stokvel? stokvel;
     private int memberCount;
+    private int activeMemberCount;
     private int activeDependentCount;
     private decimal expectedMonthlyContributions;
     private decimal outstandingFinesTotal;
@@ -1057,6 +1106,7 @@ else
     {
         isLoading = true;
         memberCount = 0;
+        activeMemberCount = 0;
         activeDependentCount = 0;
         expectedMonthlyContributions = 0;
         outstandingFinesTotal = 0;
@@ -1123,6 +1173,7 @@ else
         memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         memberCount = await MemberService.GetMemberCountByStokvelIdAsync(StokvelId);
+        activeMemberCount = await MemberService.GetActiveMemberCountByStokvelIdAsync(StokvelId);
         activeDependentCount = await MemberService.GetActiveDependentCountByStokvelIdAsync(StokvelId);
         expectedMonthlyContributions = await ContributionService.GetExpectedMonthlyContributionsByStokvelIdAsync(StokvelId);
         monthlyContributionSummary = await ContributionPaymentService.GetMonthlyContributionSummaryAsync(

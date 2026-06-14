@@ -106,31 +106,77 @@ public class QuestionnaireService(ApplicationDbContext context, FineService fine
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 
-        if (stokvel is null)
+        if (stokvel is null) return 0;
+
+        var sections = await GetActiveQuestionnaireAsync();
+
+        var requiredIds = sections
+            .Where(s => IsSetupSectionApplicable(s, stokvel))
+            .SelectMany(s => GetSetupApplicableQuestions(s, stokvel))
+            .Where(q => q.IsRequired)
+            .Select(q => q.Id)
+            .ToList();
+
+        if (requiredIds.Count == 0) return 100;
+
+        var answeredCount = await context.StokvelQuestionnaireAnswers
+            .CountAsync(a =>
+                a.TenantId == stokvel.TenantId &&
+                requiredIds.Contains(a.QuestionnaireQuestionId) &&
+                !string.IsNullOrWhiteSpace(a.AnswerValue));
+
+        return answeredCount * 100 / requiredIds.Count;
+    }
+
+    public async Task<List<string>> GetMissingSetupFieldNamesAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null) return [];
+
+        var sections = await GetActiveQuestionnaireAsync();
+
+        var requiredQuestions = sections
+            .Where(s => IsSetupSectionApplicable(s, stokvel))
+            .SelectMany(s => GetSetupApplicableQuestions(s, stokvel))
+            .Where(q => q.IsRequired)
+            .ToList();
+
+        if (requiredQuestions.Count == 0) return [];
+
+        var requiredIds = requiredQuestions.Select(q => q.Id).ToList();
+
+        var answeredIds = (await context.StokvelQuestionnaireAnswers
+            .Where(a =>
+                a.TenantId == stokvel.TenantId &&
+                requiredIds.Contains(a.QuestionnaireQuestionId) &&
+                !string.IsNullOrWhiteSpace(a.AnswerValue))
+            .Select(a => a.QuestionnaireQuestionId)
+            .ToListAsync())
+            .ToHashSet();
+
+        return requiredQuestions
+            .Where(q => !answeredIds.Contains(q.Id))
+            .Select(q => q.QuestionText)
+            .ToList();
+    }
+
+    private static bool IsSetupSectionApplicable(QuestionnaireSection section, Stokvel stokvel) =>
+        section.Name switch
         {
-            return 0;
-        }
+            "Claims and Payouts" => stokvel.EnableClaims,
+            _ => true
+        };
 
-        var requiredQuestionIds = await context.QuestionnaireQuestions
-            .Where(question =>
-                question.IsActive &&
-                question.IsRequired &&
-                question.QuestionnaireSection.IsActive)
-            .Select(question => question.Id)
-            .ToListAsync();
-
-        if (requiredQuestionIds.Count == 0)
-        {
-            return 100;
-        }
-
-        var answeredRequiredQuestionCount = await context.StokvelQuestionnaireAnswers
-            .CountAsync(answer =>
-                answer.TenantId == stokvel.TenantId &&
-                requiredQuestionIds.Contains(answer.QuestionnaireQuestionId) &&
-                !string.IsNullOrWhiteSpace(answer.AnswerValue));
-
-        return answeredRequiredQuestionCount * 100 / requiredQuestionIds.Count;
+    private static IEnumerable<QuestionnaireQuestion> GetSetupApplicableQuestions(
+        QuestionnaireSection section, Stokvel stokvel)
+    {
+        if (stokvel.EnableDependents && stokvel.EnableClaims)
+            return section.Questions;
+        return section.Questions.Where(q =>
+            !q.QuestionText.Contains("beneficiaries", StringComparison.OrdinalIgnoreCase) &&
+            !q.QuestionText.Contains("dependents", StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task<bool> CanSubmitRegistrationAsync(Guid stokvelId)

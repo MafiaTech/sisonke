@@ -415,7 +415,7 @@ else
             </div>
         </div>
 
-        @if (stokvel?.EnableDependents == true)
+        @if (IsDependentsAvailable)
         {
         <!-- Dependents / covered lives -->
         <div class="col-12">
@@ -432,7 +432,23 @@ else
                                 <i class="bi bi-plus me-1"></i>Add Dependent
                             </a>
                         }
+                        else if (!canManageStokvel)
+                        {
+                            <span class="text-muted small fst-italic">You do not have permission to add covered lives.</span>
+                        }
+                        else if (maxDependents > 0 && dependents.Count >= maxDependents)
+                        {
+                            <span class="text-muted small fst-italic">This member has reached the dependent limit.</span>
+                        }
                     </div>
+
+                    @if (waitingPeriodMonths > 0 && IsDependentsAvailable)
+                    {
+                        <div class="alert alert-info mb-3" role="alert">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Newly added covered lives are subject to a <strong>@waitingPeriodMonths-month waiting period</strong> before claims can be submitted on their behalf.
+                        </div>
+                    }
 
                     @if (maxDependents <= 0)
                     {
@@ -509,7 +525,7 @@ else
                                                         {
                                                             <a class="btn btn-sm btn-outline-secondary" href="@($"/edit-dependent/{dependent.Id}")">Edit</a>
                                                         }
-                                                        @if (stokvel?.EnableClaims == true && (canManageStokvel || isOwnMemberProfile))
+                                                        @if (IsClaimsAvailable && (canManageStokvel || isOwnMemberProfile))
                                                         {
                                                             <a class="btn btn-sm btn-primary" href="@($"/create-claim/{MemberId}?dependentId={dependent.Id}")">Create Claim</a>
                                                         }
@@ -527,7 +543,7 @@ else
         </div>
         }
 
-        @if (stokvel?.Archetype == StokvelArchetype.BurialSociety || stokvel?.EnableClaims == true)
+        @if (IsClaimsAvailable)
         {
         <div class="col-12">
             <div class="card">
@@ -548,7 +564,7 @@ else
                     @if (recentContributionSummaries.Count == 0)
                     {
                         <div class="sisonke-alert sisonke-alert-blue mb-0">
-                            Contribution verification will appear here once payments are captured.
+                            No contributions captured for this month.
                         </div>
                     }
                     else
@@ -578,7 +594,7 @@ else
         <div class="col-12">
             <div class="card">
                 <div class="card-body p-4">
-                    @if (stokvel?.EnableClaims == true)
+                    @if (IsClaimsAvailable)
                     {
                         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
                             <div class="card-section-title mb-0">Claims</div>
@@ -599,7 +615,7 @@ else
 
                         @if (funeralClaims.Count == 0)
                         {
-                            <p class="text-muted small mb-0">No funeral claims captured yet.</p>
+                            <p class="text-muted small mb-0">No claims submitted yet.</p>
                         }
                         else
                         {
@@ -650,7 +666,7 @@ else
                         <AlertBanner
                             Type="warning"
                             Title="Claims are not enabled for this stokvel type."
-                            Message="This group can still use the enabled member, contribution, fine and meeting features."
+                            Message="@GetClaimsDisabledMessage()"
                             Icon="bi bi-exclamation-triangle-fill" />
                     }
                 </div>
@@ -1008,6 +1024,7 @@ else
     private int maxNextOfKin;
     private int maxBeneficiaries;
     private int maxDependents;
+    private int waitingPeriodMonths;
     private bool isLoading = true;
     private bool showGovernanceStatusConfirmation;
     private MemberGovernanceStatus selectedGovernanceStatus = MemberGovernanceStatus.Active;
@@ -1020,6 +1037,10 @@ else
     private bool isOwnMemberProfile;
     private bool canViewFines;
     private bool canViewFinancials;
+    private bool IsClaimsAvailable => stokvel is not null &&
+        (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableClaims);
+    private bool IsDependentsAvailable => stokvel is not null &&
+        (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableDependents);
 
     private int OpenMemberWarningCount => memberWarnings.Count(warning => warning.Status == "Open");
 
@@ -1063,10 +1084,11 @@ else
         maxNextOfKin = stokvel is null ? 0 : await OperatingRuleService.GetMaxNextOfKinAsync(stokvel.Id);
         maxBeneficiaries = stokvel is null ? 0 : await OperatingRuleService.GetMaxBeneficiariesAsync(stokvel.Id);
         maxDependents = stokvel is null ? 0 : await OperatingRuleService.GetMaxDependentsAsync(stokvel.Id);
-        dependents = member is null || stokvel?.EnableDependents != true ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
-        activeDependentClaims = member is null || stokvel?.EnableClaims != true ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
+        waitingPeriodMonths = stokvel is null ? 0 : await OperatingRuleService.GetWaitingPeriodMonthsAsync(stokvel.Id);
+        dependents = member is null || !IsDependentsAvailable ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
+        activeDependentClaims = member is null || !IsClaimsAvailable ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
         memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
-        funeralClaims = member is null || stokvel?.EnableClaims != true ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
+        funeralClaims = member is null || !IsClaimsAvailable ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
         recentContributionSummaries = member is null || stokvel is null || (!canViewFinancials && !isOwnMemberProfile)
             ? []
             : await ContributionPaymentService.GetRecentContributionsByMemberIdAsync(MemberId);
@@ -1094,6 +1116,13 @@ else
     private string GetStokvelDisplayName()
     {
         return stokvel?.Name ?? member?.Tenant.Name ?? "Stokvel";
+    }
+
+    private string GetClaimsDisabledMessage()
+    {
+        return stokvel?.Archetype == StokvelArchetype.Rotational
+            ? "Claims belong to Burial Society workflows. This rotational stokvel can still use members, contributions, meetings and rotation schedule features."
+            : "This group can still use the enabled member, contribution, fine and meeting features.";
     }
 
     private string GetAccountLinkStatusText()

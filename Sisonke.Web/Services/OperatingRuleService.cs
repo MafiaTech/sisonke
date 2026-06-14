@@ -51,9 +51,15 @@ public class OperatingRuleService(ApplicationDbContext context)
             stokvelId,
             "What is the maximum number of dependents allowed per member?");
 
-        return int.TryParse(answer, out var maxDependents)
-            ? maxDependents
-            : 0;
+        if (int.TryParse(answer, out var maxDependents))
+            return maxDependents;
+
+        // No questionnaire answer yet — use a permissive default for stokvels
+        // that have dependents enabled so the Add button is not blocked by missing setup.
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(s => s.Id == stokvelId);
+
+        return stokvel?.EnableDependents == true ? 10 : 0;
     }
 
     public async Task<int> GetWaitingPeriodMonthsAsync(Guid stokvelId)

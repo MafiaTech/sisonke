@@ -51,6 +51,24 @@ public class MemberService(
             .CountAsync(member => member.TenantId == stokvel.TenantId);
     }
 
+    public async Task<int> GetActiveMemberCountByStokvelIdAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return 0;
+        }
+
+        return await context.Members
+            .CountAsync(member =>
+                member.TenantId == stokvel.TenantId &&
+                member.Status == MemberStatus.Active &&
+                member.GovernanceStatus == MemberGovernanceStatus.Active &&
+                !member.IsDeceased);
+    }
+
     public async Task<Member?> AddMemberAsync(Guid stokvelId, Member member)
     {
         if (!await stokvelService.CanAddMemberAsync(stokvelId))
@@ -388,7 +406,7 @@ public class MemberService(
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
 
-        if (stokvel is null || !stokvel.EnableDependents)
+        if (stokvel is null || !IsDependentsAvailable(stokvel))
         {
             return 0;
         }
@@ -413,7 +431,7 @@ public class MemberService(
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.TenantId == member.TenantId);
 
-        if (stokvel is null)
+        if (stokvel is null || !IsDependentsAvailable(stokvel))
         {
             return false;
         }
@@ -587,5 +605,10 @@ public class MemberService(
             or SisonkeRole.Treasurer
             or SisonkeRole.CommitteeMember
             or SisonkeRole.Creator;
+    }
+
+    private static bool IsDependentsAvailable(Stokvel stokvel)
+    {
+        return stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableDependents;
     }
 }
