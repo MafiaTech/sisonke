@@ -152,6 +152,9 @@ else
                                             <i class="bi bi-geo-alt"></i>@DisplayOrDash(meeting.Venue)
                                         </span>
                                         <span class="meeting-card-meta-item">
+                                            <i class="bi bi-person-badge"></i>@(meeting.HostMember is not null ? meeting.HostMember.FullName : "No host assigned")
+                                        </span>
+                                        <span class="meeting-card-meta-item">
                                             <i class="bi bi-list-ul"></i>@meeting.AgendaItems.Count agenda @(meeting.AgendaItems.Count == 1 ? "item" : "items")
                                         </span>
                                     </div>
@@ -317,6 +320,7 @@ else
         return await db.Meetings
             .AsNoTracking()
             .Include(meeting => meeting.AgendaItems)
+            .Include(meeting => meeting.HostMember)
             .Where(meeting => meeting.TenantId == tenantId)
             .OrderByDescending(meeting => meeting.MeetingDate)
             .ToListAsync();

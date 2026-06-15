@@ -602,6 +602,28 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         return memberContribution;
     }
 
+    public async Task<Dictionary<Guid, string?>> GetLatestCapturesByContributionIdsAsync(IEnumerable<Guid> contributionIds)
+    {
+        var ids = contributionIds.ToList();
+
+        if (ids.Count == 0)
+            return [];
+
+        var latestAudits = await context.ContributionPaymentAudits
+            .Include(audit => audit.CapturedByMember)
+            .Where(audit =>
+                ids.Contains(audit.ContributionPaymentId) &&
+                audit.Action != "MarkedOverdue")
+            .OrderByDescending(audit => audit.CreatedAt)
+            .ToListAsync();
+
+        return latestAudits
+            .GroupBy(audit => audit.ContributionPaymentId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().CapturedByMember?.FullName);
+    }
+
     public async Task<List<ContributionPaymentAudit>> GetAuditTrailByContributionPaymentIdAsync(Guid contributionPaymentId)
     {
         return await context.ContributionPaymentAudits

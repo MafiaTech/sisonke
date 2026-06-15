@@ -8,6 +8,7 @@
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
@@ -118,6 +119,64 @@ else
         </div>
     }
 
+    @if (monthSummary.RecordsGenerated > 0)
+    {
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3">
+                    <div>
+                        <h2>@SelectedPeriodLabel Summary</h2>
+                        <p>Contribution collection overview for this period.</p>
+                    </div>
+                    <span class="sisonke-badge @(monthSummary.CollectionRatePercentage >= 100 ? "sisonke-badge-green" : monthSummary.CollectionRatePercentage >= 50 ? "sisonke-badge-gold" : "sisonke-badge-red")">
+                        @monthSummary.CollectionRatePercentage.ToString("0.#")% Collected
+                    </span>
+                </div>
+                <div class="burial-readiness-grid">
+                    <div class="burial-readiness-card">
+                        <div class="detail-mini-label">Expected This Month</div>
+                        <div class="burial-readiness-value">@FormatZAR(monthSummary.ExpectedContributions)</div>
+                        <div class="text-muted small">@monthSummary.ActiveMemberCount active member(s) × @FormatZAR(monthSummary.MonthlyContributionAmount)</div>
+                    </div>
+                    <div class="burial-readiness-card">
+                        <div class="detail-mini-label">Received This Month</div>
+                        <div class="burial-readiness-value">@FormatZAR(monthSummary.ActualContributions)</div>
+                        <div class="text-muted small">@monthSummary.PaidCount member(s) fully paid.</div>
+                    </div>
+                    <div class="burial-readiness-card">
+                        <div class="detail-mini-label">Outstanding</div>
+                        <div class="burial-readiness-value">@FormatZAR(monthSummary.OutstandingContributions)</div>
+                        @if (monthSummary.OutstandingContributions == 0)
+                        {
+                            <div class="text-muted small">No outstanding contributions for this month.</div>
+                        }
+                        else
+                        {
+                            <div class="text-muted small">@monthSummary.OverdueCount overdue record(s).</div>
+                        }
+                    </div>
+                    <div class="burial-readiness-card">
+                        <div class="detail-mini-label">Members Paid</div>
+                        <div class="burial-readiness-value">@monthSummary.PaidCount</div>
+                        <div class="text-muted small">of @monthSummary.RecordsGenerated records.</div>
+                    </div>
+                    <div class="burial-readiness-card">
+                        <div class="detail-mini-label">Members Unpaid</div>
+                        <div class="burial-readiness-value">@(monthSummary.UnpaidCount + monthSummary.OverdueCount + monthSummary.PartiallyPaidCount)</div>
+                        @if (monthSummary.UnpaidCount + monthSummary.OverdueCount + monthSummary.PartiallyPaidCount == 0)
+                        {
+                            <div class="text-muted small">All members have paid for this period.</div>
+                        }
+                        else
+                        {
+                            <div class="text-muted small">@monthSummary.OverdueCount overdue · @monthSummary.PartiallyPaidCount partial.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     <div class="sisonke-card">
         <div class="sisonke-card-body">
             <div class="sisonke-card-head">
@@ -147,6 +206,7 @@ else
                                 <th>Balance</th>
                                 <th>Status</th>
                                 <th>Paid Date</th>
+                                <th>Captured By</th>
                                 <th>Payment Reference</th>
                                 <th>Audit</th>
                                 @if (canManagePayments)
@@ -169,6 +229,9 @@ else
                                     <td>@FormatZAR(contribution.OutstandingAmount)</td>
                                     <td><span class="@GetPaymentStatusBadgeClass(contribution.Status)">@GetPaymentStatusText(contribution.Status)</span></td>
                                     <td>@(contribution.FullyPaidDate?.ToString("dd MMM yyyy") ?? "-")</td>
+                                    <td class="text-muted small">
+                                        @(capturesByContributionId.TryGetValue(contribution.Id, out var capturedBy) && !string.IsNullOrWhiteSpace(capturedBy) ? capturedBy : "-")
+                                    </td>
                                     <td>
                                         @if (canManagePayments && canCaptureThisPayment)
                                         {
@@ -221,6 +284,8 @@ else
     private int selectedYear = DateTime.Today.Year;
     private List<MemberContribution> contributions = [];
     private readonly Dictionary<Guid, ContributionPaymentInput> paymentInputs = new();
+    private ContributionMonthSummaryDto monthSummary = new();
+    private Dictionary<Guid, string?> capturesByContributionId = new();
     private string? successMessage;
     private string? warningMessage;
 
@@ -272,6 +337,8 @@ else
         successMessage = null;
         warningMessage = null;
         contributions = await ContributionPaymentService.GetMonthlyContributionsAsync(StokvelId, selectedYear, selectedMonth);
+        monthSummary = await ContributionPaymentService.GetMonthlyContributionSummaryAsync(StokvelId, selectedYear, selectedMonth);
+        capturesByContributionId = await ContributionPaymentService.GetLatestCapturesByContributionIdsAsync(contributions.Select(c => c.Id));
         SyncPaymentInputs();
     }
 

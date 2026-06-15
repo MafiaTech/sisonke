@@ -65,6 +65,9 @@ else
                         <span class="meeting-detail-meta-item">
                             <i class="bi bi-geo-alt"></i>@DisplayOrDash(meeting.Venue)
                         </span>
+                        <span class="meeting-detail-meta-item">
+                            <i class="bi bi-person-badge"></i>Host: @(meeting.HostMember?.FullName ?? "Not assigned")
+                        </span>
                     </div>
                     <p class="meeting-detail-purpose">
                         <span class="meeting-detail-purpose-label">Purpose</span>

@@ -19,8 +19,28 @@ public class MeetingService(ApplicationDbContext context)
 
         return await context.Meetings
             .Include(meeting => meeting.AgendaItems)
+            .Include(meeting => meeting.HostMember)
             .Where(meeting => meeting.TenantId == stokvel.TenantId)
             .OrderByDescending(meeting => meeting.MeetingDate)
+            .ToListAsync();
+    }
+
+    public async Task<List<Member>> GetActiveMembersForHostSelectionAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        return await context.Members
+            .Where(member =>
+                member.TenantId == stokvel.TenantId &&
+                member.Status == MemberStatus.Active &&
+                !member.IsDeceased)
+            .OrderBy(member => member.FullName)
             .ToListAsync();
     }
 
@@ -29,6 +49,7 @@ public class MeetingService(ApplicationDbContext context)
         var meeting = await context.Meetings
             .Include(existingMeeting => existingMeeting.Tenant)
             .Include(existingMeeting => existingMeeting.AgendaItems)
+            .Include(existingMeeting => existingMeeting.HostMember)
             .SingleOrDefaultAsync(existingMeeting => existingMeeting.Id == meetingId);
 
         if (meeting is null)
@@ -48,7 +69,8 @@ public class MeetingService(ApplicationDbContext context)
         string title,
         DateTime meetingDate,
         string? venue,
-        string? purpose)
+        string? purpose,
+        Guid? hostMemberId = null)
     {
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
@@ -63,6 +85,8 @@ public class MeetingService(ApplicationDbContext context)
             return null;
         }
 
+        var resolvedHostMemberId = await ResolveHostMemberIdAsync(stokvel.TenantId, hostMemberId);
+
         var meeting = new Meeting
         {
             Id = Guid.NewGuid(),
@@ -71,6 +95,7 @@ public class MeetingService(ApplicationDbContext context)
             MeetingDate = meetingDate,
             Venue = venue,
             Purpose = purpose,
+            HostMemberId = resolvedHostMemberId,
             Status = MeetingStatus.Planned,
             CreatedAt = DateTime.UtcNow,
             AgendaItems = BuildDefaultAgendaItems(stokvel.Type)
@@ -87,7 +112,8 @@ public class MeetingService(ApplicationDbContext context)
         string title,
         DateTime meetingDate,
         string? venue,
-        string? purpose)
+        string? purpose,
+        Guid? hostMemberId = null)
     {
         var meeting = await context.Meetings
             .SingleOrDefaultAsync(existingMeeting => existingMeeting.Id == meetingId);
@@ -109,14 +135,34 @@ public class MeetingService(ApplicationDbContext context)
             return null;
         }
 
+        var resolvedHostMemberId = await ResolveHostMemberIdAsync(meeting.TenantId, hostMemberId);
+
         meeting.Title = title;
         meeting.MeetingDate = meetingDate;
         meeting.Venue = venue;
         meeting.Purpose = purpose;
+        meeting.HostMemberId = resolvedHostMemberId;
 
         await context.SaveChangesAsync();
 
         return meeting;
+    }
+
+    private async Task<Guid?> ResolveHostMemberIdAsync(Guid tenantId, Guid? hostMemberId)
+    {
+        if (hostMemberId is null)
+        {
+            return null;
+        }
+
+        var exists = await context.Members
+            .AnyAsync(member =>
+                member.Id == hostMemberId &&
+                member.TenantId == tenantId &&
+                member.Status == MemberStatus.Active &&
+                !member.IsDeceased);
+
+        return exists ? hostMemberId : null;
     }
 
     public async Task<bool> DeleteMeetingAsync(Guid meetingId)
@@ -151,6 +197,27 @@ public class MeetingService(ApplicationDbContext context)
                 meeting.TenantId == stokvel.TenantId &&
                 meeting.MeetingDate.Date == meetingDate.Date &&
                 meeting.Status != MeetingStatus.Cancelled);
+    }
+
+    public async Task<Meeting?> GetNextUpcomingMeetingAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return null;
+        }
+
+        return await context.Meetings
+            .Include(meeting => meeting.HostMember)
+            .Where(meeting =>
+                meeting.TenantId == stokvel.TenantId &&
+                meeting.MeetingDate >= DateTime.Today &&
+                meeting.Status != MeetingStatus.Cancelled &&
+                meeting.Status != MeetingStatus.Completed)
+            .OrderBy(meeting => meeting.MeetingDate)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<int> GetUpcomingMeetingCountByStokvelIdAsync(Guid stokvelId)

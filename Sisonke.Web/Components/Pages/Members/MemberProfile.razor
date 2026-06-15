@@ -426,15 +426,15 @@ else
                             <div class="card-section-title mb-1">Dependents / Covered Lives</div>
                             <div class="text-muted small">Dependents captured: @dependents.Count of @maxDependents</div>
                         </div>
-                        @if (canManageStokvel && maxDependents > 0 && dependents.Count < maxDependents)
+                        @if ((canManageStokvel || isOwnMemberProfile) && maxDependents > 0 && dependents.Count < maxDependents)
                         {
                             <a class="btn btn-sm btn-primary" href="@($"/add-dependent/{MemberId}")">
-                                <i class="bi bi-plus me-1"></i>Add Dependent
+                                <i class="bi bi-plus me-1"></i>Add Covered Life
                             </a>
                         }
-                        else if (!canManageStokvel)
+                        else if (!canManageStokvel && !isOwnMemberProfile)
                         {
-                            <span class="text-muted small fst-italic">You do not have permission to add covered lives.</span>
+                            <span class="text-muted small fst-italic">You can only add covered lives to your own profile.</span>
                         }
                         else if (maxDependents > 0 && dependents.Count >= maxDependents)
                         {
@@ -465,7 +465,11 @@ else
 
                     @if (dependents.Count == 0)
                     {
-                        <p class="text-muted small mb-0">No dependents captured yet.</p>
+                        <p class="text-muted small @(isOwnMemberProfile ? "mb-1" : "mb-0")">No dependents captured yet.</p>
+                        @if (isOwnMemberProfile)
+                        {
+                            <p class="text-muted small mb-0">Add your covered lives so the society has accurate funeral cover records.</p>
+                        }
                     }
                     else
                     {

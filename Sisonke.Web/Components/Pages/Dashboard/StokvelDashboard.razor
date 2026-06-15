@@ -358,8 +358,15 @@ else
                         </div>
                         <div class="executive-task-card task-accent-green">
                             <div class="detail-mini-label">Contributions to Capture</div>
-                            <div class="executive-task-count text-muted">Soon</div>
-                            <p class="text-muted small mb-3">Contribution capture workflow is coming soon.</p>
+                            <div class="executive-task-count">@(monthlyContributionSummary.UnpaidCount + monthlyContributionSummary.OverdueCount + monthlyContributionSummary.PartiallyPaidCount)</div>
+                            @if (monthlyContributionSummary.RecordsGenerated == 0)
+                            {
+                                <p class="text-muted small mb-3">Generate monthly records to begin capture.</p>
+                            }
+                            else
+                            {
+                                <p class="text-muted small mb-3">@monthlyContributionSummary.PaidCount of @monthlyContributionSummary.RecordsGenerated paid · @FormatZAR(monthlyContributionSummary.ActualContributions) collected.</p>
+                            }
                             <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/contribution-capture/{StokvelId}")">Capture Contributions</a>
                         </div>
                         @if (stokvel.EnableClaims)
@@ -509,11 +516,24 @@ else
                             <div class="burial-readiness-value">@recentMeetingCount</div>
                             @if (recentMeetingCount == 0)
                             {
-                                <div class="text-muted small">No meetings recorded yet.</div>
+                                <div class="text-muted small">No recent meetings recorded yet.</div>
                             }
                             else
                             {
                                 <div class="text-muted small">@upcomingMeetingCount upcoming meeting(s).</div>
+                            }
+                        </div>
+                        <div class="burial-readiness-card">
+                            <div class="detail-mini-label">Next Meeting Host</div>
+                            @if (nextMeeting is null)
+                            {
+                                <div class="burial-readiness-value text-muted">—</div>
+                                <div class="text-muted small">No upcoming meetings scheduled.</div>
+                            }
+                            else
+                            {
+                                <div class="burial-readiness-value" style="font-size:1.05rem">@(nextMeeting.HostMember?.FullName ?? "Not assigned")</div>
+                                <div class="text-muted small">@nextMeeting.MeetingDate.ToString("dd MMM yyyy")</div>
                             }
                         </div>
                     </div>
@@ -905,7 +925,23 @@ else
                         </div>
                         <p class="stat-value">@upcomingMeetingCount</p>
                         <p class="stat-detail">Upcoming meetings</p>
-                        <p class="text-muted small mt-3 mb-0">Manage meetings, set agendas, vote on items and log all decisions in one place.</p>
+                        @if (nextMeeting is not null)
+                        {
+                            <div class="mt-3">
+                                <div class="detail-mini-label">Next Meeting</div>
+                                <div class="detail-mini-value">@nextMeeting.MeetingDate.ToString("dd MMM yyyy")</div>
+                                @if (!string.IsNullOrWhiteSpace(nextMeeting.Venue))
+                                {
+                                    <div class="text-muted small">@nextMeeting.Venue</div>
+                                }
+                                <div class="detail-mini-label mt-2">Meeting Host</div>
+                                <div class="detail-mini-value">@(nextMeeting.HostMember?.FullName ?? "Not assigned")</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted small mt-3 mb-0">No upcoming meetings scheduled.</p>
+                        }
                         <a class="btn btn-purple btn-sm mt-3" href="@($"/meetings/{StokvelId}")">
                             <i class="bi bi-calendar-event me-1"></i>Open Meetings
                         </a>
@@ -1068,6 +1104,7 @@ else
     private decimal outstandingFinesTotal;
     private int upcomingMeetingCount;
     private int recentMeetingCount;
+    private Meeting? nextMeeting;
     private int openClaimCount;
     private int openVoteCount;
     private int closedVoteCount;
@@ -1112,6 +1149,7 @@ else
         outstandingFinesTotal = 0;
         upcomingMeetingCount = 0;
         recentMeetingCount = 0;
+        nextMeeting = null;
         openClaimCount = 0;
         openVoteCount = 0;
         closedVoteCount = 0;
@@ -1186,6 +1224,7 @@ else
         outstandingFineCount = await FineService.GetOutstandingFineCountByStokvelIdAsync(StokvelId);
         upcomingMeetingCount = await MeetingService.GetUpcomingMeetingCountByStokvelIdAsync(StokvelId);
         recentMeetingCount = await MeetingService.GetRecentMeetingCountByStokvelIdAsync(StokvelId);
+        nextMeeting = await MeetingService.GetNextUpcomingMeetingAsync(StokvelId);
         pendingApologyCount = await MeetingApologyService.GetPendingApologyCountByStokvelIdAsync(StokvelId);
         openClaimCount = await FuneralClaimService.GetOpenClaimCountByStokvelIdAsync(StokvelId);
         claimsToReviewCount = await FuneralClaimService.GetClaimsRequiringSecretaryReviewCountByStokvelIdAsync(StokvelId);

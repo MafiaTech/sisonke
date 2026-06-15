@@ -262,6 +262,27 @@ public class MemberAccessService(ApplicationDbContext context)
             .AnyAsync(member => member.Id == memberId && member.ApplicationUserId == userId);
     }
 
+    public async Task<bool> CanManageOwnDependentsAsync(string userId, Guid memberId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return false;
+
+        var member = await context.Members
+            .FirstOrDefaultAsync(m => m.Id == memberId && m.ApplicationUserId == userId);
+
+        if (member is null)
+            return false;
+
+        if (member.GovernanceStatus == MemberGovernanceStatus.Expelled || member.IsDeceased)
+            return false;
+
+        var stokvel = await context.Stokvels
+            .FirstOrDefaultAsync(s => s.TenantId == member.TenantId);
+
+        return stokvel is not null &&
+            (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableDependents);
+    }
+
     public async Task<bool> CanViewMemberProfileAsync(string userId, Guid memberId)
     {
         if (string.IsNullOrWhiteSpace(userId))

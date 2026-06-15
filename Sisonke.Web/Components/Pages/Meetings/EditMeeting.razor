@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
 @inject MeetingService MeetingService
@@ -14,6 +15,7 @@
 @inject MemberAccessService MemberAccessService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
+@inject MemberService MemberService
 
 <PageTitle>Edit Meeting</PageTitle>
 
@@ -73,6 +75,25 @@ else
                             <InputText id="venue" class="form-control" @bind-Value="model.Venue" />
                         </div>
 
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="host-member">Meeting host</label>
+                            @if (activeMembers.Count == 0)
+                            {
+                                <div class="form-control-plaintext text-muted small">No active members available to host the meeting.</div>
+                            }
+                            else
+                            {
+                                <InputSelect id="host-member" class="form-select" @bind-Value="model.HostMemberId">
+                                    <option value="">— No host selected —</option>
+                                    @foreach (var member in activeMembers)
+                                    {
+                                        <option value="@member.Id">@member.FullName</option>
+                                    }
+                                </InputSelect>
+                                <div class="form-text">Only Secretary can assign or change the meeting host.</div>
+                            }
+                        </div>
+
                         <div class="col-12">
                             <label class="form-label" for="purpose">Purpose</label>
                             <InputTextArea id="purpose" class="form-control" rows="4" @bind-Value="model.Purpose" />
@@ -94,6 +115,7 @@ else
 @code {
     private Meeting? meeting;
     private Stokvel? stokvel;
+    private List<Member> activeMembers = [];
     private EditMeetingModel model = new();
     private bool isLoading = true;
     private bool canManageMeetings;
@@ -117,6 +139,11 @@ else
 
                 canManageMeetings = !string.IsNullOrWhiteSpace(userId) &&
                     await MemberAccessService.CanManageMeetingsAsync(userId, stokvel.Id);
+
+                if (canManageMeetings)
+                {
+                    activeMembers = await MeetingService.GetActiveMembersForHostSelectionAsync(stokvel.Id);
+                }
             }
 
             model = new EditMeetingModel
@@ -124,7 +151,8 @@ else
                 Title = meeting.Title,
                 MeetingDate = meeting.MeetingDate,
                 Venue = meeting.Venue,
-                Purpose = meeting.Purpose
+                Purpose = meeting.Purpose,
+                HostMemberId = meeting.HostMemberId
             };
         }
 
@@ -146,7 +174,8 @@ else
             model.Title,
             model.MeetingDate,
             model.Venue,
-            model.Purpose);
+            model.Purpose,
+            model.HostMemberId == Guid.Empty ? null : model.HostMemberId);
 
         if (updatedMeeting is null)
         {
@@ -170,5 +199,7 @@ else
 
         [MaxLength(500)]
         public string? Purpose { get; set; }
+
+        public Guid? HostMemberId { get; set; }
     }
 }

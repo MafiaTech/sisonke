@@ -24,6 +24,9 @@ public class Meeting
     [MaxLength(500)]
     public string? Purpose { get; set; }
 
+    public Guid? HostMemberId { get; set; }
+    public Member? HostMember { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<MeetingAgendaItem> AgendaItems { get; set; } = new List<MeetingAgendaItem>();

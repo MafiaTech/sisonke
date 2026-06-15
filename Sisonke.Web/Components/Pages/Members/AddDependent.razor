@@ -46,8 +46,8 @@ else if (!canManageDependents)
 {
     <AlertBanner
         Type="warning"
-        Title="You do not have permission to add dependents for this member."
-        Message="Dependent records are managed by society office bearers."
+        Title="You can only manage covered lives linked to your own profile."
+        Message="Office bearers can add covered lives for any member. Ordinary members can only add covered lives to their own profile."
         Icon="bi bi-exclamation-triangle-fill" />
 
     <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">
@@ -74,6 +74,14 @@ else
         </a>
     </div>
 
+    @if (saveBlockedByOwnership)
+    {
+        <AlertBanner
+            Type="danger"
+            Title="Action not permitted."
+            Message="You can only add covered lives to your own member profile."
+            Icon="bi bi-x-circle-fill" />
+    }
     @if (saveFailed)
     {
         <AlertBanner
@@ -178,12 +186,14 @@ else
 
     private Member? member;
     private Stokvel? stokvel;
+    private string? userId;
     private MemberDependent model = new()
     {
         Relationship = "Child"
     };
     private bool isLoading = true;
     private bool saveFailed;
+    private bool saveBlockedByOwnership;
     private bool canManageDependents;
     private bool IsDependentsAvailable => stokvel is not null &&
         (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableDependents);
@@ -195,13 +205,24 @@ else
     {
         member = await MemberService.GetMemberByIdAsync(MemberId);
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
-        canManageDependents = await CanManageDependentsAsync();
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!string.IsNullOrWhiteSpace(userId) && stokvel is not null)
+        {
+            var isOfficeBearer = await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
+            var isOwnMember = await MemberAccessService.CanManageOwnDependentsAsync(userId, MemberId);
+            canManageDependents = isOfficeBearer || isOwnMember;
+        }
+
         isLoading = false;
     }
 
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
+        saveBlockedByOwnership = false;
 
         if (!IsDependentsAvailable)
         {
@@ -209,9 +230,19 @@ else
             return;
         }
 
-        if (!canManageDependents)
+        // Server-side ownership gate — re-verify at submit time, never trust UI state alone
+        if (string.IsNullOrWhiteSpace(userId))
         {
-            saveFailed = true;
+            saveBlockedByOwnership = true;
+            return;
+        }
+
+        var isOfficeBearerNow = stokvel is not null && await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
+        var isOwnMemberNow = await MemberAccessService.CanManageOwnDependentsAsync(userId, MemberId);
+
+        if (!isOfficeBearerNow && !isOwnMemberNow)
+        {
+            saveBlockedByOwnership = true;
             return;
         }
 
@@ -233,20 +264,6 @@ else
         }
 
         NavigationManager.NavigateTo($"/member-profile/{MemberId}");
-    }
-
-    private async Task<bool> CanManageDependentsAsync()
-    {
-        if (stokvel is null)
-        {
-            return false;
-        }
-
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return !string.IsNullOrWhiteSpace(userId) &&
-            await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id);
     }
 
     private string GetDependentsDisabledMessage()
