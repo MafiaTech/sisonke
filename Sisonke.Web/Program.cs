@@ -486,7 +486,9 @@ internal static class RegistrationSubmitEndpoint
             FullName = input.FullName?.Trim(),
             IdNumber = input.IdNumber?.Trim(),
             CellphoneNumber = input.CellphoneNumber?.Trim(),
-            ResidentialArea = input.ResidentialArea?.Trim()
+            ResidentialArea = input.ResidentialArea?.Trim(),
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "SelfRegistration"
         };
 
         await userStore.SetUserNameAsync(user, email, CancellationToken.None);

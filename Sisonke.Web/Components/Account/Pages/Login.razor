@@ -239,6 +239,20 @@
 
         if (result.Succeeded)
         {
+            try
+            {
+                var loggedInUser = await UserManager.FindByEmailAsync(Input.Email);
+                if (loggedInUser is not null)
+                {
+                    loggedInUser.LastLoginAt = DateTime.UtcNow;
+                    loggedInUser.LastLoginIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+                    await UserManager.UpdateAsync(loggedInUser);
+                }
+            }
+            catch
+            {
+                // audit update failure must not block login
+            }
             Logger.LogInformation("User logged in.");
             RedirectManager.RedirectTo(GetPostLoginRedirectUrl());
         }
