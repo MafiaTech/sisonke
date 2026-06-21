@@ -1,0 +1,142 @@
+@page "/stokvel/loans-wallet/{StokvelId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+@inject LoansWalletService Service
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Loans &amp; Wallet</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state"><span class="spinner-border spinner-border-sm me-2"></span>Loading loans and surplus wallet…</div>
+}
+else if (state is null)
+{
+    <div class="alert alert-warning">Stokvel or linked membership not found.</div>
+}
+else if (state.Stokvel.Archetype == StokvelArchetype.BurialSociety)
+{
+    <div class="alert alert-warning">Loans and surplus withdrawals are not available for Burial Societies.</div>
+}
+else
+{
+    <div class="page-header"><div><h1>Loans &amp; Wallet</h1><p class="text-muted mb-0">@state.Stokvel.Name</p></div><a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a></div>
+    @if (errors.Count > 0) { <div class="alert alert-danger">@string.Join(" ", errors)</div> }
+    @if (!string.IsNullOrWhiteSpace(success)) { <div class="alert alert-success">@success</div> }
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4"><div class="sisonke-card h-100"><div class="sisonke-card-body"><div class="detail-mini-label">Loan eligibility</div><div class="fw-semibold">@state.EligibilityMessage</div></div></div></div>
+        <div class="col-md-4"><div class="sisonke-card h-100"><div class="sisonke-card-body"><div class="detail-mini-label">Available surplus</div><div class="h4 mb-0">@Money(state.Wallet?.AvailableBalance ?? 0)</div></div></div></div>
+        <div class="col-md-4"><div class="sisonke-card h-100"><div class="sisonke-card-body"><div class="detail-mini-label">Active loan</div><div class="fw-semibold">@(MyActiveLoan is null ? "None" : $"{Money(MyActiveLoan.OutstandingBalance)} outstanding")</div></div></div></div>
+    </div>
+
+    @if (state.CanConfigure)
+    {
+        <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>Loan Configuration</h2>
+            <EditForm Model="configForm" OnValidSubmit="SaveConfigurationAsync"><div class="row g-3">
+                <div class="col-md-3 form-check ms-2"><InputCheckbox class="form-check-input" @bind-Value="configForm.LoansEnabled" /><label class="form-check-label">Loans enabled</label></div>
+                <div class="col-md-3"><label class="form-label">Minimum amount</label><InputNumber class="form-control" @bind-Value="configForm.MinLoanAmount" /></div>
+                <div class="col-md-3"><label class="form-label">Maximum amount</label><InputNumber class="form-control" @bind-Value="configForm.MaxLoanAmount" /></div>
+                <div class="col-md-3"><label class="form-label">Maximum months</label><InputNumber class="form-control" @bind-Value="configForm.MaxRepaymentMonths" /></div>
+                <div class="col-md-3"><label class="form-label">Default months</label><InputNumber class="form-control" @bind-Value="configForm.DefaultRepaymentMonths" /></div>
+                <div class="col-md-3"><label class="form-label">Interest type</label><InputSelect class="form-select" @bind-Value="configForm.LoanInterestType"><option value="@LoanInterestType.None">None</option><option value="@LoanInterestType.FixedAmount">Fixed amount</option><option value="@LoanInterestType.Percentage">Percentage</option></InputSelect></div>
+                <div class="col-md-3"><label class="form-label">Interest amount/rate</label><InputNumber class="form-control" @bind-Value="configForm.LoanInterestRate" /></div>
+                <div class="col-md-3"><label class="form-label">Grace days</label><InputNumber class="form-control" @bind-Value="configForm.GracePeriodDays" /></div>
+                <div class="col-md-3"><label class="form-label">Late fine type</label><InputSelect class="form-select" @bind-Value="configForm.LateRepaymentFineType"><option value="@LatePenaltyType.None">None</option><option value="@LatePenaltyType.FixedAmount">Fixed amount</option><option value="@LatePenaltyType.Percentage">Percentage</option></InputSelect></div>
+                <div class="col-md-3"><label class="form-label">Late fine amount/rate</label><InputNumber class="form-control" @bind-Value="configForm.LateRepaymentFineAmount" /></div>
+                <div class="col-md-3"><label class="form-label">Freeze period days</label><InputNumber class="form-control" @bind-Value="configForm.FreezePeriodAfterFullRepaymentDays" /></div>
+            </div><button class="btn btn-primary mt-3" type="submit">Save Loan Rules</button></EditForm>
+        </div></section>
+    }
+    else if (state.Configuration is not null)
+    {
+        <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>Loan Rules</h2><p>@Money(state.Configuration.MinLoanAmount) – @Money(state.Configuration.MaxLoanAmount), up to @state.Configuration.MaxRepaymentMonths months. Freeze after repayment: @state.Configuration.FreezePeriodAfterFullRepaymentDays days.</p></div></section>
+    }
+
+    @if (state.EligibilityMessage.StartsWith("Eligible", StringComparison.OrdinalIgnoreCase))
+    {
+        <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>Request Loan</h2><div class="row g-3">
+            <div class="col-md-3"><label class="form-label">Amount</label><InputNumber class="form-control" @bind-Value="loanAmount" /></div>
+            <div class="col-md-3"><label class="form-label">Repayment months</label><InputNumber class="form-control" @bind-Value="loanMonths" /></div>
+            <div class="col-md-6"><label class="form-label">Reason</label><InputText class="form-control" @bind-Value="loanReason" /></div>
+        </div><div class="text-muted mt-2">Estimated monthly repayment: @Money(EstimatedMonthly)</div><button class="btn btn-primary mt-3" @onclick="RequestLoanAsync">Submit Loan Request</button></div></section>
+    }
+
+    <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>@(state.CanViewAll ? "Loan Requests & Active Loans" : "My Loans")</h2>
+        @if (state.Loans.Count == 0) { <div class="text-muted">No loan records.</div> }
+        else { <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Member</th><th>Requested</th><th>Approved</th><th>Months</th><th>Status</th><th>Outstanding</th><th></th></tr></thead><tbody>
+            @foreach (var loan in state.Loans) { <tr><td>@loan.Member.FullName</td><td>@Money(loan.RequestedAmount)</td><td>@Money(loan.ApprovedAmount ?? 0)</td><td>@loan.RepaymentMonths</td><td>@loan.LoanStatus</td><td>@Money(loan.OutstandingBalance)</td><td class="text-end">
+                @if (state.CanApprove && loan.LoanStatus == MemberLoanStatus.PendingApproval) { <button class="btn btn-sm btn-primary me-1" @onclick="() => OpenLoanApproval(loan)">Approve</button><button class="btn btn-sm btn-outline-danger" @onclick="() => OpenLoanRejection(loan)">Reject</button> }
+                @if (state.CanConfirmMoney && loan.LoanStatus == MemberLoanStatus.DisbursementPending) { <button class="btn btn-sm btn-primary" @onclick="() => OpenDisbursement(loan)">Confirm Disbursement</button> }
+            </td></tr> }
+        </tbody></table></div> }
+    </div></section>
+
+    <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>Loan Repayment Register</h2>
+        @if (state.Repayments.Count == 0) { <div class="text-muted">No repayment schedule yet.</div> }
+        else { <div class="table-responsive"><table class="table"><thead><tr><th>Due</th><th>Expected</th><th>Paid</th><th>Fine</th><th>Status</th><th></th></tr></thead><tbody>@foreach (var repayment in state.Repayments) { <tr><td>@repayment.DueDate.ToString("dd MMM yyyy")</td><td>@Money(repayment.ExpectedAmount)</td><td>@Money(repayment.PaidAmount)</td><td>@Money(repayment.FineAmount)</td><td>@(repayment.PaymentStatus == LoanRepaymentStatus.Pending && repayment.DueDate.Date < DateTime.Today ? "Overdue" : repayment.PaymentStatus.ToString())</td><td>@if (state.CanConfirmMoney && repayment.PaymentStatus is not (LoanRepaymentStatus.Paid or LoanRepaymentStatus.Waived)) { <button class="btn btn-sm btn-primary" @onclick="() => OpenRepayment(repayment)">Confirm Repayment</button> }</td></tr> }</tbody></table></div> }
+    </div></section>
+
+    <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>My Surplus Wallet</h2><div class="row"><div class="col-md-4"><strong>Available:</strong> @Money(state.Wallet?.AvailableBalance ?? 0)</div><div class="col-md-4"><strong>Total credited:</strong> @Money(state.Wallet?.TotalCredits ?? 0)</div><div class="col-md-4"><strong>Total withdrawn:</strong> @Money(state.Wallet?.TotalWithdrawals ?? 0)</div></div>
+        @if ((state.Wallet?.AvailableBalance ?? 0) > 0) { <div class="row g-2 mt-2"><div class="col-md-3"><InputNumber class="form-control" @bind-Value="withdrawalAmount" placeholder="Amount" /></div><div class="col-md-6"><InputText class="form-control" @bind-Value="withdrawalReason" placeholder="Reason" /></div><div class="col-md-3"><button class="btn btn-primary" @onclick="RequestWithdrawalAsync">Request Withdrawal</button></div></div> }
+        @if (state.Transactions.Count > 0) { <h3 class="h6 mt-3">Recent transactions</h3><ul class="list-group">@foreach (var tx in state.Transactions) { <li class="list-group-item d-flex justify-content-between"><span>@tx.TransactionType · @tx.Description</span><span>@Money(tx.Amount) · Balance @Money(tx.BalanceAfterTransaction)</span></li> }</ul> }
+    </div></section>
+
+    <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>@(state.CanViewAll ? "Surplus Withdrawal Requests" : "My Withdrawal Requests")</h2>
+        @if (state.Withdrawals.Count == 0) { <div class="text-muted">No withdrawal requests.</div> }
+        else { <div class="table-responsive"><table class="table"><thead><tr><th>Member</th><th>Amount</th><th>Status</th><th>Reason</th><th></th></tr></thead><tbody>@foreach (var item in state.Withdrawals) { <tr><td>@item.Member.FullName</td><td>@Money(item.RequestedAmount)</td><td>@item.WithdrawalStatus</td><td>@item.RequestReason</td><td>@if (state.CanApprove && item.WithdrawalStatus == SurplusWithdrawalStatus.PendingApproval) { <button class="btn btn-sm btn-primary me-1" @onclick="() => ApproveWithdrawalAsync(item.Id)">Approve</button><button class="btn btn-sm btn-outline-danger" @onclick="() => OpenWithdrawalRejection(item)">Reject</button> } @if (state.CanConfirmMoney && item.WithdrawalStatus == SurplusWithdrawalStatus.PaymentPending) { <button class="btn btn-sm btn-primary" @onclick="() => OpenWithdrawalPayment(item)">Confirm Paid</button> }</td></tr> }</tbody></table></div> }
+    </div></section>
+}
+
+@if (dialogKind is not null)
+{
+    <div class="modal d-block" style="background:rgba(0,0,0,.45)" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5>@dialogTitle</h5></div><div class="modal-body">
+        @if (dialogKind == "loan-approve") { <label>Approved amount</label><InputNumber class="form-control mb-2" @bind-Value="actionAmount" /><label>Repayment months</label><InputNumber class="form-control" @bind-Value="actionMonths" /> }
+        else if (dialogKind is "loan-reject" or "withdraw-reject") { <label>Rejection reason</label><InputTextArea class="form-control" @bind-Value="actionReason" /> }
+        else if (dialogKind is "disburse" or "withdraw-pay" or "repayment")
+        {
+            @if (dialogKind == "repayment") { <label>Paid amount</label><InputNumber class="form-control mb-2" @bind-Value="actionAmount" /> }
+            <div class="mb-2"><label>Payment method</label><InputSelect class="form-select" @bind-Value="actionMethod"><option value="@PaymentMethod.EFT">EFT</option><option value="@PaymentMethod.Cash">Cash</option><option value="@PaymentMethod.BankDeposit">Bank deposit</option><option value="@PaymentMethod.Other">Other</option></InputSelect></div>
+            <div class="mb-2"><label>Reference</label><InputText class="form-control" @bind-Value="actionReference" /></div>
+            <div class="mb-2"><label>Date</label><InputDate class="form-control" @bind-Value="actionDate" /></div>
+            <div><label>Notes</label><InputTextArea class="form-control" @bind-Value="actionNotes" /></div>
+            @if (dialogKind == "repayment") { <div class="form-check mt-2"><InputCheckbox class="form-check-input" @bind-Value="actionApplyFine" /><label class="form-check-label">Apply suggested late fine</label></div><div class="form-check"><InputCheckbox class="form-check-input" @bind-Value="actionWaive" /><label class="form-check-label">Waive repayment</label></div> }
+        }
+    </div><div class="modal-footer"><button class="btn btn-outline-secondary" @onclick="CloseDialog">Cancel</button><button class="btn btn-primary" @onclick="SubmitDialogAsync">Confirm</button></div></div></div></div>
+}
+
+@code {
+    [Parameter] public Guid StokvelId { get; set; }
+    private LoansWalletPageState? state; private bool isLoading = true; private string currentUserId = ""; private List<string> errors = []; private string? success;
+    private StokvelLoanConfiguration configForm = NewConfig();
+    private decimal loanAmount; private int loanMonths = 1; private string loanReason = ""; private decimal withdrawalAmount; private string withdrawalReason = "";
+    private string? dialogKind; private string dialogTitle = ""; private Guid actionId; private decimal actionAmount; private int actionMonths; private string actionReason = ""; private PaymentMethod? actionMethod = PaymentMethod.EFT; private string actionReference = ""; private DateTime? actionDate = DateTime.Today; private string actionNotes = ""; private bool actionApplyFine; private bool actionWaive;
+    private MemberLoan? MyActiveLoan => state?.Loans.FirstOrDefault(x => x.MemberId == state.CurrentMember?.Id && x.LoanStatus is MemberLoanStatus.Active or MemberLoanStatus.Overdue);
+    private decimal EstimatedMonthly => loanMonths <= 0 ? 0 : Math.Round(loanAmount / loanMonths, 2);
+
+    protected override async Task OnParametersSetAsync() { isLoading = true; var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync(); currentUserId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? ""; await ReloadAsync(); isLoading = false; }
+    private async Task ReloadAsync() { state = await Service.GetPageStateAsync(StokvelId, currentUserId); if (state?.Configuration is not null) configForm = Clone(state.Configuration); else configForm = NewConfig(); loanMonths = state?.Configuration?.DefaultRepaymentMonths ?? 1; }
+    private async Task RunAsync(Task<FinanceOperationResult> task, string message) { errors = []; success = null; var result = await task; errors = result.Errors; if (result.Success) { success = message; CloseDialog(); await ReloadAsync(); } }
+    private async Task SaveConfigurationAsync() { var r = await Service.SaveConfigurationAsync(StokvelId, configForm, currentUserId); errors = r.Errors; if (r.Success) { success = "Loan rules saved."; await ReloadAsync(); } }
+    private Task RequestLoanAsync() => RunAsync(Service.RequestLoanAsync(StokvelId, currentUserId, loanAmount, loanMonths, loanReason), "Loan request submitted.");
+    private Task RequestWithdrawalAsync() => RunAsync(Service.RequestWithdrawalAsync(StokvelId, currentUserId, withdrawalAmount, withdrawalReason), "Withdrawal request submitted.");
+    private Task ApproveWithdrawalAsync(Guid id) => RunAsync(Service.ApproveWithdrawalAsync(id, currentUserId), "Withdrawal approved for payment.");
+    private void OpenLoanApproval(MemberLoan x) { dialogKind = "loan-approve"; dialogTitle = "Approve Loan"; actionId = x.Id; actionAmount = x.RequestedAmount; actionMonths = x.RepaymentMonths; }
+    private void OpenLoanRejection(MemberLoan x) { dialogKind = "loan-reject"; dialogTitle = "Reject Loan"; actionId = x.Id; actionReason = ""; }
+    private void OpenDisbursement(MemberLoan x) { dialogKind = "disburse"; dialogTitle = "Confirm Loan Disbursement"; actionId = x.Id; ResetPayment(); }
+    private void OpenRepayment(MemberLoanRepayment x) { dialogKind = "repayment"; dialogTitle = "Confirm Loan Repayment"; actionId = x.Id; actionAmount = x.ExpectedAmount; ResetPayment(); }
+    private void OpenWithdrawalRejection(MemberSurplusWithdrawalRequest x) { dialogKind = "withdraw-reject"; dialogTitle = "Reject Surplus Withdrawal"; actionId = x.Id; actionReason = ""; }
+    private void OpenWithdrawalPayment(MemberSurplusWithdrawalRequest x) { dialogKind = "withdraw-pay"; dialogTitle = "Confirm Surplus Withdrawal Paid"; actionId = x.Id; ResetPayment(); }
+    private void ResetPayment() { actionMethod = PaymentMethod.EFT; actionReference = ""; actionDate = DateTime.Today; actionNotes = ""; actionApplyFine = false; actionWaive = false; }
+    private void CloseDialog() => dialogKind = null;
+    private async Task SubmitDialogAsync() { if (dialogKind == "loan-approve") await RunAsync(Service.ApproveLoanAsync(actionId, currentUserId, actionAmount, actionMonths), "Loan approved."); else if (dialogKind == "loan-reject") await RunAsync(Service.RejectLoanAsync(actionId, currentUserId, actionReason), "Loan rejected."); else if (dialogKind == "disburse") await RunAsync(Service.ConfirmDisbursementAsync(actionId, currentUserId, actionMethod, actionReference, actionDate, actionNotes), "Loan disbursed and repayment schedule generated."); else if (dialogKind == "repayment") await RunAsync(Service.ConfirmRepaymentAsync(actionId, currentUserId, actionAmount, actionDate, actionMethod, actionReference, actionWaive, actionApplyFine, actionNotes), "Repayment confirmed."); else if (dialogKind == "withdraw-reject") await RunAsync(Service.RejectWithdrawalAsync(actionId, currentUserId, actionReason), "Withdrawal rejected."); else if (dialogKind == "withdraw-pay") await RunAsync(Service.ConfirmWithdrawalPaidAsync(actionId, currentUserId, actionMethod, actionReference, actionDate, actionNotes), "Withdrawal payment confirmed."); }
+    private static string Money(decimal x) => x.ToString("C2", new System.Globalization.CultureInfo("en-ZA"));
+    private static StokvelLoanConfiguration NewConfig() => new() { LoansEnabled = false, MinLoanAmount = 0, MaxLoanAmount = 5000, MaxRepaymentMonths = 12, DefaultRepaymentMonths = 6, FreezePeriodAfterFullRepaymentDays = 30, RequireChairpersonApproval = true, RequireTreasurerDisbursementConfirmation = true };
+    private static StokvelLoanConfiguration Clone(StokvelLoanConfiguration x) => new() { LoansEnabled = x.LoansEnabled, MinLoanAmount = x.MinLoanAmount, MaxLoanAmount = x.MaxLoanAmount, MaxRepaymentMonths = x.MaxRepaymentMonths, DefaultRepaymentMonths = x.DefaultRepaymentMonths, LoanInterestType = x.LoanInterestType, LoanInterestRate = x.LoanInterestRate, LateRepaymentFineType = x.LateRepaymentFineType, LateRepaymentFineAmount = x.LateRepaymentFineAmount, GracePeriodDays = x.GracePeriodDays, FreezePeriodAfterFullRepaymentDays = x.FreezePeriodAfterFullRepaymentDays, RequireChairpersonApproval = true, RequireTreasurerDisbursementConfirmation = true };
+}

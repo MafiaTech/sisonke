@@ -163,8 +163,9 @@ public class StokvelService(
         await using var context = await dbFactory.CreateDbContextAsync();
 
         return await context.Stokvels
+            .AsNoTracking()
             .Include(stokvel => stokvel.Tenant)
-            .Where(stokvel => stokvel.IsActive)
+            .Where(stokvel => stokvel.IsActive && !stokvel.IsDeleted)
             .OrderBy(stokvel => stokvel.Name)
             .ToListAsync();
     }
@@ -174,10 +175,112 @@ public class StokvelService(
         await using var context = await dbFactory.CreateDbContextAsync();
 
         return await context.Stokvels
+            .AsNoTracking()
             .Include(stokvel => stokvel.Tenant)
             .SingleOrDefaultAsync(stokvel =>
                 stokvel.Id == stokvelId &&
-                stokvel.IsActive);
+                stokvel.IsActive &&
+                !stokvel.IsDeleted);
+    }
+
+    public async Task<Stokvel?> GetStokvelForSettingsAsync(Guid stokvelId)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        return await context.Stokvels
+            .AsNoTracking()
+            .Include(stokvel => stokvel.Tenant)
+            .SingleOrDefaultAsync(stokvel => stokvel.Id == stokvelId);
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateStokvelDetailsAsync(
+        Guid stokvelId,
+        string name,
+        string? description,
+        string? province,
+        string? townOrArea,
+        DateTime? establishedDate,
+        int? expectedMemberCount,
+        string currentUserId)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (false, "Stokvel name is required.");
+        }
+
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(s => s.Id == stokvelId && s.IsActive && !s.IsDeleted);
+
+        if (stokvel is null)
+        {
+            return (false, "Stokvel not found.");
+        }
+
+        var trimmedName = name.Trim();
+
+        var nameConflict = await context.Stokvels
+            .AnyAsync(s =>
+                s.Id != stokvelId &&
+                s.TenantId == stokvel.TenantId &&
+                s.Name == trimmedName &&
+                !s.IsDeleted);
+
+        if (nameConflict)
+        {
+            return (false, "A stokvel with that name already exists.");
+        }
+
+        stokvel.Name = trimmedName;
+        stokvel.Description = description?.Trim();
+        stokvel.Province = province?.Trim();
+        stokvel.TownOrArea = townOrArea?.Trim();
+        stokvel.EstablishedDate = establishedDate;
+        stokvel.ExpectedMemberCount = expectedMemberCount;
+        stokvel.UpdatedAt = DateTime.UtcNow;
+        stokvel.UpdatedBy = currentUserId;
+
+        await context.SaveChangesAsync();
+
+        return (true, null);
+    }
+
+    public async Task<(bool Success, string? Error)> SoftDeleteStokvelAsync(
+        Guid stokvelId,
+        string currentUserId,
+        string deleteReason,
+        string confirmationName)
+    {
+        if (string.IsNullOrWhiteSpace(deleteReason))
+        {
+            return (false, "A reason for deletion is required.");
+        }
+
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(s => s.Id == stokvelId && !s.IsDeleted);
+
+        if (stokvel is null)
+        {
+            return (false, "Stokvel not found.");
+        }
+
+        if (!string.Equals(confirmationName.Trim(), stokvel.Name, StringComparison.Ordinal))
+        {
+            return (false, "The stokvel name you entered does not match. Deletion cancelled.");
+        }
+
+        stokvel.IsDeleted = true;
+        stokvel.IsActive = false;
+        stokvel.DeletedAt = DateTime.UtcNow;
+        stokvel.DeletedBy = currentUserId;
+        stokvel.DeleteReason = deleteReason.Trim();
+
+        await context.SaveChangesAsync();
+
+        return (true, null);
     }
 
     public async Task<Stokvel?> GetStokvelByTenantIdAsync(Guid tenantId)

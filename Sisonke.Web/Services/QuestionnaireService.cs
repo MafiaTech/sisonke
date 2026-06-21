@@ -1,14 +1,48 @@
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
+using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
 public class QuestionnaireService(ApplicationDbContext context, FineService fineService)
 {
+    public async Task<List<QuestionnaireSection>> GetActiveQuestionnaireForStokvelAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .AsNoTracking()
+            .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        var selectedType = GetQuestionnaireStokvelType(stokvel);
+        var sections = await GetActiveQuestionnaireAsync();
+
+        return sections
+            .Select(section => new QuestionnaireSection
+            {
+                Id = section.Id,
+                Name = section.Name,
+                Description = section.Description,
+                DisplayOrder = section.DisplayOrder,
+                IsActive = section.IsActive,
+                Questions = section.Questions
+                    .Where(question => IsQuestionApplicableToStokvelType(question, selectedType))
+                    .OrderBy(question => question.DisplayOrder)
+                    .ToList()
+            })
+            .Where(section => IsSetupSectionApplicable(section, stokvel) && section.Questions.Any())
+            .OrderBy(section => section.DisplayOrder)
+            .ToList();
+    }
+
     public async Task<List<QuestionnaireSection>> GetActiveQuestionnaireAsync()
     {
         var sections = await context.QuestionnaireSections
+            .AsNoTracking()
             .Where(section => section.IsActive)
             .Include(section => section.Questions
                 .Where(question => question.IsActive)
@@ -46,6 +80,7 @@ public class QuestionnaireService(ApplicationDbContext context, FineService fine
     public async Task<Dictionary<Guid, string>> GetAnswersByStokvelIdAsync(Guid stokvelId)
     {
         var stokvel = await context.Stokvels
+            .AsNoTracking()
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 
         if (stokvel is null)
@@ -53,8 +88,51 @@ public class QuestionnaireService(ApplicationDbContext context, FineService fine
             return [];
         }
 
+        var applicableQuestionIds = (await GetActiveQuestionnaireForStokvelAsync(stokvelId))
+            .SelectMany(section => section.Questions)
+            .Select(question => question.Id)
+            .ToHashSet();
+
+        if (applicableQuestionIds.Count == 0)
+        {
+            return [];
+        }
+
         return await context.StokvelQuestionnaireAnswers
-            .Where(answer => answer.TenantId == stokvel.TenantId)
+            .AsNoTracking()
+            .Where(answer =>
+                answer.TenantId == stokvel.TenantId &&
+                applicableQuestionIds.Contains(answer.QuestionnaireQuestionId))
+            .ToDictionaryAsync(
+                answer => answer.QuestionnaireQuestionId,
+                answer => answer.AnswerValue);
+    }
+
+    public async Task<Dictionary<Guid, string>> GetAnswersByStokvelIdAsync(
+        Guid stokvelId,
+        IReadOnlyCollection<Guid> applicableQuestionIds)
+    {
+        if (applicableQuestionIds.Count == 0)
+        {
+            return [];
+        }
+
+        var tenantId = await context.Stokvels
+            .AsNoTracking()
+            .Where(stokvel => stokvel.Id == stokvelId)
+            .Select(stokvel => (Guid?)stokvel.TenantId)
+            .SingleOrDefaultAsync();
+
+        if (tenantId is null)
+        {
+            return [];
+        }
+
+        return await context.StokvelQuestionnaireAnswers
+            .AsNoTracking()
+            .Where(answer =>
+                answer.TenantId == tenantId.Value &&
+                applicableQuestionIds.Contains(answer.QuestionnaireQuestionId))
             .ToDictionaryAsync(
                 answer => answer.QuestionnaireQuestionId,
                 answer => answer.AnswerValue);
@@ -70,14 +148,23 @@ public class QuestionnaireService(ApplicationDbContext context, FineService fine
             return false;
         }
 
-        var questionIds = answers.Keys.ToList();
+        var applicableQuestionIds = (await GetActiveQuestionnaireForStokvelAsync(stokvelId))
+            .SelectMany(section => section.Questions)
+            .Select(question => question.Id)
+            .ToHashSet();
+
+        var filteredAnswers = answers
+            .Where(answer => applicableQuestionIds.Contains(answer.Key))
+            .ToDictionary(answer => answer.Key, answer => answer.Value);
+
+        var questionIds = filteredAnswers.Keys.ToList();
         var existingAnswers = await context.StokvelQuestionnaireAnswers
             .Where(answer =>
                 answer.TenantId == stokvel.TenantId &&
                 questionIds.Contains(answer.QuestionnaireQuestionId))
             .ToDictionaryAsync(answer => answer.QuestionnaireQuestionId);
 
-        foreach (var answer in answers)
+        foreach (var answer in filteredAnswers)
         {
             if (existingAnswers.TryGetValue(answer.Key, out var existingAnswer))
             {
@@ -108,11 +195,10 @@ public class QuestionnaireService(ApplicationDbContext context, FineService fine
 
         if (stokvel is null) return 0;
 
-        var sections = await GetActiveQuestionnaireAsync();
+        var sections = await GetActiveQuestionnaireForStokvelAsync(stokvelId);
 
         var requiredIds = sections
-            .Where(s => IsSetupSectionApplicable(s, stokvel))
-            .SelectMany(s => GetSetupApplicableQuestions(s, stokvel))
+            .SelectMany(s => s.Questions)
             .Where(q => q.IsRequired)
             .Select(q => q.Id)
             .ToList();
@@ -135,11 +221,10 @@ public class QuestionnaireService(ApplicationDbContext context, FineService fine
 
         if (stokvel is null) return [];
 
-        var sections = await GetActiveQuestionnaireAsync();
+        var sections = await GetActiveQuestionnaireForStokvelAsync(stokvelId);
 
         var requiredQuestions = sections
-            .Where(s => IsSetupSectionApplicable(s, stokvel))
-            .SelectMany(s => GetSetupApplicableQuestions(s, stokvel))
+            .SelectMany(s => s.Questions)
             .Where(q => q.IsRequired)
             .ToList();
 
@@ -165,19 +250,34 @@ public class QuestionnaireService(ApplicationDbContext context, FineService fine
     private static bool IsSetupSectionApplicable(QuestionnaireSection section, Stokvel stokvel) =>
         section.Name switch
         {
-            "Claims and Payouts" => stokvel.EnableClaims,
+            "Claims and Payouts"  => stokvel.EnableClaims,
+            "Rotational Basics"   => stokvel.EnableRotation,
+            "Rotational Payouts"  => stokvel.EnableRotation,
+            "Rotational Order"    => stokvel.EnableRotation,
+            "Rotational Sign-off" => stokvel.EnableRotation,
             _ => true
         };
 
-    private static IEnumerable<QuestionnaireQuestion> GetSetupApplicableQuestions(
-        QuestionnaireSection section, Stokvel stokvel)
-    {
-        if (stokvel.EnableDependents && stokvel.EnableClaims)
-            return section.Questions;
-        return section.Questions.Where(q =>
-            !q.QuestionText.Contains("beneficiaries", StringComparison.OrdinalIgnoreCase) &&
-            !q.QuestionText.Contains("dependents", StringComparison.OrdinalIgnoreCase));
-    }
+    public static StokvelType GetQuestionnaireStokvelType(Stokvel stokvel) =>
+        stokvel.Archetype switch
+        {
+            StokvelArchetype.BurialSociety  => StokvelType.BurialSociety,
+            StokvelArchetype.Rotational     => StokvelType.RotationalStokvel,
+            StokvelArchetype.Grocery        => StokvelType.GroceryStokvel,
+            StokvelArchetype.InvestmentClub => StokvelType.InvestmentStokvel,
+            StokvelArchetype.Borrowing      => StokvelType.LoanStokvel,
+            StokvelArchetype.SocialClub     => StokvelType.SocialClub,
+            StokvelArchetype.SavingsClub or
+            StokvelArchetype.Education or
+            StokvelArchetype.Travel         => StokvelType.SavingsStokvel,
+            _                               => stokvel.Type
+        };
+
+    public static bool IsQuestionApplicableToStokvelType(
+        QuestionnaireQuestion question,
+        StokvelType selectedType) =>
+        question.IsActive &&
+        (question.StokvelType is null || question.StokvelType == selectedType);
 
     public async Task<bool> CanSubmitRegistrationAsync(Guid stokvelId)
     {

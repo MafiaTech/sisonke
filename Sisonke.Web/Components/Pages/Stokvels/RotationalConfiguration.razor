@@ -1,0 +1,620 @@
+@page "/rotational-configuration/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject MemberAccessService MemberAccessService
+@inject RotationalConfigurationService RotationalConfigurationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Rotational Configuration</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading configuration…
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
+    <a class="sisonke-btn sisonke-btn-outline mt-3" href="/my-workspace">
+        <i class="bi bi-arrow-left me-2"></i>Back to Workspace
+    </a>
+}
+else if (!stokvel.EnableRotation)
+{
+    <AlertBanner
+        Type="warning"
+        Title="Rotation is not enabled for this stokvel."
+        Message="Only Rotational Stokvel archetypes support rotational configuration."
+        Icon="bi bi-exclamation-triangle-fill" />
+    <a class="sisonke-btn sisonke-btn-outline mt-3" href="@($"/stokvel-dashboard/{StokvelId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+    </a>
+}
+else
+{
+    <PageHeader
+        Title="Rotational Configuration"
+        Subtitle="@stokvel.Name"
+        BackText="Dashboard"
+        BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
+
+    @if (saveSuccess)
+    {
+        <AlertBanner Type="success" Title="Configuration saved successfully." Message="" Icon="bi bi-check-circle-fill" />
+    }
+
+    @if (customErrors.Count > 0)
+    {
+        <div class="sisonke-alert sisonke-alert-red mb-3">
+            <ul class="mb-0 ps-3">
+                @foreach (var err in customErrors)
+                {
+                    <li>@err</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (!isEditing)
+    {
+        @if (activeConfig is null)
+        {
+            @if (canEdit)
+            {
+                <div class="sisonke-hero-card mb-4">
+                    <div>
+                        <span class="sisonke-badge sisonke-badge-gold">Setup Required</span>
+                        <h1 class="mt-2">No Configuration Yet</h1>
+                        <p>Create the rotational configuration to define contribution rules, payout settings and rotation order for this stokvel.</p>
+                    </div>
+                    <button class="sisonke-btn sisonke-btn-primary" @onclick="StartCreate">
+                        <i class="bi bi-plus-circle me-2"></i>Create Configuration
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="sisonke-card mb-4">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-alert sisonke-alert-blue mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            This stokvel has not been configured yet. Please ask an office bearer to complete the rotational configuration.
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head mb-3">
+                        <div>
+                            <span class="sisonke-badge sisonke-badge-green">Active Configuration</span>
+                            <h2 class="mt-2">Contribution Rules</h2>
+                        </div>
+                        @if (canEdit)
+                        {
+                            <button class="sisonke-btn sisonke-btn-outline" @onclick="StartEdit">
+                                <i class="bi bi-pencil me-2"></i>Edit Configuration
+                            </button>
+                        }
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Contribution Amount</div>
+                            <div class="detail-mini-value">@FormatZAR(activeConfig.ContributionAmount)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Frequency</div>
+                            <div class="detail-mini-value">@activeConfig.ContributionFrequency</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">@GetDueDayLabel(activeConfig.ContributionFrequency)</div>
+                            <div class="detail-mini-value">@activeConfig.ContributionDueDay</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Rotation Start Date</div>
+                            <div class="detail-mini-value">@activeConfig.RotationStartDate.ToString("dd MMM yyyy")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <h2 class="mb-3">Payout Rules</h2>
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Payout Amount</div>
+                            <div class="detail-mini-value">@FormatZAR(activeConfig.PayoutAmount)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Payout Frequency</div>
+                            <div class="detail-mini-value">@activeConfig.PayoutFrequency</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Rotation Order</div>
+                            <div class="detail-mini-value">@GetOrderMethodLabel(activeConfig.RotationOrderMethod)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Allow Turn Swap</div>
+                            <div class="detail-mini-value">@(activeConfig.AllowPayoutTurnSwap ? "Yes" : "No")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <h2 class="mb-3">Penalties &amp; Risk Controls</h2>
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Late Penalty</div>
+                            <div class="detail-mini-value">
+                                @if (activeConfig.LatePenaltyType == LatePenaltyType.None)
+                                {
+                                    <span>None</span>
+                                }
+                                else if (activeConfig.LatePenaltyType == LatePenaltyType.FixedAmount)
+                                {
+                                    <span>@FormatZAR(activeConfig.LatePenaltyAmount ?? 0) fixed</span>
+                                }
+                                else
+                                {
+                                    <span>@activeConfig.LatePenaltyAmount%</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Grace Period</div>
+                            <div class="detail-mini-value">@activeConfig.GracePeriodDays day(s)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Min Balance Before Payout</div>
+                            <div class="detail-mini-value">@FormatZAR(activeConfig.MinimumBalanceBeforePayout)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Missed Contribution Blocks Payout</div>
+                            <div class="detail-mini-value">@(activeConfig.MissedContributionBlocksPayout ? "Yes" : "No")</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Treasurer Confirmation</div>
+                            <div class="detail-mini-value">@(activeConfig.TreasurerConfirmationRequired ? "Required" : "Not required")</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-muted small">
+                        Configured @activeConfig.CreatedAt.ToString("dd MMM yyyy, HH:mm") UTC
+                        @if (!string.IsNullOrWhiteSpace(activeConfig.UpdatedBy))
+                        {
+                            <span class="ms-2">· Last updated @activeConfig.UpdatedAt?.ToString("dd MMM yyyy") UTC</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <EditForm Model="formModel" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <h2 class="mb-3">Contribution Rules</h2>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Contribution Amount (ZAR) <span class="text-danger">*</span></label>
+                            <InputNumber class="form-control" @bind-Value="formModel.ContributionAmount" min="0.01" step="0.01" />
+                            <ValidationMessage For="() => formModel.ContributionAmount" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Frequency <span class="text-danger">*</span></label>
+                            <InputSelect class="form-select" @bind-Value="formModel.ContributionFrequency" @bind-Value:after="OnFrequencyChanged">
+                                @foreach (var freq in Enum.GetValues<RotationalFrequency>())
+                                {
+                                    <option value="@freq">@freq</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">@GetDueDayLabel(formModel.ContributionFrequency) <span class="text-danger">*</span></label>
+                            <InputNumber class="form-control" @bind-Value="formModel.ContributionDueDay" min="1" max="@(formModel.ContributionFrequency == RotationalFrequency.Monthly ? 28 : 7)" />
+                            <div class="form-text">@GetDueDayHint(formModel.ContributionFrequency)</div>
+                            <ValidationMessage For="() => formModel.ContributionDueDay" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <h2 class="mb-3">Payout Rules</h2>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Payout Amount (ZAR) <span class="text-danger">*</span></label>
+                            <InputNumber class="form-control" @bind-Value="formModel.PayoutAmount" min="0.01" step="0.01" />
+                            <ValidationMessage For="() => formModel.PayoutAmount" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Payout Frequency <span class="text-danger">*</span></label>
+                            <InputSelect class="form-select" @bind-Value="formModel.PayoutFrequency">
+                                @foreach (var freq in Enum.GetValues<RotationalFrequency>())
+                                {
+                                    <option value="@freq">@freq</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Rotation Start Date <span class="text-danger">*</span></label>
+                            <InputDate class="form-control" @bind-Value="formModel.RotationStartDate" />
+                            <ValidationMessage For="() => formModel.RotationStartDate" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <h2 class="mb-3">Rotation Settings</h2>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Rotation Order Method <span class="text-danger">*</span></label>
+                            <InputSelect class="form-select" @bind-Value="formModel.RotationOrderMethod">
+                                @foreach (var method in Enum.GetValues<RotationOrderMethod>())
+                                {
+                                    <option value="@method">@GetOrderMethodLabel(method)</option>
+                                }
+                            </InputSelect>
+                            <div class="form-text">Determines how the payout order is assigned to members.</div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold d-block">Allow Payout Turn Swap</label>
+                            <div class="form-check form-switch mt-2">
+                                <InputCheckbox class="form-check-input" @bind-Value="formModel.AllowPayoutTurnSwap" id="allowSwap" />
+                                <label class="form-check-label" for="allowSwap">Members may swap their payout turn with another member</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <h2 class="mb-3">Penalties &amp; Risk Controls</h2>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Late Payment Penalty</label>
+                            <InputSelect class="form-select" @bind-Value="formModel.LatePenaltyType" @bind-Value:after="OnPenaltyTypeChanged">
+                                <option value="@LatePenaltyType.None">None</option>
+                                <option value="@LatePenaltyType.FixedAmount">Fixed Amount (ZAR)</option>
+                                <option value="@LatePenaltyType.Percentage">Percentage of contribution (%)</option>
+                            </InputSelect>
+                        </div>
+                        @if (formModel.LatePenaltyType != LatePenaltyType.None)
+                        {
+                            <div class="col-12 col-md-4">
+                                <label class="form-label fw-semibold">
+                                    @(formModel.LatePenaltyType == LatePenaltyType.Percentage ? "Penalty %" : "Penalty Amount (ZAR)")
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <InputNumber class="form-control" @bind-Value="formModel.LatePenaltyAmount"
+                                             min="0.01"
+                                             max="@(formModel.LatePenaltyType == LatePenaltyType.Percentage ? 100 : 1000000)"
+                                             step="0.01" />
+                            </div>
+                        }
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Grace Period (Days)</label>
+                            <InputNumber class="form-control" @bind-Value="formModel.GracePeriodDays" min="0" max="30" />
+                            <div class="form-text">Days after due date before a penalty applies.</div>
+                            <ValidationMessage For="() => formModel.GracePeriodDays" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Minimum Balance Before Payout (ZAR)</label>
+                            <InputNumber class="form-control" @bind-Value="formModel.MinimumBalanceBeforePayout" min="0" step="0.01" />
+                            <div class="form-text">Group balance required before a payout is released.</div>
+                            <ValidationMessage For="() => formModel.MinimumBalanceBeforePayout" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold d-block">Missed Contribution Blocks Payout</label>
+                            <div class="form-check form-switch mt-2">
+                                <InputCheckbox class="form-check-input" @bind-Value="formModel.MissedContributionBlocksPayout" id="missedBlocks" />
+                                <label class="form-check-label" for="missedBlocks">Block a member's payout if they missed contributions</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold d-block">Treasurer Confirmation Required</label>
+                            <div class="form-check form-switch mt-2">
+                                <InputCheckbox class="form-check-input" @bind-Value="formModel.TreasurerConfirmationRequired" id="treasurerConfirm" />
+                                <label class="form-check-label" for="treasurerConfirm">Treasurer must confirm before payout is released</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap mb-4">
+                <button type="submit" class="sisonke-btn sisonke-btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-floppy-fill me-2"></i>
+                    }
+                    @(editingConfigId.HasValue ? "Update Configuration" : "Save Configuration")
+                </button>
+                <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="CancelEdit" disabled="@isSaving">
+                    <i class="bi bi-x me-2"></i>Cancel
+                </button>
+            </div>
+        </EditForm>
+    }
+}
+
+<ConfirmationModal
+    IsVisible="showConfirmModal"
+    Title="@confirmModalTitle"
+    Message="@confirmModalMessage"
+    ConfirmButtonText="Yes, Save"
+    CancelButtonText="Cancel"
+    ModalType="warning"
+    OnConfirm="ConfirmSave"
+    OnCancel="CancelConfirm" />
+
+@code {
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    private Stokvel? stokvel;
+    private RotationalStokvelConfiguration? activeConfig;
+    private bool isLoading = true;
+    private bool isEditing;
+    private bool isSaving;
+    private bool canEdit;
+    private bool saveSuccess;
+    private Guid? editingConfigId;
+
+    private ConfigFormModel formModel = new();
+    private List<string> customErrors = [];
+
+    private bool showConfirmModal;
+    private string confirmModalTitle = string.Empty;
+    private string confirmModalMessage = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        saveSuccess = false;
+        isEditing = false;
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+
+        if (stokvel is not null)
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            canEdit = await MemberAccessService.IsOfficeBearerAsync(userId, StokvelId);
+            activeConfig = await RotationalConfigurationService.GetActiveConfigurationAsync(StokvelId);
+        }
+
+        isLoading = false;
+    }
+
+    private void StartCreate()
+    {
+        formModel = new ConfigFormModel();
+        editingConfigId = null;
+        customErrors = [];
+        saveSuccess = false;
+        isEditing = true;
+    }
+
+    private void StartEdit()
+    {
+        if (activeConfig is null) return;
+        formModel = ConfigFormModel.From(activeConfig);
+        editingConfigId = activeConfig.Id;
+        customErrors = [];
+        saveSuccess = false;
+        isEditing = true;
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        customErrors = [];
+    }
+
+    private void OnFrequencyChanged()
+    {
+        formModel.ContributionDueDay = 1;
+    }
+
+    private void OnPenaltyTypeChanged()
+    {
+        if (formModel.LatePenaltyType == LatePenaltyType.None)
+            formModel.LatePenaltyAmount = null;
+    }
+
+    private void HandleValidSubmit()
+    {
+        customErrors = ValidateForm();
+        if (customErrors.Count > 0) return;
+
+        confirmModalTitle = editingConfigId.HasValue
+            ? "Update Rotational Configuration"
+            : "Save Rotational Configuration";
+        confirmModalMessage = editingConfigId.HasValue
+            ? "Are you sure you want to update this configuration? The existing configuration will remain in history."
+            : "Are you sure you want to save this configuration? Any previous active configuration will be deactivated.";
+
+        showConfirmModal = true;
+    }
+
+    private async Task ConfirmSave()
+    {
+        showConfirmModal = false;
+        isSaving = true;
+        customErrors = [];
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            var entity = formModel.ToEntity();
+
+            if (editingConfigId.HasValue)
+                await RotationalConfigurationService.UpdateConfigurationAsync(editingConfigId.Value, entity, userId);
+            else
+                await RotationalConfigurationService.SaveConfigurationAsync(StokvelId, entity, userId);
+
+            activeConfig = await RotationalConfigurationService.GetActiveConfigurationAsync(StokvelId);
+            isEditing = false;
+            saveSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            customErrors = [$"Failed to save configuration: {ex.Message}"];
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void CancelConfirm() => showConfirmModal = false;
+
+    private List<string> ValidateForm()
+    {
+        var errors = new List<string>();
+
+        if (formModel.ContributionAmount <= 0)
+            errors.Add("Contribution amount must be greater than R 0.");
+
+        if (formModel.PayoutAmount <= 0)
+            errors.Add("Payout amount must be greater than R 0.");
+
+        int maxDueDay = formModel.ContributionFrequency == RotationalFrequency.Monthly ? 28 : 7;
+        if (formModel.ContributionDueDay < 1 || formModel.ContributionDueDay > maxDueDay)
+            errors.Add($"Contribution due day must be between 1 and {maxDueDay} for {formModel.ContributionFrequency} frequency.");
+
+        if (formModel.LatePenaltyType != LatePenaltyType.None)
+        {
+            if (!formModel.LatePenaltyAmount.HasValue || formModel.LatePenaltyAmount.Value <= 0)
+                errors.Add("A penalty amount greater than 0 is required when a penalty type is selected.");
+
+            if (formModel.LatePenaltyType == LatePenaltyType.Percentage &&
+                formModel.LatePenaltyAmount.HasValue && formModel.LatePenaltyAmount.Value > 100)
+                errors.Add("Percentage penalty cannot exceed 100%.");
+        }
+
+        return errors;
+    }
+
+    private static string GetDueDayLabel(RotationalFrequency frequency) =>
+        frequency == RotationalFrequency.Monthly ? "Day of Month (1–28)" : "Day of Week (1=Mon, 7=Sun)";
+
+    private static string GetDueDayHint(RotationalFrequency frequency) =>
+        frequency == RotationalFrequency.Monthly
+            ? "Day 1–28 on which contributions are due each month."
+            : "1 = Monday through 7 = Sunday.";
+
+    private static string GetOrderMethodLabel(RotationOrderMethod method) => method switch
+    {
+        RotationOrderMethod.Manual => "Manual (set by admin)",
+        RotationOrderMethod.ByJoiningDate => "By Joining Date (oldest member first)",
+        RotationOrderMethod.Random => "Random (drawn at rotation start)",
+        _ => method.ToString()
+    };
+
+    private static string FormatZAR(decimal amount) => $"R {amount:N2}";
+
+    private class ConfigFormModel
+    {
+        [Range(0.01, 1_000_000, ErrorMessage = "Contribution amount must be greater than 0.")]
+        public decimal ContributionAmount { get; set; }
+
+        public RotationalFrequency ContributionFrequency { get; set; } = RotationalFrequency.Monthly;
+
+        [Range(1, 28, ErrorMessage = "Due day must be between 1 and 28.")]
+        public int ContributionDueDay { get; set; } = 1;
+
+        [Range(0.01, 1_000_000, ErrorMessage = "Payout amount must be greater than 0.")]
+        public decimal PayoutAmount { get; set; }
+
+        public RotationalFrequency PayoutFrequency { get; set; } = RotationalFrequency.Monthly;
+
+        public DateTime RotationStartDate { get; set; } = DateTime.Today.AddDays(7);
+
+        public RotationOrderMethod RotationOrderMethod { get; set; } = RotationOrderMethod.Manual;
+
+        public bool AllowPayoutTurnSwap { get; set; }
+
+        public LatePenaltyType LatePenaltyType { get; set; } = LatePenaltyType.None;
+
+        public decimal? LatePenaltyAmount { get; set; }
+
+        [Range(0, 30, ErrorMessage = "Grace period must be between 0 and 30 days.")]
+        public int GracePeriodDays { get; set; }
+
+        [Range(0, 1_000_000, ErrorMessage = "Minimum balance must be 0 or greater.")]
+        public decimal MinimumBalanceBeforePayout { get; set; }
+
+        public bool MissedContributionBlocksPayout { get; set; } = true;
+
+        public bool TreasurerConfirmationRequired { get; set; } = true;
+
+        public static ConfigFormModel From(RotationalStokvelConfiguration config) => new()
+        {
+            ContributionAmount = config.ContributionAmount,
+            ContributionFrequency = config.ContributionFrequency,
+            ContributionDueDay = config.ContributionDueDay,
+            PayoutAmount = config.PayoutAmount,
+            PayoutFrequency = config.PayoutFrequency,
+            RotationStartDate = config.RotationStartDate,
+            RotationOrderMethod = config.RotationOrderMethod,
+            AllowPayoutTurnSwap = config.AllowPayoutTurnSwap,
+            LatePenaltyType = config.LatePenaltyType,
+            LatePenaltyAmount = config.LatePenaltyAmount,
+            GracePeriodDays = config.GracePeriodDays,
+            MinimumBalanceBeforePayout = config.MinimumBalanceBeforePayout,
+            MissedContributionBlocksPayout = config.MissedContributionBlocksPayout,
+            TreasurerConfirmationRequired = config.TreasurerConfirmationRequired
+        };
+
+        public RotationalStokvelConfiguration ToEntity() => new()
+        {
+            ContributionAmount = ContributionAmount,
+            ContributionFrequency = ContributionFrequency,
+            ContributionDueDay = ContributionDueDay,
+            PayoutAmount = PayoutAmount,
+            PayoutFrequency = PayoutFrequency,
+            RotationStartDate = RotationStartDate,
+            RotationOrderMethod = RotationOrderMethod,
+            AllowPayoutTurnSwap = AllowPayoutTurnSwap,
+            LatePenaltyType = LatePenaltyType,
+            LatePenaltyAmount = LatePenaltyType == LatePenaltyType.None ? null : LatePenaltyAmount,
+            GracePeriodDays = GracePeriodDays,
+            MinimumBalanceBeforePayout = MinimumBalanceBeforePayout,
+            MissedContributionBlocksPayout = MissedContributionBlocksPayout,
+            TreasurerConfirmationRequired = TreasurerConfirmationRequired
+        };
+    }
+}

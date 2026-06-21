@@ -15,6 +15,8 @@
 @inject FineService FineService
 @inject FuneralClaimService FuneralClaimService
 @inject ContributionPaymentService ContributionPaymentService
+@inject RotationalTaskService RotationalTaskService
+@inject LoansWalletService LoansWalletService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Treasurer Task List</PageTitle>
@@ -54,11 +56,97 @@ else
         </div>
     </section>
 
-    @if (outstandingFines.Count == 0 && approvedClaimsAwaitingPayout.Count == 0)
+    @if (outstandingFines.Count == 0 && approvedClaimsAwaitingPayout.Count == 0 &&
+         rotationalTaskState?.ApprovedPayout is null && rotationalTaskState?.HasContributionTask != true)
     {
         <div class="sisonke-alert sisonke-alert-green mb-4">
             No pending finance tasks. Everything is up to date.
         </div>
+    }
+
+    @if (rotationalTaskState?.ApprovedPayout is not null)
+    {
+        var payout = rotationalTaskState.ApprovedPayout;
+        <section class="sisonke-card mb-4" style="border-top:3px solid var(--sk-green-700)">
+            <div class="sisonke-card-head">
+                <div>
+                    <span class="sisonke-badge sisonke-badge-blue mb-1">Rotational</span>
+                    <h2>Confirm Rotational Payout Payment</h2>
+                    <p>The Chairperson has approved this payout. Confirm payment to the recipient.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-green">Action Required</span>
+            </div>
+            <div class="sisonke-card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Cycle</div>
+                        <div class="detail-mini-value">@payout.Cycle.CycleName</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Recipient</div>
+                        <div class="detail-mini-value">@payout.PayoutMember.FullName</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Payout Amount</div>
+                        <div class="detail-mini-value">@FormatZAR(payout.PayoutAmount)</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Status</div>
+                        <div class="detail-mini-value"><span class="sisonke-badge sisonke-badge-green">Approved</span></div>
+                    </div>
+                </div>
+                <div class="sisonke-alert sisonke-alert-blue mb-3">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Approved on @(payout.ApprovedAt?.ToString("dd MMM yyyy") ?? "—"). Confirm payment and capture the payment reference.
+                </div>
+                <a class="sisonke-btn sisonke-btn-primary" href="@($"/rotational/management/{StokvelId}")">
+                    <i class="bi bi-cash-coin me-1"></i>Confirm Payment
+                </a>
+            </div>
+        </section>
+    }
+
+    @if (rotationalTaskState?.HasContributionTask == true)
+    {
+        var ts = rotationalTaskState;
+        <section class="sisonke-card mb-4" style="border-top:3px solid #d97706">
+            <div class="sisonke-card-head">
+                <div>
+                    <span class="sisonke-badge sisonke-badge-gold mb-1">Rotational</span>
+                    <h2>Confirm Contribution Payments</h2>
+                    <p>@ts.CurrentCycle!.CycleName has outstanding contribution payments to confirm.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-gold">@ts.UnpaidContributionCount Outstanding</span>
+            </div>
+            <div class="sisonke-card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Cycle</div>
+                        <div class="detail-mini-value">@ts.CurrentCycle.CycleName</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Due Date</div>
+                        <div class="detail-mini-value">@ts.CurrentCycle.ContributionDueDate.ToString("d MMM yyyy")</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Unpaid / Total</div>
+                        <div class="detail-mini-value">@ts.UnpaidContributionCount / @ts.TotalContributionCount</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Outstanding Amount</div>
+                        <div class="detail-mini-value text-danger">@FormatZAR(ts.OutstandingContributionAmount)</div>
+                    </div>
+                </div>
+                <a class="sisonke-btn sisonke-btn-gold" href="@($"/rotational/management/{StokvelId}")">
+                    <i class="bi bi-list-check me-1"></i>Open Contributions
+                </a>
+            </div>
+        </section>
+    }
+
+    @if (loansWalletTasks is not null && (loansWalletTasks.LoansAwaitingDisbursement + loansWalletTasks.RepaymentsAwaitingConfirmation + loansWalletTasks.WithdrawalsAwaitingPayment) > 0)
+    {
+        <section class="sisonke-card mb-4"><div class="sisonke-card-body"><h2>Loans &amp; Wallet Payments</h2><p><strong>@loansWalletTasks.LoansAwaitingDisbursement</strong> disbursement(s), <strong>@loansWalletTasks.RepaymentsAwaitingConfirmation</strong> repayment(s), and <strong>@loansWalletTasks.WithdrawalsAwaitingPayment</strong> withdrawal payment(s) require Treasurer action.</p><a class="sisonke-btn sisonke-btn-primary" href="@($"/stokvel/loans-wallet/{StokvelId}")">Open Loans &amp; Wallet</a></div></section>
     }
 
     <div class="sisonke-grid sisonke-grid-2 mb-4">
@@ -314,6 +402,8 @@ else
     private bool canViewTreasurerTasks;
     private bool canManagePayments;
     private Guid? loggedInTreasurerMemberId;
+    private RotationalTaskState? rotationalTaskState;
+    private LoansWalletTaskCounts? loansWalletTasks;
     private List<MemberFine> outstandingFines = [];
     private List<FuneralClaim> approvedClaimsAwaitingPayout = [];
     private List<ClaimPayoutAudit> recentPayoutActivity = [];
@@ -334,6 +424,7 @@ else
         canViewTreasurerTasks = false;
         canManagePayments = false;
         loggedInTreasurerMemberId = null;
+        rotationalTaskState = null;
         outstandingFines = [];
         approvedClaimsAwaitingPayout = [];
         recentPayoutActivity = [];
@@ -376,6 +467,8 @@ else
             StokvelId,
             DateTime.Today.Year,
             DateTime.Today.Month);
+        rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
+        loansWalletTasks = await LoansWalletService.GetTaskCountsAsync(StokvelId);
         isLoading = false;
     }
 

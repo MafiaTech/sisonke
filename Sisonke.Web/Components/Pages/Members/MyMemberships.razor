@@ -11,6 +11,8 @@
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IServiceScopeFactory ScopeFactory
+@inject IWebHostEnvironment HostEnvironment
+@inject ILoggerFactory LoggerFactory
 
 <PageTitle>My Memberships</PageTitle>
 
@@ -266,6 +268,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var loadStopwatch = System.Diagnostics.Stopwatch.StartNew();
         isLoading = true;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -285,6 +288,10 @@ else
         }
 
         isLoading = false;
+        if (HostEnvironment.IsDevelopment())
+            LoggerFactory.CreateLogger("Sisonke.Performance").LogInformation(
+                "[Performance] My Memberships load completed in {ElapsedMilliseconds} ms.",
+                loadStopwatch.ElapsedMilliseconds);
     }
 
     private async Task RefreshLinkedMembershipsAsync()

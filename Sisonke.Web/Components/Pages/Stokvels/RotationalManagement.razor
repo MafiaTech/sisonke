@@ -1,0 +1,2004 @@
+@page "/rotational/management/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Components.Shared
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject MemberAccessService MemberAccessService
+@inject RotationalPayoutOrderService RotationOrderService
+@inject RotationalConfigurationService RotationalConfigurationService
+@inject RotationalContributionCycleService CycleService
+@inject RotationalContributionPaymentService PaymentService
+@inject RotationalPayoutService PayoutService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Rotation Management</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading rotation management…
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
+    <a class="sisonke-btn sisonke-btn-outline mt-3" href="/my-workspace">
+        <i class="bi bi-arrow-left me-2"></i>Back to Workspace
+    </a>
+}
+else if (!stokvel.EnableRotation)
+{
+    <AlertBanner
+        Type="warning"
+        Title="Rotation Management is not available for this stokvel."
+        Message="Only Rotational Stokvels support rotation management."
+        Icon="bi bi-exclamation-triangle-fill" />
+    <a class="sisonke-btn sisonke-btn-outline mt-3" href="@($"/stokvel-dashboard/{StokvelId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+    </a>
+}
+else
+{
+    <!-- ── Hero ─────────────────────────────────────────────────── -->
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-gold">Rotational Stokvel</span>
+            <h1 class="mt-2">Rotation Management</h1>
+            <p class="mb-1">@stokvel.Name</p>
+            @if (stokvel.IsActive)
+            {
+                <span class="sisonke-badge sisonke-badge-green">Active</span>
+            }
+            else
+            {
+                <span class="sisonke-badge sisonke-badge-gray">Inactive</span>
+            }
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">
+                <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/rotational-configuration/{StokvelId}")">
+                <i class="bi bi-gear-fill me-2"></i>Configuration
+            </a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/members/{StokvelId}")">
+                <i class="bi bi-people-fill me-2"></i>Manage Members
+            </a>
+        </div>
+    </section>
+
+    <!-- ── Alerts ────────────────────────────────────────────────── -->
+    @if (successMessage is not null)
+    {
+        <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
+    }
+
+    @if (errors.Count > 0)
+    {
+        <div class="sisonke-alert sisonke-alert-red mb-3">
+            <ul class="mb-0 ps-3">
+                @foreach (var error in errors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <!-- ── Contextual Task Banners ──────────────────────────────── -->
+    @if (payoutSummary?.Payout is not null)
+    {
+        var p = payoutSummary.Payout;
+        @if (p.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && payoutSummary.CanApprove)
+        {
+            <div class="rm-task-banner rm-task-banner-green mb-3">
+                <div class="rm-task-banner-icon"><i class="bi bi-check2-circle"></i></div>
+                <div class="rm-task-banner-body">
+                    <div class="rm-task-banner-title">Payout Approval Required</div>
+                    <div class="rm-task-banner-desc">
+                        @p.Cycle.CycleName — @p.PayoutMember.FullName is waiting for your approval.
+                        Payout amount: @FormatZAR(p.PayoutAmount).
+                    </div>
+                </div>
+                <button class="sisonke-btn sisonke-btn-gold sisonke-btn-sm"
+                        @onclick="() => showPayoutApprovalModal = true">
+                    <i class="bi bi-check-circle me-1"></i>Approve Payout
+                </button>
+            </div>
+        }
+        else if (p.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && !payoutSummary.CanApprove)
+        {
+            <div class="rm-task-banner rm-task-banner-blue mb-3">
+                <div class="rm-task-banner-icon"><i class="bi bi-hourglass-split"></i></div>
+                <div class="rm-task-banner-body">
+                    <div class="rm-task-banner-title">Waiting for Chairperson Approval</div>
+                    <div class="rm-task-banner-desc">
+                        @p.Cycle.CycleName — Payout of @FormatZAR(p.PayoutAmount) to @p.PayoutMember.FullName is pending Chairperson approval.
+                    </div>
+                </div>
+            </div>
+        }
+        else if (p.PayoutStatus == RotationalPayoutStatus.Approved && payoutSummary.CanConfirmPaid)
+        {
+            <div class="rm-task-banner rm-task-banner-green mb-3">
+                <div class="rm-task-banner-icon"><i class="bi bi-cash-coin"></i></div>
+                <div class="rm-task-banner-body">
+                    <div class="rm-task-banner-title">Confirm Payout Payment</div>
+                    <div class="rm-task-banner-desc">
+                        @p.Cycle.CycleName — Payout of @FormatZAR(p.PayoutAmount) to @p.PayoutMember.FullName has been approved.
+                        Confirm payment has been made.
+                    </div>
+                </div>
+                <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm"
+                        @onclick="OpenPayoutConfirmation">
+                    <i class="bi bi-cash-coin me-1"></i>Confirm Payment
+                </button>
+            </div>
+        }
+        else if (p.PayoutStatus == RotationalPayoutStatus.Approved && !payoutSummary.CanConfirmPaid)
+        {
+            <div class="rm-task-banner rm-task-banner-blue mb-3">
+                <div class="rm-task-banner-icon"><i class="bi bi-hourglass-split"></i></div>
+                <div class="rm-task-banner-body">
+                    <div class="rm-task-banner-title">Waiting for Treasurer Payment Confirmation</div>
+                    <div class="rm-task-banner-desc">
+                        Payout of @FormatZAR(p.PayoutAmount) to @p.PayoutMember.FullName has been approved. Awaiting Treasurer confirmation.
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    @if (isTreasurer && contributionSummary is not null && contributionSummary.UnpaidCount + contributionSummary.PartialCount > 0 && cycleSummary?.CurrentCycle is not null)
+    {
+        var outstanding = contributionSummary.UnpaidCount + contributionSummary.PartialCount;
+        <div class="rm-task-banner rm-task-banner-gold mb-3">
+            <div class="rm-task-banner-icon"><i class="bi bi-list-check"></i></div>
+            <div class="rm-task-banner-body">
+                <div class="rm-task-banner-title">Contribution Payments Outstanding</div>
+                <div class="rm-task-banner-desc">
+                    @cycleSummary.CurrentCycle.CycleName — @outstanding member@(outstanding == 1 ? "" : "s") still need payment confirmation.
+                    Outstanding: @FormatZAR(contributionSummary.OutstandingTotal).
+                </div>
+            </div>
+            <a href="#contributions" class="sisonke-btn sisonke-btn-outline sisonke-btn-sm">
+                <i class="bi bi-arrow-down me-1"></i>Review Below
+            </a>
+        </div>
+    }
+
+    <!-- ── Summary Cards ─────────────────────────────────────────── -->
+    <div class="row g-3 mb-4">
+
+        <!-- Card 1: Next Recipient -->
+        <div class="col-6 col-lg">
+            <div class="card h-100 rm-summary-card">
+                <div class="card-body">
+                    <div class="detail-mini-label">Next Recipient</div>
+                    @if (NextRecipient is not null)
+                    {
+                        <div class="rm-summary-value">@NextRecipient.MemberName</div>
+                        @if (IsCurrentMember(NextRecipient.MemberId))
+                        {
+                            <span class="sisonke-badge sisonke-badge-green me-1">YOU</span>
+                        }
+                        <div class="text-muted small mt-1">Position @NextRecipient.Position of @activeOrder.Count</div>
+                    }
+                    else
+                    {
+                        <div class="rm-summary-value text-muted">—</div>
+                        <div class="text-muted small mt-1">To be configured</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Payout Amount -->
+        <div class="col-6 col-lg">
+            <div class="card h-100 rm-summary-card">
+                <div class="card-body">
+                    <div class="detail-mini-label">Payout Amount</div>
+                    @if (activeConfig is not null)
+                    {
+                        <div class="rm-summary-value">@FormatZAR(activeConfig.PayoutAmount)</div>
+                        <div class="text-muted small mt-1">Per payout cycle</div>
+                    }
+                    else
+                    {
+                        <div class="rm-summary-value text-muted">—</div>
+                        <div class="text-muted small mt-1">Not configured</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Contribution Cycle -->
+        <div class="col-6 col-lg">
+            <div class="card h-100 rm-summary-card">
+                <div class="card-body">
+                    <div class="detail-mini-label">Contribution Cycle</div>
+                    @if (cycleSummary?.CurrentCycle is not null)
+                    {
+                        <div class="rm-summary-value">@cycleSummary.CurrentCycle.CycleName</div>
+                        <div class="text-muted small mt-1">Due @cycleSummary.CurrentCycle.ContributionDueDate.ToString("d MMM yyyy")</div>
+                    }
+                    else if (cycleSummary?.IsGenerated == true)
+                    {
+                        <div class="rm-summary-value">@cycleSummary.TotalCycles cycles</div>
+                        <div class="text-muted small mt-1">@cycleSummary.CompletedCycles completed</div>
+                    }
+                    else
+                    {
+                        <div class="rm-summary-value text-muted">Not generated</div>
+                        <div class="text-muted small mt-1">No cycles yet</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Members in Rotation -->
+        <div class="col-6 col-lg">
+            <div class="card h-100 rm-summary-card">
+                <div class="card-body">
+                    <div class="detail-mini-label">Members in Rotation</div>
+                    @if (activeOrder.Count > 0)
+                    {
+                        <div class="rm-summary-value">@activeOrder.Count</div>
+                        <div class="text-muted small mt-1">Active rotation order</div>
+                    }
+                    else
+                    {
+                        <div class="rm-summary-value">@eligibleMemberCount</div>
+                        <div class="text-muted small mt-1">Eligible member@(eligibleMemberCount == 1 ? "" : "s")</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5: Current Status -->
+        <div class="col-6 col-lg">
+            <div class="card h-100 rm-summary-card">
+                <div class="card-body">
+                    <div class="detail-mini-label">Current Status</div>
+                    @{
+                        var (statusText, statusType) = GetCurrentStatus();
+                    }
+                    <div class="mt-2">
+                        <StatusBadge Text="@statusText" Type="@statusType" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── Main Content Row ───────────────────────────────────────── -->
+    <div class="row g-3 mb-3">
+
+        <!-- ── Active Rotation Order (Left) ─────────────────────── -->
+        <div class="col-12 col-lg-8">
+
+            @* ── No active order, no preview, not editing ── *@
+            @if (activeOrder.Count == 0 && previewOrder.Count == 0 && !isEditing)
+            {
+                <section class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-2">
+                            <div>
+                                <span class="sisonke-badge sisonke-badge-gold">Not configured</span>
+                                <h2 class="mt-2">Active Rotation Order</h2>
+                                <p class="text-muted mb-0">Order determines who receives the next payout.</p>
+                            </div>
+                        </div>
+
+                        @if (eligibleMemberCount < 2)
+                        {
+                            @if (eligibleMemberCount == 0)
+                            {
+                                <div class="sisonke-alert sisonke-alert-red mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                    <strong>No active members found.</strong> Add members before creating a rotation order.
+                                    <div class="mt-2">
+                                        <a class="sisonke-btn sisonke-btn-outline" href="@($"/members/{StokvelId}")">
+                                            <i class="bi bi-people-fill me-2"></i>Manage Members
+                                        </a>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="sisonke-alert sisonke-alert-red mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                    <strong>At least 2 active members are required to create a rotation order.</strong>
+                                    Only @eligibleMemberCount eligible member found.
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue mb-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                No active rotation order has been configured yet.
+                                @if (!canManage)
+                                {
+                                    <span> Please ask an office bearer to set it up.</span>
+                                }
+                            </div>
+
+                            @if (canManage)
+                            {
+                                <div>
+                                    <p class="text-muted mb-2">Choose how to order the <strong>@eligibleMemberCount eligible members</strong>.</p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="sisonke-btn sisonke-btn-outline" @onclick="StartManualCreate" disabled="@isGeneratingPreview">
+                                            <i class="bi bi-list-ol me-2"></i>Manual
+                                        </button>
+                                        <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(RotationOrderMethod.ByJoiningDate))" disabled="@isGeneratingPreview">
+                                            @if (isGeneratingPreview && pendingPreviewMethod == RotationOrderMethod.ByJoiningDate)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-calendar-check me-2"></i>
+                                            }
+                                            By joining date
+                                        </button>
+                                        <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(RotationOrderMethod.Random))" disabled="@isGeneratingPreview">
+                                            @if (isGeneratingPreview && pendingPreviewMethod == RotationOrderMethod.Random)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-shuffle me-2"></i>
+                                            }
+                                            Random
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </section>
+            }
+
+            @* ── Preview (generated, not yet saved) ── *@
+            @if (previewOrder.Count > 0 && !isEditing)
+            {
+                <section class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <span class="sisonke-badge sisonke-badge-blue">Preview</span>
+                                <h2 class="mt-2">@previewMethodLabel Order Preview</h2>
+                                <p class="text-muted mb-0">Review below. Click <strong>Save Rotation Order</strong> to commit.</p>
+                            </div>
+                            <button class="sisonke-btn sisonke-btn-outline" @onclick="CancelPreview" disabled="@isSaving">
+                                <i class="bi bi-x me-2"></i>Cancel
+                            </button>
+                        </div>
+
+                        @RenderReadOnlyTable(previewOrder)
+
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button class="sisonke-btn sisonke-btn-primary" @onclick="SavePreviewOrderAsync" disabled="@isSaving">
+                                @if (isSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-floppy-fill me-2"></i>
+                                }
+                                Save Rotation Order
+                            </button>
+                            <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(pendingPreviewMethod))" disabled="@isSaving">
+                                <i class="bi bi-arrow-repeat me-2"></i>
+                                @(pendingPreviewMethod == RotationOrderMethod.Random ? "Reshuffle" : "Regenerate")
+                            </button>
+                            <button class="sisonke-btn sisonke-btn-outline" @onclick="CancelPreview" disabled="@isSaving">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            }
+
+            @* ── Active saved order (view mode) ── *@
+            @if (activeOrder.Count > 0 && !isEditing && previewOrder.Count == 0)
+            {
+                <section class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <span class="sisonke-badge sisonke-badge-green">Configured</span>
+                                <h2 class="mt-2">Active Rotation Order</h2>
+                                <p class="text-muted mb-0">@activeOrder.Count member@(activeOrder.Count == 1 ? "" : "s") in rotation. Order determines who receives the next payout.</p>
+                            </div>
+                            @if (canManage)
+                            {
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button class="sisonke-btn sisonke-btn-outline" @onclick="StartEdit" disabled="@isGeneratingPreview">
+                                        <i class="bi bi-pencil me-2"></i>Reorder
+                                    </button>
+                                    <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(RotationOrderMethod.ByJoiningDate))" disabled="@isGeneratingPreview">
+                                        @if (isGeneratingPreview && pendingPreviewMethod == RotationOrderMethod.ByJoiningDate)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-calendar-check me-2"></i>
+                                        }
+                                        Regenerate by joining date
+                                    </button>
+                                    <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(RotationOrderMethod.Random))" disabled="@isGeneratingPreview">
+                                        @if (isGeneratingPreview && pendingPreviewMethod == RotationOrderMethod.Random)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-shuffle me-2"></i>
+                                        }
+                                        Regenerate random
+                                    </button>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Member</th>
+                                        <th>Status</th>
+                                        <th>Payout Received</th>
+                                        <th>Last Payout Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in activeOrder)
+                                    {
+                                        <tr class="@(IsCurrentMember(row.MemberId) ? "table-success" : null)">
+                                            <td class="fw-bold text-muted">@row.Position</td>
+                                            <td>
+                                                <div class="fw-semibold">
+                                                    @row.MemberName
+                                                    @if (IsCurrentMember(row.MemberId))
+                                                    {
+                                                        <span class="sisonke-badge sisonke-badge-green ms-2">You</span>
+                                                    }
+                                                    @if (!row.HasReceivedPayout && row.Position == (NextRecipient?.Position ?? 0))
+                                                    {
+                                                        <span class="sisonke-badge sisonke-badge-gold ms-1">Next</span>
+                                                    }
+                                                </div>
+                                                <div class="text-muted small">@row.MemberNumber</div>
+                                            </td>
+                                            <td><span class="text-muted small">@row.MemberStatus / @row.GovernanceStatus</span></td>
+                                            <td>
+                                                @if (row.HasReceivedPayout)
+                                                {
+                                                    <span class="sisonke-badge sisonke-badge-green">Yes</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="sisonke-badge sisonke-badge-gray">No</span>
+                                                }
+                                            </td>
+                                            <td class="text-muted small">@(row.LastPayoutDate?.ToString("dd MMM yyyy") ?? "Not yet")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            }
+
+            @* ── Manual editing ── *@
+            @if (isEditing)
+            {
+                <section class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <span class="sisonke-badge sisonke-badge-blue">Editing</span>
+                                <h2 class="mt-2">Manual Rotation Order</h2>
+                                <p class="text-muted mb-0">Use the arrows to set the payout order, then click Save.</p>
+                            </div>
+                            <button class="sisonke-btn sisonke-btn-outline" @onclick="CancelEdit" disabled="@isSaving">
+                                <i class="bi bi-x me-2"></i>Cancel
+                            </button>
+                        </div>
+
+                        @if (editableOrder.Count == 0)
+                        {
+                            <div class="sisonke-alert sisonke-alert-red">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                No eligible members found. Add active members to this stokvel first.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Member</th>
+                                            <th>Status</th>
+                                            <th>Move</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (var i = 0; i < editableOrder.Count; i++)
+                                        {
+                                            var row = editableOrder[i];
+                                            var idx = i;
+                                            <tr class="@(IsCurrentMember(row.MemberId) ? "table-success" : null)">
+                                                <td class="fw-bold text-muted">@row.Position</td>
+                                                <td>
+                                                    <div class="fw-semibold">
+                                                        @row.MemberName
+                                                        @if (IsCurrentMember(row.MemberId))
+                                                        {
+                                                            <span class="sisonke-badge sisonke-badge-green ms-2">You</span>
+                                                        }
+                                                    </div>
+                                                    <div class="text-muted small">@row.MemberNumber</div>
+                                                </td>
+                                                <td><span class="text-muted small">@row.MemberStatus / @row.GovernanceStatus</span></td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button type="button" class="btn btn-outline-secondary"
+                                                                disabled="@(idx == 0 || isSaving)"
+                                                                @onclick="() => MoveUp(idx)">
+                                                            <i class="bi bi-arrow-up"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-secondary"
+                                                                disabled="@(idx == editableOrder.Count - 1 || isSaving)"
+                                                                @onclick="() => MoveDown(idx)">
+                                                            <i class="bi bi-arrow-down"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <button class="sisonke-btn sisonke-btn-primary" @onclick="SaveManualOrderAsync" disabled="@isSaving">
+                                    @if (isSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-floppy-fill me-2"></i>
+                                    }
+                                    Save Rotation Order
+                                </button>
+                                <button class="sisonke-btn sisonke-btn-outline" @onclick="CancelEdit" disabled="@isSaving">
+                                    Cancel
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+
+        </div>
+
+        <!-- ── Configuration Snapshot (Right) ───────────────────── -->
+        <div class="col-12 col-lg-4">
+            <div class="sisonke-card h-100">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head mb-3">
+                        <div>
+                            <h2>Configuration Snapshot</h2>
+                        </div>
+                    </div>
+
+                    @if (activeConfig is null)
+                    {
+                        <div class="sisonke-alert sisonke-alert-blue mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Configuration not completed.
+                        </div>
+                        @if (canManage)
+                        {
+                            <a class="sisonke-btn sisonke-btn-primary" href="@($"/rotational-configuration/{StokvelId}")">
+                                <i class="bi bi-gear-fill me-2"></i>Configure Rules
+                            </a>
+                        }
+                    }
+                    else
+                    {
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Contribution Amount</span>
+                            <span class="detail-mini-value">@FormatZAR(activeConfig.ContributionAmount)</span>
+                        </div>
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Payout Amount</span>
+                            <span class="detail-mini-value">@FormatZAR(activeConfig.PayoutAmount)</span>
+                        </div>
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Payout Frequency</span>
+                            <span class="detail-mini-value">@activeConfig.PayoutFrequency</span>
+                        </div>
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Contribution Frequency</span>
+                            <span class="detail-mini-value">@activeConfig.ContributionFrequency</span>
+                        </div>
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Turn Swap</span>
+                            <span class="detail-mini-value">@(activeConfig.AllowPayoutTurnSwap ? "Allowed" : "Not allowed")</span>
+                        </div>
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Late Contribution Penalty</span>
+                            <span class="detail-mini-value">
+                                @if (activeConfig.LatePenaltyType == LatePenaltyType.None)
+                                {
+                                    <span>None</span>
+                                }
+                                else if (activeConfig.LatePenaltyType == LatePenaltyType.FixedAmount)
+                                {
+                                    <span>@FormatZAR(activeConfig.LatePenaltyAmount ?? 0) fixed</span>
+                                }
+                                else
+                                {
+                                    <span>@activeConfig.LatePenaltyAmount%</span>
+                                }
+                            </span>
+                        </div>
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Grace Period</span>
+                            <span class="detail-mini-value">@activeConfig.GracePeriodDays day(s)</span>
+                        </div>
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Missed Contribution Blocks Payout</span>
+                            <span class="detail-mini-value">@(activeConfig.MissedContributionBlocksPayout ? "Yes" : "No")</span>
+                        </div>
+                        <div class="rm-config-row">
+                            <span class="detail-mini-label">Treasurer Confirmation Required</span>
+                            <span class="detail-mini-value">@(activeConfig.TreasurerConfirmationRequired ? "Required" : "Not required")</span>
+                        </div>
+
+                        <div class="mt-3">
+                            <a class="sisonke-btn sisonke-btn-outline" href="@($"/rotational-configuration/{StokvelId}")">
+                                <i class="bi bi-eye me-2"></i>View Full Configuration
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── Bottom Row ─────────────────────────────────────────────── -->
+    <div class="row g-3 mb-4">
+
+    <section class="sisonke-card mb-3">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head mb-3"><div><h2>Current Cycle Payout</h2><p class="text-muted mb-0">Chairperson approval and Treasurer payment confirmation.</p></div></div>
+            @if (payoutSummary?.Payout is null)
+            {
+                <div class="sisonke-alert sisonke-alert-blue">Payout will be available once contribution payments are complete.</div>
+                <div class="border rounded p-3 mt-3">
+                    <div class="fw-semibold">Contribution Banking Details</div>
+                    @if (payoutSummary?.BankingDetails is null) { <div class="text-warning">Banking details have not been captured for this stokvel.</div> }
+                    else { <div>@payoutSummary.BankingDetails.BankName · @StokvelBankingDetailsService.MaskAccountNumber(payoutSummary.BankingDetails.AccountNumber)</div> }
+                    <a class="btn btn-sm btn-outline-secondary mt-2" href="@($"/stokvel-settings/{StokvelId}")">View Banking Details</a>
+                </div>
+            }
+            else
+            {
+                var payout = payoutSummary.Payout;
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3"><div class="detail-mini-label">Cycle</div><div class="detail-mini-value">@payout.Cycle.CycleName</div></div>
+                    <div class="col-md-3"><div class="detail-mini-label">Recipient</div><div class="detail-mini-value">@payout.PayoutMember.FullName</div></div>
+                    <div class="col-md-3"><div class="detail-mini-label">Amount</div><div class="detail-mini-value">@FormatZAR(payout.PayoutAmount)</div></div>
+                    <div class="col-md-3"><div class="detail-mini-label">Status</div><StatusBadge Text="@FormatPayoutStatus(payout.PayoutStatus)" Type="@GetPayoutStatusType(payout.PayoutStatus)" /></div>
+                </div>
+                @if (payoutSummary.IsRecipient) { <div class="sisonke-alert sisonke-alert-green mb-3">You are the current payout recipient.</div> }
+                @if (payout.PayoutStatus == RotationalPayoutStatus.Rejected) { <div class="sisonke-alert sisonke-alert-red mb-3"><strong>Payout rejected.</strong> @payout.RejectionReason</div> }
+                @if (payout.PayoutStatus == RotationalPayoutStatus.Paid) { <div class="sisonke-alert sisonke-alert-green mb-3">Paid on @payout.PaidAt?.ToLocalTime().ToString("dd MMM yyyy"). Reference: @payout.PaymentReference</div> }
+                <div class="border rounded p-3 mb-3">
+                    <div class="fw-semibold mb-2">Contribution Banking Details</div>
+                    @if (payoutSummary.BankingDetails is null) { <div class="text-warning">Banking details have not been captured for this stokvel.</div> }
+                    else { <div>@payoutSummary.BankingDetails.BankName · @StokvelBankingDetailsService.MaskAccountNumber(payoutSummary.BankingDetails.AccountNumber)</div><div class="text-muted small">Reference: @(payoutSummary.BankingDetails.PaymentReferenceFormat ?? "Not specified")</div> }
+                    <a class="btn btn-sm btn-outline-secondary mt-2" href="@($"/stokvel-settings/{StokvelId}")">View Banking Details</a>
+                </div>
+                @if (payout.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && payoutSummary.CanApprove)
+                { <div class="d-flex gap-2"><button class="btn btn-primary" @onclick="() => showPayoutApprovalModal = true">Approve Payout</button><button class="btn btn-outline-danger" @onclick="() => showPayoutRejectionModal = true">Reject Payout</button></div> }
+                else if (payout.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && payoutSummary.CanConfirmPaid) { <div class="text-muted">Waiting for Chairperson approval.</div> }
+                else if (payout.PayoutStatus == RotationalPayoutStatus.Approved && payoutSummary.CanConfirmPaid) { <button class="btn btn-primary" @onclick="OpenPayoutConfirmation">Confirm Payout Paid</button> }
+                else if (payout.PayoutStatus == RotationalPayoutStatus.Approved) { <div class="text-muted">Approved, waiting for Treasurer payment confirmation.</div> }
+                @if (payoutErrors.Count > 0) { <div class="alert alert-danger mt-3">@string.Join(" ", payoutErrors)</div> }
+            }
+        </div>
+    </section>
+
+        <!-- ── Contribution Cycles (Left) ───────────────────────── -->
+        <div class="col-12 col-lg-8">
+            <section class="sisonke-card h-100">
+                <div class="sisonke-card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <h2 class="mb-0">Contribution Cycles</h2>
+                        @if (canManage && cycleSummary?.IsGenerated == true)
+                        {
+                            <button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm"
+                                    @onclick="ConfirmRegenerateCyclesAsync"
+                                    disabled="@(isGeneratingCycles)">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Regenerate
+                            </button>
+                        }
+                    </div>
+
+                    @if (cycleErrors.Count > 0)
+                    {
+                        <div class="sisonke-alert sisonke-alert-red mb-3">
+                            @foreach (var e in cycleErrors)
+                            {
+                                <div><i class="bi bi-exclamation-circle me-2"></i>@e</div>
+                            }
+                        </div>
+                    }
+                    @if (cycleSuccessMessage is not null)
+                    {
+                        <div class="sisonke-alert sisonke-alert-green mb-3">
+                            <i class="bi bi-check-circle me-2"></i>@cycleSuccessMessage
+                        </div>
+                    }
+
+                    @if (cycleSummary is null || !cycleSummary.IsGenerated)
+                    {
+                        <!-- Empty state -->
+                        @if (canManage && activeOrder.Count >= 2 && activeConfig is not null)
+                        {
+                            <div class="text-center py-4">
+                                <i class="bi bi-calendar3 fs-2 text-muted mb-3 d-block"></i>
+                                <p class="text-muted mb-3">No contribution cycles have been generated yet.<br />Generate cycles to create the payout schedule for each member.</p>
+                                <button class="sisonke-btn sisonke-btn-primary"
+                                        @onclick="GenerateCyclesAsync"
+                                        disabled="@isGeneratingCycles">
+                                    @if (isGeneratingCycles)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-calendar-plus me-2"></i>
+                                    }
+                                    Generate Contribution Cycles
+                                </button>
+                            </div>
+                        }
+                        else if (canManage && activeOrder.Count < 2)
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Set up a rotation order with at least 2 members before generating contribution cycles.
+                            </div>
+                        }
+                        else if (canManage && activeConfig is null)
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Complete the stokvel configuration before generating contribution cycles.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Contribution cycles have not been generated yet. Contact an office bearer to set up the schedule.
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <!-- Cycle summary stats -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Total Cycles</div>
+                                <div class="detail-mini-value">@cycleSummary.TotalCycles</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Completed</div>
+                                <div class="detail-mini-value">@cycleSummary.CompletedCycles</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Contribution Due</div>
+                                <div class="detail-mini-value">
+                                    @(cycleSummary.CurrentCycleContributionDue.HasValue
+                                        ? cycleSummary.CurrentCycleContributionDue.Value.ToString("d MMM yyyy")
+                                        : "—")
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="detail-mini-label">Scheduled Payout</div>
+                                <div class="detail-mini-value">
+                                    @(cycleSummary.CurrentCyclePayoutDate.HasValue
+                                        ? cycleSummary.CurrentCyclePayoutDate.Value.ToString("d MMM yyyy")
+                                        : "—")
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="detail-mini-label mb-0">Cycle Progress</span>
+                            <span class="detail-mini-value">@cycleSummary.CompletedCycles / @cycleSummary.TotalCycles</span>
+                        </div>
+                        <div class="progress mb-4" role="progressbar" aria-label="Cycle progress"
+                             aria-valuenow="@(cycleSummary.TotalCycles > 0 ? Math.Round(cycleSummary.CompletedCycles * 100.0 / cycleSummary.TotalCycles) : 0)"
+                             aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar" style="width:@(cycleSummary.TotalCycles > 0 ? Math.Round(cycleSummary.CompletedCycles * 100.0 / cycleSummary.TotalCycles) : 0)%"></div>
+                        </div>
+
+                        <!-- Cycle table -->
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Cycle</th>
+                                        <th>Start</th>
+                                        <th>End</th>
+                                        <th>Due Date</th>
+                                        <th>Payout To</th>
+                                        <th class="text-end">Expected Payout</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var cycle in cycleSummary.AllCycles)
+                                    {
+                                        <tr class="@(cycle.Status == RotationalCycleStatus.Open ? "table-success" : "")">
+                                            <td>@cycle.CycleNumber</td>
+                                            <td class="fw-medium">@cycle.CycleName</td>
+                                            <td class="text-nowrap">@cycle.CycleStartDate.ToString("d MMM yy")</td>
+                                            <td class="text-nowrap">@cycle.CycleEndDate.ToString("d MMM yy")</td>
+                                            <td class="text-nowrap">@cycle.ContributionDueDate.ToString("d MMM yy")</td>
+                                            <td>
+                                                @cycle.PayoutMember.FullName
+                                                @if (cycle.PayoutMemberId == linkedMember?.Id)
+                                                {
+                                                    <span class="sisonke-badge sisonke-badge-gold ms-1">You</span>
+                                                }
+                                            </td>
+                                            <td class="text-end text-nowrap">@FormatZAR(cycle.ExpectedPayoutAmount)</td>
+                                            <td><StatusBadge Text="@GetCycleStatusLabel(cycle.Status)" Type="@GetCycleStatusType(cycle.Status)" /></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </section>
+        </div>
+
+        <!-- ── Quick Actions (Right) ──────────────────────────────── -->
+        <div class="col-12 col-lg-4">
+            <div class="sisonke-card h-100">
+                <div class="sisonke-card-body">
+                    <h2 class="mb-3">Quick Actions</h2>
+
+                    @if (canManage)
+                    {
+                        <div class="d-flex flex-column gap-2">
+                            @if (activeOrder.Count > 0 && !isEditing && previewOrder.Count == 0)
+                            {
+                                <button class="sisonke-btn sisonke-btn-outline" @onclick="StartEdit" disabled="@(isGeneratingPreview || isSaving)">
+                                    <i class="bi bi-pencil me-2"></i>Reorder
+                                </button>
+                                <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(RotationOrderMethod.ByJoiningDate))" disabled="@(isGeneratingPreview || isSaving)">
+                                    <i class="bi bi-calendar-check me-2"></i>Regenerate by joining date
+                                </button>
+                                <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(RotationOrderMethod.Random))" disabled="@(isGeneratingPreview || isSaving)">
+                                    <i class="bi bi-shuffle me-2"></i>Regenerate random
+                                </button>
+                            }
+                            else if (activeOrder.Count == 0 && !isEditing && previewOrder.Count == 0 && eligibleMemberCount >= 2)
+                            {
+                                <button class="sisonke-btn sisonke-btn-primary" @onclick="StartManualCreate" disabled="@(isGeneratingPreview || isSaving)">
+                                    <i class="bi bi-list-ol me-2"></i>Create Order (Manual)
+                                </button>
+                                <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(RotationOrderMethod.ByJoiningDate))" disabled="@(isGeneratingPreview || isSaving)">
+                                    <i class="bi bi-calendar-check me-2"></i>By joining date
+                                </button>
+                                <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => GeneratePreviewAsync(RotationOrderMethod.Random))" disabled="@(isGeneratingPreview || isSaving)">
+                                    <i class="bi bi-shuffle me-2"></i>Random
+                                </button>
+                            }
+                            @if (previewOrder.Count > 0 || isEditing)
+                            {
+                                <button class="sisonke-btn sisonke-btn-primary" @onclick="SaveFromQuickActionsAsync" disabled="@isSaving">
+                                    @if (isSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-floppy-fill me-2"></i>
+                                    }
+                                    Save Order
+                                </button>
+                                <button class="sisonke-btn sisonke-btn-outline" @onclick="CancelCurrentAction" disabled="@isSaving">
+                                    <i class="bi bi-x me-2"></i>Cancel
+                                </button>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-2">
+                            <a class="sisonke-btn sisonke-btn-outline" href="@($"/rotational-configuration/{StokvelId}")">
+                                <i class="bi bi-eye me-2"></i>View Configuration
+                            </a>
+                        </div>
+                        <div class="sisonke-alert sisonke-alert-blue mt-3 mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Contact an office bearer to modify the rotation order.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── Current Cycle Contributions ──────────────────────────────── -->
+    @if (cycleSummary?.CurrentCycle is not null)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <section class="sisonke-card">
+                    <div class="sisonke-card-body">
+
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <div>
+                                <h2 class="mb-0">Current Cycle Contributions</h2>
+                                <div class="text-muted small mt-1">@cycleSummary.CurrentCycle.CycleName — Due @cycleSummary.CurrentCycle.ContributionDueDate.ToString("d MMM yyyy")</div>
+                            </div>
+                            @if (canManage && cyclePayments.Count == 0)
+                            {
+                                <button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm"
+                                        @onclick="PreparePaymentRegisterAsync"
+                                        disabled="@isPreparingPayments">
+                                    @if (isPreparingPayments)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-list-check me-1"></i>
+                                    }
+                                    Prepare Payment Register
+                                </button>
+                            }
+                        </div>
+
+                        @if (paymentErrors.Count > 0)
+                        {
+                            <div class="sisonke-alert sisonke-alert-red mb-3">
+                                @foreach (var e in paymentErrors) { <div><i class="bi bi-exclamation-circle me-2"></i>@e</div> }
+                            </div>
+                        }
+                        @if (paymentSuccessMessage is not null)
+                        {
+                            <div class="sisonke-alert sisonke-alert-green mb-3">
+                                <i class="bi bi-check-circle me-2"></i>@paymentSuccessMessage
+                            </div>
+                        }
+
+                        @if (contributionSummary is not null && cyclePayments.Count > 0)
+                        {
+                            <!-- Summary bar -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-6 col-md-2">
+                                    <div class="detail-mini-label">Expected</div>
+                                    <div class="detail-mini-value fw-bold">@FormatZAR(contributionSummary.ExpectedTotal)</div>
+                                </div>
+                                <div class="col-6 col-md-2">
+                                    <div class="detail-mini-label">Received</div>
+                                    <div class="detail-mini-value fw-bold text-success">@FormatZAR(contributionSummary.ReceivedTotal)</div>
+                                </div>
+                                <div class="col-6 col-md-2">
+                                    <div class="detail-mini-label">Outstanding</div>
+                                    <div class="detail-mini-value fw-bold @(contributionSummary.OutstandingTotal > 0 ? "text-danger" : "")">@FormatZAR(contributionSummary.OutstandingTotal)</div>
+                                </div>
+                                <div class="col-6 col-md-2">
+                                    <div class="detail-mini-label">Paid</div>
+                                    <div class="detail-mini-value">@contributionSummary.PaidCount / @contributionSummary.TotalExpected</div>
+                                </div>
+                                <div class="col-6 col-md-2">
+                                    <div class="detail-mini-label">Unpaid</div>
+                                    <div class="detail-mini-value @(contributionSummary.UnpaidCount > 0 ? "text-danger" : "")">@contributionSummary.UnpaidCount</div>
+                                </div>
+                                @if (contributionSummary.LateCount > 0)
+                                {
+                                    <div class="col-6 col-md-2">
+                                        <div class="detail-mini-label">Late</div>
+                                        <div class="detail-mini-value text-warning">@contributionSummary.LateCount</div>
+                                    </div>
+                                }
+                            </div>
+
+                            @if (canViewPayments)
+                            {
+                                <!-- Full payment table for office bearers -->
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Member</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Paid</th>
+                                                <th>Status</th>
+                                                <th>Date</th>
+                                                <th>Method</th>
+                                                <th>Reference</th>
+                                                <th class="text-end">Penalty</th>
+                                                <th>Confirmed By</th>
+                                                @if (isTreasurer) { <th></th> }
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var payment in cyclePayments)
+                                            {
+                                                <tr class="@GetPaymentRowClass(payment.PaymentStatus)">
+                                                    <td class="fw-medium">
+                                                        @payment.Member.FullName
+                                                        @if (payment.MemberId == linkedMember?.Id)
+                                                        {
+                                                            <span class="sisonke-badge sisonke-badge-gold ms-1">You</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end text-nowrap">@FormatZAR(payment.ExpectedAmount)</td>
+                                                    <td class="text-end text-nowrap">@FormatZAR(payment.PaidAmount)</td>
+                                                    <td><StatusBadge Text="@GetPaymentStatusLabel(payment.PaymentStatus)" Type="@GetPaymentStatusType(payment.PaymentStatus)" /></td>
+                                                    <td class="text-nowrap">@(payment.PaymentDate?.ToString("d MMM yyyy") ?? "—")</td>
+                                                    <td>@(payment.PaymentMethod.HasValue ? payment.PaymentMethod.Value.ToString() : "—")</td>
+                                                    <td>@(payment.ReferenceNumber ?? "—")</td>
+                                                    <td class="text-end text-nowrap">@(payment.PenaltyAmount > 0 ? FormatZAR(payment.PenaltyAmount) : "—")</td>
+                                                    <td class="text-muted small">@(string.IsNullOrWhiteSpace(payment.ConfirmedByTreasurerId) ? "—" : "Confirmed")</td>
+                                                    @if (isTreasurer)
+                                                    {
+                                                        <td>
+                                                            <button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm"
+                                                                    @onclick="() => OpenPaymentForm(payment)"
+                                                                    disabled="@(payment.PaymentStatus == ContributionPaymentStatus.Waived)">
+                                                                <i class="bi bi-pencil-square me-1"></i>@(payment.PaymentStatus == ContributionPaymentStatus.Unpaid ? "Record" : "Edit")
+                                                            </button>
+                                                        </td>
+                                                    }
+                                                </tr>
+                                                @if (selectedPaymentId == payment.Id)
+                                                {
+                                                    <tr class="rm-payment-form-row">
+                                                        <td colspan="@(isTreasurer ? 10 : 9)">
+                                                            <div class="rm-payment-form p-3">
+                                                                <div class="fw-medium mb-3">Recording payment for @payment.Member.FullName</div>
+                                                                <div class="row g-3">
+                                                                    <div class="col-12 col-md-4">
+                                                                        <label class="form-label detail-mini-label">Status</label>
+                                                                        <select class="form-select form-select-sm" @bind="paymentFormStatus">
+                                                                            <option value="@ContributionPaymentStatus.Paid">Paid</option>
+                                                                            <option value="@ContributionPaymentStatus.PartiallyPaid">Partially Paid</option>
+                                                                            <option value="@ContributionPaymentStatus.Late">Late (with penalty)</option>
+                                                                            <option value="@ContributionPaymentStatus.Waived">Waived</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    @if (paymentFormStatus != ContributionPaymentStatus.Waived)
+                                                                    {
+                                                                        <div class="col-6 col-md-2">
+                                                                            <label class="form-label detail-mini-label">Paid Amount (R)</label>
+                                                                            <input type="number" class="form-control form-control-sm" step="0.01" min="0"
+                                                                                   @bind="paymentFormPaidAmount" />
+                                                                        </div>
+                                                                        <div class="col-6 col-md-3">
+                                                                            <label class="form-label detail-mini-label">Payment Date</label>
+                                                                            <input type="date" class="form-control form-control-sm"
+                                                                                   @bind="paymentFormDate" @bind:format="yyyy-MM-dd" />
+                                                                        </div>
+                                                                        <div class="col-6 col-md-3">
+                                                                            <label class="form-label detail-mini-label">Payment Method</label>
+                                                                            <select class="form-select form-select-sm" @bind="paymentFormMethod">
+                                                                                <option value="">-- Select --</option>
+                                                                                <option value="@ContributionPaymentMethod.Cash">Cash</option>
+                                                                                <option value="@ContributionPaymentMethod.EFT">EFT</option>
+                                                                                <option value="@ContributionPaymentMethod.BankDeposit">Bank Deposit</option>
+                                                                                <option value="@ContributionPaymentMethod.Other">Other</option>
+                                                                            </select>
+                                                                        </div>
+                                                                        <div class="col-6 col-md-4">
+                                                                            <label class="form-label detail-mini-label">Reference Number</label>
+                                                                            <input type="text" class="form-control form-control-sm" placeholder="Optional"
+                                                                                   @bind="paymentFormReference" />
+                                                                        </div>
+                                                                    }
+                                                                    <div class="col-12 col-md-8">
+                                                                        <label class="form-label detail-mini-label">Notes</label>
+                                                                        <input type="text" class="form-control form-control-sm" placeholder="Optional"
+                                                                               @bind="paymentFormNotes" />
+                                                                    </div>
+                                                                </div>
+                                                                <div class="d-flex gap-2 mt-3">
+                                                                    <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm"
+                                                                            @onclick="() => SavePaymentAsync(payment.Id)"
+                                                                            disabled="@isConfirmingPayment">
+                                                                        @if (isConfirmingPayment)
+                                                                        {
+                                                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            <i class="bi bi-floppy-fill me-1"></i>
+                                                                        }
+                                                                        Save Payment
+                                                                    </button>
+                                                                    <button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm"
+                                                                            @onclick="ClosePaymentForm"
+                                                                            disabled="@isConfirmingPayment">
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else if (myPayment is not null)
+                            {
+                                <!-- Ordinary member: own payment only -->
+                                <div class="sisonke-card mb-3" style="border:1px solid var(--sk-border)">
+                                    <div class="sisonke-card-body">
+                                        <div class="fw-medium mb-2">My Contribution — @cycleSummary.CurrentCycle.CycleName</div>
+                                        <div class="row g-3">
+                                            <div class="col-6 col-md-3">
+                                                <div class="detail-mini-label">Expected</div>
+                                                <div class="detail-mini-value">@FormatZAR(myPayment.ExpectedAmount)</div>
+                                            </div>
+                                            <div class="col-6 col-md-3">
+                                                <div class="detail-mini-label">Status</div>
+                                                <div class="mt-1"><StatusBadge Text="@GetPaymentStatusLabel(myPayment.PaymentStatus)" Type="@GetPaymentStatusType(myPayment.PaymentStatus)" /></div>
+                                            </div>
+                                            @if (myPayment.PaymentDate.HasValue)
+                                            {
+                                                <div class="col-6 col-md-3">
+                                                    <div class="detail-mini-label">Paid On</div>
+                                                    <div class="detail-mini-value">@myPayment.PaymentDate.Value.ToString("d MMM yyyy")</div>
+                                                </div>
+                                            }
+                                            @if (myPayment.PenaltyAmount > 0)
+                                            {
+                                                <div class="col-6 col-md-3">
+                                                    <div class="detail-mini-label">Penalty</div>
+                                                    <div class="detail-mini-value text-danger">@FormatZAR(myPayment.PenaltyAmount)</div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Contact the Treasurer to record your contribution payment.
+                                </div>
+                            }
+                        }
+                        else if (cycleSummary?.CurrentCycle is not null && cyclePayments.Count == 0)
+                        {
+                            @if (canManage)
+                            {
+                                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Payment records for this cycle have not been prepared yet. Click <strong>Prepare Payment Register</strong> above to create them.
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Payment records are being prepared. Check back shortly.
+                                </div>
+                            }
+                        }
+
+                    </div>
+                </section>
+            </div>
+        </div>
+    }
+
+}
+
+<ConfirmationModal
+    IsVisible="@showConfirmModal"
+    Title="@confirmTitle"
+    Message="@confirmMessage"
+    ConfirmButtonText="@confirmButtonText"
+    CancelButtonText="Cancel"
+    ModalType="warning"
+    OnConfirm="@ConfirmReplaceAndSaveAsync"
+    OnCancel="@CancelConfirm" />
+
+<ConfirmationModal
+    IsVisible="@showCycleRegenConfirm"
+    Title="Regenerate Contribution Cycles"
+    Message="This will deactivate all existing contribution cycles and generate a new schedule based on the current rotation order and configuration. This cannot be undone."
+    ConfirmButtonText="Regenerate"
+    CancelButtonText="Cancel"
+    ModalType="warning"
+    OnConfirm="@DoRegenerateCyclesAsync"
+    OnCancel="@CancelCycleRegen" />
+
+<style>
+    .rm-summary-card { border: 1px solid var(--sk-border); }
+    .rm-summary-value {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--sk-text);
+        margin: .35rem 0 .15rem;
+    }
+    .rm-config-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: .5rem;
+        padding: .4rem 0;
+        border-bottom: 1px solid var(--sk-border);
+        flex-wrap: wrap;
+    }
+    .rm-config-row:last-of-type { border-bottom: none; }
+    .rm-task-banner {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: .85rem 1.1rem;
+        border-radius: var(--r-md);
+        border: 1px solid transparent;
+        flex-wrap: wrap;
+    }
+    .rm-task-banner-green { background: var(--sk-green-50, #f0fdf4); border-color: var(--sk-green-200, #bbf7d0); }
+    .rm-task-banner-blue  { background: #eff6ff; border-color: #bfdbfe; }
+    .rm-task-banner-gold  { background: #fffbeb; border-color: #fde68a; }
+    .rm-task-banner-icon  { font-size: 1.4rem; flex-shrink: 0; color: var(--sk-green-700, #15803d); }
+    .rm-task-banner-blue .rm-task-banner-icon  { color: #2563eb; }
+    .rm-task-banner-gold .rm-task-banner-icon  { color: #d97706; }
+    .rm-task-banner-body  { flex: 1; min-width: 0; }
+    .rm-task-banner-title { font-weight: 600; font-size: .95rem; }
+    .rm-task-banner-desc  { font-size: .85rem; color: var(--sk-text-muted, #6b7280); margin-top: .15rem; }
+    .rm-payment-form-row > td { padding: 0 !important; }
+    .rm-payment-form {
+        background: var(--sk-surface-2, #f8f9fa);
+        border-top: 2px solid var(--sk-green-700, #15803d);
+        border-radius: 0 0 .5rem .5rem;
+    }
+</style>
+
+@if (showPayoutApprovalModal && payoutSummary?.Payout is not null)
+{
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.45)"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Approve Payout</h5></div><div class="modal-body">
+        <p><strong>Cycle:</strong> @payoutSummary.Payout.Cycle.CycleName</p><p><strong>Recipient:</strong> @payoutSummary.Payout.PayoutMember.FullName</p><p><strong>Amount:</strong> @FormatZAR(payoutSummary.Payout.PayoutAmount)</p>
+        <p><strong>Contributions:</strong> @payoutSummary.ContributionSummary.PaidCount paid of @payoutSummary.ContributionSummary.TotalExpected</p>
+        @if (payoutSummary.BankingDetails is null) { <div class="alert alert-warning">Banking details have not been captured for this stokvel.</div> }
+    </div><div class="modal-footer"><button class="btn btn-outline-secondary" @onclick="() => showPayoutApprovalModal = false">Cancel</button><button class="btn btn-primary" @onclick="ApprovePayoutAsync" disabled="@isProcessingPayout">Approve</button></div></div></div></div>
+}
+@if (showPayoutRejectionModal && payoutSummary?.Payout is not null)
+{
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.45)"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reject Payout</h5></div><div class="modal-body"><label class="form-label">Rejection reason *</label><InputTextArea class="form-control" rows="3" @bind-Value="payoutRejectionReason" /></div><div class="modal-footer"><button class="btn btn-outline-secondary" @onclick="() => showPayoutRejectionModal = false">Cancel</button><button class="btn btn-danger" @onclick="RejectPayoutAsync" disabled="@isProcessingPayout">Reject Payout</button></div></div></div></div>
+}
+@if (showPayoutConfirmationModal && payoutSummary?.Payout is not null)
+{
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.45)"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Confirm Payout Payment</h5></div><div class="modal-body">
+        <p><strong>Amount:</strong> @FormatZAR(payoutSummary.Payout.PayoutAmount)</p><p><strong>Recipient:</strong> @payoutSummary.Payout.PayoutMember.FullName</p>
+        <div class="mb-3"><label class="form-label">Payment method *</label><InputSelect class="form-select" @bind-Value="payoutPaymentMethod"><option value="">Select method</option><option value="@PaymentMethod.EFT">EFT</option><option value="@PaymentMethod.Cash">Cash</option><option value="@PaymentMethod.BankDeposit">Bank deposit</option><option value="@PaymentMethod.Other">Other</option></InputSelect></div>
+        <div class="mb-3"><label class="form-label">Payment reference *</label><InputText class="form-control" @bind-Value="payoutPaymentReference" /></div>
+        <div class="mb-3"><label class="form-label">Paid date *</label><InputDate class="form-control" @bind-Value="payoutPaidAt" /></div>
+        <div class="mb-3"><label class="form-label">Notes</label><InputTextArea class="form-control" rows="2" @bind-Value="payoutNotes" /></div>
+    </div><div class="modal-footer"><button class="btn btn-outline-secondary" @onclick="() => showPayoutConfirmationModal = false">Cancel</button><button class="btn btn-primary" @onclick="ConfirmPayoutPaidAsync" disabled="@isProcessingPayout">Confirm Payment</button></div></div></div></div>
+}
+
+@code {
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    private Stokvel? stokvel;
+    private Member? linkedMember;
+    private List<RotationalPayoutOrderItem> activeOrder = [];
+    private List<RotationalPayoutOrderItem> editableOrder = [];
+    private List<RotationalPayoutOrderItem> previewOrder = [];
+    private RotationalStokvelConfiguration? activeConfig;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isEditing;
+    private bool isGeneratingPreview;
+    private bool canManage;
+    private bool showConfirmModal;
+    private int eligibleMemberCount;
+    private RotationOrderMethod pendingPreviewMethod;
+    private string previewMethodLabel = string.Empty;
+    private string confirmTitle = string.Empty;
+    private string confirmMessage = string.Empty;
+    private string confirmButtonText = "Confirm";
+    private string? currentUserId;
+    private string? successMessage;
+    private List<string> errors = [];
+    private CycleSummary? cycleSummary;
+    private bool isGeneratingCycles;
+    private bool showCycleRegenConfirm;
+    private List<string> cycleErrors = [];
+    private string? cycleSuccessMessage;
+
+    // Payment section state
+    private List<RotationalContributionPayment> cyclePayments = [];
+    private CycleContributionSummary? contributionSummary;
+    private bool isTreasurer;
+    private bool canViewPayments;
+    private RotationalContributionPayment? myPayment;
+    private Guid? selectedPaymentId;
+    private decimal paymentFormPaidAmount;
+    private DateTime? paymentFormDate;
+    private ContributionPaymentMethod? paymentFormMethod;
+    private string? paymentFormReference;
+    private string? paymentFormNotes;
+    private ContributionPaymentStatus paymentFormStatus = ContributionPaymentStatus.Paid;
+    private bool isConfirmingPayment;
+    private bool isPreparingPayments;
+    private List<string> paymentErrors = [];
+    private string? paymentSuccessMessage;
+    private PayoutSummary? payoutSummary;
+    private bool showPayoutApprovalModal;
+    private bool showPayoutRejectionModal;
+    private bool showPayoutConfirmationModal;
+    private bool isProcessingPayout;
+    private string? payoutRejectionReason;
+    private PaymentMethod? payoutPaymentMethod;
+    private string? payoutPaymentReference;
+    private DateTime? payoutPaidAt;
+    private string? payoutNotes;
+    private List<string> payoutErrors = [];
+
+    private RotationalPayoutOrderItem? NextRecipient =>
+        activeOrder.FirstOrDefault(item => !item.HasReceivedPayout);
+
+    private int CompletedPayouts =>
+        activeOrder.Count(item => item.HasReceivedPayout);
+
+    private bool IsCurrentMember(Guid memberId) =>
+        linkedMember?.Id == memberId;
+
+    private (string Text, string Type) GetCurrentStatus()
+    {
+        if (payoutSummary?.Payout is not null)
+        {
+            return payoutSummary.Payout.PayoutStatus switch
+            {
+                RotationalPayoutStatus.ReadyForApproval => ("Waiting for payout approval", "warning"),
+                RotationalPayoutStatus.Approved => ("Payout approved", "success"),
+                RotationalPayoutStatus.Rejected => ("Payout rejected", "danger"),
+                RotationalPayoutStatus.Paid => ("Payout paid", "success"),
+                _ => ("Payout pending", "warning")
+            };
+        }
+        if (cycleSummary?.CurrentCycle is not null)
+        {
+            return cycleSummary.CurrentCycle.Status switch
+            {
+                RotationalCycleStatus.Open => ("Cycle open", "success"),
+                RotationalCycleStatus.ContributionsDue => ("Contributions due", "warning"),
+                RotationalCycleStatus.ReadyForPayout => ("Ready for payout", "success"),
+                RotationalCycleStatus.PayoutPending => ("Payout pending", "warning"),
+                _ => ("Cycle active", "success")
+            };
+        }
+        if (cycleSummary?.IsGenerated == true) return ("Cycles generated", "success");
+        if (activeOrder.Count > 0) return ("Order ready", "success");
+        if (activeConfig is null) return ("Configuration required", "warning");
+        if (eligibleMemberCount < 2) return ("Add members", "warning");
+        return ("Order not configured", "secondary");
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errors = [];
+        successMessage = null;
+        isEditing = false;
+        previewOrder = [];
+        activeOrder = [];
+        editableOrder = [];
+        activeConfig = null;
+        eligibleMemberCount = 0;
+        linkedMember = null;
+        canManage = false;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        var summary = await RotationOrderService.GetRotationalManagementSummaryAsync(StokvelId, currentUserId);
+        stokvel = summary?.Stokvel;
+
+        if (summary is null || !summary.Stokvel.EnableRotation)
+        {
+            isLoading = false;
+            return;
+        }
+
+        linkedMember = summary.LinkedMember;
+        canManage = summary.CanManage;
+        activeConfig = summary.ActiveConfiguration;
+        activeOrder = summary.ActiveOrder;
+        eligibleMemberCount = summary.EligibleMemberCount;
+
+        cycleSummary = await CycleService.GetCycleSummaryAsync(StokvelId, currentUserId);
+        payoutSummary = await PayoutService.GetPayoutSummaryAsync(StokvelId, currentUserId);
+
+        // Load payment section
+        isTreasurer = currentUserId != null && await MemberAccessService.CanManagePaymentsAsync(currentUserId, StokvelId);
+        canViewPayments = canManage || isTreasurer;
+        cyclePayments = [];
+        contributionSummary = null;
+        myPayment = null;
+        selectedPaymentId = null;
+        paymentErrors = [];
+        paymentSuccessMessage = null;
+
+        if (cycleSummary?.CurrentCycle is not null && currentUserId != null)
+        {
+            if (canViewPayments)
+            {
+                cyclePayments = await PaymentService.GetPaymentsForCycleAsync(cycleSummary.CurrentCycle.Id);
+                if (cyclePayments.Count > 0)
+                    contributionSummary = await PaymentService.GetCycleContributionSummaryAsync(cycleSummary.CurrentCycle.Id);
+            }
+            else if (linkedMember is not null)
+            {
+                myPayment = await PaymentService.GetMyPaymentForCycleAsync(cycleSummary.CurrentCycle.Id, linkedMember.Id);
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private async Task GenerateCyclesAsync()
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+        isGeneratingCycles = true;
+        cycleErrors = [];
+        cycleSuccessMessage = null;
+
+        var result = await CycleService.GenerateContributionCyclesAsync(StokvelId, currentUserId);
+        if (result.Success)
+        {
+            cycleSuccessMessage = $"{result.CyclesGenerated} contribution cycles generated successfully.";
+            cycleSummary = await CycleService.GetCycleSummaryAsync(StokvelId, currentUserId);
+        }
+        else
+        {
+            cycleErrors = result.Errors;
+        }
+
+        isGeneratingCycles = false;
+    }
+
+    private async Task ConfirmRegenerateCyclesAsync()
+    {
+        showCycleRegenConfirm = true;
+    }
+
+    private async Task DoRegenerateCyclesAsync()
+    {
+        showCycleRegenConfirm = false;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+        isGeneratingCycles = true;
+        cycleErrors = [];
+        cycleSuccessMessage = null;
+
+        var result = await CycleService.RegenerateContributionCyclesAsync(StokvelId, currentUserId);
+        if (result.Success)
+        {
+            cycleSuccessMessage = $"Contribution cycles regenerated ({result.CyclesGenerated} cycles).";
+            cycleSummary = await CycleService.GetCycleSummaryAsync(StokvelId, currentUserId);
+        }
+        else
+        {
+            cycleErrors = result.Errors;
+        }
+
+        isGeneratingCycles = false;
+    }
+
+    private void CancelCycleRegen() => showCycleRegenConfirm = false;
+
+    private async Task GeneratePreviewAsync(RotationOrderMethod method)
+    {
+        if (!canManage)
+        {
+            errors = ["Only office bearers can generate or edit the rotation order."];
+            return;
+        }
+
+        if (activeOrder.Count > 0)
+        {
+            pendingPreviewMethod = method;
+            confirmTitle = "Replace Rotation Order";
+            confirmMessage = "This will generate a new order preview. The current active order will only be replaced when you click Save. Historical records will be preserved.";
+            confirmButtonText = "Generate Preview";
+            showConfirmModal = true;
+            return;
+        }
+
+        await DoGeneratePreviewAsync(method);
+    }
+
+    private async Task ConfirmReplaceAndSaveAsync()
+    {
+        showConfirmModal = false;
+        await DoGeneratePreviewAsync(pendingPreviewMethod);
+    }
+
+    private async Task DoGeneratePreviewAsync(RotationOrderMethod method)
+    {
+        isGeneratingPreview = true;
+        pendingPreviewMethod = method;
+        errors = [];
+        successMessage = null;
+
+        var (items, previewErrors) = await RotationOrderService.PreviewRotationOrderAsync(StokvelId, method);
+
+        if (previewErrors.Count > 0)
+        {
+            errors = previewErrors;
+            isGeneratingPreview = false;
+            return;
+        }
+
+        previewOrder = items;
+        previewMethodLabel = method switch
+        {
+            RotationOrderMethod.ByJoiningDate => "By Joining Date",
+            RotationOrderMethod.Random => "Random",
+            _ => "Generated"
+        };
+        isEditing = false;
+        editableOrder = [];
+        isGeneratingPreview = false;
+    }
+
+    private void CancelPreview()
+    {
+        previewOrder = [];
+        pendingPreviewMethod = default;
+        previewMethodLabel = string.Empty;
+        errors = [];
+    }
+
+    private async Task SavePreviewOrderAsync()
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            errors = ["Current user could not be identified."];
+            return;
+        }
+
+        isSaving = true;
+        var orderedMemberIds = previewOrder.Select(item => item.MemberId).ToList();
+        var result = await RotationOrderService.SaveManualRotationOrderAsync(StokvelId, orderedMemberIds, currentUserId);
+        await HandleSaveResultAsync(result, $"Rotation order saved ({previewMethodLabel}).");
+        if (result.Success) previewOrder = [];
+        isSaving = false;
+    }
+
+    private async Task StartManualCreate()
+    {
+        if (!canManage)
+        {
+            errors = ["Only office bearers can create or edit the rotation order."];
+            return;
+        }
+
+        editableOrder = activeOrder.Count > 0
+            ? activeOrder.Select(item => item with { }).ToList()
+            : await RotationOrderService.GetEligibleMembersAsync(StokvelId);
+
+        for (var i = 0; i < editableOrder.Count; i++)
+            editableOrder[i] = editableOrder[i] with { Position = i + 1 };
+
+        isEditing = true;
+        previewOrder = [];
+        errors = [];
+        successMessage = null;
+    }
+
+    private void StartEdit()
+    {
+        if (!canManage)
+        {
+            errors = ["Only office bearers can edit the rotation order."];
+            return;
+        }
+
+        editableOrder = activeOrder.Select(item => item with { }).ToList();
+        isEditing = true;
+        previewOrder = [];
+        errors = [];
+        successMessage = null;
+    }
+
+    private async Task SaveManualOrderAsync()
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            errors = ["Current user could not be identified."];
+            return;
+        }
+
+        isSaving = true;
+        var orderedMemberIds = editableOrder.Select(item => item.MemberId).ToList();
+        var result = activeOrder.Count > 0
+            ? await RotationOrderService.ReorderRotationOrderAsync(StokvelId, orderedMemberIds, currentUserId)
+            : await RotationOrderService.SaveManualRotationOrderAsync(StokvelId, orderedMemberIds, currentUserId);
+
+        await HandleSaveResultAsync(result, "Manual rotation order saved.");
+        isSaving = false;
+    }
+
+    private async Task SaveFromQuickActionsAsync()
+    {
+        if (previewOrder.Count > 0)
+            await SavePreviewOrderAsync();
+        else if (isEditing)
+            await SaveManualOrderAsync();
+    }
+
+    private void CancelCurrentAction()
+    {
+        if (previewOrder.Count > 0) CancelPreview();
+        else if (isEditing) CancelEdit();
+    }
+
+    private async Task HandleSaveResultAsync(RotationOrderSaveResult result, string message)
+    {
+        if (!result.Success)
+        {
+            errors = result.Errors;
+            return;
+        }
+
+        activeOrder = await RotationOrderService.GetActiveRotationOrderAsync(StokvelId);
+        eligibleMemberCount = await RotationOrderService.GetEligibleMemberCountAsync(StokvelId);
+        editableOrder = [];
+        isEditing = false;
+        errors = [];
+        successMessage = message;
+    }
+
+    private void MoveUp(int index)
+    {
+        if (index <= 0) return;
+        (editableOrder[index - 1], editableOrder[index]) = (editableOrder[index], editableOrder[index - 1]);
+        RecalculatePositions();
+    }
+
+    private void MoveDown(int index)
+    {
+        if (index >= editableOrder.Count - 1) return;
+        (editableOrder[index + 1], editableOrder[index]) = (editableOrder[index], editableOrder[index + 1]);
+        RecalculatePositions();
+    }
+
+    private void RecalculatePositions()
+    {
+        for (var i = 0; i < editableOrder.Count; i++)
+            editableOrder[i] = editableOrder[i] with { Position = i + 1 };
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        editableOrder = [];
+        errors = [];
+    }
+
+    private void CancelConfirm() => showConfirmModal = false;
+
+    private RenderFragment RenderReadOnlyTable(IReadOnlyList<RotationalPayoutOrderItem> rows) => builder =>
+    {
+        var seq = 0;
+        builder.OpenElement(seq++, "div");
+        builder.AddAttribute(seq++, "class", "table-responsive");
+        builder.OpenElement(seq++, "table");
+        builder.AddAttribute(seq++, "class", "table align-middle");
+        builder.OpenElement(seq++, "thead");
+        builder.OpenElement(seq++, "tr");
+        foreach (var h in new[] { "#", "Member", "Status" })
+        {
+            builder.OpenElement(seq++, "th");
+            builder.AddContent(seq++, h);
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.OpenElement(seq++, "tbody");
+
+        foreach (var row in rows)
+        {
+            var isCurrent = linkedMember?.Id == row.MemberId;
+            builder.OpenElement(seq++, "tr");
+            builder.AddAttribute(seq++, "class", isCurrent ? "table-success" : null);
+
+            builder.OpenElement(seq++, "td");
+            builder.AddAttribute(seq++, "class", "fw-bold text-muted");
+            builder.AddContent(seq++, row.Position);
+            builder.CloseElement();
+
+            builder.OpenElement(seq++, "td");
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "fw-semibold");
+            builder.AddContent(seq++, row.MemberName);
+            if (isCurrent)
+            {
+                builder.AddMarkupContent(seq++, " <span class=\"sisonke-badge sisonke-badge-green ms-2\">You</span>");
+            }
+            builder.CloseElement();
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "text-muted small");
+            builder.AddContent(seq++, row.MemberNumber);
+            builder.CloseElement();
+            builder.CloseElement();
+
+            builder.OpenElement(seq++, "td");
+            builder.AddAttribute(seq++, "class", "text-muted small");
+            builder.AddContent(seq++, $"{row.MemberStatus} / {row.GovernanceStatus}");
+            builder.CloseElement();
+
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private async Task RefreshPayoutAsync()
+    {
+        payoutSummary = await PayoutService.GetPayoutSummaryAsync(StokvelId, currentUserId);
+        cycleSummary = await CycleService.GetCycleSummaryAsync(StokvelId, currentUserId);
+        activeOrder = await RotationOrderService.GetActiveRotationOrderAsync(StokvelId);
+    }
+
+    private async Task ApprovePayoutAsync()
+    {
+        if (payoutSummary?.Payout is null || string.IsNullOrWhiteSpace(currentUserId)) return;
+        isProcessingPayout = true;
+        var result = await PayoutService.ApprovePayoutAsync(payoutSummary.Payout.Id, currentUserId);
+        payoutErrors = result.Errors; isProcessingPayout = false;
+        if (!result.Success) return;
+        showPayoutApprovalModal = false;
+        await RefreshPayoutAsync();
+    }
+
+    private async Task RejectPayoutAsync()
+    {
+        if (payoutSummary?.Payout is null || string.IsNullOrWhiteSpace(currentUserId)) return;
+        isProcessingPayout = true;
+        var result = await PayoutService.RejectPayoutAsync(
+            payoutSummary.Payout.Id, currentUserId, payoutRejectionReason ?? string.Empty);
+        payoutErrors = result.Errors; isProcessingPayout = false;
+        if (!result.Success) return;
+        showPayoutRejectionModal = false;
+        await RefreshPayoutAsync();
+    }
+
+    private void OpenPayoutConfirmation()
+    {
+        payoutPaymentMethod = PaymentMethod.EFT;
+        payoutPaymentReference = null;
+        payoutPaidAt = DateTime.Today;
+        payoutNotes = null;
+        payoutErrors = [];
+        showPayoutConfirmationModal = true;
+    }
+
+    private async Task ConfirmPayoutPaidAsync()
+    {
+        if (payoutSummary?.Payout is null || string.IsNullOrWhiteSpace(currentUserId)) return;
+        isProcessingPayout = true;
+        var result = await PayoutService.ConfirmPayoutPaidAsync(
+            payoutSummary.Payout.Id, currentUserId,
+            new ConfirmPayoutPaidRequest(payoutPaymentMethod, payoutPaymentReference, payoutPaidAt, payoutNotes));
+        payoutErrors = result.Errors; isProcessingPayout = false;
+        if (!result.Success) return;
+        showPayoutConfirmationModal = false;
+        await RefreshPayoutAsync();
+    }
+
+    private static string FormatPayoutStatus(RotationalPayoutStatus status) => status switch
+    {
+        RotationalPayoutStatus.ReadyForApproval => "Ready for approval",
+        RotationalPayoutStatus.Approved => "Approved — awaiting payment",
+        _ => status.ToString()
+    };
+
+    private static string GetPayoutStatusType(RotationalPayoutStatus status) => status switch
+    {
+        RotationalPayoutStatus.Paid => "success",
+        RotationalPayoutStatus.Rejected or RotationalPayoutStatus.Cancelled => "danger",
+        RotationalPayoutStatus.Approved => "info",
+        _ => "warning"
+    };
+
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string GetCycleStatusLabel(RotationalCycleStatus status) => status switch
+    {
+        RotationalCycleStatus.Draft => "Draft",
+        RotationalCycleStatus.Pending => "Pending",
+        RotationalCycleStatus.Open => "Open",
+        RotationalCycleStatus.ContributionsDue => "Due",
+        RotationalCycleStatus.ReadyForPayout => "Ready",
+        RotationalCycleStatus.PayoutPending => "Payout Pending",
+        RotationalCycleStatus.PaidOut => "Paid Out",
+        RotationalCycleStatus.Closed => "Closed",
+        RotationalCycleStatus.Cancelled => "Cancelled",
+        _ => status.ToString()
+    };
+
+    private static string GetCycleStatusType(RotationalCycleStatus status) => status switch
+    {
+        RotationalCycleStatus.Open => "success",
+        RotationalCycleStatus.ContributionsDue => "warning",
+        RotationalCycleStatus.ReadyForPayout => "info",
+        RotationalCycleStatus.PayoutPending => "warning",
+        RotationalCycleStatus.PaidOut => "dark",
+        RotationalCycleStatus.Closed => "secondary",
+        RotationalCycleStatus.Cancelled => "danger",
+        _ => "secondary"
+    };
+
+    // ── Payment section ────────────────────────────────────────────────
+
+    private async Task PreparePaymentRegisterAsync()
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+        isPreparingPayments = true;
+        paymentErrors = [];
+        paymentSuccessMessage = null;
+
+        var result = await PaymentService.EnsurePaymentRecordsForStokvelAsync(StokvelId, currentUserId);
+        if (result.Success)
+        {
+            paymentSuccessMessage = result.RecordsCreated > 0
+                ? $"Payment register prepared: {result.RecordsCreated} records created."
+                : "Payment register is already up to date.";
+            if (cycleSummary?.CurrentCycle is not null)
+            {
+                cyclePayments = await PaymentService.GetPaymentsForCycleAsync(cycleSummary.CurrentCycle.Id);
+                if (cyclePayments.Count > 0)
+                    contributionSummary = await PaymentService.GetCycleContributionSummaryAsync(cycleSummary.CurrentCycle.Id);
+            }
+        }
+        else
+        {
+            paymentErrors = result.Errors;
+        }
+
+        isPreparingPayments = false;
+    }
+
+    private void OpenPaymentForm(RotationalContributionPayment payment)
+    {
+        selectedPaymentId = payment.Id;
+        paymentFormPaidAmount = payment.PaidAmount > 0 ? payment.PaidAmount : payment.ExpectedAmount;
+        paymentFormDate = payment.PaymentDate ?? DateTime.Today;
+        paymentFormMethod = payment.PaymentMethod;
+        paymentFormReference = payment.ReferenceNumber;
+        paymentFormNotes = payment.Notes;
+        paymentFormStatus = payment.PaymentStatus is ContributionPaymentStatus.Unpaid or ContributionPaymentStatus.PartiallyPaid
+            ? ContributionPaymentStatus.Paid
+            : payment.PaymentStatus;
+        paymentErrors = [];
+        paymentSuccessMessage = null;
+    }
+
+    private void ClosePaymentForm()
+    {
+        selectedPaymentId = null;
+        paymentErrors = [];
+    }
+
+    private async Task SavePaymentAsync(Guid paymentId)
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+        isConfirmingPayment = true;
+        paymentErrors = [];
+        paymentSuccessMessage = null;
+
+        var request = new ConfirmPaymentRequest(
+            PaidAmount: paymentFormStatus == ContributionPaymentStatus.Waived ? 0 : paymentFormPaidAmount,
+            PaymentDate: paymentFormStatus == ContributionPaymentStatus.Waived ? null : paymentFormDate,
+            PaymentMethod: paymentFormStatus == ContributionPaymentStatus.Waived ? null : paymentFormMethod,
+            ReferenceNumber: paymentFormReference,
+            Notes: paymentFormNotes,
+            PaymentStatus: paymentFormStatus);
+
+        var result = await PaymentService.ConfirmPaymentAsync(paymentId, request, currentUserId);
+
+        if (result.Success)
+        {
+            selectedPaymentId = null;
+            paymentSuccessMessage = result.PenaltyApplied > 0
+                ? $"Payment recorded. Penalty applied: {FormatZAR(result.PenaltyApplied)}."
+                : "Payment recorded successfully.";
+            if (cycleSummary?.CurrentCycle is not null)
+            {
+                cyclePayments = await PaymentService.GetPaymentsForCycleAsync(cycleSummary.CurrentCycle.Id);
+                contributionSummary = await PaymentService.GetCycleContributionSummaryAsync(cycleSummary.CurrentCycle.Id);
+                cycleSummary = await CycleService.GetCycleSummaryAsync(StokvelId, currentUserId);
+                payoutSummary = await PayoutService.GetPayoutSummaryAsync(StokvelId, currentUserId);
+            }
+        }
+        else
+        {
+            paymentErrors = result.Errors;
+        }
+
+        isConfirmingPayment = false;
+    }
+
+    private static string GetPaymentStatusLabel(ContributionPaymentStatus status) => status switch
+    {
+        ContributionPaymentStatus.Unpaid => "Unpaid",
+        ContributionPaymentStatus.PartiallyPaid => "Partial",
+        ContributionPaymentStatus.Paid => "Paid",
+        ContributionPaymentStatus.Late => "Late",
+        ContributionPaymentStatus.Waived => "Waived",
+        ContributionPaymentStatus.Cancelled => "Cancelled",
+        _ => status.ToString()
+    };
+
+    private static string GetPaymentStatusType(ContributionPaymentStatus status) => status switch
+    {
+        ContributionPaymentStatus.Paid => "success",
+        ContributionPaymentStatus.PartiallyPaid => "warning",
+        ContributionPaymentStatus.Unpaid => "secondary",
+        ContributionPaymentStatus.Late => "danger",
+        ContributionPaymentStatus.Waived => "info",
+        ContributionPaymentStatus.Cancelled => "dark",
+        _ => "secondary"
+    };
+
+    private static string GetPaymentRowClass(ContributionPaymentStatus status) => status switch
+    {
+        ContributionPaymentStatus.Paid => "table-success",
+        ContributionPaymentStatus.Late => "table-danger",
+        ContributionPaymentStatus.Waived => "table-info",
+        _ => ""
+    };
+}

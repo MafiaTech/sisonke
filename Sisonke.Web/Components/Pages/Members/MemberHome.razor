@@ -21,6 +21,9 @@
 @inject StokvelService StokvelService
 @inject ContributionPaymentService ContributionPaymentService
 @inject VotingService VotingService
+@inject RotationalPayoutOrderService RotationalPayoutOrderService
+@inject RotationalTaskService RotationalTaskService
+@inject StokvelBankingDetailsService StokvelBankingDetailsService
 
 <PageTitle>My Member Dashboard</PageTitle>
 <link rel="stylesheet" href="/css/member-workspace.css" />
@@ -624,20 +627,210 @@ else
                 <div class="mw-card mw-card-accent mw-ca-ochre">
                     <div class="mw-card-top">
                         <div class="mw-card-tl">
-                            <div class="mw-card-ico mw-ico-ochre">🏠</div>
-                            <span class="mw-card-lbl">My Payout / Host Turn</span>
+                            <div class="mw-card-ico mw-ico-ochre">#</div>
+                            <span class="mw-card-lbl">My Rotation Position</span>
                         </div>
+                        <a class="mw-btn mw-btn-outline mw-btn-xs" href="@($"/rotational/rotation-order/{stokvel.Id}")">View Order</a>
                     </div>
                     <div class="mw-card-body">
-                        <div class="mw-alert mw-alert-warn">
-                            <div class="mw-alert-icon">ℹ</div>
-                            <div>
-                                <div class="mw-alert-title">Coming Soon</div>
-                                <div class="mw-alert-body">Payout and host rotation coming soon.</div>
+                        @if (!rotationOrderSummary.IsConfigured)
+                        {
+                            <div class="mw-alert mw-alert-warn">
+                                <div class="mw-alert-icon">i</div>
+                                <div>
+                                    <div class="mw-alert-title">Not configured</div>
+                                    <div class="mw-alert-body">An office bearer still needs to set the rotation order.</div>
+                                </div>
                             </div>
-                        </div>
+                        }
+                        else
+                        {
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Position</span>
+                                <span class="mw-p-val">@DisplayPosition(rotationOrderSummary.CurrentMemberPosition) of @rotationOrderSummary.MemberCount</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Payout received</span>
+                                <span class="mw-p-val">@(rotationOrderSummary.CurrentMemberHasReceivedPayout == true ? "Yes" : "No")</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Next payout member</span>
+                                <span class="mw-p-val">@Display(rotationOrderSummary.NextPayoutMemberName)</span>
+                            </div>
+                        }
                     </div>
                 </div>
+
+                @if (memberRotationalView?.CurrentCycle is not null)
+                {
+                    <div class="mw-card mw-card-accent mw-ca-green">
+                        <div class="mw-card-top">
+                            <div class="mw-card-tl">
+                                <div class="mw-card-ico mw-ico-green">R</div>
+                                <span class="mw-card-lbl">My Contribution — @memberRotationalView.CurrentCycle.CycleName</span>
+                            </div>
+                        </div>
+                        <div class="mw-card-body">
+                            @if (memberRotationalView.MyPayment is not null)
+                            {
+                                var payment = memberRotationalView.MyPayment;
+                                <div class="mw-p-row">
+                                    <span class="mw-p-lbl">Expected amount</span>
+                                    <span class="mw-p-val">@FormatCurrency(payment.ExpectedAmount)</span>
+                                </div>
+                                <div class="mw-p-row">
+                                    <span class="mw-p-lbl">Status</span>
+                                    <span class="mw-p-val">
+                                        @(payment.PaymentStatus switch {
+                                            ContributionPaymentStatus.Paid => "✓ Paid",
+                                            ContributionPaymentStatus.PartiallyPaid => "Partially Paid",
+                                            ContributionPaymentStatus.Late => "Late",
+                                            ContributionPaymentStatus.Waived => "Waived",
+                                            _ => "Not yet paid"
+                                        })
+                                    </span>
+                                </div>
+                                <div class="mw-p-row">
+                                    <span class="mw-p-lbl">Due date</span>
+                                    <span class="mw-p-val">@memberRotationalView.CurrentCycle.ContributionDueDate.ToString("d MMM yyyy")</span>
+                                </div>
+                                @if (payment.PaidAmount > 0)
+                                {
+                                    <div class="mw-p-row">
+                                        <span class="mw-p-lbl">Paid</span>
+                                        <span class="mw-p-val">@FormatCurrency(payment.PaidAmount)</span>
+                                    </div>
+                                }
+                                @if (payment.PaymentDate.HasValue)
+                                {
+                                    <div class="mw-p-row">
+                                        <span class="mw-p-lbl">Payment date</span>
+                                        <span class="mw-p-val">@payment.PaymentDate.Value.ToString("d MMM yyyy")</span>
+                                    </div>
+                                }
+                                @if (payment.PenaltyAmount > 0)
+                                {
+                                    <div class="mw-p-row">
+                                        <span class="mw-p-lbl">Penalty</span>
+                                        <span class="mw-p-val" style="color:var(--sk-red,#dc2626)">@FormatCurrency(payment.PenaltyAmount)</span>
+                                    </div>
+                                }
+                                @if (payment.PaymentStatus == ContributionPaymentStatus.Unpaid || payment.PaymentStatus == ContributionPaymentStatus.PartiallyPaid)
+                                {
+                                    <div class="mw-alert mw-alert-info mt-2">
+                                        <div class="mw-alert-icon">i</div>
+                                        <div>
+                                            <div class="mw-alert-title">Payment required</div>
+                                            <div class="mw-alert-body">Contact the Treasurer once you have made your payment.</div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="mw-alert mw-alert-info">
+                                    <div class="mw-alert-icon">i</div>
+                                    <div>
+                                        <div class="mw-alert-title">Payment record pending</div>
+                                        <div class="mw-alert-body">The Treasurer will prepare your contribution record shortly.</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (memberRotationalView?.BankingDetails is not null)
+                {
+                    var banking = memberRotationalView.BankingDetails;
+                    <div class="mw-card mw-card-accent mw-ca-blue">
+                        <div class="mw-card-top">
+                            <div class="mw-card-tl">
+                                <div class="mw-card-ico mw-ico-blue">B</div>
+                                <span class="mw-card-lbl">Contribution Banking Details</span>
+                            </div>
+                        </div>
+                        <div class="mw-card-body">
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Bank</span>
+                                <span class="mw-p-val">@banking.BankName</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Account holder</span>
+                                <span class="mw-p-val">@banking.AccountHolderName</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Account number</span>
+                                <span class="mw-p-val mw-p-val--mono">@StokvelBankingDetailsService.MaskAccountNumber(banking.AccountNumber)</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(banking.BranchCode))
+                            {
+                                <div class="mw-p-row">
+                                    <span class="mw-p-lbl">Branch code</span>
+                                    <span class="mw-p-val mw-p-val--mono">@banking.BranchCode</span>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(banking.PaymentReferenceFormat))
+                            {
+                                <div class="mw-p-row">
+                                    <span class="mw-p-lbl">Payment reference</span>
+                                    <span class="mw-p-val">@banking.PaymentReferenceFormat</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (memberRotationalView?.IsCurrentRecipient == true && memberRotationalView.CurrentPayout is not null)
+                {
+                    var payout = memberRotationalView.CurrentPayout;
+                    <div class="mw-card mw-card-accent mw-ca-fern">
+                        <div class="mw-card-top">
+                            <div class="mw-card-tl">
+                                <div class="mw-card-ico mw-ico-fern">★</div>
+                                <span class="mw-card-lbl">My Payout</span>
+                            </div>
+                        </div>
+                        <div class="mw-card-body">
+                            <div class="mw-alert mw-alert-info mb-2">
+                                <div class="mw-alert-icon">★</div>
+                                <div>
+                                    <div class="mw-alert-title">You are the current payout recipient</div>
+                                </div>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Payout amount</span>
+                                <span class="mw-p-val">@FormatCurrency(payout.PayoutAmount)</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Status</span>
+                                <span class="mw-p-val">
+                                    @(payout.PayoutStatus switch {
+                                        RotationalPayoutStatus.ReadyForApproval => "Waiting for Chairperson approval",
+                                        RotationalPayoutStatus.Approved => "Approved — waiting for payment",
+                                        RotationalPayoutStatus.Paid => "Paid ✓",
+                                        RotationalPayoutStatus.Rejected => "Rejected",
+                                        _ => payout.PayoutStatus.ToString()
+                                    })
+                                </span>
+                            </div>
+                            @if (payout.PayoutStatus == RotationalPayoutStatus.Paid && payout.PaidAt.HasValue)
+                            {
+                                <div class="mw-p-row">
+                                    <span class="mw-p-lbl">Paid on</span>
+                                    <span class="mw-p-val">@payout.PaidAt.Value.ToString("d MMM yyyy")</span>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(payout.PaymentReference))
+                                {
+                                    <div class="mw-p-row">
+                                        <span class="mw-p-lbl">Reference</span>
+                                        <span class="mw-p-val mw-p-val--mono">@payout.PaymentReference</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
             }
 
         </div>
@@ -743,6 +936,8 @@ else
 
     private Member? member;
     private Stokvel? stokvel;
+    private RotationalPayoutOrderSummary rotationOrderSummary = new(false, 0, null, null, null);
+    private MemberRotationalView? memberRotationalView;
     private List<MemberFine> memberFines = [];
     private List<FuneralClaim> memberClaims = [];
     private List<MemberDependent> dependents = [];
@@ -798,6 +993,8 @@ else
         isAllowed = false;
         member = null;
         stokvel = null;
+        rotationOrderSummary = new(false, 0, null, null, null);
+        memberRotationalView = null;
         memberFines = [];
         memberClaims = [];
         dependents = [];
@@ -866,6 +1063,11 @@ else
             .GroupBy(minutes => minutes.MeetingId)
             .ToDictionary(group => group.Key, group => group.First());
         openVotes = await VotingService.GetOpenVotesForMemberAsync(MemberId, stokvel.Id);
+        if (stokvel.EnableRotation)
+        {
+            rotationOrderSummary = await RotationalPayoutOrderService.GetSummaryAsync(stokvel.Id, MemberId);
+            memberRotationalView = await RotationalTaskService.GetMemberRotationalViewAsync(stokvel.Id, MemberId);
+        }
 
         foreach (var meeting in upcomingMeetings)
         {
@@ -884,6 +1086,9 @@ else
     {
         return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
     }
+
+    private static string DisplayPosition(int? position) =>
+        position.HasValue ? position.Value.ToString() : "Not assigned";
 
     private static string GetMemberStatusVariant(MemberStatus status)
     {

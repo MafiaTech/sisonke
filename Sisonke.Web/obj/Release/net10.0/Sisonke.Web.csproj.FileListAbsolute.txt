@@ -1,5 +1,6 @@
 C:\Users\mpshe\Projects\Sisonke-Recovered\Sisonke.Web\bin\Release\net10.0\appsettings.Development.json
 C:\Users\mpshe\Projects\Sisonke-Recovered\Sisonke.Web\bin\Release\net10.0\appsettings.json
+C:\Users\mpshe\Projects\Sisonke-Recovered\Sisonke.Web\bin\Release\net10.0\appsettings.Production.json
 C:\Users\mpshe\Projects\Sisonke-Recovered\Sisonke.Web\bin\Release\net10.0\artifacts\verify-build\appsettings.Development.json
 C:\Users\mpshe\Projects\Sisonke-Recovered\Sisonke.Web\bin\Release\net10.0\artifacts\verify-build\appsettings.json
 C:\Users\mpshe\Projects\Sisonke-Recovered\Sisonke.Web\bin\Release\net10.0\artifacts\verify-build\Sisonke.Web.deps.json

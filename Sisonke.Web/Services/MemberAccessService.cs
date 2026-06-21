@@ -161,6 +161,7 @@ public class MemberAccessService(ApplicationDbContext context)
         }
 
         var stokvel = await context.Stokvels
+            .AsNoTracking()
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
             .ThenBy(existingStokvel => existingStokvel.Name)
@@ -171,16 +172,20 @@ public class MemberAccessService(ApplicationDbContext context)
             return null;
         }
 
-        var linkedMembers = await context.Members
+        return await context.Members
+            .AsNoTracking()
             .Where(member =>
                 member.ApplicationUserId == userId &&
                 member.TenantId == stokvel.TenantId)
-            .OrderBy(member => member.CreatedAt)
+            .OrderByDescending(member =>
+                member.DefaultRole == SisonkeRole.Creator ||
+                member.DefaultRole == SisonkeRole.StokvelAdmin ||
+                member.DefaultRole == SisonkeRole.Chairperson ||
+                member.DefaultRole == SisonkeRole.Secretary ||
+                member.DefaultRole == SisonkeRole.Treasurer)
+            .ThenBy(member => member.CreatedAt)
             .ThenBy(member => member.FullName)
-            .ToListAsync();
-
-        return linkedMembers.FirstOrDefault(member => IsOfficeBearerRole(member.DefaultRole.ToString())) ??
-            linkedMembers.FirstOrDefault();
+            .FirstOrDefaultAsync();
     }
 
     public async Task<List<Member>> GetLinkedMembershipsForUserAsync(string userId)
@@ -191,10 +196,33 @@ public class MemberAccessService(ApplicationDbContext context)
         }
 
         return await context.Members
+            .AsNoTracking()
             .Include(member => member.Tenant)
             .Where(member => member.ApplicationUserId == userId)
             .OrderBy(member => member.FullName)
             .ToListAsync();
+    }
+
+    public async Task<DashboardAccessSnapshot> GetDashboardAccessAsync(string userId, Guid stokvelId)
+    {
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+        if (member is null)
+        {
+            return DashboardAccessSnapshot.None;
+        }
+
+        var role = member.DefaultRole.ToString();
+        return new DashboardAccessSnapshot(
+            member,
+            IsOfficeBearerRole(role),
+            CanViewSecretaryTasksRole(role),
+            CanViewChairpersonTasksRole(role),
+            CanManageMeetingsRole(role),
+            CanReviewClaimsRole(role),
+            CanManageMeetingsRole(role),
+            CanViewTreasurerTasksRole(role),
+            CanManagePaymentsRole(role),
+            CanViewFinancialsRole(role));
     }
 
     public async Task<bool> IsOfficeBearerAsync(string userId, Guid stokvelId)
@@ -584,4 +612,61 @@ public class MemberAccessService(ApplicationDbContext context)
 
         return member is not null && CanViewFinancialsRole(member.DefaultRole.ToString());
     }
+
+    public async Task<bool> CanEditStokvelAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        if (member is null)
+        {
+            return false;
+        }
+
+        var role = member.DefaultRole;
+        return role == SisonkeRole.Chairperson ||
+               role == SisonkeRole.Secretary ||
+               role == SisonkeRole.StokvelAdmin ||
+               role == SisonkeRole.Creator;
+    }
+
+    public async Task<bool> CanDeleteStokvelAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        if (member is null)
+        {
+            return false;
+        }
+
+        var role = member.DefaultRole;
+        return role == SisonkeRole.Chairperson ||
+               role == SisonkeRole.StokvelAdmin ||
+               role == SisonkeRole.Creator;
+    }
+}
+
+public sealed record DashboardAccessSnapshot(
+    Member? LinkedMember,
+    bool CanManageDashboard,
+    bool CanViewSecretaryTasks,
+    bool CanViewChairpersonTasks,
+    bool CanManageMeetings,
+    bool CanReviewClaims,
+    bool CanManageAttendance,
+    bool CanViewTreasurerTasks,
+    bool CanManagePayments,
+    bool CanViewFinancials)
+{
+    public static DashboardAccessSnapshot None { get; } =
+        new(null, false, false, false, false, false, false, false, false, false);
 }

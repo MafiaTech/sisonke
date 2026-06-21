@@ -12,7 +12,11 @@
 @inject MemberAccessService MemberAccessService
 @inject FuneralClaimService FuneralClaimService
 @inject MeetingService MeetingService
+@inject RotationalTaskService RotationalTaskService
+@inject LoansWalletService LoansWalletService
 @inject NavigationManager NavigationManager
+
+@using Sisonke.Web.Data.Enums
 
 <PageTitle>Chairperson Approval Tasks</PageTitle>
 
@@ -58,6 +62,13 @@ else
                 <span>Minutes awaiting approval</span>
                 <strong>@minutesAwaitingApprovalCount</strong>
             </div>
+            @if (rotationalTaskState?.PendingApprovalPayout is not null)
+            {
+                <div style="border-color:rgba(255,255,255,.4)">
+                    <span>Rotational payout approval</span>
+                    <strong>1</strong>
+                </div>
+            }
         </div>
     </section>
 
@@ -72,6 +83,53 @@ else
             </a>
         }
     </div>
+
+    @if (rotationalTaskState?.PendingApprovalPayout is not null)
+    {
+        var p = rotationalTaskState.PendingApprovalPayout;
+        <section class="sisonke-card mb-4" style="border-top:3px solid var(--sk-green-700)">
+            <div class="sisonke-card-head">
+                <div>
+                    <span class="sisonke-badge sisonke-badge-green mb-1">Rotational Stokvel</span>
+                    <h2>Approve Rotational Payout</h2>
+                    <p>A payout is ready for your approval as Chairperson.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-green">Action Required</span>
+            </div>
+            <div class="sisonke-card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Cycle</div>
+                        <div class="detail-mini-value">@p.Cycle.CycleName</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Recipient</div>
+                        <div class="detail-mini-value">@p.PayoutMember.FullName</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Payout Amount</div>
+                        <div class="detail-mini-value">@FormatZAR(p.PayoutAmount)</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Status</div>
+                        <div class="detail-mini-value"><span class="sisonke-badge sisonke-badge-gold">Ready for Approval</span></div>
+                    </div>
+                </div>
+                <div class="sisonke-alert sisonke-alert-green mb-3">
+                    <i class="bi bi-check2-circle me-2"></i>
+                    All contribution payments are complete. This payout is ready for your review and approval.
+                </div>
+                <a class="sisonke-btn sisonke-btn-gold" href="@($"/rotational/management/{StokvelId}")">
+                    <i class="bi bi-check2-circle me-1"></i>Review Payout
+                </a>
+            </div>
+        </section>
+    }
+
+    @if (loansWalletTasks is not null && (loansWalletTasks.PendingLoanApprovals + loansWalletTasks.PendingWithdrawalApprovals) > 0)
+    {
+        <section class="sisonke-card mb-4"><div class="sisonke-card-body"><h2>Loans &amp; Wallet Approvals</h2><p><strong>@loansWalletTasks.PendingLoanApprovals</strong> loan request(s) and <strong>@loansWalletTasks.PendingWithdrawalApprovals</strong> surplus withdrawal(s) await Chairperson approval.</p><a class="sisonke-btn sisonke-btn-gold" href="@($"/stokvel/loans-wallet/{StokvelId}")">Review Financial Requests</a></div></section>
+    }
 
     <div class="sisonke-grid sisonke-grid-2">
     <section class="sisonke-card">
@@ -192,6 +250,8 @@ else
 @code {
     private List<FuneralClaim> claimsAwaitingApproval = [];
     private int minutesAwaitingApprovalCount;
+    private RotationalTaskState? rotationalTaskState;
+    private LoansWalletTaskCounts? loansWalletTasks;
     private bool isLoading = true;
     private bool canViewChairpersonTasks;
     private bool canViewSecretaryTasks;
@@ -207,6 +267,7 @@ else
         isLoading = true;
         claimsAwaitingApproval = [];
         minutesAwaitingApprovalCount = 0;
+        rotationalTaskState = null;
         canViewChairpersonTasks = false;
         canViewSecretaryTasks = false;
 
@@ -230,8 +291,13 @@ else
 
         claimsAwaitingApproval = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalByStokvelIdAsync(StokvelId);
         minutesAwaitingApprovalCount = await MeetingService.GetMinutesAwaitingApprovalCountByStokvelIdAsync(StokvelId);
+        rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
+        loansWalletTasks = await LoansWalletService.GetTaskCountsAsync(StokvelId);
         isLoading = false;
     }
+
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
 
     private static string DisplayOrDash(string? value)
     {

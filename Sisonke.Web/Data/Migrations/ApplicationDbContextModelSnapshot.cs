@@ -599,6 +599,122 @@ namespace Sisonke.Web.Data.Migrations
                     b.ToTable("ContributionRules");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.CycleContribution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AmountDue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("MarkedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("PaidDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("RotationCycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("RotationCycleId", "MemberId")
+                        .IsUnique();
+
+                    b.ToTable("CycleContributions");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.CyclePayout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("MarkedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("PayoutDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("RotationCycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("RotationCycleId", "MemberId")
+                        .IsUnique();
+
+                    b.ToTable("CyclePayouts");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.FineType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1351,6 +1467,439 @@ namespace Sisonke.Web.Data.Migrations
                     b.ToTable("MemberFines");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ApprovedByChairpersonId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("DisbursedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DisbursedByTreasurerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("DisbursementMethod")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DisbursementReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("DueStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpectedFinalPaymentDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FullyRepaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LoanStatus")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("MonthlyRepaymentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("NextEligibleLoanDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("OutstandingBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RejectedByChairpersonId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("RepaymentMonths")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestReason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("RequestedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("TotalRepayableAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("StokvelId", "LoanStatus");
+
+                    b.HasIndex("StokvelId", "MemberId")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1 AND [LoanStatus] IN (2, 3, 4, 6, 7, 9)");
+
+                    b.HasIndex("StokvelId", "MemberId", "IsActive");
+
+                    b.ToTable("MemberLoans");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoanRepayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ConfirmedByTreasurerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("ExpectedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("FineAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("PaymentDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PaymentMethod")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("PaymentStatus")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LoanId");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("LoanId", "DueDate")
+                        .IsUnique();
+
+                    b.HasIndex("StokvelId", "PaymentStatus");
+
+                    b.ToTable("MemberLoanRepayments");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberSurplusWallet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AvailableBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("TotalCredits")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalWithdrawals")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId", "MemberId", "IsActive")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("MemberSurplusWallets");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberSurplusWalletTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("BalanceAfterTransaction")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SourceReferenceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SourceType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("TransactionType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("WalletId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WalletId");
+
+                    b.HasIndex("StokvelId", "MemberId", "CreatedAt");
+
+                    b.HasIndex("WalletId", "SourceType", "SourceReferenceId", "TransactionType")
+                        .IsUnique()
+                        .HasFilter("[SourceReferenceId] IS NOT NULL");
+
+                    b.ToTable("MemberSurplusWalletTransactions");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberSurplusWithdrawalRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ApprovedByChairpersonId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaidByTreasurerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("PaymentMethod")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RejectedByChairpersonId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("RequestReason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("RequestedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("WalletId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("WithdrawalStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("WalletId");
+
+                    b.HasIndex("StokvelId", "MemberId")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1 AND [WithdrawalStatus] IN (1, 2, 3, 5)");
+
+                    b.HasIndex("StokvelId", "WithdrawalStatus");
+
+                    b.HasIndex("StokvelId", "MemberId", "IsActive");
+
+                    b.ToTable("MemberSurplusWithdrawalRequests");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberVote", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1591,7 +2140,11 @@ namespace Sisonke.Web.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("QuestionnaireSectionId");
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("StokvelType");
+
+                    b.HasIndex("QuestionnaireSectionId", "StokvelType", "IsActive");
 
                     b.ToTable("QuestionnaireQuestions");
                 });
@@ -1622,6 +2175,588 @@ namespace Sisonke.Web.Data.Migrations
                     b.ToTable("QuestionnaireSections");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationCycle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ActualCollectedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("CycleNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("ExpectedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("PayoutDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("PayoutMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayoutMemberId");
+
+                    b.HasIndex("StokvelId", "CycleNumber")
+                        .IsUnique();
+
+                    b.ToTable("RotationCycles");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("HasReceivedPayout")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("ReceivedCycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId", "MemberId")
+                        .IsUnique();
+
+                    b.HasIndex("StokvelId", "Position")
+                        .IsUnique();
+
+                    b.ToTable("RotationOrders");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalContributionCycle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ConfigurationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ContributionAmountPerMember")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("ContributionDueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CycleEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CycleName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("CycleNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CycleStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("ExpectedPayoutAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ExpectedTotalContributionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("PayoutMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PayoutOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ScheduledPayoutDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConfigurationId");
+
+                    b.HasIndex("PayoutMemberId");
+
+                    b.HasIndex("PayoutOrderId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("StokvelId", "CycleNumber")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.HasIndex("StokvelId", "IsActive");
+
+                    b.HasIndex("StokvelId", "Status");
+
+                    b.ToTable("RotationalContributionCycles");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalContributionPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ConfirmedByTreasurerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("CycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ExpectedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("PaymentDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PaymentMethod")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PaymentStatus")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PenaltyAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConfirmedByTreasurerId");
+
+                    b.HasIndex("CycleId");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("CycleId", "MemberId")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.HasIndex("StokvelId", "CycleId");
+
+                    b.HasIndex("StokvelId", "PaymentStatus");
+
+                    b.ToTable("RotationalContributionPayments");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalPayout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ApprovedByChairpersonId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("CycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaidByTreasurerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("PaymentMethod")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("PayoutAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("PayoutMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("PayoutStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RejectedByChairpersonId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CycleId");
+
+                    b.HasIndex("PayoutMemberId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("CycleId", "IsActive")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.HasIndex("StokvelId", "PayoutStatus");
+
+                    b.ToTable("RotationalPayouts");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalPayoutOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("HasReceivedPayout")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastPayoutDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("StokvelId", "IsActive");
+
+                    b.HasIndex("StokvelId", "MemberId")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.HasIndex("StokvelId", "Position")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("RotationalPayoutOrders");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalStokvelConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AllowPayoutTurnSwap")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("ContributionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("ContributionDueDay")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ContributionFrequency")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("GracePeriodDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("LatePenaltyAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("LatePenaltyType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("MinimumBalanceBeforePayout")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("MissedContributionBlocksPayout")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("PayoutAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("PayoutFrequency")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RotationOrderMethod")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("RotationStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("TreasurerConfirmationRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("StokvelId", "IsActive");
+
+                    b.ToTable("RotationalStokvelConfigurations");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalStokvelSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ContributionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ContributionFrequency")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("CyclesGenerated")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MissedPaymentRule")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("PayoutDay")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RotationMethod")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StokvelId")
+                        .IsUnique();
+
+                    b.ToTable("RotationalStokvelSettings");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Stokvel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1637,6 +2772,17 @@ namespace Sisonke.Web.Data.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
@@ -1678,6 +2824,9 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsSetupComplete")
                         .HasColumnType("bit");
 
@@ -1703,6 +2852,13 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code");
@@ -1710,6 +2866,160 @@ namespace Sisonke.Web.Data.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("Stokvels");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.StokvelBankingDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccountHolderName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("AccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("AccountType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("BankName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("BranchCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("BranchName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("PaymentReferenceFormat")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("StokvelId", "IsActive", "IsPrimary")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1 AND [IsPrimary] = 1");
+
+                    b.ToTable("StokvelBankingDetails");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.StokvelLoanConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("DefaultRepaymentMonths")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FreezePeriodAfterFullRepaymentDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GracePeriodDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("LateRepaymentFineAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("LateRepaymentFineType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("LoanInterestRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("LoanInterestType")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("LoansEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("MaxLoanAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MaxRepaymentMonths")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("MinLoanAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("RequireChairpersonApproval")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequireTreasurerDisbursementConfirmation")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StokvelId");
+
+                    b.HasIndex("StokvelId", "IsActive")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("StokvelLoanConfigurations");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.StokvelOperatingRules", b =>
@@ -2268,6 +3578,44 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.CycleContribution", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.RotationCycle", "RotationCycle")
+                        .WithMany("CycleContributions")
+                        .HasForeignKey("RotationCycleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("RotationCycle");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.CyclePayout", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.RotationCycle", "RotationCycle")
+                        .WithMany("CyclePayouts")
+                        .HasForeignKey("RotationCycleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("RotationCycle");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.FineType", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.Tenant", "Tenant")
@@ -2507,6 +3855,85 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoan", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoanRepayment", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.MemberLoan", "Loan")
+                        .WithMany("Repayments")
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Loan");
+
+                    b.Navigation("Member");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberSurplusWallet", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberSurplusWalletTransaction", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.MemberSurplusWallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Wallet");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberSurplusWithdrawalRequest", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.MemberSurplusWallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Wallet");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberVote", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
@@ -2620,6 +4047,173 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("QuestionnaireSection");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationCycle", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "PayoutMember")
+                        .WithMany()
+                        .HasForeignKey("PayoutMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PayoutMember");
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationOrder", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalContributionCycle", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.RotationalStokvelConfiguration", "Configuration")
+                        .WithMany()
+                        .HasForeignKey("ConfigurationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "PayoutMember")
+                        .WithMany()
+                        .HasForeignKey("PayoutMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.RotationalPayoutOrder", "PayoutOrder")
+                        .WithMany()
+                        .HasForeignKey("PayoutOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Configuration");
+
+                    b.Navigation("PayoutMember");
+
+                    b.Navigation("PayoutOrder");
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalContributionPayment", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.RotationalContributionCycle", "Cycle")
+                        .WithMany()
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cycle");
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalPayout", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.RotationalContributionCycle", "Cycle")
+                        .WithMany()
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "PayoutMember")
+                        .WithMany()
+                        .HasForeignKey("PayoutMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Cycle");
+
+                    b.Navigation("PayoutMember");
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalPayoutOrder", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalStokvelConfiguration", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationalStokvelSetting", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Stokvel");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Stokvel", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.Tenant", "Tenant")
@@ -2629,6 +4223,28 @@ namespace Sisonke.Web.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.StokvelBankingDetails", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Stokvel");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.StokvelLoanConfiguration", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Stokvel");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.StokvelOperatingRules", b =>
@@ -2738,6 +4354,11 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("NextOfKinRecords");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoan", b =>
+                {
+                    b.Navigation("Repayments");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.QuestionnaireQuestion", b =>
                 {
                     b.Navigation("Options");
@@ -2746,6 +4367,13 @@ namespace Sisonke.Web.Data.Migrations
             modelBuilder.Entity("Sisonke.Web.Data.Entities.QuestionnaireSection", b =>
                 {
                     b.Navigation("Questions");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.RotationCycle", b =>
+                {
+                    b.Navigation("CycleContributions");
+
+                    b.Navigation("CyclePayouts");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionPlan", b =>

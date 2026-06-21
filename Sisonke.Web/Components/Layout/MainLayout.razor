@@ -84,7 +84,9 @@
             return "Member Workspace";
         }
 
-        if (path.StartsWith("managed-stokvels") || path.StartsWith("stokvel-dashboard"))
+        if (path.StartsWith("managed-stokvels") || path.StartsWith("stokvel-dashboard") ||
+            path.StartsWith("rotational-configuration") || path.StartsWith("rotation-schedule") ||
+            path.StartsWith("rotational/") || path.StartsWith("stokvel-settings"))
         {
             return "Executive Workspace";
         }

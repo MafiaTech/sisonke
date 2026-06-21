@@ -12,6 +12,7 @@ using Sisonke.Web.Components;
 using Sisonke.Web.Components.Account;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Seed;
+using Sisonke.Web.Helpers;
 using Sisonke.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -66,6 +67,30 @@ if (!isSqlite && !isSqlServer)
     throw new InvalidOperationException(
         "Unable to determine database provider. Set DatabaseProvider to 'Sqlite' or 'SqlServer', " +
         "or supply a DefaultConnection containing either 'Data Source=' or 'Server='.");
+}
+
+// Extract server and database name for startup diagnostics — no credentials are logged.
+string dbDiagServer;
+string dbDiagName;
+try
+{
+    var diagCsb = new System.Data.Common.DbConnectionStringBuilder { ConnectionString = rawConnectionString };
+    if (isSqlite)
+    {
+        dbDiagServer = "localhost (SQLite)";
+        dbDiagName   = diagCsb.ContainsKey("Data Source") ? diagCsb["Data Source"]?.ToString() ?? "(unknown)" : "(unknown)";
+    }
+    else
+    {
+        dbDiagServer = diagCsb.ContainsKey("Server")          ? diagCsb["Server"]?.ToString()          ?? "(unknown)" : "(unknown)";
+        dbDiagName   = diagCsb.ContainsKey("Initial Catalog") ? diagCsb["Initial Catalog"]?.ToString() ?? "(unknown)" :
+                       diagCsb.ContainsKey("Database")        ? diagCsb["Database"]?.ToString()        ?? "(unknown)" : "(unknown)";
+    }
+}
+catch
+{
+    dbDiagServer = "(unknown)";
+    dbDiagName   = "(unknown)";
 }
 
 if (isSqlite)
@@ -195,6 +220,15 @@ builder.Services.AddScoped<ClaimEligibilityService>();
 builder.Services.AddScoped<MemberAccountLinkingService>();
 builder.Services.AddScoped<MemberAccessService>();
 builder.Services.AddScoped<StokvelArchetypeConfigurationService>();
+builder.Services.AddScoped<RotationalStokvelService>();
+builder.Services.AddScoped<RotationalConfigurationService>();
+builder.Services.AddScoped<RotationalPayoutOrderService>();
+builder.Services.AddScoped<RotationalContributionCycleService>();
+builder.Services.AddScoped<StokvelBankingDetailsService>();
+builder.Services.AddScoped<RotationalPayoutService>();
+builder.Services.AddScoped<LoansWalletService>();
+builder.Services.AddScoped<RotationalContributionPaymentService>();
+builder.Services.AddScoped<RotationalTaskService>();
 builder.Services.AddScoped<DashboardQueryService>();
 builder.Services.AddHttpClient();
 
@@ -211,21 +245,34 @@ using (var scope = app.Services.CreateScope())
     // Set SeedData__Enabled=true explicitly in development or staging when demo data is needed.
     var seedDataEnabled = builder.Configuration.GetValue("SeedData:Enabled", false);
 
-    startupLogger.LogInformation("[Startup] DB provider: {Provider} | SeedData: {SeedEnabled} | AdminSeed: {AdminSeedEnabled}",
+    startupLogger.LogInformation(
+        "[Startup] Environment: {Environment} | DB provider: {Provider} | DB server: {DbServer} | DB name: {DbName} | SeedData: {SeedEnabled} | AdminSeed: {AdminSeedEnabled}",
+        builder.Environment.EnvironmentName,
         isSqlite ? "SQLite" : "SQL Server",
+        dbDiagServer,
+        dbDiagName,
         seedDataEnabled,
         builder.Configuration.GetValue("AdminSeed:Enabled", false));
 
-    try
+    var autoMigrateOnStartup = builder.Configuration.GetValue("Database:AutoMigrateOnStartup", false);
+
+    if (autoMigrateOnStartup)
     {
-        startupLogger.LogInformation("[Startup] Applying pending migrations...");
-        await context.Database.MigrateAsync();
-        startupLogger.LogInformation("[Startup] Migrations applied successfully.");
+        try
+        {
+            startupLogger.LogInformation("[Startup] Applying pending migrations because Database:AutoMigrateOnStartup is enabled...");
+            await context.Database.MigrateAsync();
+            startupLogger.LogInformation("[Startup] Migrations applied successfully.");
+        }
+        catch (Exception ex)
+        {
+            startupLogger.LogCritical(ex, "[Startup] Database migration failed. The application cannot start safely.");
+            throw;
+        }
     }
-    catch (Exception ex)
+    else
     {
-        startupLogger.LogCritical(ex, "[Startup] Database migration failed. The application cannot start safely.");
-        throw;
+        startupLogger.LogInformation("[Startup] Automatic database migrations are disabled. Use 'dotnet ef database update' to apply migrations.");
     }
 
     if (builder.Configuration.GetValue("AdminSeed:Enabled", false))
@@ -277,6 +324,56 @@ using (var scope = app.Services.CreateScope())
     else
     {
         startupLogger.LogInformation("[Startup] Seed data is disabled (SeedData:Enabled=false). Skipping.");
+
+        // Development safety nets: ensure subscription plans and questionnaire questions exist
+        // so the Register wizard and Quick Setup wizard work on a fresh local database.
+        // Skipped when SeedData:Enabled=true because SeedAsync already covers these.
+        var ensureDevelopmentDataOnStartup = builder.Configuration.GetValue(
+            "SeedData:EnsureDevelopmentDataOnStartup", false);
+
+        if (builder.Environment.IsDevelopment() && ensureDevelopmentDataOnStartup)
+        {
+            var devSeedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("SisonkeSeedData");
+
+            try
+            {
+                startupLogger.LogInformation("[Startup] Checking dev subscription plans...");
+                await SisonkeSeedData.EnsureDevSubscriptionPlansAsync(context, devSeedLogger);
+                startupLogger.LogInformation("[Startup] Dev subscription plans check complete.");
+            }
+            catch (Exception ex)
+            {
+                startupLogger.LogError(ex, "[Startup] Dev subscription plan seed failed. Registration may show 'No packages configured'.");
+            }
+
+            try
+            {
+                startupLogger.LogInformation("[Startup] Checking dev questionnaire...");
+                await SisonkeSeedData.EnsureDevQuestionnaireAsync(context, devSeedLogger);
+                startupLogger.LogInformation("[Startup] Dev questionnaire check complete.");
+            }
+            catch (Exception ex)
+            {
+                startupLogger.LogError(ex, "[Startup] Dev questionnaire seed failed. Quick Setup wizard may show 'no questions'.");
+            }
+
+            try
+            {
+                startupLogger.LogInformation("[Startup] Checking dev Stokvel soft-delete columns...");
+                await SisonkeSeedData.EnsureDevStokvelColumnsAsync(context, devSeedLogger);
+                startupLogger.LogInformation("[Startup] Dev Stokvel columns check complete.");
+            }
+            catch (Exception ex)
+            {
+                startupLogger.LogError(ex, "[Startup] Dev Stokvel column migration failed. Stokvel Settings may not work.");
+            }
+        }
+        else if (builder.Environment.IsDevelopment())
+        {
+            startupLogger.LogInformation(
+                "[Startup] Development data checks are disabled. Set SeedData:EnsureDevelopmentDataOnStartup=true to run them.");
+        }
     }
 }
 
@@ -336,7 +433,7 @@ app.MapPost("/Account/RegisterSubmit", RegistrationSubmitEndpoint.HandleAsync)
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
 
-Console.WriteLine($"[Sisonke] DB provider: {(isSqlite ? "SQLite" : "SQL Server")} | Connection: {MaskConnectionString(connectionString)}");
+Console.WriteLine($"[Sisonke] Environment: {builder.Environment.EnvironmentName} | DB provider: {(isSqlite ? "SQLite" : "SQL Server")} | DB server: {dbDiagServer} | DB name: {dbDiagName} | Connection: {MaskConnectionString(connectionString)}");
 Console.WriteLine($"[Sisonke] SMTP configured: {!string.IsNullOrWhiteSpace(emailSettings.SmtpHost)} | RequireConfirmedAccount: {authSettings.RequireConfirmedAccount} | SessionTimeout: {authSettings.SessionTimeoutMinutes}m | PublicBaseUrl: {appSettings.PublicBaseUrl ?? "(NavigationManager)"}");
 
 
@@ -623,25 +720,26 @@ internal static class RegistrationSubmitEndpoint
 
 internal sealed class RegisterSubmitInput
 {
-    [Required]
+    [Required(ErrorMessage = "Full name is required.")]
     [Display(Name = "Full Name")]
     public string? FullName { get; set; }
 
-    [Required]
-    [EmailAddress]
+    [Required(ErrorMessage = "Email address is required.")]
+    [SaEmailWithDomain]
     [Display(Name = "Email")]
     public string? Email { get; set; }
 
-    [Required]
-    [MaxLength(30)]
+    [Required(ErrorMessage = "ID number is required.")]
+    [SaIdNumber]
     [Display(Name = "ID Number")]
     public string? IdNumber { get; set; }
 
-    [Required]
-    [MaxLength(30)]
+    [Required(ErrorMessage = "Cellphone number is required.")]
+    [SaCellphone]
     [Display(Name = "Cellphone Number")]
     public string? CellphoneNumber { get; set; }
 
+    [Required(ErrorMessage = "Residential area is required.")]
     [Display(Name = "Residential Area")]
     public string? ResidentialArea { get; set; }
 

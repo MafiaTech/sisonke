@@ -15,6 +15,7 @@
 @using Sisonke.Web.Services
 
 @inject StokvelService StokvelService
+@inject StokvelBankingDetailsService BankingDetailsService
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject UserManager<ApplicationUser> UserManager
@@ -163,6 +164,40 @@ else
                                     @bind-Value="model.Description" />
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Optional banking details -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <h2>Banking Details <span class="text-muted fw-normal">(optional)</span></h2>
+                                <p>Capture the account members will use for contribution deposits and payouts.</p>
+                            </div>
+                        </div>
+                        <div class="form-check mb-3">
+                            <InputCheckbox id="skip-banking" class="form-check-input" @bind-Value="model.SkipBankingDetails" />
+                            <label class="form-check-label" for="skip-banking">Skip and add later</label>
+                        </div>
+                        @if (model.SkipBankingDetails)
+                        {
+                            <div class="sisonke-alert sisonke-alert-blue mb-0">
+                                You can add banking details later in Stokvel Settings.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="sisonke-grid sisonke-grid-2">
+                                <div class="member-form-field"><label class="form-label">Bank name *</label><InputText class="form-control" @bind-Value="model.BankName" /></div>
+                                <div class="member-form-field"><label class="form-label">Account holder name *</label><InputText class="form-control" @bind-Value="model.AccountHolderName" /></div>
+                                <div class="member-form-field"><label class="form-label">Account number *</label><InputText class="form-control" inputmode="numeric" autocomplete="off" @bind-Value="model.AccountNumber" /></div>
+                                <div class="member-form-field"><label class="form-label">Account type *</label><InputSelect class="form-select" @bind-Value="model.AccountType"><option value="@BankAccountType.Savings">Savings</option><option value="@BankAccountType.ChequeCurrent">Cheque / Current</option><option value="@BankAccountType.Transmission">Transmission</option><option value="@BankAccountType.Business">Business</option><option value="@BankAccountType.Other">Other</option></InputSelect></div>
+                                <div class="member-form-field"><label class="form-label">Branch code</label><InputText class="form-control" inputmode="numeric" @bind-Value="model.BranchCode" /></div>
+                                <div class="member-form-field"><label class="form-label">Branch name</label><InputText class="form-control" @bind-Value="model.BranchName" /></div>
+                                <div class="member-form-field register-form-wide"><label class="form-label">Payment reference format</label><InputText class="form-control" placeholder="e.g. Member number + surname" @bind-Value="model.PaymentReferenceFormat" /></div>
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -908,6 +943,17 @@ else
 
         if (currentUser is null) { saveFailed = true; return; }
         if (model.SubscriptionPlanId is null) { packageSelectionFailed = true; currentWizardStep = 2; return; }
+        if (!model.SkipBankingDetails &&
+            (string.IsNullOrWhiteSpace(model.BankName) ||
+             string.IsNullOrWhiteSpace(model.AccountHolderName) ||
+             string.IsNullOrWhiteSpace(model.AccountNumber) ||
+             !model.AccountNumber.All(char.IsDigit) ||
+             (!string.IsNullOrWhiteSpace(model.BranchCode) && !model.BranchCode.All(char.IsDigit))))
+        {
+            saveFailed = true;
+            currentWizardStep = 1;
+            return;
+        }
 
         var createdStokvel = await StokvelService.RegisterStokvelAsync(
             model.Name, MapArchetypeToStokvelType(model.Archetype), model.Archetype, model.Province, model.TownOrArea,
@@ -926,6 +972,24 @@ else
             model.CreatorResidentialArea);
 
         if (creatorMember is null) { saveFailed = true; return; }
+
+        if (!model.SkipBankingDetails)
+        {
+            var bankingResult = await BankingDetailsService.SaveBankingDetailsAsync(
+                createdStokvel.Id,
+                new StokvelBankingDetails
+                {
+                    BankName = model.BankName ?? string.Empty,
+                    AccountHolderName = model.AccountHolderName ?? string.Empty,
+                    AccountNumber = model.AccountNumber ?? string.Empty,
+                    AccountType = model.AccountType,
+                    BranchCode = model.BranchCode,
+                    BranchName = model.BranchName,
+                    PaymentReferenceFormat = model.PaymentReferenceFormat
+                },
+                currentUser.Id);
+            if (!bankingResult.Success) { saveFailed = true; return; }
+        }
 
         await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(currentUser.Id, model.CreatorIdNumber);
         NavigationManager.NavigateTo($"/stokvel-questionnaire/{createdStokvel.Id}");
@@ -979,6 +1043,14 @@ else
         [EmailAddress][MaxLength(150)] public string? CreatorEmail { get; set; }
         [MaxLength(30)] public string? CreatorIdNumber { get; set; }
         [MaxLength(150)] public string? CreatorResidentialArea { get; set; }
+        public bool SkipBankingDetails { get; set; } = true;
+        [MaxLength(150)] public string? BankName { get; set; }
+        [MaxLength(150)] public string? AccountHolderName { get; set; }
+        [MaxLength(40)] public string? AccountNumber { get; set; }
+        public BankAccountType AccountType { get; set; } = BankAccountType.Savings;
+        [MaxLength(20)] public string? BranchCode { get; set; }
+        [MaxLength(150)] public string? BranchName { get; set; }
+        [MaxLength(200)] public string? PaymentReferenceFormat { get; set; }
     }
 
     private static string FormatCurrency(decimal amount) =>
@@ -1006,7 +1078,7 @@ else
         archetype switch
         {
             StokvelArchetype.BurialSociety  => StokvelType.BurialSociety,
-            StokvelArchetype.Rotational     => StokvelType.SavingsStokvel,
+            StokvelArchetype.Rotational     => StokvelType.RotationalStokvel,
             StokvelArchetype.Grocery        => StokvelType.GroceryStokvel,
             StokvelArchetype.InvestmentClub => StokvelType.InvestmentStokvel,
             StokvelArchetype.SavingsClub    => StokvelType.SavingsStokvel,

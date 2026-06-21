@@ -43,6 +43,23 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ConstitutionDocument> ConstitutionDocuments => Set<ConstitutionDocument>();
     public DbSet<ConstitutionWizardAnswer> ConstitutionWizardAnswers => Set<ConstitutionWizardAnswer>();
     public DbSet<StokvelOperatingRules> StokvelOperatingRules => Set<StokvelOperatingRules>();
+    public DbSet<RotationalStokvelSetting> RotationalStokvelSettings => Set<RotationalStokvelSetting>();
+    public DbSet<RotationOrder> RotationOrders => Set<RotationOrder>();
+    public DbSet<RotationCycle> RotationCycles => Set<RotationCycle>();
+    public DbSet<CycleContribution> CycleContributions => Set<CycleContribution>();
+    public DbSet<CyclePayout> CyclePayouts => Set<CyclePayout>();
+    public DbSet<RotationalStokvelConfiguration> RotationalStokvelConfigurations => Set<RotationalStokvelConfiguration>();
+    public DbSet<RotationalPayoutOrder> RotationalPayoutOrders => Set<RotationalPayoutOrder>();
+    public DbSet<RotationalContributionCycle> RotationalContributionCycles => Set<RotationalContributionCycle>();
+    public DbSet<RotationalContributionPayment> RotationalContributionPayments => Set<RotationalContributionPayment>();
+    public DbSet<StokvelBankingDetails> StokvelBankingDetails => Set<StokvelBankingDetails>();
+    public DbSet<RotationalPayout> RotationalPayouts => Set<RotationalPayout>();
+    public DbSet<StokvelLoanConfiguration> StokvelLoanConfigurations => Set<StokvelLoanConfiguration>();
+    public DbSet<MemberLoan> MemberLoans => Set<MemberLoan>();
+    public DbSet<MemberLoanRepayment> MemberLoanRepayments => Set<MemberLoanRepayment>();
+    public DbSet<MemberSurplusWallet> MemberSurplusWallets => Set<MemberSurplusWallet>();
+    public DbSet<MemberSurplusWalletTransaction> MemberSurplusWalletTransactions => Set<MemberSurplusWalletTransaction>();
+    public DbSet<MemberSurplusWithdrawalRequest> MemberSurplusWithdrawalRequests => Set<MemberSurplusWithdrawalRequest>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -545,5 +562,373 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .Property(a => a.PreviousPayoutAmount).HasPrecision(18, 2);
         builder.Entity<ClaimPayoutAudit>()
             .Property(a => a.NewPayoutAmount).HasPrecision(18, 2);
+
+        // ── Rotational Stokvel MVP ────────────────────────────────────────────
+
+        // RotationalStokvelSetting: one per stokvel, cascade when stokvel deleted
+        builder.Entity<RotationalStokvelSetting>()
+            .HasOne(s => s.Stokvel)
+            .WithMany()
+            .HasForeignKey(s => s.StokvelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RotationalStokvelSetting>()
+            .HasIndex(s => s.StokvelId)
+            .IsUnique();
+
+        builder.Entity<RotationalStokvelSetting>()
+            .Property(s => s.ContributionAmount).HasPrecision(18, 2);
+
+        // RotationOrder: cascade from stokvel, restrict from member
+        builder.Entity<RotationOrder>()
+            .HasOne(ro => ro.Stokvel)
+            .WithMany()
+            .HasForeignKey(ro => ro.StokvelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RotationOrder>()
+            .HasOne(ro => ro.Member)
+            .WithMany()
+            .HasForeignKey(ro => ro.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RotationOrder>()
+            .HasIndex(ro => new { ro.StokvelId, ro.Position })
+            .IsUnique();
+
+        builder.Entity<RotationOrder>()
+            .HasIndex(ro => new { ro.StokvelId, ro.MemberId })
+            .IsUnique();
+
+        // RotationCycle: cascade from stokvel, restrict from payout member
+        builder.Entity<RotationCycle>()
+            .HasOne(rc => rc.Stokvel)
+            .WithMany()
+            .HasForeignKey(rc => rc.StokvelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RotationCycle>()
+            .HasOne(rc => rc.PayoutMember)
+            .WithMany()
+            .HasForeignKey(rc => rc.PayoutMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RotationCycle>()
+            .HasIndex(rc => new { rc.StokvelId, rc.CycleNumber })
+            .IsUnique();
+
+        builder.Entity<RotationCycle>()
+            .Property(rc => rc.ExpectedAmount).HasPrecision(18, 2);
+
+        builder.Entity<RotationCycle>()
+            .Property(rc => rc.ActualCollectedAmount).HasPrecision(18, 2);
+
+        // CycleContribution: cascade from rotation cycle, restrict from member
+        builder.Entity<CycleContribution>()
+            .HasOne(cc => cc.RotationCycle)
+            .WithMany(rc => rc.CycleContributions)
+            .HasForeignKey(cc => cc.RotationCycleId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<CycleContribution>()
+            .HasOne(cc => cc.Member)
+            .WithMany()
+            .HasForeignKey(cc => cc.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CycleContribution>()
+            .HasIndex(cc => new { cc.RotationCycleId, cc.MemberId })
+            .IsUnique();
+
+        builder.Entity<CycleContribution>()
+            .Property(cc => cc.AmountDue).HasPrecision(18, 2);
+
+        builder.Entity<CycleContribution>()
+            .Property(cc => cc.AmountPaid).HasPrecision(18, 2);
+
+        // CyclePayout: cascade from rotation cycle, restrict from member
+        builder.Entity<CyclePayout>()
+            .HasOne(cp => cp.RotationCycle)
+            .WithMany(rc => rc.CyclePayouts)
+            .HasForeignKey(cp => cp.RotationCycleId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<CyclePayout>()
+            .HasOne(cp => cp.Member)
+            .WithMany()
+            .HasForeignKey(cp => cp.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CyclePayout>()
+            .HasIndex(cp => new { cp.RotationCycleId, cp.MemberId })
+            .IsUnique();
+
+        builder.Entity<CyclePayout>()
+            .Property(cp => cp.Amount).HasPrecision(18, 2);
+
+        // ── Rotational Stokvel Configuration ─────────────────────────────────
+        builder.Entity<RotationalStokvelConfiguration>()
+            .HasOne(c => c.Stokvel)
+            .WithMany()
+            .HasForeignKey(c => c.StokvelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RotationalStokvelConfiguration>()
+            .HasIndex(c => c.StokvelId);
+
+        builder.Entity<RotationalStokvelConfiguration>()
+            .HasIndex(c => new { c.StokvelId, c.IsActive });
+
+        builder.Entity<RotationalStokvelConfiguration>()
+            .Property(c => c.ContributionAmount).HasPrecision(18, 2);
+
+        builder.Entity<RotationalStokvelConfiguration>()
+            .Property(c => c.PayoutAmount).HasPrecision(18, 2);
+
+        builder.Entity<RotationalStokvelConfiguration>()
+            .Property(c => c.LatePenaltyAmount).HasPrecision(18, 2);
+
+        builder.Entity<RotationalStokvelConfiguration>()
+            .Property(c => c.MinimumBalanceBeforePayout).HasPrecision(18, 2);
+
+        // ── Rotational Payout Order ──────────────────────────────────────────
+        builder.Entity<RotationalPayoutOrder>()
+            .HasOne(order => order.Stokvel)
+            .WithMany()
+            .HasForeignKey(order => order.StokvelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RotationalPayoutOrder>()
+            .HasOne(order => order.Member)
+            .WithMany()
+            .HasForeignKey(order => order.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QuestionnaireQuestion>()
+            .HasIndex(q => q.StokvelType);
+
+        builder.Entity<QuestionnaireQuestion>()
+            .HasIndex(q => q.IsActive);
+
+        builder.Entity<QuestionnaireQuestion>()
+            .HasIndex(q => new { q.QuestionnaireSectionId, q.StokvelType, q.IsActive });
+
+        builder.Entity<RotationalPayoutOrder>()
+            .HasIndex(order => order.StokvelId);
+
+        builder.Entity<RotationalPayoutOrder>()
+            .HasIndex(order => order.MemberId);
+
+        builder.Entity<RotationalPayoutOrder>()
+            .HasIndex(order => new { order.StokvelId, order.Position })
+            .IsUnique()
+            .HasFilter("[IsActive] = 1");
+
+        builder.Entity<RotationalPayoutOrder>()
+            .HasIndex(order => new { order.StokvelId, order.MemberId })
+            .IsUnique()
+            .HasFilter("[IsActive] = 1");
+
+        builder.Entity<RotationalPayoutOrder>()
+            .HasIndex(order => new { order.StokvelId, order.IsActive });
+
+        // ── Rotational Contribution Cycles ────────────────────────────────────
+        builder.Entity<RotationalContributionCycle>()
+            .HasOne(c => c.Stokvel)
+            .WithMany()
+            .HasForeignKey(c => c.StokvelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasOne(c => c.Configuration)
+            .WithMany()
+            .HasForeignKey(c => c.ConfigurationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasOne(c => c.PayoutOrder)
+            .WithMany()
+            .HasForeignKey(c => c.PayoutOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasOne(c => c.PayoutMember)
+            .WithMany()
+            .HasForeignKey(c => c.PayoutMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasIndex(c => c.StokvelId);
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasIndex(c => new { c.StokvelId, c.IsActive });
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasIndex(c => new { c.StokvelId, c.CycleNumber })
+            .IsUnique()
+            .HasFilter("[IsActive] = 1");
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasIndex(c => c.PayoutMemberId);
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasIndex(c => c.ConfigurationId);
+
+        builder.Entity<RotationalContributionCycle>()
+            .HasIndex(c => new { c.StokvelId, c.Status });
+
+        builder.Entity<RotationalContributionCycle>()
+            .Property(c => c.ContributionAmountPerMember).HasPrecision(18, 2);
+
+        builder.Entity<RotationalContributionCycle>()
+            .Property(c => c.ExpectedTotalContributionAmount).HasPrecision(18, 2);
+
+        builder.Entity<RotationalContributionCycle>()
+            .Property(c => c.ExpectedPayoutAmount).HasPrecision(18, 2);
+
+        builder.Entity<StokvelBankingDetails>()
+            .HasOne(details => details.Stokvel).WithMany()
+            .HasForeignKey(details => details.StokvelId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<StokvelBankingDetails>().HasIndex(details => details.StokvelId);
+        builder.Entity<StokvelBankingDetails>()
+            .HasIndex(details => new { details.StokvelId, details.IsActive, details.IsPrimary })
+            .IsUnique().HasFilter("[IsActive] = 1 AND [IsPrimary] = 1");
+
+        builder.Entity<RotationalPayout>()
+            .HasOne(payout => payout.Stokvel).WithMany()
+            .HasForeignKey(payout => payout.StokvelId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<RotationalPayout>()
+            .HasOne(payout => payout.Cycle).WithMany()
+            .HasForeignKey(payout => payout.CycleId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<RotationalPayout>()
+            .HasOne(payout => payout.PayoutMember).WithMany()
+            .HasForeignKey(payout => payout.PayoutMemberId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<RotationalPayout>().Property(payout => payout.PayoutAmount).HasPrecision(18, 2);
+        builder.Entity<RotationalPayout>().HasIndex(payout => payout.StokvelId);
+        builder.Entity<RotationalPayout>().HasIndex(payout => payout.CycleId);
+        builder.Entity<RotationalPayout>().HasIndex(payout => payout.PayoutMemberId);
+        builder.Entity<RotationalPayout>().HasIndex(payout => new { payout.StokvelId, payout.PayoutStatus });
+        builder.Entity<RotationalPayout>()
+            .HasIndex(payout => new { payout.CycleId, payout.IsActive })
+            .IsUnique().HasFilter("[IsActive] = 1");
+
+        // ── Rotational Contribution Payments ─────────────────────────────────
+        builder.Entity<RotationalContributionPayment>()
+            .HasOne(p => p.Stokvel)
+            .WithMany()
+            .HasForeignKey(p => p.StokvelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasOne(p => p.Cycle)
+            .WithMany()
+            .HasForeignKey(p => p.CycleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasOne(p => p.Member)
+            .WithMany()
+            .HasForeignKey(p => p.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RotationalContributionPayment>()
+            .Property(p => p.ExpectedAmount).HasPrecision(18, 2);
+
+        builder.Entity<RotationalContributionPayment>()
+            .Property(p => p.PaidAmount).HasPrecision(18, 2);
+
+        builder.Entity<RotationalContributionPayment>()
+            .Property(p => p.PenaltyAmount).HasPrecision(18, 2);
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasIndex(p => p.StokvelId);
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasIndex(p => p.CycleId);
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasIndex(p => p.MemberId);
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasIndex(p => new { p.CycleId, p.MemberId })
+            .IsUnique()
+            .HasFilter("[IsActive] = 1");
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasIndex(p => new { p.StokvelId, p.CycleId });
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasIndex(p => new { p.StokvelId, p.PaymentStatus });
+
+        builder.Entity<RotationalContributionPayment>()
+            .HasIndex(p => p.ConfirmedByTreasurerId);
+
+        builder.Entity<StokvelLoanConfiguration>().HasOne(x => x.Stokvel).WithMany()
+            .HasForeignKey(x => x.StokvelId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<StokvelLoanConfiguration>().HasIndex(x => x.StokvelId);
+        builder.Entity<StokvelLoanConfiguration>().HasIndex(x => new { x.StokvelId, x.IsActive })
+            .IsUnique().HasFilter("[IsActive] = 1");
+        builder.Entity<StokvelLoanConfiguration>().Property(x => x.MinLoanAmount).HasPrecision(18, 2);
+        builder.Entity<StokvelLoanConfiguration>().Property(x => x.MaxLoanAmount).HasPrecision(18, 2);
+        builder.Entity<StokvelLoanConfiguration>().Property(x => x.LoanInterestRate).HasPrecision(18, 2);
+        builder.Entity<StokvelLoanConfiguration>().Property(x => x.LateRepaymentFineAmount).HasPrecision(18, 2);
+
+        builder.Entity<MemberLoan>().HasOne(x => x.Stokvel).WithMany()
+            .HasForeignKey(x => x.StokvelId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MemberLoan>().HasOne(x => x.Member).WithMany()
+            .HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MemberLoan>().HasIndex(x => x.StokvelId);
+        builder.Entity<MemberLoan>().HasIndex(x => x.MemberId);
+        builder.Entity<MemberLoan>().HasIndex(x => new { x.StokvelId, x.LoanStatus });
+        builder.Entity<MemberLoan>().HasIndex(x => new { x.StokvelId, x.MemberId, x.IsActive });
+        builder.Entity<MemberLoan>().HasIndex(x => new { x.StokvelId, x.MemberId })
+            .IsUnique().HasFilter("[IsActive] = 1 AND [LoanStatus] IN (2, 3, 4, 6, 7, 9)");
+        builder.Entity<MemberLoan>().Property(x => x.RequestedAmount).HasPrecision(18, 2);
+        builder.Entity<MemberLoan>().Property(x => x.ApprovedAmount).HasPrecision(18, 2);
+        builder.Entity<MemberLoan>().Property(x => x.MonthlyRepaymentAmount).HasPrecision(18, 2);
+        builder.Entity<MemberLoan>().Property(x => x.TotalRepayableAmount).HasPrecision(18, 2);
+        builder.Entity<MemberLoan>().Property(x => x.OutstandingBalance).HasPrecision(18, 2);
+
+        builder.Entity<MemberLoanRepayment>().HasOne(x => x.Loan).WithMany(x => x.Repayments)
+            .HasForeignKey(x => x.LoanId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MemberLoanRepayment>().HasOne(x => x.Member).WithMany()
+            .HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MemberLoanRepayment>().HasIndex(x => x.StokvelId);
+        builder.Entity<MemberLoanRepayment>().HasIndex(x => x.LoanId);
+        builder.Entity<MemberLoanRepayment>().HasIndex(x => new { x.LoanId, x.DueDate }).IsUnique();
+        builder.Entity<MemberLoanRepayment>().HasIndex(x => new { x.StokvelId, x.PaymentStatus });
+        builder.Entity<MemberLoanRepayment>().Property(x => x.ExpectedAmount).HasPrecision(18, 2);
+        builder.Entity<MemberLoanRepayment>().Property(x => x.PaidAmount).HasPrecision(18, 2);
+        builder.Entity<MemberLoanRepayment>().Property(x => x.FineAmount).HasPrecision(18, 2);
+
+        builder.Entity<MemberSurplusWallet>().HasOne(x => x.Member).WithMany()
+            .HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MemberSurplusWallet>().HasIndex(x => new { x.StokvelId, x.MemberId, x.IsActive })
+            .IsUnique().HasFilter("[IsActive] = 1");
+        builder.Entity<MemberSurplusWallet>().Property(x => x.AvailableBalance).HasPrecision(18, 2);
+        builder.Entity<MemberSurplusWallet>().Property(x => x.TotalCredits).HasPrecision(18, 2);
+        builder.Entity<MemberSurplusWallet>().Property(x => x.TotalWithdrawals).HasPrecision(18, 2);
+
+        builder.Entity<MemberSurplusWalletTransaction>().HasOne(x => x.Wallet).WithMany()
+            .HasForeignKey(x => x.WalletId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MemberSurplusWalletTransaction>().HasIndex(x => x.WalletId);
+        builder.Entity<MemberSurplusWalletTransaction>().HasIndex(x => new { x.StokvelId, x.MemberId, x.CreatedAt });
+        builder.Entity<MemberSurplusWalletTransaction>()
+            .HasIndex(x => new { x.WalletId, x.SourceType, x.SourceReferenceId, x.TransactionType })
+            .IsUnique().HasFilter("[SourceReferenceId] IS NOT NULL");
+        builder.Entity<MemberSurplusWalletTransaction>().Property(x => x.Amount).HasPrecision(18, 2);
+        builder.Entity<MemberSurplusWalletTransaction>().Property(x => x.BalanceAfterTransaction).HasPrecision(18, 2);
+
+        builder.Entity<MemberSurplusWithdrawalRequest>().HasOne(x => x.Member).WithMany()
+            .HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MemberSurplusWithdrawalRequest>().HasOne(x => x.Wallet).WithMany()
+            .HasForeignKey(x => x.WalletId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MemberSurplusWithdrawalRequest>().HasIndex(x => x.StokvelId);
+        builder.Entity<MemberSurplusWithdrawalRequest>().HasIndex(x => x.MemberId);
+        builder.Entity<MemberSurplusWithdrawalRequest>().HasIndex(x => new { x.StokvelId, x.WithdrawalStatus });
+        builder.Entity<MemberSurplusWithdrawalRequest>().HasIndex(x => new { x.StokvelId, x.MemberId, x.IsActive });
+        builder.Entity<MemberSurplusWithdrawalRequest>().HasIndex(x => new { x.StokvelId, x.MemberId })
+            .IsUnique().HasFilter("[IsActive] = 1 AND [WithdrawalStatus] IN (1, 2, 3, 5)");
+        builder.Entity<MemberSurplusWithdrawalRequest>().Property(x => x.RequestedAmount).HasPrecision(18, 2);
     }
 }

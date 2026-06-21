@@ -383,6 +383,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQbGF0Zm9ybVxQbGF0Zm9ybVN1cHBvcnQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Stokvels/LoansWallet.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xMb2Fuc1dhbGxldC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Stokvels/ManagedStokvels.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xNYW5hZ2VkU3Rva3ZlbHMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
@@ -391,12 +395,28 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xSZWdpc3RlclN0b2t2ZWwucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Stokvels/RotationalConfiguration.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xSb3RhdGlvbmFsQ29uZmlndXJhdGlvbi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Stokvels/RotationalManagement.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xSb3RhdGlvbmFsTWFuYWdlbWVudC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Stokvels/RotationOrder.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xSb3RhdGlvbk9yZGVyLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Stokvels/RotationSchedule.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xSb3RhdGlvblNjaGVkdWxlLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Stokvels/StokvelQuestionnaire.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xTdG9rdmVsUXVlc3Rpb25uYWlyZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Stokvels/StokvelSettings.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTdG9rdmVsc1xTdG9rdmVsU2V0dGluZ3MucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/mpshe/Projects/Sisonke-Recovered/Sisonke.Web/Components/Pages/Voting/Votes.razor]

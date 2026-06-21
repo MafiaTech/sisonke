@@ -3,6 +3,7 @@
 @layout AuthLayout
 
 @using System.ComponentModel.DataAnnotations
+@using Sisonke.Web.Helpers
 @using Sisonke.Web.Services
 
 @inject ILogger<Register> Logger
@@ -158,6 +159,8 @@
                                            id="Input.IdNumber"
                                            class="auth-input"
                                            autocomplete="off"
+                                           inputmode="numeric"
+                                           maxlength="13"
                                            placeholder="13-digit SA ID" />
                             </div>
                             @StepError(nameof(Input.IdNumber))
@@ -171,6 +174,8 @@
                                            id="Input.CellphoneNumber"
                                            class="auth-input phone-input"
                                            autocomplete="tel"
+                                           inputmode="tel"
+                                           maxlength="12"
                                            placeholder="e.g. 0821234567" />
                             </div>
                             @StepError(nameof(Input.CellphoneNumber))
@@ -447,7 +452,8 @@
             nameof(Input.FullName),
             nameof(Input.Email),
             nameof(Input.IdNumber),
-            nameof(Input.CellphoneNumber));
+            nameof(Input.CellphoneNumber),
+            nameof(Input.ResidentialArea));
         if (valid)
         {
             Logger.LogInformation("[Register] Step 1 validation passed for {Email}", Input.Email);
@@ -505,25 +511,26 @@
 
     private sealed class InputModel
     {
-        [Required]
+        [Required(ErrorMessage = "Full name is required.")]
         [Display(Name = "Full Name")]
         public string FullName { get; set; } = string.Empty;
 
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "Email address is required.")]
+        [SaEmailWithDomain]
         [Display(Name = "Email")]
         public string Email { get; set; } = "";
 
-        [Required]
-        [MaxLength(30)]
+        [Required(ErrorMessage = "ID number is required.")]
+        [SaIdNumber]
         [Display(Name = "ID Number")]
         public string IdNumber { get; set; } = string.Empty;
 
-        [Required]
-        [MaxLength(30)]
+        [Required(ErrorMessage = "Cellphone number is required.")]
+        [SaCellphone]
         [Display(Name = "Cellphone Number")]
         public string CellphoneNumber { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "Residential area is required.")]
         [Display(Name = "Residential Area")]
         public string? ResidentialArea { get; set; }
 

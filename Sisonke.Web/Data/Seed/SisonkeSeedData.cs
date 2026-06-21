@@ -13,12 +13,72 @@ public static class SisonkeSeedData
         await SeedQuestionnaireAsync(context, logger);
     }
 
+    // Called at startup in Development when SeedData:Enabled=false.
+    // Inserts the default subscription plans only if none exist yet — safe to call on every restart.
+    public static async Task EnsureDevSubscriptionPlansAsync(ApplicationDbContext context, ILogger? logger = null)
+    {
+        var hasPlans = await context.SubscriptionPlans
+            .AnyAsync(plan => plan.IsActive && plan.Name != "Pilot");
+
+        if (hasPlans)
+        {
+            logger?.LogInformation("[DevSeed] Active subscription plans already present — skipping.");
+            return;
+        }
+
+        logger?.LogInformation("[DevSeed] No active subscription plans found. Seeding development defaults.");
+        await SeedSubscriptionPlansAsync(context, logger);
+    }
+
+    // Called at startup in Development when SeedData:Enabled=false.
+    // Seeds questionnaire sections (including rotational) when they are absent.
+    public static async Task EnsureDevQuestionnaireAsync(ApplicationDbContext context, ILogger? logger = null)
+    {
+        logger?.LogInformation("[DevSeed] Refreshing questionnaire defaults including stokvel type rules.");
+        await SeedQuestionnaireAsync(context, logger);
+    }
+
+    // Called at startup in Development to add soft-delete and audit columns to Stokvels
+    // if the 20260620200000_AddStokvelSoftDeleteAndAudit migration has not yet been applied.
+    public static async Task EnsureDevStokvelColumnsAsync(ApplicationDbContext context, ILogger? logger = null)
+    {
+        var migrationApplied = await context.Database
+            .SqlQueryRaw<string>("SELECT MigrationId FROM __EFMigrationsHistory WHERE MigrationId = '20260620200000_AddStokvelSoftDeleteAndAudit'")
+            .AnyAsync();
+
+        if (migrationApplied)
+        {
+            logger?.LogInformation("[DevSeed] Stokvel soft-delete columns already present — skipping.");
+            return;
+        }
+
+        logger?.LogInformation("[DevSeed] Applying Stokvel soft-delete and audit columns...");
+
+        var statements = new[]
+        {
+            "IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Stokvels') AND name = 'IsDeleted') ALTER TABLE Stokvels ADD IsDeleted bit NOT NULL DEFAULT 0",
+            "IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Stokvels') AND name = 'DeletedAt') ALTER TABLE Stokvels ADD DeletedAt datetime2 NULL",
+            "IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Stokvels') AND name = 'DeletedBy') ALTER TABLE Stokvels ADD DeletedBy nvarchar(450) NULL",
+            "IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Stokvels') AND name = 'DeleteReason') ALTER TABLE Stokvels ADD DeleteReason nvarchar(500) NULL",
+            "IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Stokvels') AND name = 'UpdatedAt') ALTER TABLE Stokvels ADD UpdatedAt datetime2 NULL",
+            "IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Stokvels') AND name = 'UpdatedBy') ALTER TABLE Stokvels ADD UpdatedBy nvarchar(450) NULL",
+            "IF NOT EXISTS (SELECT 1 FROM __EFMigrationsHistory WHERE MigrationId = '20260620200000_AddStokvelSoftDeleteAndAudit') INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ('20260620200000_AddStokvelSoftDeleteAndAudit', '10.0.8')"
+        };
+
+        foreach (var sql in statements)
+        {
+            await context.Database.ExecuteSqlRawAsync(sql);
+        }
+
+        logger?.LogInformation("[DevSeed] Stokvel soft-delete and audit columns applied.");
+    }
+
     private static async Task SeedSubscriptionPlansAsync(ApplicationDbContext context, ILogger? logger)
     {
         await UpsertSubscriptionPlanAsync(context, logger, "Pilot", null, 1, null, 0, 0);
         await UpsertSubscriptionPlanAsync(context, logger, "Basic", "Starter", 1, 30, 149, 1490);
         await UpsertSubscriptionPlanAsync(context, logger, "Standard", "Growth", 31, 50, 279, 2790);
-        await UpsertSubscriptionPlanAsync(context, logger, "Premium", null, 51, null, 459, 4590);
+        await UpsertSubscriptionPlanAsync(context, logger, "Premium", null, 51, null, 399, 3990);
 
         await context.SaveChangesAsync();
     }
@@ -364,7 +424,7 @@ public static class SisonkeSeedData
         await SeedQuestionnaireOptionsAsync(
             context,
             stokvelTypeQuestion,
-            ["Burial Society", "Savings Stokvel", "Grocery Stokvel", "Investment Stokvel", "Social Club", "Family Society"]);
+            ["Burial Society", "Savings Stokvel", "Grocery Stokvel", "Investment Stokvel", "Social Club", "Family Society", "Rotational Stokvel"]);
 
         var existingConstitutionQuestion = await GetOrCreateQuestionnaireQuestionAsync(
             context,
@@ -463,7 +523,7 @@ public static class SisonkeSeedData
         await SeedQuestionnaireOptionsAsync(
             context,
             contributionFrequencyQuestion,
-            ["Weekly", "Monthly", "Quarterly", "Annually"]);
+            ["Weekly", "Fortnightly", "Monthly", "Quarterly", "Annually"]);
 
         await GetOrCreateQuestionnaireQuestionAsync(
             context,
@@ -586,6 +646,248 @@ public static class SisonkeSeedData
             false,
             4);
 
+        // ── Rotational Stokvel sections ──────────────────────────────────────
+
+        var rotationalBasics = await GetOrCreateQuestionnaireSectionAsync(
+            context,
+            logger,
+            "Rotational Basics",
+            "Core details about the rotational stokvel's structure and payout cycle.",
+            6);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalBasics,
+            "How many active members will participate in the rotation?",
+            QuestionType.Number,
+            true,
+            1);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalBasics,
+            "When should the rotation cycle start?",
+            QuestionType.Date,
+            true,
+            2);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalBasics,
+            "Will all members receive exactly one payout turn per cycle?",
+            QuestionType.YesNo,
+            true,
+            3);
+
+        var rotationalPayouts = await GetOrCreateQuestionnaireSectionAsync(
+            context,
+            logger,
+            "Rotational Payouts",
+            "Define the payout amount, frequency and release conditions for each member's turn.",
+            7);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalPayouts,
+            "How much must each member contribute?",
+            QuestionType.Currency,
+            true,
+            1);
+
+        var rotationalContributionFrequencyQuestion = await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalPayouts,
+            "How often must members contribute?",
+            QuestionType.SingleSelect,
+            true,
+            2);
+        await SeedQuestionnaireOptionsAsync(
+            context,
+            rotationalContributionFrequencyQuestion,
+            ["Weekly", "Fortnightly", "Monthly"]);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalPayouts,
+            "What is the contribution due day?",
+            QuestionType.Number,
+            true,
+            3);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalPayouts,
+            "What is the payout amount per member turn?",
+            QuestionType.Currency,
+            true,
+            4);
+
+        var payoutFrequencyQuestion = await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalPayouts,
+            "How often will payouts be made?",
+            QuestionType.SingleSelect,
+            true,
+            5);
+        await SeedQuestionnaireOptionsAsync(
+            context,
+            payoutFrequencyQuestion,
+            ["Weekly", "Fortnightly", "Monthly"]);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalPayouts,
+            "What is the minimum balance required before a payout is released?",
+            QuestionType.Currency,
+            false,
+            6,
+            "Leave blank if there is no minimum balance requirement.");
+
+        var rotationalOrder = await GetOrCreateQuestionnaireSectionAsync(
+            context,
+            logger,
+            "Rotational Order",
+            "Rules for determining and managing the payout order among members.",
+            8);
+
+        var payoutOrderQuestion = await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalOrder,
+            "How should the payout order be determined?",
+            QuestionType.SingleSelect,
+            true,
+            1);
+        await SeedQuestionnaireOptionsAsync(
+            context,
+            payoutOrderQuestion,
+            ["Manual — secretary assigns order", "By joining date — earliest joins first", "Random draw"]);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalOrder,
+            "Are members allowed to swap their payout turn with another member?",
+            QuestionType.YesNo,
+            true,
+            2);
+
+        var latePenaltyTypeQuestion = await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalOrder,
+            "What penalty applies for a late contribution?",
+            QuestionType.SingleSelect,
+            true,
+            3);
+        await SeedQuestionnaireOptionsAsync(
+            context,
+            latePenaltyTypeQuestion,
+            ["None", "Fixed amount", "Percentage of contribution"]);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalOrder,
+            "What is the late penalty amount or percentage?",
+            QuestionType.Currency,
+            false,
+            4,
+            "Enter the penalty amount when a fixed amount or percentage applies.");
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalOrder,
+            "How many grace days are allowed before a late penalty is applied?",
+            QuestionType.Number,
+            true,
+            5);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalOrder,
+            "Should a member who missed a contribution be blocked from receiving their payout?",
+            QuestionType.YesNo,
+            true,
+            6);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalOrder,
+            "Is treasurer confirmation required before releasing a payout to a member?",
+            QuestionType.YesNo,
+            true,
+            7);
+
+        // ── Sign-off (all stokvel types) ────────────────────────────────────
+
+        var governanceSignOff = await GetOrCreateQuestionnaireSectionAsync(
+            context,
+            logger,
+            "Governance Sign-off",
+            "Final confirmation before completing the stokvel setup.",
+            9);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            governanceSignOff,
+            "Do office bearers confirm that the burial society rules, dependent rules, and claim rules are correct?",
+            QuestionType.YesNo,
+            true,
+            1);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            governanceSignOff,
+            "Should the system generate a rules summary based on these answers?",
+            QuestionType.YesNo,
+            true,
+            2);
+
+        // ── Rotational Sign-off ─────────────────────────────────────────────
+
+        var rotationalSignOff = await GetOrCreateQuestionnaireSectionAsync(
+            context,
+            logger,
+            "Rotational Sign-off",
+            "Rotational stokvel governance confirmation by office bearers.",
+            10);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalSignOff,
+            "Do office bearers confirm that the rotational contribution and payout rules are correct?",
+            QuestionType.YesNo,
+            true,
+            1);
+
+        await GetOrCreateQuestionnaireQuestionAsync(
+            context,
+            logger,
+            rotationalSignOff,
+            "Should the system generate a rules summary based on these answers?",
+            QuestionType.YesNo,
+            true,
+            2);
+
+        await context.SaveChangesAsync();
+        await ApplyQuestionnaireStokvelTypeRulesAsync(context);
+
         await context.SaveChangesAsync();
     }
 
@@ -662,6 +964,12 @@ public static class SisonkeSeedData
                     question.Id);
             }
 
+            question.QuestionType = questionType;
+            question.IsRequired = isRequired;
+            question.DisplayOrder = displayOrder;
+            question.HelpText = helpText;
+            question.IsActive = true;
+
             return question;
         }
 
@@ -681,6 +989,38 @@ public static class SisonkeSeedData
         context.QuestionnaireQuestions.Add(question);
 
         return question;
+    }
+
+    private static async Task ApplyQuestionnaireStokvelTypeRulesAsync(ApplicationDbContext context)
+    {
+        var questions = await context.QuestionnaireQuestions
+            .Include(question => question.QuestionnaireSection)
+            .ToListAsync();
+
+        foreach (var question in questions)
+        {
+            question.StokvelType = question.QuestionnaireSection.Name switch
+            {
+                "Stokvel Identity" => null,
+                "Membership Rules" => StokvelType.BurialSociety,
+                "Contributions and Fines" => StokvelType.BurialSociety,
+                "Meetings and Decisions" => StokvelType.BurialSociety,
+                "Claims and Payouts" => StokvelType.BurialSociety,
+                "Governance Sign-off" => StokvelType.BurialSociety,
+                "Rotational Basics" => StokvelType.RotationalStokvel,
+                "Rotational Payouts" => StokvelType.RotationalStokvel,
+                "Rotational Order" => StokvelType.RotationalStokvel,
+                "Rotational Sign-off" => StokvelType.RotationalStokvel,
+                _ => question.StokvelType
+            };
+        }
+
+        foreach (var question in questions.Where(question =>
+            question.QuestionText == "Do you confirm that the stokvel information captured is accurate and complete?" ||
+            question.QuestionText == "Do all office bearers confirm that the rotational contribution and payout rules are correct?"))
+        {
+            question.IsActive = false;
+        }
     }
 
     private static async Task SeedQuestionnaireOptionsAsync(
