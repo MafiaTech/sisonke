@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj": {}
+    "C:\\Dev\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj": {}
   },
   "projects": {
-    "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj": {
+    "C:\\Dev\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj",
+        "projectUniqueName": "C:\\Dev\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj",
         "projectName": "Sisonke.MigrationTool",
-        "projectPath": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj",
+        "projectPath": "C:\\Dev\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj",
         "packagesPath": "C:\\Users\\mpshe\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\obj\\",
+        "outputPath": "C:\\Dev\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\mpshe\\AppData\\Roaming\\NuGet\\NuGet.Config"

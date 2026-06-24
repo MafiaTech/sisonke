@@ -8,5 +8,6 @@ public enum StokvelType
     InvestmentStokvel = 4,
     SocialClub = 5,
     FamilySociety = 6,
-    LoanStokvel = 7
+    LoanStokvel = 7,
+    RotationalStokvel = 8
 }

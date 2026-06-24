@@ -27,6 +27,7 @@ public class StokvelArchetypeConfigurationService
                 break;
             case StokvelArchetype.Rotational:
                 stokvel.EnableRotation = true;
+                stokvel.EnableLending = true;
                 break;
             case StokvelArchetype.Grocery:
                 stokvel.EnableInventory = true;

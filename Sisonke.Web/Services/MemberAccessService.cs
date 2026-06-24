@@ -584,4 +584,94 @@ public class MemberAccessService(ApplicationDbContext context)
 
         return member is not null && CanViewFinancialsRole(member.DefaultRole.ToString());
     }
+
+    public async Task<bool> CanEditStokvelAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        if (member is null)
+        {
+            return false;
+        }
+
+        var role = member.DefaultRole;
+        return role == SisonkeRole.Chairperson ||
+               role == SisonkeRole.Secretary ||
+               role == SisonkeRole.StokvelAdmin ||
+               role == SisonkeRole.Creator;
+    }
+
+    public async Task<bool> CanDeleteStokvelAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
+
+        if (member is null)
+        {
+            return false;
+        }
+
+        var role = member.DefaultRole;
+        return role == SisonkeRole.Chairperson ||
+               role == SisonkeRole.StokvelAdmin ||
+               role == SisonkeRole.Creator;
+    }
+
+    public async Task<DashboardAccess> GetDashboardAccessAsync(string userId, Guid stokvelId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return DashboardAccess.Denied;
+
+        var linkedMember = await GetLinkedMemberForUserAsync(userId, stokvelId);
+        var canManage = await CanViewFullDashboardAsync(userId, stokvelId);
+
+        if (!canManage)
+            return new DashboardAccess(false, linkedMember, false, false, false, false, false, false, false, false);
+
+        var canViewSecretaryTasks = await CanViewSecretaryTasksAsync(userId, stokvelId);
+        var canViewChairpersonTasks = await CanViewChairpersonTasksAsync(userId, stokvelId);
+        var canManageMeetings = await CanManageMeetingsAsync(userId, stokvelId);
+        var canReviewClaims = await CanReviewClaimsAsync(userId, stokvelId);
+        var canManageAttendance = await CanManageAttendanceAsync(userId, stokvelId);
+        var canViewTreasurerTasks = await CanViewTreasurerTasksAsync(userId, stokvelId);
+        var canManagePayments = await CanManagePaymentsAsync(userId, stokvelId);
+        var canViewFinancials = await CanViewFinancialsAsync(userId, stokvelId);
+
+        return new DashboardAccess(
+            CanManageDashboard: true,
+            LinkedMember: linkedMember,
+            CanViewSecretaryTasks: canViewSecretaryTasks,
+            CanViewChairpersonTasks: canViewChairpersonTasks,
+            CanManageMeetings: canManageMeetings,
+            CanReviewClaims: canReviewClaims,
+            CanManageAttendance: canManageAttendance,
+            CanViewTreasurerTasks: canViewTreasurerTasks,
+            CanManagePayments: canManagePayments,
+            CanViewFinancials: canViewFinancials
+        );
+    }
+}
+
+public record DashboardAccess(
+    bool CanManageDashboard,
+    Member? LinkedMember,
+    bool CanViewSecretaryTasks,
+    bool CanViewChairpersonTasks,
+    bool CanManageMeetings,
+    bool CanReviewClaims,
+    bool CanManageAttendance,
+    bool CanViewTreasurerTasks,
+    bool CanManagePayments,
+    bool CanViewFinancials)
+{
+    public static DashboardAccess Denied => new(false, null, false, false, false, false, false, false, false, false);
 }

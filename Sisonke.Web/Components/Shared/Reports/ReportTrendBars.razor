@@ -1,0 +1,45 @@
+<section class="report-card @CssClass">
+    <div class="report-card-head">
+        <div>
+            <span class="report-kicker">@Eyebrow</span>
+            <h3>@Title</h3>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <p>@Subtitle</p>
+            }
+        </div>
+    </div>
+
+    <div class="report-trend" role="img" aria-label="@AriaLabel">
+        @foreach (var item in Items)
+        {
+            var height = GetHeight(item.Value);
+            <div class="report-trend-col">
+                <div class="report-trend-bars">
+                    <span style="@($"height:{height}%;background:{item.Color}")"></span>
+                </div>
+                <strong>@FormatValue(item.Value)</strong>
+                <small>@item.Label</small>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter] public string Eyebrow { get; set; } = "Report";
+    [Parameter] public string Title { get; set; } = "Trend";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string CssClass { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<ReportDatum> Items { get; set; } = [];
+    [Parameter] public decimal? MaxValue { get; set; }
+    [Parameter] public Func<decimal, string>? ValueFormatter { get; set; }
+
+    private string AriaLabel => $"{Title}: {string.Join(", ", Items.Select(item => $"{item.Label} {FormatValue(item.Value)}"))}";
+
+    private decimal EffectiveMax => Math.Max(1, MaxValue ?? (Items.Count == 0 ? 1 : Items.Max(item => item.Value)));
+
+    private string FormatValue(decimal value) => ValueFormatter?.Invoke(value) ?? value.ToString("0.#");
+
+    private decimal GetHeight(decimal value) => Math.Clamp(Math.Round(value / EffectiveMax * 100, 1), 4, 100);
+}
+

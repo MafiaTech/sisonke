@@ -235,6 +235,23 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<List<ContributionMonthlyTrendDto>> GetContributionTrendsAsync(Guid stokvelId, int monthsBack = 6)
     {
+        var stokvel = await context.Stokvels
+            .AsNoTracking()
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .ThenBy(existingStokvel => existingStokvel.Name)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        if (stokvel.EnableRotation)
+        {
+            return await GetRotationalContributionTrendsAsync(stokvelId, monthsBack);
+        }
+
         var monthCount = Math.Max(1, monthsBack);
         var currentMonthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         var startMonth = currentMonthStart.AddMonths(-(monthCount - 1));
@@ -262,6 +279,81 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         }
 
         return trends;
+    }
+
+    private async Task<List<ContributionMonthlyTrendDto>> GetRotationalContributionTrendsAsync(Guid stokvelId, int cyclesBack)
+    {
+        var cycleCount = Math.Max(1, cyclesBack);
+        var cycles = await context.RotationalContributionCycles
+            .AsNoTracking()
+            .Where(cycle =>
+                cycle.StokvelId == stokvelId &&
+                cycle.IsActive &&
+                cycle.Status != RotationalCycleStatus.Draft &&
+                cycle.Status != RotationalCycleStatus.Cancelled)
+            .OrderByDescending(cycle => cycle.CycleNumber)
+            .ThenByDescending(cycle => cycle.CycleStartDate)
+            .Take(cycleCount)
+            .ToListAsync();
+
+        if (cycles.Count == 0)
+        {
+            return [];
+        }
+
+        var cycleIds = cycles.Select(cycle => cycle.Id).ToList();
+        var payments = await context.RotationalContributionPayments
+            .AsNoTracking()
+            .Where(payment =>
+                payment.StokvelId == stokvelId &&
+                payment.IsActive &&
+                cycleIds.Contains(payment.CycleId))
+            .ToListAsync();
+
+        var paymentsByCycle = payments
+            .GroupBy(payment => payment.CycleId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        return cycles
+            .OrderBy(cycle => cycle.CycleNumber)
+            .ThenBy(cycle => cycle.CycleStartDate)
+            .Select(cycle =>
+            {
+                paymentsByCycle.TryGetValue(cycle.Id, out var cyclePayments);
+                cyclePayments ??= [];
+
+                var expected = cyclePayments.Count > 0
+                    ? cyclePayments.Sum(payment => payment.ExpectedAmount)
+                    : cycle.ExpectedTotalContributionAmount;
+                var actual = cyclePayments.Sum(payment => payment.PaidAmount);
+                var outstanding = Math.Max(0, expected - actual);
+                var dueDate = cycle.ContributionDueDate.Date;
+                var isOverdue = dueDate < DateTime.Today;
+
+                return new ContributionMonthlyTrendDto
+                {
+                    Year = cycle.CycleStartDate.Year,
+                    Month = cycle.CycleStartDate.Month,
+                    MonthName = string.IsNullOrWhiteSpace(cycle.CycleName)
+                        ? $"Cycle {cycle.CycleNumber}"
+                        : cycle.CycleName,
+                    ExpectedContributions = expected,
+                    ActualContributions = actual,
+                    OutstandingContributions = outstanding,
+                    CollectionRatePercentage = expected > 0 ? actual / expected * 100 : 0,
+                    PaidCount = cyclePayments.Count(payment =>
+                        payment.PaymentStatus is ContributionPaymentStatus.Paid or ContributionPaymentStatus.Waived),
+                    PartiallyPaidCount = cyclePayments.Count(payment =>
+                        payment.PaymentStatus == ContributionPaymentStatus.PartiallyPaid ||
+                        (payment.PaymentStatus == ContributionPaymentStatus.Late && payment.PaidAmount > 0)),
+                    OverdueCount = cyclePayments.Count(payment =>
+                        payment.PaymentStatus == ContributionPaymentStatus.Late ||
+                        (isOverdue &&
+                            payment.PaymentStatus is ContributionPaymentStatus.Unpaid or ContributionPaymentStatus.PartiallyPaid)),
+                    UnpaidCount = cyclePayments.Count(payment => payment.PaymentStatus == ContributionPaymentStatus.Unpaid)
+                };
+            })
+            .ToList();
     }
 
     public async Task<MemberContribution?> GetMemberContributionForMonthAsync(

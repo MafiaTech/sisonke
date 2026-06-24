@@ -3,12 +3,29 @@
 @implements IDisposable
 
 @inject NavigationManager NavigationManager
-@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebHostEnvironment
+@inject IConfiguration Configuration
 
-<div class="sisonke-shell sisonke-role-member">
+<div class="sisonke-app-shell sisonke-shell sisonke-role-member">
+    <input id="sisonke-mobile-nav-toggle" class="sisonke-mobile-nav-toggle" type="checkbox" aria-hidden="true" />
+    <label class="sisonke-mobile-menu-button sisonke-mobile-menu-button--floating" for="sisonke-mobile-nav-toggle" aria-label="Open navigation">
+        <i class="bi bi-list" aria-hidden="true"></i>
+    </label>
     <NavMenu />
+    <label class="sisonke-mobile-scrim" for="sisonke-mobile-nav-toggle" aria-hidden="true"></label>
 
     <main class="sisonke-main">
+        <div class="sisonke-mobile-topbar">
+            <label class="sisonke-mobile-menu-button" for="sisonke-mobile-nav-toggle" aria-label="Open navigation">
+                <i class="bi bi-list" aria-hidden="true"></i>
+            </label>
+            <a class="sisonke-mobile-brand" href="/">
+                <span class="sisonke-mobile-brand-mark">S</span>
+                <span>Sisonke</span>
+            </a>
+            <a class="sisonke-mobile-icon-link" href="Account/Manage" aria-label="Account">
+                <i class="bi bi-person-circle" aria-hidden="true"></i>
+            </a>
+        </div>
         <div class="sisonke-topbar">
             <div class="sisonke-topbar-inner">
                 <div>
@@ -39,15 +56,34 @@
 
         <div class="sisonke-content">
 
-             @if (WebHostEnvironment.EnvironmentName == "Staging" || WebHostEnvironment.EnvironmentName == "Development")
+            @if (EnvironmentBannerEnabled && !string.IsNullOrWhiteSpace(EnvironmentBannerText))
             {
                 <div class="pilot-banner">
-                    Sisonke Pilot Environment — for controlled user testing only. Do not use for final production records yet.
+                    @EnvironmentBannerText
                 </div>
             }
 
             @Body
         </div>
+
+        <nav class="sisonke-mobile-bottom-nav" aria-label="Primary mobile navigation">
+            <a href="/my-workspace">
+                <i class="bi bi-house-fill" aria-hidden="true"></i>
+                <span>Home</span>
+            </a>
+            <a href="/my-memberships">
+                <i class="bi bi-grid-fill" aria-hidden="true"></i>
+                <span>Stokvels</span>
+            </a>
+            <a href="/managed-stokvels">
+                <i class="bi bi-speedometer2" aria-hidden="true"></i>
+                <span>Manage</span>
+            </a>
+            <a href="Account/Manage">
+                <i class="bi bi-person-circle" aria-hidden="true"></i>
+                <span>Profile</span>
+            </a>
+        </nav>
     </main>
 </div>
 
@@ -58,6 +94,9 @@
 </div>
 
 @code {
+    private bool EnvironmentBannerEnabled => Configuration.GetValue("EnvironmentBanner:Enabled", false);
+    private string? EnvironmentBannerText => Configuration["EnvironmentBanner:Text"];
+
     private string CurrentAreaLabel => GetCurrentAreaLabel();
 
     protected override void OnInitialized()
@@ -84,7 +123,16 @@
             return "Member Workspace";
         }
 
-        if (path.StartsWith("managed-stokvels") || path.StartsWith("stokvel-dashboard"))
+        if (path.StartsWith("rotational/management") || path.StartsWith("stokvel/"))
+        {
+            return "Rotational Module";
+        }
+
+        if (path.StartsWith("managed-stokvels") || path.StartsWith("stokvel-dashboard") ||
+            path.StartsWith("rotational-configuration") || path.StartsWith("rotation-schedule") ||
+            path.StartsWith("stokvel-settings") || path.StartsWith("members/") ||
+            path.StartsWith("contribution-capture/") || path.StartsWith("meetings/") ||
+            path.StartsWith("finance-summary/"))
         {
             return "Executive Workspace";
         }

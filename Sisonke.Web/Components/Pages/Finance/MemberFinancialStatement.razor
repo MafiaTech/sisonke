@@ -48,12 +48,14 @@ else
             <div class="d-flex flex-wrap gap-2 mt-3">
                 <span class="sisonke-badge sisonke-badge-gray">Member No. @Display(statement.MemberNumber)</span>
                 <span class="sisonke-badge sisonke-badge-blue">@statement.StokvelName</span>
+                <span class="sisonke-badge sisonke-badge-gold">@(statement.IsRotationalStokvel ? "Rotational" : "Monthly")</span>
                 <span class="sisonke-badge sisonke-badge-gold">Generated @FormatDateTime(statement.GeneratedAt)</span>
                 <span class="sisonke-badge sisonke-badge-red">Outstanding @FormatZAR(statement.TotalOutstandingBalance)</span>
             </div>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">Back to Member Profile</a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-home/{MemberId}")">Back to Member Dashboard</a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">Member Profile</a>
             @if (canViewFinancials)
             {
                 <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
@@ -70,12 +72,38 @@ else
         @MetricCard("Total Outstanding Balance", FormatZAR(statement.TotalOutstandingBalance), "red")
     </div>
 
+    <div class="report-grid mb-4">
+        <ReportDonut
+            Eyebrow="Contributions"
+            Title="Contribution Position"
+            Subtitle="Paid versus outstanding contribution balances on this statement."
+            CenterValue="@FormatZAR(statement.TotalExpectedContributions)"
+            CenterLabel="Expected"
+            Segments="@GetContributionStatementSegments()"
+            ValueFormatter="FormatZAR" />
+            <ReportBarList
+                Eyebrow="History"
+                Title="Contribution History"
+                Subtitle="@ContributionHistorySubtitle"
+                Items="@GetContributionStatementBars()"
+                MaxValue="@GetContributionStatementMax()"
+                ValueFormatter="FormatZAR" />
+        <ReportDonut
+            Eyebrow="Fines"
+            Title="Fine Position"
+            Subtitle="Outstanding fine balance for this member."
+            CenterValue="@FormatZAR(statement.TotalOutstandingFines)"
+            CenterLabel="Fines"
+            Segments="@GetFineStatementSegments()"
+            ValueFormatter="FormatZAR" />
+    </div>
+
     <section class="sisonke-card mb-4">
         <div class="sisonke-card-body">
             <div class="sisonke-card-head">
                 <div>
                     <h2>Contributions</h2>
-                    <p>Contribution position by month.</p>
+                    <p>Contribution position by @(statement.IsRotationalStokvel ? "cycle" : "month").</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                     <span class="sisonke-badge sisonke-badge-red">@statement.OverdueContributionCount Overdue</span>
@@ -98,7 +126,7 @@ else
                     <table class="sisonke-table mb-0">
                         <thead>
                             <tr>
-                                <th>Month/Year</th>
+                                <th>@(statement.IsRotationalStokvel ? "Cycle" : "Month/Year")</th>
                                 <th>Expected</th>
                                 <th>Paid</th>
                                 <th>Balance</th>
@@ -179,7 +207,8 @@ else
     </section>
 
     <div class="d-flex flex-wrap gap-2">
-        <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">Back to Member Profile</a>
+        <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-home/{MemberId}")">Back to Member Dashboard</a>
+        <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{MemberId}")">Member Profile</a>
         @if (canViewFinancials)
         {
             <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
@@ -199,6 +228,8 @@ else
     private bool canManagePayments;
     private bool canAccessStatement;
     private MemberFinancialStatementDto? statement;
+    private string ContributionHistorySubtitle =>
+        $"Recent contribution amounts by {(statement?.IsRotationalStokvel == true ? "cycle" : "month")}.";
 
     [Parameter]
     public Guid MemberId { get; set; }
@@ -254,6 +285,63 @@ else
 
     private static string FormatDateTime(DateTime value) =>
         value == default ? "-" : value.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+
+    private IReadOnlyList<ReportDatum> GetContributionStatementSegments()
+    {
+        if (statement is null)
+        {
+            return [];
+        }
+
+        return
+        [
+            new("Paid", statement.TotalContributionPaid, "#0F8A50", "Confirmed contribution payments"),
+            new("Outstanding", statement.TotalContributionOutstanding, "#D97706", "Still due")
+        ];
+    }
+
+    private IReadOnlyList<ReportDatum> GetContributionStatementBars()
+    {
+        if (statement is null)
+        {
+            return [];
+        }
+
+        return statement.Contributions
+            .Take(8)
+            .Select(contribution => new ReportDatum(
+                contribution.MonthYear,
+                contribution.PaidAmount,
+                contribution.Balance <= 0 ? "#0F8A50" : "#D97706",
+                $"{FormatZAR(contribution.ExpectedAmount)} expected"))
+            .ToList();
+    }
+
+    private decimal GetContributionStatementMax()
+    {
+        if (statement is null || statement.Contributions.Count == 0)
+        {
+            return Math.Max(1, statement?.TotalExpectedContributions ?? 1);
+        }
+
+        return Math.Max(1, statement.Contributions.Max(contribution => Math.Max(contribution.ExpectedAmount, contribution.PaidAmount)));
+    }
+
+    private IReadOnlyList<ReportDatum> GetFineStatementSegments()
+    {
+        if (statement is null)
+        {
+            return [];
+        }
+
+        var paid = statement.Fines.Sum(fine => fine.AmountPaid);
+
+        return
+        [
+            new("Paid", paid, "#0F8A50", "Fine payments"),
+            new("Outstanding", statement.TotalOutstandingFines, "#B94242", $"{statement.OutstandingFineCount} open")
+        ];
+    }
 
     private static string GetPaymentStatusBadgeClass(string status) =>
         status switch

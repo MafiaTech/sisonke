@@ -548,11 +548,21 @@
    ═══════════════════════════════════════════════════════════ */
 
 .ws-g   { display: grid; gap: 16px; }
-.ws-g-4 { grid-template-columns: repeat(4, 1fr); }
-.ws-g-3 { grid-template-columns: repeat(3, 1fr); }
-.ws-g-2 { grid-template-columns: repeat(2, 1fr); }
-.ws-g-2-1 { grid-template-columns: 2fr 1fr; }
-.ws-g-1-2 { grid-template-columns: 1fr 2fr; }
+.ws-g-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ws-g-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ws-g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ws-g-2-1 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.ws-g-1-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+
+.ws-g-4 > *,
+.ws-g-3 > *,
+.ws-g-2 > *,
+.ws-g-2-1 > *,
+.ws-g-1-2 > *,
+.ws-card,
+.ws-panel {
+    min-width: 0;
+}
 
 /* ── Section label ──────────────────────────────────────── */
 .ws-sec-label {
@@ -800,10 +810,10 @@
    ═══════════════════════════════════════════════════════════ */
 
 @media (max-width: 1100px) {
-    .ws-g-4 { grid-template-columns: repeat(2, 1fr); }
+    .ws-g-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 1000px) {
-    .ws-g-3 { grid-template-columns: repeat(2, 1fr); }
+    .ws-g-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ws-g-2-1 { grid-template-columns: 1fr; }
     .ws-g-1-2 { grid-template-columns: 1fr; }
 }
@@ -811,13 +821,39 @@
     .ws-sidebar { transform: translateX(-100%); }
     .ws-sidebar.ws-open { transform: translateX(0); }
     .ws-topbar { margin-left: 0; }
-    .ws-main { margin-left: 0; padding: 20px 16px 60px; }
+    .ws-main {
+        width: 100%;
+        max-width: 100%;
+        margin-left: 0;
+        overflow-x: hidden;
+        padding: 18px 12px 96px;
+    }
     .ws-g-4, .ws-g-3, .ws-g-2 { grid-template-columns: 1fr; }
     .ws-hero { padding: 20px 20px; }
     .ws-hero-name { font-size: 22px; }
     .ws-hero { flex-direction: column; gap: 12px; }
     .ws-hero-right { text-align: left; }
+    .ws-flex-between,
+    .ws-card-head,
+    .ws-list-item {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .ws-tbl,
+    .ws-card table,
+    .ws-panel table {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 @media (max-width: 480px) {
-    .ws-main { padding: 16px 12px 60px; }
+    .ws-main { padding: 16px 10px 96px; }
+    .ws-hero { padding: 18px 16px; }
+    .ws-btn,
+    .ws-btn-full {
+        width: 100%;
+    }
 }

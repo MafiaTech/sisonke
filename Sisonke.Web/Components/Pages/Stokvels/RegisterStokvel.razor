@@ -211,6 +211,55 @@ else
                     </div>
                 </div>
 
+                <!-- Banking details -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <h2>Banking Details</h2>
+                                <p>Add the stokvel bank account members should use for deposits and payouts.</p>
+                            </div>
+                            <span class="sisonke-badge sisonke-badge-gray">Optional</span>
+                        </div>
+                        <div class="sisonke-grid sisonke-grid-2">
+                            <div class="member-form-field">
+                                <label class="form-label" for="bank-name">Bank name</label>
+                                <InputText id="bank-name" class="form-control" maxlength="100" placeholder="e.g. FNB" @bind-Value="model.BankName" />
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="account-holder-name">Account holder name</label>
+                                <InputText id="account-holder-name" class="form-control" maxlength="150" placeholder="e.g. Local Test Stokvel" @bind-Value="model.AccountHolderName" />
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="account-number">Account number</label>
+                                <InputText id="account-number" class="form-control" maxlength="50" inputmode="numeric" @bind-Value="model.AccountNumber" />
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="account-type">Account type</label>
+                                <InputSelect id="account-type" class="form-select" @bind-Value="model.AccountType">
+                                    @foreach (var accountType in Enum.GetValues<BankAccountType>())
+                                    {
+                                        <option value="@accountType">@GetBankAccountTypeLabel(accountType)</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="branch-code">Branch code</label>
+                                <InputText id="branch-code" class="form-control" maxlength="20" inputmode="numeric" @bind-Value="model.BranchCode" />
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="branch-name">Branch name</label>
+                                <InputText id="branch-name" class="form-control" maxlength="100" @bind-Value="model.BranchName" />
+                            </div>
+                            <div class="member-form-field register-form-wide">
+                                <label class="form-label" for="payment-reference">Payment reference format</label>
+                                <InputText id="payment-reference" class="form-control" maxlength="200" placeholder="e.g. Member number + month" @bind-Value="model.PaymentReferenceFormat" />
+                                <div class="form-text">This helps members use consistent references when making payments.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="rw-step-actions">
                     <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Cancel</a>
                     <button type="button" class="sisonke-btn sisonke-btn-primary rw-btn-next" @onclick="GoToStep2">
@@ -450,6 +499,41 @@ else
                         </div>
                     </div>
                 </div>
+
+                @if (HasBankingDetails())
+                {
+                    <div class="sisonke-card mb-3">
+                        <div class="sisonke-card-body">
+                            <div class="form-section-title mb-3">Banking Details</div>
+                            <div class="row g-3">
+                                <div class="col-6 col-md-3">
+                                    <div class="detail-mini-label">Bank</div>
+                                    <div class="fw-600">@Display(model.BankName)</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="detail-mini-label">Account Holder</div>
+                                    <div class="fw-600">@Display(model.AccountHolderName)</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="detail-mini-label">Account Number</div>
+                                    <div class="fw-600">@StokvelBankingDetailsService.MaskAccountNumber(model.AccountNumber)</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="detail-mini-label">Account Type</div>
+                                    <div class="fw-600">@GetBankAccountTypeLabel(model.AccountType)</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="detail-mini-label">Branch Code</div>
+                                    <div class="fw-600">@Display(model.BranchCode)</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="detail-mini-label">Payment Reference</div>
+                                    <div class="fw-600">@Display(model.PaymentReferenceFormat)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
 
                 <!-- Creator summary -->
                 <div class="sisonke-card mb-3">
@@ -813,6 +897,12 @@ else
             wizardValidationMessage = "Please enter the office bearer's cellphone number to continue.";
             return;
         }
+        var bankingValidation = ValidateBankingDetails();
+        if (bankingValidation is not null)
+        {
+            wizardValidationMessage = bankingValidation;
+            return;
+        }
         currentWizardStep = 2;
     }
 
@@ -908,11 +998,18 @@ else
 
         if (currentUser is null) { saveFailed = true; return; }
         if (model.SubscriptionPlanId is null) { packageSelectionFailed = true; currentWizardStep = 2; return; }
+        var bankingValidation = ValidateBankingDetails();
+        if (bankingValidation is not null)
+        {
+            wizardValidationMessage = bankingValidation;
+            currentWizardStep = 1;
+            return;
+        }
 
         var createdStokvel = await StokvelService.RegisterStokvelAsync(
-            model.Name, MapArchetypeToStokvelType(model.Archetype), model.Archetype, model.Province, model.TownOrArea,
+            model.Name, StokvelService.MapArchetypeToStokvelType(model.Archetype), model.Archetype, model.Province, model.TownOrArea,
             model.EstablishedDate, model.ExpectedMemberCount,
-            model.SubscriptionPlanId.Value, model.Description);
+            model.SubscriptionPlanId.Value, model.Description, BuildBankingDetailsForCreate(), currentUser.Id);
 
         if (createdStokvel is null) { saveFailed = true; return; }
 
@@ -979,6 +1076,13 @@ else
         [EmailAddress][MaxLength(150)] public string? CreatorEmail { get; set; }
         [MaxLength(30)] public string? CreatorIdNumber { get; set; }
         [MaxLength(150)] public string? CreatorResidentialArea { get; set; }
+        [MaxLength(100)] public string? BankName { get; set; }
+        [MaxLength(150)] public string? AccountHolderName { get; set; }
+        [MaxLength(50)] public string? AccountNumber { get; set; }
+        public BankAccountType AccountType { get; set; } = BankAccountType.Savings;
+        [MaxLength(20)] public string? BranchCode { get; set; }
+        [MaxLength(100)] public string? BranchName { get; set; }
+        [MaxLength(200)] public string? PaymentReferenceFormat { get; set; }
     }
 
     private static string FormatCurrency(decimal amount) =>
@@ -1002,26 +1106,58 @@ else
             _          => []
         };
 
-    private static StokvelType MapArchetypeToStokvelType(StokvelArchetype archetype) =>
-        archetype switch
-        {
-            StokvelArchetype.BurialSociety  => StokvelType.BurialSociety,
-            StokvelArchetype.Rotational     => StokvelType.SavingsStokvel,
-            StokvelArchetype.Grocery        => StokvelType.GroceryStokvel,
-            StokvelArchetype.InvestmentClub => StokvelType.InvestmentStokvel,
-            StokvelArchetype.SavingsClub    => StokvelType.SavingsStokvel,
-            StokvelArchetype.Education      => StokvelType.SavingsStokvel,
-            StokvelArchetype.Borrowing      => StokvelType.LoanStokvel,
-            StokvelArchetype.Travel         => StokvelType.SavingsStokvel,
-            StokvelArchetype.SocialClub     => StokvelType.SocialClub,
-            _                               => StokvelType.BurialSociety
-        };
-
     private static string GetArchetypeBadgeClass(ArchetypeOption option) =>
         option.IsComingSoon                               ? "sisonke-badge sisonke-badge-gray"  :
         option.Archetype == StokvelArchetype.Rotational   ? "sisonke-badge sisonke-badge-blue"  :
         option.Archetype == StokvelArchetype.BurialSociety? "sisonke-badge sisonke-badge-green" :
         "sisonke-badge sisonke-badge-gold";
+
+    private bool HasBankingDetails() =>
+        !string.IsNullOrWhiteSpace(model.BankName) ||
+        !string.IsNullOrWhiteSpace(model.AccountHolderName) ||
+        !string.IsNullOrWhiteSpace(model.AccountNumber) ||
+        !string.IsNullOrWhiteSpace(model.BranchCode) ||
+        !string.IsNullOrWhiteSpace(model.BranchName) ||
+        !string.IsNullOrWhiteSpace(model.PaymentReferenceFormat);
+
+    private string? ValidateBankingDetails()
+    {
+        if (!HasBankingDetails())
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(model.BankName)) return "Please enter the bank name or clear the banking details section.";
+        if (string.IsNullOrWhiteSpace(model.AccountHolderName)) return "Please enter the account holder name or clear the banking details section.";
+        if (string.IsNullOrWhiteSpace(model.AccountNumber)) return "Please enter the account number or clear the banking details section.";
+        if (!model.AccountNumber.All(char.IsDigit)) return "Account number must contain digits only.";
+        if (!string.IsNullOrWhiteSpace(model.BranchCode) && !model.BranchCode.All(char.IsDigit)) return "Branch code must contain digits only.";
+        return null;
+    }
+
+    private StokvelBankingDetails? BuildBankingDetailsForCreate() =>
+        !HasBankingDetails()
+            ? null
+            : new StokvelBankingDetails
+            {
+                BankName = model.BankName ?? string.Empty,
+                AccountHolderName = model.AccountHolderName ?? string.Empty,
+                AccountNumber = model.AccountNumber ?? string.Empty,
+                AccountType = model.AccountType,
+                BranchCode = model.BranchCode,
+                BranchName = model.BranchName,
+                PaymentReferenceFormat = model.PaymentReferenceFormat
+            };
+
+    private static string GetBankAccountTypeLabel(BankAccountType accountType) =>
+        accountType switch
+        {
+            BankAccountType.Savings       => "Savings",
+            BankAccountType.Current       => "Current",
+            BankAccountType.Transmission  => "Transmission",
+            BankAccountType.ChequeAccount => "Cheque Account",
+            _                             => accountType.ToString()
+        };
 
     private sealed record ArchetypeOption(
         StokvelArchetype Archetype,

@@ -124,6 +124,32 @@ else
             @MetricCard("Approved Claims Awaiting Payout", FormatZAR(report.ApprovedClaimsAwaitingPayoutTotal), $"{report.ApprovedClaimsAwaitingPayoutCount} approved", "gold")
         </div>
 
+        <div class="report-grid mb-4">
+            <ReportDonut
+                Eyebrow="Collections"
+                Title="Collection Breakdown"
+                Subtitle="Actual contributions versus outstanding balances for the selected report period."
+                CenterValue="@FormatPercentage(report.CollectionRatePercentage)"
+                CenterLabel="Collected"
+                Segments="@GetFinanceCollectionSegments()"
+                ValueFormatter="FormatZAR" />
+            <ReportBarList
+                Eyebrow="Members"
+                Title="Member Payment Status"
+                Subtitle="Payment status count for the selected month."
+                Items="@GetFinanceStatusBars()"
+                MaxValue="@Math.Max(1, report.ActiveMemberCount)"
+                ValueFormatter="FormatCount" />
+            <ReportDonut
+                Eyebrow="Obligations"
+                Title="Outstanding Exposure"
+                Subtitle="Open fines and approved claims still awaiting payout."
+                CenterValue="@FormatZAR(report.OutstandingFinesTotal + report.ApprovedClaimsAwaitingPayoutTotal)"
+                CenterLabel="Open"
+                Segments="@GetFinanceExposureSegments()"
+                ValueFormatter="FormatZAR" />
+        </div>
+
         <section class="sisonke-card mb-4">
             <div class="sisonke-card-body">
                 <div class="sisonke-card-head">
@@ -235,6 +261,9 @@ else
     private static string FormatPercentage(decimal percentage) =>
         $"{percentage:0.#}%";
 
+    private static string FormatCount(decimal value) =>
+        value.ToString("0");
+
     private static string FormatDateTime(DateTime? value) =>
         value is null || value == default ? "-" : value.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm");
 
@@ -250,6 +279,50 @@ else
             : collectionRatePercentage >= 70
                 ? "gold"
                 : "red";
+    }
+
+    private IReadOnlyList<ReportDatum> GetFinanceCollectionSegments()
+    {
+        if (report is null)
+        {
+            return [];
+        }
+
+        return
+        [
+            new("Collected", report.ActualContributions, "#0F8A50", "Actual member payments"),
+            new("Outstanding", report.OutstandingContributions, "#D97706", "Still due")
+        ];
+    }
+
+    private IReadOnlyList<ReportDatum> GetFinanceStatusBars()
+    {
+        if (report is null)
+        {
+            return [];
+        }
+
+        return
+        [
+            new("Paid", report.PaidCount, "#0F8A50"),
+            new("Partial", report.PartiallyPaidCount, "#D97706"),
+            new("Overdue", report.OverdueCount, "#B94242"),
+            new("Unpaid", report.UnpaidCount, "#64746B")
+        ];
+    }
+
+    private IReadOnlyList<ReportDatum> GetFinanceExposureSegments()
+    {
+        if (report is null)
+        {
+            return [];
+        }
+
+        return
+        [
+            new("Outstanding fines", report.OutstandingFinesTotal, "#B94242", $"{report.OutstandingFinesCount} unpaid"),
+            new("Claims awaiting payout", report.ApprovedClaimsAwaitingPayoutTotal, "#D97706", $"{report.ApprovedClaimsAwaitingPayoutCount} approved")
+        ];
     }
 
     private static RenderFragment MetricCard(string title, string value, string? detail, string badgeType) => @<div class="sisonke-card">

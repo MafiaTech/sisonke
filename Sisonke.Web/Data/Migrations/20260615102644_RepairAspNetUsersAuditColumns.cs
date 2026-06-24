@@ -18,58 +18,58 @@ namespace Sisonke.Web.Data.Migrations
             nullable: false,
             defaultValueSql: "SYSUTCDATETIME()");
 
-        migrationBuilder.AddColumn<string>(
-            name: "CreatedBy",
-            table: "AspNetUsers",
-            type: "nvarchar(256)",
-            maxLength: 256,
-            nullable: true);
+            migrationBuilder.AddColumn<string>(
+                name: "CreatedBy",
+                table: "AspNetUsers",
+                type: "nvarchar(256)",
+                maxLength: 256,
+                nullable: true);
 
-        migrationBuilder.AddColumn<DateTime>(
-            name: "UpdatedAt",
-            table: "AspNetUsers",
-            type: "datetime2",
-            nullable: true);
+            migrationBuilder.AddColumn<DateTime>(
+                name: "UpdatedAt",
+                table: "AspNetUsers",
+                type: "datetime2",
+                nullable: true);
 
-        migrationBuilder.AddColumn<string>(
-            name: "UpdatedBy",
-            table: "AspNetUsers",
-            type: "nvarchar(256)",
-            maxLength: 256,
-            nullable: true);
+            migrationBuilder.AddColumn<string>(
+                name: "UpdatedBy",
+                table: "AspNetUsers",
+                type: "nvarchar(256)",
+                maxLength: 256,
+                nullable: true);
 
-        migrationBuilder.AddColumn<bool>(
-            name: "IsDeleted",
-            table: "AspNetUsers",
-            type: "bit",
-            nullable: false,
-            defaultValue: false);
+            migrationBuilder.AddColumn<bool>(
+                name: "IsDeleted",
+                table: "AspNetUsers",
+                type: "bit",
+                nullable: false,
+                defaultValue: false);
 
-        migrationBuilder.AddColumn<DateTime>(
-            name: "DeletedAt",
-            table: "AspNetUsers",
-            type: "datetime2",
-            nullable: true);
+            migrationBuilder.AddColumn<DateTime>(
+                name: "DeletedAt",
+                table: "AspNetUsers",
+                type: "datetime2",
+                nullable: true);
 
-        migrationBuilder.AddColumn<string>(
-            name: "DeletedBy",
-            table: "AspNetUsers",
-            type: "nvarchar(256)",
-            maxLength: 256,
-            nullable: true);
+            migrationBuilder.AddColumn<string>(
+                name: "DeletedBy",
+                table: "AspNetUsers",
+                type: "nvarchar(256)",
+                maxLength: 256,
+                nullable: true);
 
-        migrationBuilder.AddColumn<DateTime>(
-            name: "LastLoginAt",
-            table: "AspNetUsers",
-            type: "datetime2",
-            nullable: true);
+            migrationBuilder.AddColumn<DateTime>(
+                name: "LastLoginAt",
+                table: "AspNetUsers",
+                type: "datetime2",
+                nullable: true);
 
-        migrationBuilder.AddColumn<string>(
-            name: "LastLoginIp",
-            table: "AspNetUsers",
-            type: "nvarchar(64)",
-            maxLength: 64,
-            nullable: true);
+            migrationBuilder.AddColumn<string>(
+                name: "LastLoginIp",
+                table: "AspNetUsers",
+                type: "nvarchar(64)",
+                maxLength: 64,
+                nullable: true);
         }
 
         /// <inheritdoc />

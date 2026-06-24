@@ -1,0 +1,54 @@
+@using Microsoft.AspNetCore.Components.Routing
+
+<div class="sk-subnav">
+    <div class="sk-subnav-group">
+        <span class="sk-subnav-group-label">Stokvel</span>
+        <div class="sk-subnav-links">
+            <NavLink class="sk-subnav-link" href="@($"stokvel-dashboard/{StokvelId}")" Match="NavLinkMatch.All">
+                <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+            </NavLink>
+            <NavLink class="sk-subnav-link" href="@($"members/{StokvelId}")">
+                <i class="bi bi-people-fill"></i><span>Members</span>
+            </NavLink>
+            <NavLink class="sk-subnav-link" href="@($"contribution-capture/{StokvelId}")">
+                <i class="bi bi-cash-stack"></i><span>Contributions</span>
+            </NavLink>
+            <NavLink class="sk-subnav-link" href="@($"meetings/{StokvelId}")">
+                <i class="bi bi-calendar-event-fill"></i><span>Meetings</span>
+            </NavLink>
+            <NavLink class="sk-subnav-link" href="@($"finance-summary/{StokvelId}")">
+                <i class="bi bi-bar-chart-fill"></i><span>Reports</span>
+            </NavLink>
+            <NavLink class="sk-subnav-link" href="@($"stokvel-settings/{StokvelId}")">
+                <i class="bi bi-gear-fill"></i><span>Settings</span>
+            </NavLink>
+        </div>
+    </div>
+
+    @if (IsRotational)
+    {
+        <div class="sk-subnav-sep" aria-hidden="true"></div>
+        <div class="sk-subnav-group">
+            <span class="sk-subnav-group-label sk-subnav-label-module">Rotational</span>
+            <div class="sk-subnav-links">
+                <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"rotational/management/{StokvelId}")">
+                    <i class="bi bi-arrow-repeat"></i><span>Rotation</span>
+                </NavLink>
+                <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"stokvel/{StokvelId}/loans")">
+                    <i class="bi bi-bank2"></i><span>Loans</span>
+                </NavLink>
+                <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"stokvel/{StokvelId}/wallet")">
+                    <i class="bi bi-wallet2"></i><span>Wallet</span>
+                </NavLink>
+                <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"rotational-configuration/{StokvelId}")">
+                    <i class="bi bi-sliders"></i><span>Rules</span>
+                </NavLink>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid StokvelId { get; set; }
+    [Parameter] public bool IsRotational { get; set; }
+}

@@ -94,7 +94,7 @@ else
     </div>
 
     <!-- ── Step content ── -->
-    @if (currentStep < 4)
+    @if (currentStep <= 4)
     {
         @if (currentStep == 1 && stokvel is not null)
         {
@@ -120,7 +120,7 @@ else
             {
                 <div class="sisonke-card">
                     <div class="sisonke-card-body">
-                        <div class="form-section-title">@section.Name</div>
+                        <div class="form-section-title">@GetSectionDisplayName(section.Name)</div>
                         @if (!string.IsNullOrWhiteSpace(section.Description))
                         {
                             <p class="text-muted small mb-3">@section.Description</p>
@@ -207,6 +207,49 @@ else
                 </div>
             }
         </div>
+
+        @if (currentStep == 4)
+        {
+            <div class="card mb-4 mt-4">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="wizard-step-num" style="background:var(--sk-green-800);color:#fff;border-radius:50%;width:1.75rem;height:1.75rem;display:flex;align-items:center;justify-content:center;font-size:.875rem;font-weight:700;flex-shrink:0">4</div>
+                        <h3 class="h5 mb-0">Review</h3>
+                    </div>
+                    <p class="text-muted small mb-4">Review all setup answers before completing setup. You can go back to any step to make corrections.</p>
+
+                    <div class="qs-progress-wrap mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-600 small">Completion</span>
+                            <span class="fw-700 small" style="color:@(completionPercentage == 100 ? "var(--sk-success)" : "var(--sk-gold-dark)")">@completionPercentage%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar @(completionPercentage == 100 ? "bg-success" : "bg-warning")"
+                                 style="width:@(completionPercentage)%"></div>
+                        </div>
+                    </div>
+
+                    @foreach (var section in ReviewSections)
+                    {
+                        <div class="review-section mb-3">
+                            <div class="review-section-title">@GetSectionDisplayName(section.Name)</div>
+                            @foreach (var question in GetApplicableQuestions(section))
+                            {
+                                <div class="review-row">
+                                    <span class="review-q">@question.QuestionText</span>
+                                    <span class="review-a @(GetAnswer(question.Id) == "" ? "review-a-empty" : "")">@GetReviewAnswer(question.Id)</span>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (completionPercentage < 100)
+                    {
+                        <AlertBanner Type="warning" Title="Setup incomplete" Message="Please complete all required questions before submitting." Icon="bi bi-exclamation-triangle-fill" />
+                    }
+                </div>
+            </div>
+        }
     }
     else
     {
@@ -233,7 +276,7 @@ else
                 @foreach (var section in ReviewSections)
                 {
                     <div class="review-section mb-3">
-                        <div class="review-section-title">@section.Name</div>
+                        <div class="review-section-title">@GetSectionDisplayName(section.Name)</div>
                         @foreach (var question in GetApplicableQuestions(section))
                         {
                             <div class="review-row">
@@ -351,28 +394,15 @@ else
 
     private List<QuestionnaireSection> CurrentStepSections =>
         sections
-            .Where(s => GetSectionStep(s.Name) == currentStep && IsSectionApplicable(s))
+            .Where(s => GetSectionStep(s.Name) == currentStep && s.Questions.Any())
             .ToList();
 
     private IEnumerable<QuestionnaireSection> ReviewSections =>
-        sections.Where(IsSectionApplicable);
-
-    private bool IsSectionApplicable(QuestionnaireSection section) =>
-        section.Name switch
-        {
-            "Claims and Payouts" => stokvel?.EnableClaims == true,
-            _ => true
-        };
+        sections.Where(section => section.Questions.Any());
 
     private IEnumerable<QuestionnaireQuestion> GetApplicableQuestions(QuestionnaireSection section)
     {
-        if (stokvel?.EnableDependents == true && stokvel?.EnableClaims == true)
-            return section.Questions;
-
-        return section.Questions
-            .Where(q =>
-                !q.QuestionText.Contains("beneficiaries", StringComparison.OrdinalIgnoreCase) &&
-                !q.QuestionText.Contains("dependents", StringComparison.OrdinalIgnoreCase));
+        return section.Questions;
     }
 
     private void PrePopulateAutoAnswers()
@@ -397,25 +427,13 @@ else
             }
         }
 
-        foreach (var section in sections)
-        {
-            if (!IsSectionApplicable(section))
-            {
-                foreach (var q in section.Questions.Where(q => q.IsRequired))
-                {
-                    if (!answers.TryGetValue(q.Id, out var existing) || string.IsNullOrWhiteSpace(existing))
-                        answers[q.Id] = "N/A";
-                }
-                continue;
-            }
+        var applicableIds = sections
+            .SelectMany(section => section.Questions)
+            .Select(question => question.Id)
+            .ToHashSet();
 
-            var applicableIds = GetApplicableQuestions(section).Select(q => q.Id).ToHashSet();
-            foreach (var q in section.Questions.Where(q => q.IsRequired && !applicableIds.Contains(q.Id)))
-            {
-                if (!answers.TryGetValue(q.Id, out var existing) || string.IsNullOrWhiteSpace(existing))
-                    answers[q.Id] = "N/A";
-            }
-        }
+        foreach (var answerId in answers.Keys.Where(answerId => !applicableIds.Contains(answerId)).ToList())
+            answers.Remove(answerId);
     }
 
     private static string MapArchetypeToQuestionnaireAnswer(StokvelArchetype archetype) =>
@@ -423,7 +441,7 @@ else
         {
             StokvelArchetype.BurialSociety  => "Burial Society",
             StokvelArchetype.SavingsClub    => "Savings Stokvel",
-            StokvelArchetype.Rotational     => "Savings Stokvel",
+            StokvelArchetype.Rotational     => "Rotational Stokvel",
             StokvelArchetype.Grocery        => "Grocery Stokvel",
             StokvelArchetype.InvestmentClub => "Investment Stokvel",
             StokvelArchetype.SocialClub     => "Social Club",
@@ -433,7 +451,6 @@ else
     private void RecomputeLocalCompletion()
     {
         var required = sections
-            .Where(IsSectionApplicable)
             .SelectMany(GetApplicableQuestions)
             .Where(q => q.IsRequired)
             .ToList();
@@ -454,7 +471,7 @@ else
 
         if (stokvel is not null)
         {
-            sections = await QuestionnaireService.GetActiveQuestionnaireAsync();
+            sections = await QuestionnaireService.GetActiveQuestionnaireForStokvelAsync(StokvelId);
             answers  = await QuestionnaireService.GetAnswersByStokvelIdAsync(StokvelId);
             PrePopulateAutoAnswers();
             RecomputeLocalCompletion();
@@ -472,8 +489,11 @@ else
         return string.IsNullOrWhiteSpace(a) ? "Not answered" : a;
     }
 
-    private void SetAnswer(Guid questionId, string? value) =>
+    private void SetAnswer(Guid questionId, string? value)
+    {
         answers[questionId] = value ?? string.Empty;
+        RecomputeLocalCompletion();
+    }
 
     private int? GetIntAnswer(Guid questionId) =>
         int.TryParse(GetAnswer(questionId), out var v) ? v : null;
@@ -545,11 +565,38 @@ else
         {
             "Stokvel Identity"          => 1,
             "Membership Rules"          => 1,
+            "Rotational Basics"         => 1,
             "Contributions and Fines"   => 2,
+            "Rotational Payouts"        => 2,
             "Meetings and Decisions"    => 3,
             "Claims and Payouts"        => 3,
-            _                           => 4
+            "Rotational Order"          => 3,
+            _                           => 4   // "Governance Sign-off", "Rotational Sign-off"
         };
+
+    private string GetSectionDisplayName(string sectionName)
+    {
+        if (stokvel is null)
+        {
+            return sectionName;
+        }
+
+        var selectedType = QuestionnaireService.GetQuestionnaireStokvelType(stokvel);
+
+        return (selectedType, sectionName) switch
+        {
+            (StokvelType.BurialSociety, "Stokvel Identity") => "Burial Basics",
+            (StokvelType.BurialSociety, "Membership Rules") => "Dependents",
+            (StokvelType.BurialSociety, "Contributions and Fines") => "Burial Contributions",
+            (StokvelType.BurialSociety, "Meetings and Decisions") => "Burial Rules",
+            (StokvelType.BurialSociety, "Claims and Payouts") => "Claims",
+            (StokvelType.BurialSociety, "Governance Sign-off") => "Burial Sign-off",
+            (StokvelType.RotationalStokvel, "Stokvel Identity") => "Rotational Basics",
+            (StokvelType.RotationalStokvel, "Rotational Payouts") => "Rotational Contributions",
+            (StokvelType.RotationalStokvel, "Rotational Order") => "Rotational Rules",
+            _ => sectionName
+        };
+    }
 
     private static string GetStepName(int step) =>
         step switch { 1 => "Basics", 2 => "Money", 3 => "Rules", 4 => "Sign-off", _ => string.Empty };

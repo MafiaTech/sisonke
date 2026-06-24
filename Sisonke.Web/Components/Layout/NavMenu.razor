@@ -46,6 +46,119 @@
                     </NavLink>
                 </div>
 
+            @if (HasContextNavigation)
+            {
+                <div class="sisonke-nav-section">Standard</div>
+                <div class="nav-item px-0">
+                    <NavLink class="sisonke-nav-item" href="@DashboardHref">
+                        <i class="bi bi-speedometer2 nav-icon" aria-hidden="true"></i>
+                        <span>Dashboard</span>
+                    </NavLink>
+                </div>
+                @if (contextMember is not null)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="@($"/member-profile/{contextMember.Id}")">
+                            <i class="bi bi-person-circle nav-icon" aria-hidden="true"></i>
+                            <span>My Profile</span>
+                        </NavLink>
+                    </div>
+                }
+                @if (contextMember is not null && !CanManageContextStokvel)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="@($"/member-home/{contextMember.Id}#member-contributions")">
+                            <i class="bi bi-cash-coin nav-icon" aria-hidden="true"></i>
+                            <span>Contributions</span>
+                        </NavLink>
+                    </div>
+                }
+                else if (contextStokvel is not null && CanManageContextStokvel)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="@($"/contribution-capture/{contextStokvel.Id}")">
+                            <i class="bi bi-cash-stack nav-icon" aria-hidden="true"></i>
+                            <span>Contributions</span>
+                        </NavLink>
+                    </div>
+                }
+                @if (contextStokvel is not null)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="@($"/meetings/{contextStokvel.Id}")">
+                            <i class="bi bi-calendar3 nav-icon" aria-hidden="true"></i>
+                            <span>Meetings</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="@($"/constitution-builder/{contextStokvel.Id}")">
+                            <i class="bi bi-file-earmark-text nav-icon" aria-hidden="true"></i>
+                            <span>Constitution</span>
+                        </NavLink>
+                    </div>
+                }
+                <div class="nav-item px-0">
+                    <NavLink class="sisonke-nav-item" href="/platform-support">
+                        <i class="bi bi-life-preserver nav-icon" aria-hidden="true"></i>
+                        <span>Report an Issue</span>
+                    </NavLink>
+                </div>
+            }
+
+            @if (contextStokvel?.EnableRotation == true)
+            {
+                <div class="sisonke-nav-section">Rotational Module</div>
+                @if (CanManageContextStokvel)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="@($"/rotational/management/{contextStokvel.Id}")">
+                            <i class="bi bi-arrow-repeat nav-icon" aria-hidden="true"></i>
+                            <span>Rotation Management</span>
+                        </NavLink>
+                    </div>
+                }
+                <div class="nav-item px-0">
+                    <NavLink class="sisonke-nav-item" href="@($"/rotational/rotation-order/{contextStokvel.Id}")">
+                        <i class="bi bi-list-ol nav-icon" aria-hidden="true"></i>
+                        <span>Rotation Order</span>
+                    </NavLink>
+                </div>
+                <div class="nav-item px-0">
+                    <NavLink class="sisonke-nav-item" href="@($"/stokvel/{contextStokvel.Id}/wallet")">
+                        <i class="bi bi-wallet2 nav-icon" aria-hidden="true"></i>
+                        <span>Wallet</span>
+                    </NavLink>
+                </div>
+                <div class="nav-item px-0">
+                    <span class="sisonke-nav-item sisonke-nav-item-disabled" aria-disabled="true" title="Coming soon">
+                        <i class="bi bi-bank nav-icon" aria-hidden="true"></i>
+                        <span>My Payouts</span>
+                        <span class="sisonke-nav-mini-badge">Soon</span>
+                    </span>
+                </div>
+                @if (contextStokvel.EnableLending)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="@($"/stokvel/{contextStokvel.Id}/loans")">
+                            <i class="bi bi-cash-coin nav-icon" aria-hidden="true"></i>
+                            <span>Loans</span>
+                        </NavLink>
+                    </div>
+                }
+            }
+
+            @if (HasContextNavigation)
+            {
+                <div class="sisonke-nav-section">Support</div>
+                <div class="nav-item px-0">
+                    <span class="sisonke-nav-item sisonke-nav-item-disabled" aria-disabled="true" title="Coming soon">
+                        <i class="bi bi-chat-dots nav-icon" aria-hidden="true"></i>
+                        <span>Contact Chairperson</span>
+                        <span class="sisonke-nav-mini-badge">Soon</span>
+                    </span>
+                </div>
+            }
+
             @if (hasManagedStokvels || canRegisterStokvel)
             {
                 <div class="sisonke-nav-section">Stokvels</div>
@@ -145,7 +258,17 @@
     private bool isPlatformAdmin;
     private bool isPlatformSupport;
     private bool canRegisterStokvel;
+    private List<Member> memberships = [];
+    private Member? contextMember;
+    private Stokvel? contextStokvel;
     private string HomeHref => isAuthenticated ? "/my-workspace" : "/";
+    private bool HasContextNavigation => contextMember is not null || contextStokvel is not null;
+    private bool CanManageContextStokvel => IsOfficeBearerRole(contextMember?.DefaultRole.ToString());
+    private string DashboardHref => contextStokvel is not null && CanManageContextStokvel
+        ? $"/stokvel-dashboard/{contextStokvel.Id}"
+        : contextMember is not null
+            ? $"/member-home/{contextMember.Id}"
+            : HomeHref;
     private string SidebarCssClass => $"sisonke-sidebar {RoleCssClass}";
     private string RoleCssClass =>
         isPlatformAdmin ? "sisonke-role-platform-admin" :
@@ -172,6 +295,9 @@
         isPlatformSupport = false;
         canRegisterStokvel = false;
         currentUser = null;
+        memberships = [];
+        contextMember = null;
+        contextStokvel = null;
 
         if (!isAuthenticated)
         {
@@ -191,8 +317,9 @@
         currentUser = await LoadCurrentUserAsync(userId);
         canRegisterStokvel = !string.IsNullOrWhiteSpace(currentUser?.IdNumber);
 
-        var memberships = await LoadMembershipsAsync(userId);
+        memberships = await LoadMembershipsAsync(userId);
         hasManagedStokvels = memberships.Any(member => IsOfficeBearerRole(member.DefaultRole.ToString()));
+        await LoadContextNavigationAsync(userId);
     }
 
     private async Task<ApplicationUser?> LoadCurrentUserAsync(string currentUserId)
@@ -216,7 +343,110 @@
             .ToListAsync();
     }
 
-private static bool IsOfficeBearerRole(string? role)
+    private async Task LoadContextNavigationAsync(string currentUserId)
+    {
+        contextMember = null;
+        contextStokvel = null;
+
+        var (memberId, stokvelId) = GetRouteContextIds();
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        if (memberId is not null)
+        {
+            contextMember = memberships.FirstOrDefault(member => member.Id == memberId.Value);
+
+            if (contextMember is not null)
+            {
+                contextStokvel = await context.Stokvels
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(stokvel => stokvel.TenantId == contextMember.TenantId);
+                return;
+            }
+        }
+
+        if (stokvelId is not null)
+        {
+            contextStokvel = await context.Stokvels
+                .AsNoTracking()
+                .FirstOrDefaultAsync(stokvel => stokvel.Id == stokvelId.Value);
+
+            if (contextStokvel is not null)
+            {
+                contextMember = memberships.FirstOrDefault(member => member.TenantId == contextStokvel.TenantId);
+                return;
+            }
+        }
+
+        if (memberships.Count == 1)
+        {
+            contextMember = memberships[0];
+            contextStokvel = await context.Stokvels
+                .AsNoTracking()
+                .FirstOrDefaultAsync(stokvel => stokvel.TenantId == contextMember.TenantId);
+        }
+    }
+
+    private (Guid? MemberId, Guid? StokvelId) GetRouteContextIds()
+    {
+        var path = (currentUrl ?? string.Empty).Split('?', '#')[0].Trim('/');
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (segments.Length == 0)
+        {
+            return (null, null);
+        }
+
+        if (segments.Length >= 2 &&
+            (segments[0].Equals("member-home", StringComparison.OrdinalIgnoreCase) ||
+             segments[0].Equals("member-profile", StringComparison.OrdinalIgnoreCase)) &&
+            Guid.TryParse(segments[1], out var memberId))
+        {
+            return (memberId, null);
+        }
+
+        if (segments.Length >= 3 &&
+            segments[0].Equals("member-statement", StringComparison.OrdinalIgnoreCase) &&
+            Guid.TryParse(segments[1], out memberId) &&
+            Guid.TryParse(segments[2], out var statementStokvelId))
+        {
+            return (memberId, statementStokvelId);
+        }
+
+        if (segments.Length >= 2 &&
+            (segments[0].Equals("stokvel-dashboard", StringComparison.OrdinalIgnoreCase) ||
+             segments[0].Equals("rotational-configuration", StringComparison.OrdinalIgnoreCase) ||
+             segments[0].Equals("rotation-schedule", StringComparison.OrdinalIgnoreCase) ||
+             segments[0].Equals("meetings", StringComparison.OrdinalIgnoreCase) ||
+             segments[0].Equals("constitution-builder", StringComparison.OrdinalIgnoreCase) ||
+             segments[0].Equals("contribution-capture", StringComparison.OrdinalIgnoreCase) ||
+             segments[0].Equals("stokvel-settings", StringComparison.OrdinalIgnoreCase) ||
+             segments[0].Equals("members", StringComparison.OrdinalIgnoreCase)) &&
+            Guid.TryParse(segments[1], out var stokvelId))
+        {
+            return (null, stokvelId);
+        }
+
+        if (segments.Length >= 3 &&
+            segments[0].Equals("rotational", StringComparison.OrdinalIgnoreCase) &&
+            (segments[1].Equals("management", StringComparison.OrdinalIgnoreCase) ||
+             segments[1].Equals("rotation-order", StringComparison.OrdinalIgnoreCase)) &&
+            Guid.TryParse(segments[2], out stokvelId))
+        {
+            return (null, stokvelId);
+        }
+
+        if (segments.Length >= 3 &&
+            segments[0].Equals("stokvel", StringComparison.OrdinalIgnoreCase) &&
+            Guid.TryParse(segments[1], out stokvelId))
+        {
+            return (null, stokvelId);
+        }
+
+        return (null, null);
+    }
+
+    private static bool IsOfficeBearerRole(string? role)
     {
         return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
             role?.Trim().Equals("Secretary", StringComparison.OrdinalIgnoreCase) == true ||
@@ -246,7 +476,18 @@ private static bool IsOfficeBearerRole(string? role)
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
-        StateHasChanged();
+        _ = InvokeAsync(async () =>
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                await LoadContextNavigationAsync(userId);
+            }
+
+            StateHasChanged();
+        });
     }
 
     public void Dispose()

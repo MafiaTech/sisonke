@@ -22,7 +22,12 @@
 @inject VotingService VotingService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
+@inject RotationalPayoutOrderService RotationalPayoutOrderService
+@inject RotationalTaskService RotationalTaskService
+@inject LoansWalletService LoansWalletService
 @inject NavigationManager NavigationManager
+@inject IWebHostEnvironment HostEnvironment
+@inject ILoggerFactory LoggerFactory
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -75,6 +80,7 @@ else if (!canManageDashboard)
 }
 else
 {
+    <div class="dashboard-redesign-page admin-dashboard-redesign">
     <!-- ── Page header ── -->
     <div class="page-header">
         <div class="page-header-text">
@@ -96,10 +102,20 @@ else
                 }
             </p>
         </div>
-        <a class="btn btn-outline-secondary btn-sm" href="/my-stokvels">
-            <i class="bi bi-grid me-1"></i>My Stokvels
-        </a>
+        <div class="d-flex gap-2 flex-wrap">
+            @if (canManageDashboard)
+            {
+                <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-settings/{StokvelId}")">
+                    <i class="bi bi-gear me-1"></i>Settings
+                </a>
+            }
+            <a class="btn btn-outline-secondary btn-sm" href="/my-stokvels">
+                <i class="bi bi-grid me-1"></i>My Stokvels
+            </a>
+        </div>
     </div>
+
+    <StokvelSubNav StokvelId="@StokvelId" IsRotational="@stokvel.EnableRotation" />
 
     <!-- ── Archetype awareness banner ── -->
     @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
@@ -111,8 +127,14 @@ else
             </div>
             @if (stokvel.EnableRotation)
             {
-                <a class="sisonke-btn sisonke-btn-outline ms-auto" href="@($"/rotation-schedule/{StokvelId}")">
-                    <i class="bi bi-arrow-repeat me-1"></i>Rotation Schedule
+                <a class="sisonke-btn sisonke-btn-primary ms-auto" href="@($"/rotational/management/{StokvelId}")">
+                    <i class="bi bi-arrow-repeat me-1"></i>Rotation Management
+                </a>
+            }
+            @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+            {
+                <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel/loans-wallet/{StokvelId}")">
+                    <i class="bi bi-wallet2 me-1"></i>Loans &amp; Wallet
                 </a>
             }
         </div>
@@ -136,6 +158,98 @@ else
                         <div class="detail-mini-value">@GetResponsibilityLabel(linkedMember.DefaultRole.ToString())</div>
                     </div>
                 </div>
+            </div>
+        </section>
+    }
+
+    @if (stokvel.EnableRotation)
+    {
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3">
+                    <div>
+                        <span class="sisonke-badge @(rotationOrderSummary.IsConfigured ? "sisonke-badge-green" : "sisonke-badge-gold")">
+                            @(rotationOrderSummary.IsConfigured ? "Configured" : "Not configured")
+                        </span>
+                        <h2 class="mt-2">Rotation Order</h2>
+                    </div>
+                    <a class="sisonke-btn sisonke-btn-primary" href="@($"/rotational/management/{StokvelId}")">
+                        <i class="bi bi-arrow-repeat me-2"></i>Rotation Management
+                    </a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6 col-md-4">
+                        <div class="detail-mini-label">Members in Order</div>
+                        <div class="detail-mini-value">@rotationOrderSummary.MemberCount</div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="detail-mini-label">Next Payout Member</div>
+                        <div class="detail-mini-value">@(rotationOrderSummary.NextPayoutMemberName ?? "Not set")</div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="detail-mini-label">Status</div>
+                        <div class="detail-mini-value">@(rotationOrderSummary.IsConfigured ? "Active order ready" : "Setup required")</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+
+    @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+    {
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3">
+                    <div>
+                        @if (activeLoanConfig is null)
+                        {
+                            <span class="sisonke-badge sisonke-badge-gold">Not Configured</span>
+                        }
+                        else if (!activeLoanConfig.LoansEnabled)
+                        {
+                            <span class="sisonke-badge sisonke-badge-gray">Loans Disabled</span>
+                        }
+                        else
+                        {
+                            <span class="sisonke-badge sisonke-badge-green">Loans Active</span>
+                        }
+                        <h2 class="mt-2">Loan Rules</h2>
+                    </div>
+                    <a class="sisonke-btn sisonke-btn-primary" href="@($"/stokvel/loans-wallet/{StokvelId}")">
+                        <i class="bi bi-wallet2 me-1"></i>@(activeLoanConfig is null ? "Configure Loan Rules" : "Loans &amp; Wallet")
+                    </a>
+                </div>
+                @if (activeLoanConfig is null)
+                {
+                    <div class="sisonke-alert sisonke-alert-blue mb-0">
+                        Loan rules have not been configured yet. Office bearers can set loan limits, interest, and repayment terms.
+                    </div>
+                }
+                else if (!activeLoanConfig.LoansEnabled)
+                {
+                    <p class="text-muted mb-0">Loans are currently disabled. Edit loan rules to enable member lending.</p>
+                }
+                else
+                {
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Minimum Loan</div>
+                            <div class="detail-mini-value">@FormatZAR(activeLoanConfig.MinLoanAmount)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Maximum Loan</div>
+                            <div class="detail-mini-value">@FormatZAR(activeLoanConfig.MaxLoanAmount)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Max Repayment</div>
+                            <div class="detail-mini-value">@activeLoanConfig.MaxRepaymentMonths month(s)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="detail-mini-label">Interest</div>
+                            <div class="detail-mini-value">@activeLoanConfig.LoanInterestType</div>
+                        </div>
+                    </div>
+                }
             </div>
         </section>
     }
@@ -184,10 +298,42 @@ else
                         @if (stokvel.EnableRotation)
                         {
                             <div class="executive-task-card task-accent-blue">
-                                <div class="detail-mini-label">Rotation Schedule</div>
-                                <div class="executive-task-count text-muted">Preview</div>
-                                <p class="text-muted small mb-3">Payout order, next recipient and contribution cycle for this rotational stokvel.</p>
-                                <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/rotation-schedule/{StokvelId}")">View Schedule</a>
+                                <div class="detail-mini-label">Rotation Management</div>
+                                @if (rotationalTaskState?.RotationalPendingCount > 0)
+                                {
+                                    <div class="executive-task-count text-warning">@rotationalTaskState.RotationalPendingCount action@(rotationalTaskState.RotationalPendingCount == 1 ? "" : "s")</div>
+                                    <p class="text-muted small mb-3">
+                                        @(rotationalTaskState.PendingApprovalPayout is not null ? "Secretary review complete; payout awaiting Chairperson approval. " : "")
+                                        @(rotationalTaskState.ApprovedPayout is not null ? "Chairperson approved; payout awaiting Treasurer payment. " : "")
+                                        @(rotationalTaskState.HasContributionTask ? $"{rotationalTaskState.UnpaidContributionCount} unpaid contribution(s)." : "")
+                                    </p>
+                                }
+                                else
+                                {
+                                    <div class="executive-task-count text-muted">@(rotationOrderSummary.IsConfigured ? "Ready" : "Open")</div>
+                                    <p class="text-muted small mb-3">Manage payout order, rotation schedule, configuration and member turns in one place.</p>
+                                }
+                                <a class="sisonke-btn sisonke-btn-primary executive-task-action" href="@($"/rotational/management/{StokvelId}")">Open</a>
+                            </div>
+                            <div class="executive-task-card task-accent-green">
+                                <div class="detail-mini-label">Rotational Configuration</div>
+                                <div class="executive-task-count text-muted">Setup</div>
+                                <p class="text-muted small mb-3">Define contribution rules, payout amount, rotation order and late payment penalties.</p>
+                                <a class="sisonke-btn sisonke-btn-primary executive-task-action" href="@($"/rotational-configuration/{StokvelId}")">Configure</a>
+                            </div>
+                        }
+                        @if (stokvel.Archetype != StokvelArchetype.BurialSociety && activeLoanConfig is null)
+                        {
+                            <div class="executive-task-card task-accent-blue">
+                                <div class="detail-mini-label">
+                                    <span class="sisonke-badge sisonke-badge-blue me-1">Loans</span>
+                                    Configure Loan Rules
+                                </div>
+                                <div class="executive-task-count text-muted">Open</div>
+                                <p class="text-muted small mb-3">Loan rules have not been configured for this stokvel yet.</p>
+                                <a class="sisonke-btn sisonke-btn-primary executive-task-action" href="@($"/stokvel/loans-wallet/{StokvelId}")">
+                                    <i class="bi bi-wallet2 me-1"></i>Configure
+                                </a>
                             </div>
                         }
                         <div class="executive-task-card task-accent-red">
@@ -242,10 +388,10 @@ else
                     <a class="sisonke-btn sisonke-btn-primary" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
                 </div>
                 <div class="sisonke-card-body">
-                    @if (claimsAwaitingChairpersonApprovalCount == 0)
+                    @if (claimsAwaitingChairpersonApprovalCount == 0 && rotationalTaskState?.PendingApprovalPayout is null)
                     {
                         <div class="sisonke-alert sisonke-alert-green mb-3">
-                            No claims are currently awaiting chairperson approval.
+                            No approval tasks are currently awaiting chairperson action.
                         </div>
                     }
                     <div class="executive-task-grid">
@@ -256,6 +402,24 @@ else
                                 <div class="executive-task-count">@claimsAwaitingChairpersonApprovalCount</div>
                                 <p class="text-muted small mb-3">Secretary-reviewed claims ready for final decision.</p>
                                 <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/chairperson-tasks/{StokvelId}")">View Approval Tasks</a>
+                            </div>
+                        }
+                        @if (stokvel.EnableRotation && rotationalTaskState?.PendingApprovalPayout is not null)
+                        {
+                            var approvalPayout = rotationalTaskState.PendingApprovalPayout;
+                            <div class="executive-task-card task-accent-green">
+                                <div class="detail-mini-label">
+                                    <span class="sisonke-badge sisonke-badge-green me-1">Rotational</span>
+                                    Chairperson Payout Approval
+                                </div>
+                                <div class="executive-task-count text-success">1</div>
+                                <p class="text-muted small mb-3">
+                                    Secretary review is complete. @approvalPayout.Cycle.CycleName is ready for your approval for @approvalPayout.PayoutMember.FullName.
+                                    Payout: @FormatZAR(approvalPayout.PayoutAmount).
+                                </p>
+                                <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/rotational/management/{StokvelId}")">
+                                    <i class="bi bi-check2-circle me-1"></i>Approve Payout
+                                </a>
                             </div>
                         }
                         <div class="executive-task-card task-accent-gold">
@@ -376,6 +540,41 @@ else
                                 <div class="executive-task-count">@approvedClaimsAwaitingPayoutCount</div>
                                 <p class="text-muted small mb-3">Approved claims needing finance follow-up.</p>
                                 <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/treasurer-tasks/{StokvelId}")">Open Claims</a>
+                            </div>
+                        }
+                        @if (stokvel.EnableRotation && rotationalTaskState?.ApprovedPayout is not null)
+                        {
+                            var approvedPayout = rotationalTaskState.ApprovedPayout;
+                            <div class="executive-task-card task-accent-green">
+                                <div class="detail-mini-label">
+                                    <span class="sisonke-badge sisonke-badge-blue me-1">Rotational</span>
+                                    Treasurer Payout Task
+                                </div>
+                                <div class="executive-task-count text-success">1</div>
+                                <p class="text-muted small mb-3">
+                                    Chairperson approved @approvedPayout.Cycle.CycleName. Pay @FormatZAR(approvedPayout.PayoutAmount) to @approvedPayout.PayoutMember.FullName and confirm the payout.
+                                </p>
+                                <a class="sisonke-btn sisonke-btn-primary executive-task-action" href="@($"/rotational/management/{StokvelId}")">
+                                    <i class="bi bi-cash-coin me-1"></i>Pay Out
+                                </a>
+                            </div>
+                        }
+                        @if (stokvel.EnableRotation && rotationalTaskState?.HasContributionTask == true)
+                        {
+                            var ts = rotationalTaskState;
+                            <div class="executive-task-card task-accent-gold" style="border-top:3px solid #d97706">
+                                <div class="detail-mini-label">
+                                    <span class="sisonke-badge sisonke-badge-gold me-1">Rotational</span>
+                                    Confirm Contribution Payments
+                                </div>
+                                <div class="executive-task-count">@ts.UnpaidContributionCount</div>
+                                <p class="text-muted small mb-3">
+                                    @ts.CurrentCycle!.CycleName — @ts.UnpaidContributionCount of @ts.TotalContributionCount members still outstanding.
+                                    @FormatZAR(ts.OutstandingContributionAmount) to collect.
+                                </p>
+                                <a class="sisonke-btn sisonke-btn-gold executive-task-action" href="@($"/rotational/management/{StokvelId}")">
+                                    <i class="bi bi-list-check me-1"></i>Open Contributions
+                                </a>
                             </div>
                         }
                         <div class="executive-task-card task-accent-blue">
@@ -720,6 +919,24 @@ else
                         <span class="sisonke-badge sisonke-badge-gray">@monthlyContributionSummary.UnpaidCount Unpaid</span>
                     </div>
 
+                    <div class="report-grid mb-3">
+                        <ReportDonut
+                            Eyebrow="Collections"
+                            Title="Contribution Mix"
+                            Subtitle="Actual collections against outstanding balances."
+                            CenterValue="@FormatPercentage(monthlyContributionSummary.CollectionRatePercentage)"
+                            CenterLabel="Collected"
+                            Segments="@GetMonthlyContributionMixSegments()"
+                            ValueFormatter="FormatZAR" />
+                        <ReportBarList
+                            Eyebrow="Members"
+                            Title="Payment Status Distribution"
+                            Subtitle="Current contribution period by member status."
+                            Items="@GetMonthlyContributionStatusBars()"
+                            MaxValue="@Math.Max(1, monthlyContributionSummary.ActiveMemberCount)"
+                            ValueFormatter="FormatCount" />
+                    </div>
+
                     @if (monthlyContributionSummary.RecordsGenerated == 0)
                     {
                         <div class="sisonke-alert sisonke-alert-blue mb-0">
@@ -759,6 +976,23 @@ else
                     }
                     else
                     {
+                        <div class="report-grid mb-3">
+                            <ReportTrendBars
+                                Eyebrow="Trend"
+                                Title="Collection Trend"
+                                Subtitle="Actual collections over recent months or rotational cycles."
+                                Items="@GetContributionTrendBars()"
+                                MaxValue="@GetContributionTrendMax()"
+                                ValueFormatter="FormatZAR" />
+                            <ReportBarList
+                                Eyebrow="Outstanding"
+                                Title="Outstanding Trend"
+                                Subtitle="Balances still open by month or cycle."
+                                Items="@GetContributionOutstandingBars()"
+                                MaxValue="@GetContributionTrendMax()"
+                                ValueFormatter="FormatZAR" />
+                        </div>
+
                         <div class="table-responsive mb-3">
                             <table class="sisonke-table mb-0">
                                 <thead>
@@ -986,6 +1220,7 @@ else
 
         </div>
     }
+    </div>
 }
 
 <style>
@@ -1132,15 +1367,23 @@ else
     private int attendanceToCaptureCount;
     private int openWarningCount;
     private int outstandingFineCount;
+    private RotationalPayoutOrderSummary rotationOrderSummary = new(false, 0, null, null, null);
+    private RotationalTaskState? rotationalTaskState;
+    private StokvelLoanConfiguration? activeLoanConfig;
     private int SecretaryTaskTotal => pendingApologyCount + claimsToReviewCount + attendanceToCaptureCount + openWarningCount;
-    private int TreasurerTaskTotal => outstandingFineCount + approvedClaimsAwaitingPayoutCount;
-    private int ExecutiveTaskTotal => pendingApologyCount + claimsToReviewCount + claimsAwaitingChairpersonApprovalCount + attendanceToCaptureCount + openWarningCount + TreasurerTaskTotal;
+    private int TreasurerTaskTotal => outstandingFineCount + approvedClaimsAwaitingPayoutCount +
+        (rotationalTaskState?.ApprovedPayout is not null ? 1 : 0) +
+        (rotationalTaskState?.HasContributionTask == true ? 1 : 0);
+    private int ExecutiveTaskTotal => pendingApologyCount + claimsToReviewCount + claimsAwaitingChairpersonApprovalCount + attendanceToCaptureCount + openWarningCount + TreasurerTaskTotal +
+        (rotationalTaskState?.PendingApprovalPayout is not null ? 1 : 0) +
+        (stokvel?.Archetype != StokvelArchetype.BurialSociety && activeLoanConfig is null ? 1 : 0);
 
     [Parameter]
     public Guid StokvelId { get; set; }
 
     protected override async Task OnParametersSetAsync()
     {
+        var loadStopwatch = System.Diagnostics.Stopwatch.StartNew();
         isLoading = true;
         memberCount = 0;
         activeMemberCount = 0;
@@ -1176,10 +1419,13 @@ else
         attendanceToCaptureCount = 0;
         openWarningCount = 0;
         outstandingFineCount = 0;
+        rotationOrderSummary = new(false, 0, null, null, null);
+        rotationalTaskState = null;
+        activeLoanConfig = null;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
 
-        if (stokvel is null) { isLoading = false; return; }
+        if (stokvel is null) { isLoading = false; LogLoadTime(loadStopwatch.ElapsedMilliseconds); return; }
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -1187,27 +1433,30 @@ else
         if (string.IsNullOrWhiteSpace(userId))
         {
             isLoading = false;
+            LogLoadTime(loadStopwatch.ElapsedMilliseconds);
             return;
         }
 
-        canManageDashboard = await MemberAccessService.CanAccessManagementDashboardAsync(userId, StokvelId);
-        linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(userId, StokvelId);
+        var access = await MemberAccessService.GetDashboardAccessAsync(userId, StokvelId);
+        canManageDashboard = access.CanManageDashboard;
+        linkedMember = access.LinkedMember;
 
         if (!canManageDashboard)
         {
             isLoading = false;
+            LogLoadTime(loadStopwatch.ElapsedMilliseconds);
             return;
         }
 
         activeSubscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(StokvelId);
-        canViewSecretaryTasks = await MemberAccessService.CanViewSecretaryTasksAsync(userId, StokvelId);
-        canViewChairpersonTasks = await MemberAccessService.CanViewChairpersonTasksAsync(userId, StokvelId);
-        canManageMeetings = await MemberAccessService.CanManageMeetingsAsync(userId, StokvelId);
-        canReviewClaims = await MemberAccessService.CanReviewClaimsAsync(userId, StokvelId);
-        canManageAttendance = await MemberAccessService.CanManageAttendanceAsync(userId, StokvelId);
-        canViewTreasurerTasks = await MemberAccessService.CanViewTreasurerTasksAsync(userId, StokvelId);
-        canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, StokvelId);
-        canViewFinancials = await MemberAccessService.CanViewFinancialsAsync(userId, StokvelId);
+        canViewSecretaryTasks = access.CanViewSecretaryTasks;
+        canViewChairpersonTasks = access.CanViewChairpersonTasks;
+        canManageMeetings = access.CanManageMeetings;
+        canReviewClaims = access.CanReviewClaims;
+        canManageAttendance = access.CanManageAttendance;
+        canViewTreasurerTasks = access.CanViewTreasurerTasks;
+        canManagePayments = access.CanManagePayments;
+        canViewFinancials = access.CanViewFinancials;
         memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         memberCount = await MemberService.GetMemberCountByStokvelIdAsync(StokvelId);
@@ -1222,6 +1471,15 @@ else
         totalContributionOutstanding = await ContributionPaymentService.GetTotalOutstandingByStokvelIdAsync(StokvelId);
         outstandingFinesTotal = await FineService.GetOutstandingFinesTotalByStokvelIdAsync(StokvelId);
         outstandingFineCount = await FineService.GetOutstandingFineCountByStokvelIdAsync(StokvelId);
+        if (stokvel.EnableRotation)
+        {
+            rotationOrderSummary = await RotationalPayoutOrderService.GetSummaryAsync(StokvelId, linkedMember?.Id);
+            rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
+        }
+        if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+        {
+            activeLoanConfig = await LoansWalletService.GetActiveLoanConfigurationAsync(StokvelId);
+        }
         upcomingMeetingCount = await MeetingService.GetUpcomingMeetingCountByStokvelIdAsync(StokvelId);
         recentMeetingCount = await MeetingService.GetRecentMeetingCountByStokvelIdAsync(StokvelId);
         nextMeeting = await MeetingService.GetNextUpcomingMeetingAsync(StokvelId);
@@ -1236,6 +1494,15 @@ else
         openVoteCount = voteMotions.Count(vote => vote.Status == "Open");
         closedVoteCount = voteMotions.Count(vote => vote.Status == "Closed");
         isLoading = false;
+        LogLoadTime(loadStopwatch.ElapsedMilliseconds);
+    }
+
+    private void LogLoadTime(long elapsedMilliseconds)
+    {
+        if (HostEnvironment.IsDevelopment())
+            LoggerFactory.CreateLogger("Sisonke.Performance").LogInformation(
+                "[Performance] Dashboard load for stokvel {StokvelId} completed in {ElapsedMilliseconds} ms.",
+                StokvelId, elapsedMilliseconds);
     }
 
     private static string FormatZAR(decimal amount) =>
@@ -1243,6 +1510,9 @@ else
 
     private static string FormatPercentage(decimal percentage) =>
         $"{percentage:0.#}%";
+
+    private static string FormatCount(decimal value) =>
+        value.ToString("0");
 
     private static string GetMemberRangeText(SubscriptionPlan plan) =>
         plan.MaxMembers is null
@@ -1291,6 +1561,49 @@ else
         return insightTrends.Count == 0
             ? 0
             : insightTrends.Average(trend => trend.CollectionRatePercentage);
+    }
+
+    private IReadOnlyList<ReportDatum> GetMonthlyContributionMixSegments() =>
+    [
+        new("Collected", monthlyContributionSummary.ActualContributions, "#0F8A50", $"{monthlyContributionSummary.PaidCount} paid"),
+        new("Outstanding", monthlyContributionSummary.OutstandingContributions, "#D97706", $"{monthlyContributionSummary.UnpaidCount + monthlyContributionSummary.PartiallyPaidCount + monthlyContributionSummary.OverdueCount} open")
+    ];
+
+    private IReadOnlyList<ReportDatum> GetMonthlyContributionStatusBars() =>
+    [
+        new("Paid", monthlyContributionSummary.PaidCount, "#0F8A50"),
+        new("Partial", monthlyContributionSummary.PartiallyPaidCount, "#D97706"),
+        new("Overdue", monthlyContributionSummary.OverdueCount, "#B94242"),
+        new("Unpaid", monthlyContributionSummary.UnpaidCount, "#64746B")
+    ];
+
+    private IReadOnlyList<ReportDatum> GetContributionTrendBars() =>
+        contributionTrends
+            .TakeLast(6)
+            .Select(trend => new ReportDatum(
+                trend.MonthName,
+                trend.ActualContributions,
+                trend.CollectionRatePercentage >= 90 ? "#0F8A50" : trend.CollectionRatePercentage >= 60 ? "#D97706" : "#B94242",
+                $"{FormatZAR(trend.ExpectedContributions)} expected"))
+            .ToList();
+
+    private IReadOnlyList<ReportDatum> GetContributionOutstandingBars() =>
+        contributionTrends
+            .TakeLast(6)
+            .Select(trend => new ReportDatum(
+                trend.MonthName,
+                trend.OutstandingContributions,
+                trend.OutstandingContributions <= 0 ? "#0F8A50" : "#D97706",
+                $"{FormatPercentage(trend.CollectionRatePercentage)} collected"))
+            .ToList();
+
+    private decimal GetContributionTrendMax()
+    {
+        var max = contributionTrends.Count == 0
+            ? 0
+            : contributionTrends.Max(trend => Math.Max(trend.ExpectedContributions, Math.Max(trend.ActualContributions, trend.OutstandingContributions)));
+
+        return Math.Max(1, max);
     }
 
     private static string GetConstitutionButtonText(string status) =>

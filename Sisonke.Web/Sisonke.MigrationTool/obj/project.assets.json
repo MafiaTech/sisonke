@@ -2122,11 +2122,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj",
+      "projectUniqueName": "C:\\Dev\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj",
       "projectName": "Sisonke.MigrationTool",
-      "projectPath": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj",
+      "projectPath": "C:\\Dev\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\Sisonke.MigrationTool.csproj",
       "packagesPath": "C:\\Users\\mpshe\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\mpshe\\Projects\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\obj\\",
+      "outputPath": "C:\\Dev\\Sisonke-Recovered\\Sisonke.Web\\Sisonke.MigrationTool\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\mpshe\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -2479,5 +2479,17 @@
         }
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q",
+      "libraryId": "SQLitePCLRaw.lib.e_sqlite3",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
 }

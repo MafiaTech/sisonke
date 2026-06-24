@@ -86,48 +86,9 @@ public class FinanceReportService(
             return null;
         }
 
-        var contributions = await context.MemberContributions
-            .Include(contribution => contribution.ContributionCycle)
-            .Where(contribution =>
-                contribution.MemberId == member.Id &&
-                contribution.TenantId == stokvel.TenantId)
-            .OrderByDescending(contribution => contribution.ContributionCycle.PeriodStart)
-            .ThenByDescending(contribution => contribution.CreatedAt)
-            .ToListAsync();
-
-        var contributionIds = contributions.Select(contribution => contribution.Id).ToList();
-        var payments = contributionIds.Count == 0
-            ? []
-            : await context.Payments
-                .Where(payment => contributionIds.Contains(payment.MemberContributionId))
-                .OrderByDescending(payment => payment.PaymentDate)
-                .ThenByDescending(payment => payment.CreatedAt)
-                .ToListAsync();
-        var latestPaymentByContributionId = payments
-            .GroupBy(payment => payment.MemberContributionId)
-            .ToDictionary(group => group.Key, group => group.First());
-
-        var contributionLines = contributions
-            .Select(contribution =>
-            {
-                latestPaymentByContributionId.TryGetValue(contribution.Id, out var latestPayment);
-                var effectiveStatus = GetEffectivePaymentStatus(contribution.Status, contribution.ContributionCycle.DueDate);
-
-                return new ContributionArrearsLineDto
-                {
-                    ContributionId = contribution.Id,
-                    Year = contribution.ContributionCycle.PeriodStart.Year,
-                    Month = contribution.ContributionCycle.PeriodStart.Month,
-                    MonthYear = contribution.ContributionCycle.PeriodStart.ToString("MMMM yyyy"),
-                    ExpectedAmount = contribution.ExpectedAmount,
-                    PaidAmount = contribution.PaidAmount,
-                    Balance = contribution.OutstandingAmount,
-                    DueDate = contribution.ContributionCycle.DueDate,
-                    Status = effectiveStatus == PaymentStatus.Late ? "Overdue" : effectiveStatus.ToString(),
-                    Reference = latestPayment?.Reference
-                };
-            })
-            .ToList();
+        var contributionLines = stokvel.EnableRotation
+            ? await GetRotationalContributionStatementLinesAsync(stokvelId, member.Id)
+            : await GetMonthlyContributionStatementLinesAsync(stokvel.TenantId, member.Id);
 
         var fines = await context.MemberFines
             .Include(fine => fine.FineType)
@@ -172,6 +133,7 @@ public class FinanceReportService(
             CellphoneNumber = member.CellphoneNumber,
             Email = member.EmailAddress,
             StokvelName = stokvel.Name,
+            IsRotationalStokvel = stokvel.EnableRotation,
             TotalExpectedContributions = contributionLines.Sum(contribution => contribution.ExpectedAmount),
             TotalContributionPaid = contributionLines.Sum(contribution => contribution.PaidAmount),
             TotalContributionOutstanding = contributionOutstanding,
@@ -185,6 +147,92 @@ public class FinanceReportService(
         };
     }
 
+    private async Task<List<ContributionArrearsLineDto>> GetMonthlyContributionStatementLinesAsync(Guid tenantId, Guid memberId)
+    {
+        var contributions = await context.MemberContributions
+            .Include(contribution => contribution.ContributionCycle)
+            .Where(contribution =>
+                contribution.MemberId == memberId &&
+                contribution.TenantId == tenantId)
+            .OrderByDescending(contribution => contribution.ContributionCycle.PeriodStart)
+            .ThenByDescending(contribution => contribution.CreatedAt)
+            .ToListAsync();
+
+        var contributionIds = contributions.Select(contribution => contribution.Id).ToList();
+        var payments = contributionIds.Count == 0
+            ? []
+            : await context.Payments
+                .Where(payment => contributionIds.Contains(payment.MemberContributionId))
+                .OrderByDescending(payment => payment.PaymentDate)
+                .ThenByDescending(payment => payment.CreatedAt)
+                .ToListAsync();
+        var latestPaymentByContributionId = payments
+            .GroupBy(payment => payment.MemberContributionId)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        return contributions
+            .Select(contribution =>
+            {
+                latestPaymentByContributionId.TryGetValue(contribution.Id, out var latestPayment);
+                var effectiveStatus = GetEffectivePaymentStatus(contribution.Status, contribution.ContributionCycle.DueDate);
+
+                return new ContributionArrearsLineDto
+                {
+                    ContributionId = contribution.Id,
+                    Year = contribution.ContributionCycle.PeriodStart.Year,
+                    Month = contribution.ContributionCycle.PeriodStart.Month,
+                    MonthYear = contribution.ContributionCycle.PeriodStart.ToString("MMMM yyyy"),
+                    ExpectedAmount = contribution.ExpectedAmount,
+                    PaidAmount = contribution.PaidAmount,
+                    Balance = contribution.OutstandingAmount,
+                    DueDate = contribution.ContributionCycle.DueDate,
+                    Status = effectiveStatus == PaymentStatus.Late ? "Overdue" : effectiveStatus.ToString(),
+                    Reference = latestPayment?.Reference
+                };
+            })
+            .ToList();
+    }
+
+    private async Task<List<ContributionArrearsLineDto>> GetRotationalContributionStatementLinesAsync(Guid stokvelId, Guid memberId)
+    {
+        var payments = await context.RotationalContributionPayments
+            .AsNoTracking()
+            .Include(payment => payment.Cycle)
+            .Where(payment =>
+                payment.StokvelId == stokvelId &&
+                payment.MemberId == memberId &&
+                payment.IsActive)
+            .OrderByDescending(payment => payment.Cycle.CycleNumber)
+            .ThenByDescending(payment => payment.Cycle.CycleStartDate)
+            .ThenByDescending(payment => payment.CreatedAt)
+            .ToListAsync();
+
+        return payments
+            .Select(payment =>
+            {
+                var cycle = payment.Cycle;
+                var cycleStart = cycle?.CycleStartDate ?? DateTime.Today;
+                var balance = Math.Max(0, payment.ExpectedAmount + payment.PenaltyAmount - payment.PaidAmount);
+
+                return new ContributionArrearsLineDto
+                {
+                    ContributionId = payment.Id,
+                    Year = cycleStart.Year,
+                    Month = cycleStart.Month,
+                    MonthYear = string.IsNullOrWhiteSpace(cycle?.CycleName)
+                        ? cycleStart.ToString("MMMM yyyy")
+                        : cycle.CycleName,
+                    ExpectedAmount = payment.ExpectedAmount,
+                    PaidAmount = payment.PaidAmount,
+                    Balance = balance,
+                    DueDate = cycle?.ContributionDueDate,
+                    Status = GetRotationalPaymentStatementStatus(payment.PaymentStatus, cycle?.ContributionDueDate),
+                    Reference = payment.ReferenceNumber
+                };
+            })
+            .ToList();
+    }
+
     private static PaymentStatus GetEffectivePaymentStatus(PaymentStatus status, DateTime dueDate)
     {
         if (dueDate < DateTime.Today && status is PaymentStatus.Unpaid or PaymentStatus.PartiallyPaid)
@@ -193,5 +241,23 @@ public class FinanceReportService(
         }
 
         return status;
+    }
+
+    private static string GetRotationalPaymentStatementStatus(ContributionPaymentStatus status, DateTime? dueDate)
+    {
+        if (status is ContributionPaymentStatus.Unpaid or ContributionPaymentStatus.PartiallyPaid &&
+            dueDate.HasValue &&
+            dueDate.Value.Date < DateTime.Today)
+        {
+            return "Overdue";
+        }
+
+        return status switch
+        {
+            ContributionPaymentStatus.PartiallyPaid => "PartiallyPaid",
+            ContributionPaymentStatus.Late => "Overdue",
+            ContributionPaymentStatus.Waived => "Exempted",
+            _ => status.ToString()
+        };
     }
 }

@@ -1,0 +1,78 @@
+<section class="report-card @CssClass">
+    <div class="report-card-head">
+        <div>
+            <span class="report-kicker">@Eyebrow</span>
+            <h3>@Title</h3>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <p>@Subtitle</p>
+            }
+        </div>
+    </div>
+
+    <div class="report-donut-layout">
+        <div class="report-donut" style="@DonutStyle" role="img" aria-label="@AriaLabel">
+            <div class="report-donut-center">
+                <strong>@CenterValue</strong>
+                <span>@CenterLabel</span>
+            </div>
+        </div>
+        <div class="report-legend">
+            @foreach (var item in Segments)
+            {
+                <div class="report-legend-item">
+                    <span class="report-legend-dot" style="@($"background:{item.Color}")"></span>
+                    <span>@item.Label</span>
+                    <strong>@FormatValue(item.Value)</strong>
+                    @if (!string.IsNullOrWhiteSpace(item.Detail))
+                    {
+                        <small>@item.Detail</small>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter] public string Eyebrow { get; set; } = "Report";
+    [Parameter] public string Title { get; set; } = "Breakdown";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string CenterValue { get; set; } = "0";
+    [Parameter] public string CenterLabel { get; set; } = "Total";
+    [Parameter] public string CssClass { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<ReportDatum> Segments { get; set; } = [];
+    [Parameter] public Func<decimal, string>? ValueFormatter { get; set; }
+
+    private string AriaLabel => $"{Title}: {string.Join(", ", Segments.Select(item => $"{item.Label} {FormatValue(item.Value)}"))}";
+
+    private string DonutStyle => $"background:{BuildConicGradient()};";
+
+    private string FormatValue(decimal value) => ValueFormatter?.Invoke(value) ?? value.ToString("0.#");
+
+    private string BuildConicGradient()
+    {
+        var visibleSegments = Segments
+            .Where(segment => segment.Value > 0)
+            .ToList();
+
+        var total = visibleSegments.Sum(segment => segment.Value);
+        if (total <= 0)
+        {
+            return "#eef1ec";
+        }
+
+        var cursor = 0m;
+        var pieces = new List<string>();
+
+        foreach (var segment in visibleSegments)
+        {
+            var next = cursor + segment.Value / total * 100;
+            pieces.Add(FormattableString.Invariant($"{segment.Color} {cursor:0.###}% {next:0.###}%"));
+            cursor = next;
+        }
+
+        return $"conic-gradient({string.Join(", ", pieces)})";
+    }
+}
+

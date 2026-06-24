@@ -1,0 +1,470 @@
+@page "/rotational/rotation-order/{StokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Components.Shared
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject MemberAccessService MemberAccessService
+@inject RotationalPayoutOrderService RotationOrderService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Rotation Order</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading rotation order…
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
+}
+else if (!stokvel.EnableRotation)
+{
+    <AlertBanner
+        Type="warning"
+        Title="Rotation Order is not available for this stokvel."
+        Message="Only Rotational Stokvels can define a payout rotation order."
+        Icon="bi bi-exclamation-triangle-fill" />
+    <a class="sisonke-btn sisonke-btn-outline mt-3" href="@($"/stokvel-dashboard/{StokvelId}")">
+        <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+    </a>
+}
+else
+{
+    <PageHeader
+        Title="Rotation Order"
+        Subtitle="@stokvel.Name"
+        BackText="Dashboard"
+        BackHref="@($"/stokvel-dashboard/{StokvelId}")" />
+
+    @if (successMessage is not null)
+    {
+        <AlertBanner Type="success" Title="@successMessage" Message="" Icon="bi bi-check-circle-fill" />
+    }
+
+    @if (errors.Count > 0)
+    {
+        <div class="sisonke-alert sisonke-alert-red mb-3">
+            <ul class="mb-0 ps-3">
+                @foreach (var error in errors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (activeOrder.Count == 0 && !isEditing)
+    {
+        <section class="sisonke-hero-card mb-4">
+            <div>
+                <span class="sisonke-badge sisonke-badge-gold">Not configured</span>
+                <h1 class="mt-2">No rotation order has been configured yet.</h1>
+                <p>Define the order in which members receive their rotational payout turns.</p>
+            </div>
+            @if (canManage)
+            {
+                <button class="sisonke-btn sisonke-btn-primary" @onclick="StartManualCreate">
+                    <i class="bi bi-list-ol me-2"></i>Create Rotation Order
+                </button>
+            }
+        </section>
+
+        @if (canManage)
+        {
+            <section class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
+                    <h2 class="mb-3">Generation Options</h2>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="sisonke-btn sisonke-btn-outline" @onclick="StartManualCreate">
+                            <i class="bi bi-list-ol me-2"></i>Manual
+                        </button>
+                        <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => RequestGenerate(RotationOrderMethod.ByJoiningDate))">
+                            <i class="bi bi-calendar-check me-2"></i>By joining date
+                        </button>
+                        <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => RequestGenerate(RotationOrderMethod.Random))">
+                            <i class="bi bi-shuffle me-2"></i>Random
+                        </button>
+                    </div>
+                </div>
+            </section>
+        }
+        else
+        {
+            <div class="sisonke-alert sisonke-alert-blue">
+                <i class="bi bi-info-circle me-2"></i>
+                Rotation order has not been configured yet. Please ask an office bearer to set it up.
+            </div>
+        }
+    }
+
+    @if ((activeOrder.Count > 0 || isEditing) && !isEditing)
+    {
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3">
+                    <div>
+                        <span class="sisonke-badge sisonke-badge-green">Configured</span>
+                        <h2 class="mt-2">Active Payout Order</h2>
+                    </div>
+                    @if (canManage)
+                    {
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="sisonke-btn sisonke-btn-outline" @onclick="StartEdit">
+                                <i class="bi bi-pencil me-2"></i>Edit order
+                            </button>
+                            <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => RequestGenerate(RotationOrderMethod.ByJoiningDate))">
+                                <i class="bi bi-calendar-check me-2"></i>Regenerate by joining date
+                            </button>
+                            <button class="sisonke-btn sisonke-btn-outline" @onclick="@(() => RequestGenerate(RotationOrderMethod.Random))">
+                                <i class="bi bi-shuffle me-2"></i>Regenerate random
+                            </button>
+                        </div>
+                    }
+                </div>
+
+                @RenderOrderTable(activeOrder, false)
+            </div>
+        </section>
+    }
+
+    @if (isEditing)
+    {
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3">
+                    <div>
+                        <span class="sisonke-badge sisonke-badge-blue">Editing</span>
+                        <h2 class="mt-2">Manual Rotation Order</h2>
+                    </div>
+                    <button class="sisonke-btn sisonke-btn-outline" @onclick="CancelEdit" disabled="@isSaving">
+                        <i class="bi bi-x me-2"></i>Cancel edit
+                    </button>
+                </div>
+
+                @RenderOrderTable(editableOrder, true)
+
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <button class="sisonke-btn sisonke-btn-primary" @onclick="SaveManualOrderAsync" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-floppy-fill me-2"></i>
+                        }
+                        Save order
+                    </button>
+                    <button class="sisonke-btn sisonke-btn-outline" @onclick="CancelEdit" disabled="@isSaving">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </section>
+    }
+}
+
+<ConfirmationModal
+    IsVisible="@showConfirmModal"
+    Title="@confirmTitle"
+    Message="@confirmMessage"
+    ConfirmButtonText="@confirmButtonText"
+    CancelButtonText="Cancel"
+    ModalType="warning"
+    OnConfirm="@ConfirmGenerateAsync"
+    OnCancel="@CancelConfirm" />
+
+@code {
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    private Stokvel? stokvel;
+    private Member? linkedMember;
+    private List<RotationalPayoutOrderItem> activeOrder = [];
+    private List<RotationalPayoutOrderItem> editableOrder = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isEditing;
+    private bool canManage;
+    private bool showConfirmModal;
+    private RotationOrderMethod pendingGenerateMethod;
+    private string confirmTitle = string.Empty;
+    private string confirmMessage = string.Empty;
+    private string confirmButtonText = "Confirm";
+    private string? currentUserId;
+    private string? successMessage;
+    private List<string> errors = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errors = [];
+        successMessage = null;
+        isEditing = false;
+
+        stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (stokvel is not null && !string.IsNullOrWhiteSpace(currentUserId))
+        {
+            linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(currentUserId, StokvelId);
+            canManage = await MemberAccessService.IsOfficeBearerAsync(currentUserId, StokvelId);
+            activeOrder = await RotationOrderService.GetActiveRotationOrderAsync(StokvelId);
+        }
+
+        isLoading = false;
+    }
+
+    private async Task StartManualCreate()
+    {
+        if (!canManage)
+        {
+            errors = ["Only office bearers can create or edit rotation order."];
+            return;
+        }
+
+        editableOrder = activeOrder.Count > 0
+            ? activeOrder.Select(CloneForEdit).ToList()
+            : await RotationOrderService.GetEligibleMembersAsync(StokvelId);
+
+        for (var index = 0; index < editableOrder.Count; index++)
+        {
+            editableOrder[index] = editableOrder[index] with { Position = index + 1 };
+        }
+
+        isEditing = true;
+        errors = [];
+        successMessage = null;
+    }
+
+    private void StartEdit()
+    {
+        if (!canManage)
+        {
+            errors = ["Only office bearers can edit rotation order."];
+            return;
+        }
+
+        editableOrder = activeOrder.Select(CloneForEdit).ToList();
+        isEditing = true;
+        errors = [];
+        successMessage = null;
+    }
+
+    private void RequestGenerate(RotationOrderMethod method)
+    {
+        if (!canManage)
+        {
+            errors = ["Only office bearers can generate rotation order."];
+            return;
+        }
+
+        pendingGenerateMethod = method;
+        var replacing = activeOrder.Count > 0;
+        confirmTitle = replacing ? "Replace Rotation Order" : "Create Rotation Order";
+        confirmMessage = replacing
+            ? "This will deactivate the current active order and create a new order. Historical order records will be preserved."
+            : "This will create the active payout order for this rotational stokvel.";
+        confirmButtonText = replacing ? "Replace Order" : "Create Order";
+        showConfirmModal = true;
+        errors = [];
+        successMessage = null;
+    }
+
+    private async Task ConfirmGenerateAsync()
+    {
+        showConfirmModal = false;
+        await SaveGeneratedOrderAsync(pendingGenerateMethod);
+    }
+
+    private async Task SaveGeneratedOrderAsync(RotationOrderMethod method)
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            errors = ["Current user could not be identified."];
+            return;
+        }
+
+        isSaving = true;
+        var result = await RotationOrderService.GenerateRotationOrderAsync(StokvelId, method, currentUserId);
+        await HandleSaveResultAsync(result, method == RotationOrderMethod.Random ? "Random rotation order saved." : "Rotation order saved by joining date.");
+        isSaving = false;
+    }
+
+    private async Task SaveManualOrderAsync()
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            errors = ["Current user could not be identified."];
+            return;
+        }
+
+        isSaving = true;
+        var orderedMemberIds = editableOrder.Select(item => item.MemberId).ToList();
+        var result = activeOrder.Count > 0
+            ? await RotationOrderService.ReorderRotationOrderAsync(StokvelId, orderedMemberIds, currentUserId)
+            : await RotationOrderService.SaveManualRotationOrderAsync(StokvelId, orderedMemberIds, currentUserId);
+
+        await HandleSaveResultAsync(result, "Manual rotation order saved.");
+        isSaving = false;
+    }
+
+    private async Task HandleSaveResultAsync(RotationOrderSaveResult result, string message)
+    {
+        if (!result.Success)
+        {
+            errors = result.Errors;
+            return;
+        }
+
+        activeOrder = await RotationOrderService.GetActiveRotationOrderAsync(StokvelId);
+        editableOrder = [];
+        isEditing = false;
+        errors = [];
+        successMessage = message;
+    }
+
+    private void MoveUp(int index)
+    {
+        if (index <= 0) return;
+        (editableOrder[index - 1], editableOrder[index]) = (editableOrder[index], editableOrder[index - 1]);
+        RecalculateEditablePositions();
+    }
+
+    private void MoveDown(int index)
+    {
+        if (index >= editableOrder.Count - 1) return;
+        (editableOrder[index + 1], editableOrder[index]) = (editableOrder[index], editableOrder[index + 1]);
+        RecalculateEditablePositions();
+    }
+
+    private void RecalculateEditablePositions()
+    {
+        for (var index = 0; index < editableOrder.Count; index++)
+        {
+            editableOrder[index] = editableOrder[index] with { Position = index + 1 };
+        }
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        editableOrder = [];
+        errors = [];
+    }
+
+    private void CancelConfirm() => showConfirmModal = false;
+
+    private static RotationalPayoutOrderItem CloneForEdit(RotationalPayoutOrderItem item) => item with { };
+
+    private RenderFragment RenderOrderTable(IReadOnlyList<RotationalPayoutOrderItem> rows, bool editable) => builder =>
+    {
+        var sequence = 0;
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "table-responsive");
+        builder.OpenElement(sequence++, "table");
+        builder.AddAttribute(sequence++, "class", "table align-middle");
+        builder.OpenElement(sequence++, "thead");
+        builder.OpenElement(sequence++, "tr");
+        foreach (var header in editable
+            ? new[] { "Position", "Member", "Status", "Payout received", "Move" }
+            : new[] { "Position", "Member", "Status", "Payout received", "Last payout date" })
+        {
+            builder.OpenElement(sequence++, "th");
+            builder.AddContent(sequence++, header);
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "tbody");
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var rowIndex = index;
+            var row = rows[index];
+            var isCurrentMember = linkedMember?.Id == row.MemberId;
+            builder.OpenElement(sequence++, "tr");
+            builder.AddAttribute(sequence++, "class", isCurrentMember ? "table-success" : null);
+
+            builder.OpenElement(sequence++, "td");
+            builder.AddContent(sequence++, row.Position);
+            builder.CloseElement();
+
+            builder.OpenElement(sequence++, "td");
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "fw-semibold");
+            builder.AddContent(sequence++, row.MemberName);
+            if (isCurrentMember)
+            {
+                builder.AddContent(sequence++, " ");
+                builder.OpenElement(sequence++, "span");
+                builder.AddAttribute(sequence++, "class", "sisonke-badge sisonke-badge-green ms-2");
+                builder.AddContent(sequence++, "You");
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "text-muted small");
+            builder.AddContent(sequence++, row.MemberNumber);
+            builder.CloseElement();
+            builder.CloseElement();
+
+            builder.OpenElement(sequence++, "td");
+            builder.AddContent(sequence++, $"{row.MemberStatus} / {row.GovernanceStatus}");
+            builder.CloseElement();
+
+            builder.OpenElement(sequence++, "td");
+            builder.AddContent(sequence++, row.HasReceivedPayout ? "Yes" : "No");
+            builder.CloseElement();
+
+            if (editable)
+            {
+                builder.OpenElement(sequence++, "td");
+                builder.OpenElement(sequence++, "div");
+                builder.AddAttribute(sequence++, "class", "btn-group btn-group-sm");
+                builder.OpenElement(sequence++, "button");
+                builder.AddAttribute(sequence++, "type", "button");
+                builder.AddAttribute(sequence++, "class", "btn btn-outline-secondary");
+                builder.AddAttribute(sequence++, "disabled", rowIndex == 0 || isSaving);
+                builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => MoveUp(rowIndex)));
+                builder.AddMarkupContent(sequence++, "<i class=\"bi bi-arrow-up\"></i>");
+                builder.CloseElement();
+                builder.OpenElement(sequence++, "button");
+                builder.AddAttribute(sequence++, "type", "button");
+                builder.AddAttribute(sequence++, "class", "btn btn-outline-secondary");
+                builder.AddAttribute(sequence++, "disabled", rowIndex == rows.Count - 1 || isSaving);
+                builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => MoveDown(rowIndex)));
+                builder.AddMarkupContent(sequence++, "<i class=\"bi bi-arrow-down\"></i>");
+                builder.CloseElement();
+                builder.CloseElement();
+                builder.CloseElement();
+            }
+            else
+            {
+                builder.OpenElement(sequence++, "td");
+                builder.AddContent(sequence++, row.LastPayoutDate?.ToString("dd MMM yyyy") ?? "Not yet");
+                builder.CloseElement();
+            }
+
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}

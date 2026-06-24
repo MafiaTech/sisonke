@@ -21,6 +21,9 @@
 @inject StokvelService StokvelService
 @inject ContributionPaymentService ContributionPaymentService
 @inject VotingService VotingService
+@inject RotationalPayoutOrderService RotationalPayoutOrderService
+@inject RotationalTaskService RotationalTaskService
+@inject RotationalContributionPaymentService RotationalContributionPaymentService
 
 <PageTitle>My Member Dashboard</PageTitle>
 <link rel="stylesheet" href="/css/member-workspace.css" />
@@ -50,16 +53,28 @@ else if (stokvel is null)
 else
 {
     <div class="mw-member-workspace">
+        <header class="member-dashboard-header">
+            <div>
+                <span class="member-dashboard-kicker">Member dashboard</span>
+                <h1>Welcome back, @Display(member.FullName)</h1>
+                <p>Here is what is happening in your stokvel today.</p>
+            </div>
+            <div class="member-dashboard-profile">
+                <span class="sisonke-badge sisonke-badge-green">@member.DefaultRole</span>
+                <span class="member-dashboard-avatar">@GetInitials(member.FullName)</span>
+            </div>
+        </header>
+
         <div class="mw-hero member-hero">
             <div class="mw-hero-ring"></div>
             <div class="mw-hero-ring2"></div>
             <div class="mw-hero-left">
                 <div class="mw-hero-eyebrow" id="mw-greeting">Welcome back</div>
-                <div class="mw-hero-name">@Display(member.FullName)</div>
+                <div class="mw-hero-name">@stokvel.Name</div>
                 <div class="mw-hero-sub">
-                    <span>@stokvel.Name</span>
+                    <span>@GetStokvelTypeLabel()</span>
                     <span class="mw-hero-sub-dot"></span>
-                    <span>@member.DefaultRole</span>
+                    <span>@member.Status member</span>
                 </div>
                 <div class="mw-hero-chips">
                     <span class="mw-hchip mw-hchip--green">@member.Status</span>
@@ -70,142 +85,162 @@ else
             <div class="mw-hero-right">
                 <div class="mw-hero-tiles member-hero-grid">
                     <div class="mw-htile">
-                        <div class="mw-htile-label">Member No.</div>
-                        <div class="mw-htile-val">@Display(member.MemberNumber)</div>
+                        <div class="mw-htile-label">@(stokvel.EnableRotation ? "Cycle contribution" : "Monthly contribution")</div>
+                        <div class="mw-htile-val">@(currentMonthContribution is null ? "Not configured" : FormatCurrency(currentMonthContribution.ExpectedAmount))</div>
                     </div>
                     <div class="mw-htile">
-                        <div class="mw-htile-label">Joining Date</div>
+                        <div class="mw-htile-label">Member since</div>
                         <div class="mw-htile-val mw-htile-val--mint">@member.JoiningDate.ToString("dd MMM yyyy")</div>
                     </div>
-                    <div class="mw-htile">
-                        <div class="mw-htile-label">ID Number</div>
-                        <div class="mw-htile-val">@SensitiveDataMasker.MaskIdNumber(member.IdNumber)</div>
-                    </div>
-                    <div class="mw-htile">
-                        <div class="mw-htile-label">Cellphone</div>
-                        <div class="mw-htile-val mw-htile-val--ochre">@SensitiveDataMasker.MaskPhoneNumber(member.CellphoneNumber)</div>
-                    </div>
+                    @if (stokvel.EnableRotation)
+                    {
+                        <div class="mw-htile">
+                            <div class="mw-htile-label">My rotation position</div>
+                            <div class="mw-htile-val">@DisplayPosition(rotationOrderSummary.CurrentMemberPosition)</div>
+                        </div>
+                        <div class="mw-htile">
+                            <div class="mw-htile-label">Next recipient</div>
+                            <div class="mw-htile-val mw-htile-val--ochre">@DisplayAvailable(rotationOrderSummary.NextPayoutMemberName)</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mw-htile">
+                            <div class="mw-htile-label">Covered dependents</div>
+                            <div class="mw-htile-val">@(stokvel.EnableDependents ? dependents.Count.ToString() : "Not available")</div>
+                        </div>
+                        <div class="mw-htile">
+                            <div class="mw-htile-label">Benefit amount</div>
+                            <div class="mw-htile-val mw-htile-val--ochre">Not configured</div>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
 
-        <section class="sisonke-card upcoming-meetings-card">
-            <div class="sisonke-card-head">
-                <div>
-                    <h2 class="h5 mb-1">Upcoming Meetings</h2>
-                    <div class="text-muted">View your next meetings and send apologies where needed.</div>
-                </div>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="sisonke-badge sisonke-badge-blue">@upcomingMeetings.Count Scheduled</span>
-                    <a class="sisonke-btn sisonke-btn-outline" href="/meetings/@stokvel.Id">View All</a>
-                </div>
-            </div>
-            <div class="sisonke-card-body">
-                @if (upcomingMeetings.Count == 0)
-                {
-                    <div class="sisonke-alert sisonke-alert-blue">
-                        No upcoming meetings have been scheduled yet.
+        <div class="member-dashboard-grid member-dashboard-grid--top">
+            <section class="mw-card dashboard-panel">
+                <div class="dashboard-panel-head">
+                    <div>
+                        <span class="dashboard-panel-eyebrow">This month</span>
+                        <h2>Important Tasks</h2>
                     </div>
+                    <span class="dashboard-panel-icon"><i class="bi bi-check2-square"></i></span>
+                </div>
+                <div class="dashboard-task-list">
+                    @if (currentMonthContribution is null || currentMonthContribution.Balance > 0)
+                    {
+                        <a class="dashboard-task" href="#member-contributions">
+                            <i class="bi bi-exclamation-circle"></i>
+                            <span><strong>Contribution needs attention</strong><small>Review your @CurrentMonthLabel contribution.</small></span>
+                        </a>
+                    }
+                    @if (NextMeeting is not null)
+                    {
+                        <a class="dashboard-task" href="/meeting/@NextMeeting.Id">
+                            <i class="bi bi-calendar-event"></i>
+                            <span><strong>Upcoming meeting</strong><small>@NextMeeting.MeetingDate.ToString("dd MMM yyyy 'at' HH:mm")</small></span>
+                        </a>
+                    }
+                    @if (OpenFinesCount > 0)
+                    {
+                        <a class="dashboard-task" href="#member-fines">
+                            <i class="bi bi-receipt"></i>
+                            <span><strong>@OpenFinesCount outstanding fine(s)</strong><small>Review your fine details below.</small></span>
+                        </a>
+                    }
+                    @if ((currentMonthContribution is not null && currentMonthContribution.Balance <= 0) && NextMeeting is null && OpenFinesCount == 0)
+                    {
+                        <div class="dashboard-empty dashboard-empty--success"><i class="bi bi-check-circle"></i><span>You are all caught up. Nothing needs your attention.</span></div>
+                    }
+                </div>
+            </section>
+
+            <section class="mw-card dashboard-panel">
+                <div class="dashboard-panel-head">
+                    <div>
+                        <span class="dashboard-panel-eyebrow">Schedule</span>
+                        <h2>Next Meeting</h2>
+                    </div>
+                    <span class="dashboard-panel-icon"><i class="bi bi-calendar3"></i></span>
+                </div>
+                @if (NextMeeting is null)
+                {
+                    <div class="dashboard-empty"><i class="bi bi-calendar-x"></i><span>No upcoming meeting has been scheduled yet.</span></div>
                 }
                 else
                 {
-                    <div class="member-meeting-grid">
-                        @foreach (var meeting in upcomingMeetings.Take(2))
+                    var hasApology = meetingApologiesByMeetingId.ContainsKey(NextMeeting.Id);
+                    var apologyType = GetApologyType(NextMeeting.Id);
+                    var isPastMeeting = NextMeeting.MeetingDate.Date < DateTime.Today;
+
+                    <div class="next-meeting-summary">
+                        <div class="next-meeting-date"><strong>@NextMeeting.MeetingDate.Day.ToString("00")</strong><span>@NextMeeting.MeetingDate.ToString("MMM")</span></div>
+                        <div class="next-meeting-copy">
+                            <div class="next-meeting-title-row">
+                                <h3>@Display(NextMeeting.Title)</h3>
+                                @if (hasApology)
+                                {
+                                    <span class="sisonke-badge sisonke-badge-green">Apology Submitted</span>
+                                }
+                                else if (isPastMeeting)
+                                {
+                                    <span class="sisonke-badge sisonke-badge-gray">Closed</span>
+                                }
+                                else
+                                {
+                                    <span class="sisonke-badge sisonke-badge-gold">RSVP Open</span>
+                                }
+                            </div>
+                            <p><i class="bi bi-clock"></i> @NextMeeting.MeetingDate.ToString("HH:mm")</p>
+                            <p><i class="bi bi-geo-alt"></i> @Display(NextMeeting.Venue)</p>
+                        </div>
+                    </div>
+                    <div class="next-meeting-actions">
+                        <a class="mw-btn mw-btn-forest mw-btn-sm" href="/meeting/@NextMeeting.Id">View Meeting Agenda</a>
+                        @if (approvedMinutesByMeetingId.ContainsKey(NextMeeting.Id))
                         {
-                            var hasApology = meetingApologiesByMeetingId.ContainsKey(meeting.Id);
-                            var apologyType = GetApologyType(meeting.Id);
-                            var isPastMeeting = meeting.MeetingDate.Date < DateTime.Today;
-
-                            <article class="member-meeting-card">
-                                <div class="meeting-date-block">
-                                    <span class="meeting-date-day">@meeting.MeetingDate.Day.ToString("00")</span>
-                                    <span class="meeting-date-month">@meeting.MeetingDate.ToString("MMM")</span>
-                                    <span class="meeting-date-year">@meeting.MeetingDate.Year</span>
-                                </div>
-
-                                <div class="member-meeting-content">
-                                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-                                        <div>
-                                            <h3>@Display(meeting.Title)</h3>
-                                            @if (!string.IsNullOrWhiteSpace(meeting.Purpose))
-                                            {
-                                                <p>@meeting.Purpose</p>
-                                            }
-                                        </div>
-                                        @if (hasApology)
-                                        {
-                                            <span class="sisonke-badge sisonke-badge-green">Apology Submitted</span>
-                                        }
-                                        else if (isPastMeeting)
-                                        {
-                                            <span class="sisonke-badge sisonke-badge-gray">Closed</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="sisonke-badge sisonke-badge-gold">RSVP Open</span>
-                                        }
-                                    </div>
-
-                                    <div class="member-meeting-meta">
-                                        <span><i class="bi bi-clock me-1"></i>@meeting.MeetingDate.ToString("HH:mm")</span>
-                                        <span><i class="bi bi-geo-alt me-1"></i>@Display(meeting.Venue)</span>
-                                        <span><i class="bi bi-calendar-check me-1"></i>Deadline @meeting.MeetingDate.ToString("dd MMM yyyy HH:mm")</span>
-                                    </div>
-
-                                    <div class="member-meeting-actions">
-                                        <a class="sisonke-btn sisonke-btn-outline" href="/meeting/@meeting.Id">View</a>
-                                        @if (approvedMinutesByMeetingId.ContainsKey(meeting.Id))
-                                        {
-                                            <a class="sisonke-btn sisonke-btn-primary" href="@($"/meeting-minutes/{meeting.Id}")">
-                                                View Approved Minutes
-                                            </a>
-                                        }
-                                        @if (hasApology)
-                                        {
-                                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                <span class="sisonke-badge sisonke-badge-green">Apology Submitted</span>
-                                                <span class="text-muted small">· @apologyType</span>
-                                            </div>
-                                        }
-                                        else if (isPastMeeting)
-                                        {
-                                            <span class="sisonke-badge sisonke-badge-gray">Closed</span>
-                                        }
-                                        else
-                                        {
-                                            <a class="sisonke-btn sisonke-btn-gold send-apology-btn" href="@($"/submit-apology/{meeting.Id}/{MemberId}")">
-                                                Send Apology
-                                            </a>
-                                        }
-                                    </div>
-                                </div>
-                            </article>
+                            <a class="mw-btn mw-btn-outline mw-btn-sm" href="@($"/meeting-minutes/{NextMeeting.Id}")">View Approved Minutes</a>
+                        }
+                        @if (hasApology)
+                        {
+                            <span class="next-meeting-note"><i class="bi bi-check-circle"></i> @apologyType</span>
+                        }
+                        else if (!isPastMeeting)
+                        {
+                            <a class="mw-btn mw-btn-outline mw-btn-sm" href="@($"/submit-apology/{NextMeeting.Id}/{MemberId}")">Send Apology</a>
                         }
                     </div>
                 }
-            </div>
-        </section>
+                <a class="dashboard-text-link" href="/meetings/@stokvel.Id">View meeting calendar <i class="bi bi-arrow-right"></i></a>
+            </section>
 
-        <div class="member-quick-actions">
-            <a class="member-quick-action-tile" href="/member-profile/@MemberId">
-                <span class="member-quick-action-icon">👤</span>
-                <span>My Profile</span>
-            </a>
-            @if (stokvel.EnableClaims)
-            {
-                <a class="member-quick-action-tile" href="/create-claim/@MemberId">
-                    <span class="member-quick-action-icon">📋</span>
-                    <span>Create Claim</span>
-                </a>
-            }
-            <a class="member-quick-action-tile" href="#member-contributions">
-                <span class="member-quick-action-icon">💰</span>
-                <span>Contributions</span>
-            </a>
-            <a class="member-quick-action-tile" href="/constitution-builder/@stokvel.Id">
-                <span class="member-quick-action-icon">📜</span>
-                <span>Constitution</span>
-            </a>
+            <section class="mw-card dashboard-panel">
+                <div class="dashboard-panel-head">
+                    <div>
+                        <span class="dashboard-panel-eyebrow">Documents</span>
+                        <h2>Previous Minutes</h2>
+                    </div>
+                    <span class="dashboard-panel-icon"><i class="bi bi-file-earmark-text"></i></span>
+                </div>
+                @if (approvedMinutesByMeetingId.Count == 0)
+                {
+                    <div class="dashboard-empty"><i class="bi bi-file-earmark-x"></i><span>No meeting minutes available yet.</span></div>
+                }
+                else
+                {
+                    <div class="minutes-list">
+                        @foreach (var minutes in approvedMinutesByMeetingId.Values.OrderByDescending(item => item.ApprovedAt ?? item.UpdatedAt ?? item.CreatedAt).Take(3))
+                        {
+                            <a class="minutes-item" href="/meeting-minutes/@minutes.MeetingId">
+                                <i class="bi bi-file-earmark-pdf"></i>
+                                <span><strong>@Display(minutes.Title)</strong><small>@((minutes.ApprovedAt ?? minutes.UpdatedAt ?? minutes.CreatedAt).ToString("dd MMM yyyy")) · Approved minutes</small></span>
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        }
+                    </div>
+                }
+            </section>
         </div>
 
         <div class="mw-sec-head">
@@ -271,7 +306,7 @@ else
             <span class="mw-sec-label">Financial &amp; Membership</span>
             <div class="mw-sec-line"></div>
         </div>
-        <div class="mw-g mw-g3 mw-mb26">
+        <div class="mw-g member-financial-strip mw-mb26">
             <div class="mw-card mw-card-accent mw-ca-fern" id="member-contributions">
                 <div class="mw-card-top">
                     <div class="mw-card-tl">
@@ -294,12 +329,18 @@ else
                             <div class="mw-alert-icon">ℹ</div>
                             <div>
                                 <div class="mw-alert-title">No current record</div>
-                                <div class="mw-alert-body">No contribution record has been generated for @CurrentMonthLabel yet.</div>
+                                <div class="mw-alert-body">No contribution record has been generated for @CurrentContributionLabel yet.</div>
                             </div>
                         </div>
                     }
                     else
                     {
+                        <div class="contribution-friendly-status @(currentMonthContribution.Balance <= 0 ? "is-current" : "needs-attention")">
+                            <i class="bi @(currentMonthContribution.Balance <= 0 ? "bi-check-circle" : "bi-exclamation-circle")"></i>
+                            <span>@(currentMonthContribution.Balance <= 0
+                                ? "You are up to date with your contributions. Thank you!"
+                                : "You have an outstanding contribution for this month.")</span>
+                        </div>
                         <div class="mw-smini">
                             <div class="mw-smini-block">
                                 <span class="mw-smini-num">@FormatCurrency(currentMonthContribution.ExpectedAmount)</span>
@@ -317,7 +358,7 @@ else
                         <div class="mw-div"></div>
                         <div class="mw-p-row">
                             <span class="mw-p-lbl">Month</span>
-                            <span class="mw-p-val">@CurrentMonthLabel</span>
+                            <span class="mw-p-val">@CurrentContributionLabel</span>
                         </div>
                         <div class="mw-p-row">
                             <span class="mw-p-lbl">Status</span>
@@ -376,7 +417,7 @@ else
                 </div>
             </div>
 
-            <div class="mw-card mw-card-accent mw-ca-terra">
+            <div class="mw-card mw-card-accent mw-ca-terra" id="member-fines">
                 <div class="mw-card-top">
                     <div class="mw-card-tl">
                         <div class="mw-card-ico mw-ico-terra">⚖</div>
@@ -441,6 +482,8 @@ else
                 </div>
             </div>
 
+            @if (stokvel.EnableClaims)
+            {
             <div class="sisonke-card mw-card-accent mw-ca-blue">
                 <div class="sisonke-card-head">
                     <div class="mw-card-tl">
@@ -525,7 +568,10 @@ else
                     }
                 </div>
             </div>
+            }
 
+            @if (stokvel.EnableDependents)
+            {
             <div class="mw-card mw-card-accent mw-ca-forest">
                 <div class="mw-card-top">
                     <div class="mw-card-tl">
@@ -576,6 +622,130 @@ else
                     }
                 </div>
             </div>
+            }
+        </div>
+
+        <div class="mw-sec-head">
+            <span class="mw-sec-label">Reports &amp; Insights</span>
+            <div class="mw-sec-line"></div>
+        </div>
+        <div class="report-grid mw-mb26">
+            <ReportDonut
+                Eyebrow="Contribution"
+                Title="Contribution Health"
+                Subtitle="Paid versus outstanding for your current contribution period."
+                CenterValue="@FormatCurrency(CurrentContributionTotal)"
+                CenterLabel="Expected"
+                Segments="@GetMemberContributionReportSegments()"
+                ValueFormatter="FormatCurrency" />
+            <ReportBarList
+                Eyebrow="History"
+                Title="Recent Contribution Payments"
+                Subtitle="Latest expected and paid amounts by month or cycle."
+                Items="@GetMemberContributionHistoryBars()"
+                MaxValue="@GetMemberContributionHistoryMax()"
+                ValueFormatter="FormatCurrency" />
+            <ReportDonut
+                Eyebrow="Fines"
+                Title="Fine Status"
+                Subtitle="Paid and open fines recorded against your membership."
+                CenterValue="@FormatCurrency(memberFines.Sum(fine => fine.Amount))"
+                CenterLabel="Fines"
+                Segments="@GetMemberFineReportSegments()"
+                ValueFormatter="FormatCurrency" />
+        </div>
+
+        <div class="mw-sec-head">
+            <span class="mw-sec-label">Member Transparency</span>
+            <div class="mw-sec-line"></div>
+        </div>
+        <div class="member-transparency-grid">
+            <section class="mw-card dashboard-panel dashboard-panel--wide">
+                <div class="dashboard-panel-head">
+                    <div><span class="dashboard-panel-eyebrow">@CurrentContributionLabel</span><h2>@(stokvel.EnableRotation ? "Current Cycle Contributions" : "Contributions This Month")</h2></div>
+                    <span class="mw-badge mw-bg-info">View only</span>
+                </div>
+                @if (stokvel.EnableRotation)
+                {
+                    @if (currentCycleRotationalContributions.Count == 0)
+                    {
+                        <div class="dashboard-empty"><i class="bi bi-cash-stack"></i><span>No rotational contributions recorded for this cycle yet.</span></div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="sisonke-table member-transparency-table">
+                                <thead><tr><th>Member</th><th>Status</th><th>Expected</th><th>Paid</th><th>Balance</th><th>Paid On</th></tr></thead>
+                                <tbody>
+                                @foreach (var contribution in currentCycleRotationalContributions)
+                                {
+                                    <tr class="@(contribution.MemberId == MemberId ? "member-current-row" : null)">
+                                        <td>@Display(contribution.Member?.FullName) @(contribution.MemberId == MemberId ? "(You)" : null)</td>
+                                        <td><span class="@GetRotationalPaymentStatusBadgeClass(contribution.PaymentStatus)">@GetRotationalPaymentStatusText(contribution.PaymentStatus)</span></td>
+                                        <td>@FormatCurrency(contribution.ExpectedAmount)</td>
+                                        <td>@FormatCurrency(contribution.PaidAmount)</td>
+                                        <td>@FormatCurrency(GetRotationalPaymentBalance(contribution))</td>
+                                        <td>@(contribution.PaymentDate?.ToString("dd MMM yyyy") ?? "Pending")</td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                }
+                else if (currentMonthStokvelContributions.Count == 0)
+                {
+                    <div class="dashboard-empty"><i class="bi bi-cash-stack"></i><span>No contributions recorded for this month yet.</span></div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="sisonke-table member-transparency-table">
+                            <thead><tr><th>Member</th><th>Status</th><th>Amount</th><th>Paid On</th></tr></thead>
+                            <tbody>
+                            @foreach (var contribution in currentMonthStokvelContributions)
+                            {
+                                <tr class="@(contribution.MemberId == MemberId ? "member-current-row" : null)">
+                                    <td>@Display(contribution.Member?.FullName) @(contribution.MemberId == MemberId ? "(You)" : null)</td>
+                                    <td><span class="@GetPaymentStatusBadgeClass(contribution.Status)">@GetPaymentStatusText(contribution.Status)</span></td>
+                                    <td>@FormatCurrency(contribution.PaidAmount)</td>
+                                    <td>@(contribution.FullyPaidDate?.ToString("dd MMM yyyy") ?? "Pending")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section class="mw-card dashboard-panel dashboard-panel--wide">
+                <div class="dashboard-panel-head">
+                    <div><span class="dashboard-panel-eyebrow">Community overview</span><h2>Members Fined</h2></div>
+                    <span class="mw-badge mw-bg-info">View only</span>
+                </div>
+                @if (stokvelOutstandingFines.Count == 0)
+                {
+                    <div class="dashboard-empty"><i class="bi bi-shield-check"></i><span>No fines recorded.</span></div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="sisonke-table member-transparency-table">
+                            <thead><tr><th>Member</th><th>Reason</th><th>Fine Amount</th><th>Date Fined</th><th>Status</th></tr></thead>
+                            <tbody>
+                            @foreach (var fine in stokvelOutstandingFines.Take(8))
+                            {
+                                <tr class="@(fine.MemberId == MemberId ? "member-current-row" : null)">
+                                    <td>@Display(fine.Member?.FullName) @(fine.MemberId == MemberId ? "(You)" : null)</td>
+                                    <td>@Display(fine.Reason)</td><td>@FormatCurrency(fine.Amount)</td><td>@fine.FineDate.ToString("dd MMM yyyy")</td>
+                                    <td><span class="@GetFineStatusBadgeClass(fine.Status)">@fine.Status</span></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
         </div>
 
         <div class="mw-sec-head">
@@ -624,18 +794,61 @@ else
                 <div class="mw-card mw-card-accent mw-ca-ochre">
                     <div class="mw-card-top">
                         <div class="mw-card-tl">
-                            <div class="mw-card-ico mw-ico-ochre">🏠</div>
-                            <span class="mw-card-lbl">My Payout / Host Turn</span>
+                            <div class="mw-card-ico mw-ico-ochre">#</div>
+                            <span class="mw-card-lbl">My Rotation Position</span>
                         </div>
+                        <a class="mw-btn mw-btn-outline mw-btn-xs" href="@($"/rotational/rotation-order/{stokvel.Id}")">View Order</a>
                     </div>
                     <div class="mw-card-body">
-                        <div class="mw-alert mw-alert-warn">
-                            <div class="mw-alert-icon">ℹ</div>
-                            <div>
-                                <div class="mw-alert-title">Coming Soon</div>
-                                <div class="mw-alert-body">Payout and host rotation coming soon.</div>
+                        @if (!rotationOrderSummary.IsConfigured)
+                        {
+                            <div class="mw-alert mw-alert-warn">
+                                <div class="mw-alert-icon">i</div>
+                                <div>
+                                    <div class="mw-alert-title">Not configured</div>
+                                    <div class="mw-alert-body">An office bearer still needs to set the rotation order.</div>
+                                </div>
                             </div>
-                        </div>
+                        }
+                        else
+                        {
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Position</span>
+                                <span class="mw-p-val">@DisplayPosition(rotationOrderSummary.CurrentMemberPosition) of @rotationOrderSummary.MemberCount</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Payout received</span>
+                                <span class="mw-p-val">@(rotationOrderSummary.CurrentMemberHasReceivedPayout == true ? "Yes" : "No")</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Next payout member</span>
+                                <span class="mw-p-val">@Display(rotationOrderSummary.NextPayoutMemberName)</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Next payout date</span>
+                                <span class="mw-p-val">Not available</span>
+                            </div>
+                            <div class="mw-p-row">
+                                <span class="mw-p-lbl">Payout amount</span>
+                                <span class="mw-p-val">Not configured</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (!stokvel.EnableRotation && (stokvel.EnableClaims || stokvel.EnableDependents))
+            {
+                <div class="mw-card mw-card-accent mw-ca-ochre">
+                    <div class="mw-card-top">
+                        <div class="mw-card-tl"><div class="mw-card-ico mw-ico-ochre"><i class="bi bi-shield-heart"></i></div><span class="mw-card-lbl">Burial Cover</span></div>
+                        <span class="mw-badge mw-bg-info">Member cover</span>
+                    </div>
+                    <div class="mw-card-body">
+                        <div class="mw-p-row"><span class="mw-p-lbl">Waiting period status</span><span class="mw-p-val">Not configured</span></div>
+                        <div class="mw-p-row"><span class="mw-p-lbl">Benefit amount</span><span class="mw-p-val">Not configured</span></div>
+                        <div class="mw-p-row"><span class="mw-p-lbl">Dependents covered</span><span class="mw-p-val">@(stokvel.EnableDependents ? ActiveDependentCount.ToString() : "Not available")</span></div>
+                        <div class="mw-p-row"><span class="mw-p-lbl">Latest claim</span><span class="mw-p-val">@(LatestClaim is null ? "No claim submitted yet" : GetClaimStatusText(LatestClaim.Status))</span></div>
                     </div>
                 </div>
             }
@@ -721,6 +934,39 @@ else
                 </div>
             </div>
         </div>
+
+        <section class="mw-card dashboard-panel recent-activity-panel">
+            <div class="dashboard-panel-head">
+                <div><span class="dashboard-panel-eyebrow">Latest updates</span><h2>Recent Activity</h2></div>
+                <span class="dashboard-panel-icon"><i class="bi bi-activity"></i></span>
+            </div>
+            @if (recentContributions.Count == 0 && memberFines.Count == 0 && approvedMinutesByMeetingId.Count == 0)
+            {
+                <div class="dashboard-empty"><i class="bi bi-inbox"></i><span>No recent activity yet.</span></div>
+            }
+            else
+            {
+                <div class="activity-list">
+                    @if (recentContributions.FirstOrDefault() is { } recentContribution)
+                    {
+                        <div class="activity-item"><i class="bi bi-cash-coin"></i><span><strong>Contribution update</strong><small>@recentContribution.MonthYearLabel · @GetPaymentStatusText(recentContribution.Status)</small></span></div>
+                    }
+                    @if (memberFines.FirstOrDefault() is { } recentFine)
+                    {
+                        <div class="activity-item"><i class="bi bi-receipt"></i><span><strong>Fine update</strong><small>@Display(recentFine.Reason) · @recentFine.FineDate.ToString("dd MMM yyyy")</small></span></div>
+                    }
+                    @if (approvedMinutesByMeetingId.Values.OrderByDescending(item => item.ApprovedAt ?? item.CreatedAt).FirstOrDefault() is { } recentMinutes)
+                    {
+                        <a class="activity-item" href="/meeting-minutes/@recentMinutes.MeetingId"><i class="bi bi-file-earmark-check"></i><span><strong>Minutes published</strong><small>@Display(recentMinutes.Title)</small></span></a>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="member-community-footer">
+            <i class="bi bi-people-fill"></i>
+            <div><strong>Stronger together</strong><span>Thank you for your commitment. Transparency builds trust and keeps our stokvel strong.</span></div>
+        </section>
     </div>
 }
 
@@ -743,6 +989,7 @@ else
 
     private Member? member;
     private Stokvel? stokvel;
+    private RotationalPayoutOrderSummary rotationOrderSummary = new(false, 0, null, null, null);
     private List<MemberFine> memberFines = [];
     private List<FuneralClaim> memberClaims = [];
     private List<MemberDependent> dependents = [];
@@ -753,10 +1000,17 @@ else
     private List<ContributionPaymentSummary> memberContributions = [];
     private List<ContributionPaymentSummary> recentContributions = [];
     private List<MemberContribution> overdueContributions = [];
+    private List<MemberContribution> currentMonthStokvelContributions = [];
+    private List<RotationalContributionPayment> currentCycleRotationalContributions = [];
+    private List<MemberFine> stokvelOutstandingFines = [];
     private ContributionPaymentSummary? currentMonthContribution;
+    private MemberRotationalView? rotationalMemberView;
     private bool isLoading = true;
     private bool isAllowed;
     private string CurrentMonthLabel => DateTime.Today.ToString("MMMM yyyy");
+    private string CurrentContributionLabel => stokvel?.EnableRotation == true && rotationalMemberView?.CurrentCycle is not null
+        ? rotationalMemberView.CurrentCycle.CycleName
+        : CurrentMonthLabel;
 
     private FuneralClaim? LatestClaim => memberClaims
         .OrderByDescending(claim => claim.CreatedAt)
@@ -785,6 +1039,9 @@ else
     private int PaidFinesCount => memberFines.Count(fine => fine.Status == FineStatus.Paid);
     private int ApologiesSubmittedCount => meetingApologiesByMeetingId.Count;
     private int PendingApologyCount => Math.Max(0, upcomingMeetings.Count - meetingApologiesByMeetingId.Count);
+    private decimal CurrentContributionTotal => currentMonthContribution?.ExpectedAmount ??
+        recentContributions.FirstOrDefault()?.ExpectedAmount ??
+        0;
     private decimal MemberContributionOutstandingTotal => memberContributions
         .Where(contribution =>
             contribution.Status != PaymentStatus.Paid &&
@@ -798,6 +1055,7 @@ else
         isAllowed = false;
         member = null;
         stokvel = null;
+        rotationOrderSummary = new(false, 0, null, null, null);
         memberFines = [];
         memberClaims = [];
         dependents = [];
@@ -808,7 +1066,11 @@ else
         memberContributions = [];
         recentContributions = [];
         overdueContributions = [];
+        currentMonthStokvelContributions = [];
+        currentCycleRotationalContributions = [];
+        stokvelOutstandingFines = [];
         currentMonthContribution = null;
+        rotationalMemberView = null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -846,12 +1108,37 @@ else
         memberFines = await FineService.GetMemberFinesAsync(MemberId);
         memberClaims = stokvel.EnableClaims ? await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId) : [];
         dependents = stokvel.EnableDependents ? await MemberService.GetDependentsByMemberIdAsync(MemberId) : [];
-        memberContributions = await ContributionPaymentService.GetContributionsByMemberIdAsync(MemberId);
-        overdueContributions = await ContributionPaymentService.GetOverdueContributionsByMemberIdAsync(MemberId);
-        currentMonthContribution = memberContributions.FirstOrDefault(contribution =>
-            contribution.ContributionYear == DateTime.Today.Year &&
-            contribution.ContributionMonth == DateTime.Today.Month);
-        recentContributions = memberContributions.Take(6).ToList();
+        if (stokvel.EnableRotation)
+        {
+            rotationalMemberView = await RotationalTaskService.GetMemberRotationalViewAsync(stokvel.Id, MemberId);
+            var rotationalMemberPayments = await RotationalContributionPaymentService.GetPaymentsForMemberAsync(stokvel.Id, MemberId);
+            memberContributions = rotationalMemberPayments
+                .Select(payment => MapRotationalPaymentToContributionSummary(payment))
+                .ToList();
+            recentContributions = memberContributions.Take(6).ToList();
+
+            if (rotationalMemberView.CurrentCycle is not null)
+            {
+                currentCycleRotationalContributions = await RotationalContributionPaymentService.GetPaymentsForCycleAsync(rotationalMemberView.CurrentCycle.Id);
+                currentMonthContribution = rotationalMemberView.MyPayment is not null
+                    ? MapRotationalPaymentToContributionSummary(rotationalMemberView.MyPayment, rotationalMemberView.CurrentCycle)
+                    : null;
+            }
+        }
+        else
+        {
+            memberContributions = await ContributionPaymentService.GetContributionsByMemberIdAsync(MemberId);
+            overdueContributions = await ContributionPaymentService.GetOverdueContributionsByMemberIdAsync(MemberId);
+            currentMonthStokvelContributions = await ContributionPaymentService.GetMonthlyContributionsAsync(
+                stokvel.Id,
+                DateTime.Today.Year,
+                DateTime.Today.Month);
+            currentMonthContribution = memberContributions.FirstOrDefault(contribution =>
+                contribution.ContributionYear == DateTime.Today.Year &&
+                contribution.ContributionMonth == DateTime.Today.Month);
+            recentContributions = memberContributions.Take(6).ToList();
+        }
+        stokvelOutstandingFines = await FineService.GetOutstandingFinesByStokvelIdAsync(stokvel.Id);
 
         var meetings = await MeetingService.GetMeetingsByStokvelIdAsync(stokvel.Id);
         upcomingMeetings = meetings
@@ -866,6 +1153,10 @@ else
             .GroupBy(minutes => minutes.MeetingId)
             .ToDictionary(group => group.Key, group => group.First());
         openVotes = await VotingService.GetOpenVotesForMemberAsync(MemberId, stokvel.Id);
+        if (stokvel.EnableRotation)
+        {
+            rotationOrderSummary = await RotationalPayoutOrderService.GetSummaryAsync(stokvel.Id, MemberId);
+        }
 
         foreach (var meeting in upcomingMeetings)
         {
@@ -884,6 +1175,29 @@ else
     {
         return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
     }
+
+    private static string DisplayAvailable(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not available" : value;
+
+    private string GetStokvelTypeLabel() => stokvel?.EnableRotation == true
+        ? "Rotational Stokvel"
+        : stokvel?.EnableClaims == true || stokvel?.EnableDependents == true
+            ? "Burial Stokvel"
+            : $"{stokvel?.Type} Stokvel";
+
+    private static string GetInitials(string? fullName)
+    {
+        var parts = (fullName ?? string.Empty)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Take(2)
+            .Select(part => char.ToUpperInvariant(part[0]));
+
+        var initials = string.Concat(parts);
+        return string.IsNullOrWhiteSpace(initials) ? "M" : initials;
+    }
+
+    private static string DisplayPosition(int? position) =>
+        position.HasValue ? position.Value.ToString() : "Not assigned";
 
     private static string GetMemberStatusVariant(MemberStatus status)
     {
@@ -918,6 +1232,16 @@ else
     private static string GetPaymentStatusText(PaymentStatus status)
     {
         return status == PaymentStatus.Late ? "Overdue" : status.ToString();
+    }
+
+    private static string GetRotationalPaymentStatusText(ContributionPaymentStatus status)
+    {
+        return status switch
+        {
+            ContributionPaymentStatus.PartiallyPaid => "Partial",
+            ContributionPaymentStatus.Late => "Overdue",
+            _ => status.ToString()
+        };
     }
 
     private static string GetClaimStatusBadgeClass(FuneralClaimStatus status)
@@ -1012,6 +1336,104 @@ else
             PaymentStatus.WrittenOff => "sisonke-badge sisonke-badge-gray",
             _ => "sisonke-badge sisonke-badge-gray"
         };
+    }
+
+    private static string GetRotationalPaymentStatusBadgeClass(ContributionPaymentStatus status)
+    {
+        return status switch
+        {
+            ContributionPaymentStatus.Paid => "sisonke-badge sisonke-badge-green",
+            ContributionPaymentStatus.Waived => "sisonke-badge sisonke-badge-green",
+            ContributionPaymentStatus.PartiallyPaid => "sisonke-badge sisonke-badge-gold",
+            ContributionPaymentStatus.Late => "sisonke-badge sisonke-badge-red",
+            ContributionPaymentStatus.Unpaid => "sisonke-badge sisonke-badge-gray",
+            ContributionPaymentStatus.Cancelled => "sisonke-badge sisonke-badge-gray",
+            _ => "sisonke-badge sisonke-badge-gray"
+        };
+    }
+
+    private static ContributionPaymentSummary MapRotationalPaymentToContributionSummary(
+        RotationalContributionPayment payment,
+        RotationalContributionCycle? fallbackCycle = null)
+    {
+        var cycle = payment.Cycle ?? fallbackCycle;
+        var cycleDate = cycle?.CycleStartDate ?? DateTime.Today;
+
+        return new ContributionPaymentSummary
+        {
+            Id = payment.Id,
+            ContributionYear = cycleDate.Year,
+            ContributionMonth = cycleDate.Month,
+            MonthYearLabel = string.IsNullOrWhiteSpace(cycle?.CycleName)
+                ? cycleDate.ToString("MMMM yyyy")
+                : cycle.CycleName,
+            ExpectedAmount = payment.ExpectedAmount,
+            PaidAmount = payment.PaidAmount,
+            Balance = GetRotationalPaymentBalance(payment),
+            Status = MapRotationalPaymentStatus(payment.PaymentStatus),
+            PaidDate = payment.PaymentDate,
+            PaymentReference = payment.ReferenceNumber
+        };
+    }
+
+    private static PaymentStatus MapRotationalPaymentStatus(ContributionPaymentStatus status)
+    {
+        return status switch
+        {
+            ContributionPaymentStatus.Paid => PaymentStatus.Paid,
+            ContributionPaymentStatus.Waived => PaymentStatus.Exempted,
+            ContributionPaymentStatus.PartiallyPaid => PaymentStatus.PartiallyPaid,
+            ContributionPaymentStatus.Late => PaymentStatus.Late,
+            _ => PaymentStatus.Unpaid
+        };
+    }
+
+    private static decimal GetRotationalPaymentBalance(RotationalContributionPayment payment) =>
+        Math.Max(0, payment.ExpectedAmount + payment.PenaltyAmount - payment.PaidAmount);
+
+    private IReadOnlyList<ReportDatum> GetMemberContributionReportSegments()
+    {
+        var paid = currentMonthContribution?.PaidAmount ?? recentContributions.Sum(contribution => contribution.PaidAmount);
+        var balance = currentMonthContribution?.Balance ?? recentContributions.Sum(contribution => contribution.Balance);
+
+        return
+        [
+            new("Paid", paid, "#0F8A50", "Confirmed payments"),
+            new("Outstanding", balance, "#D97706", "Balance still open")
+        ];
+    }
+
+    private IReadOnlyList<ReportDatum> GetMemberContributionHistoryBars() =>
+        recentContributions
+            .Take(6)
+            .Select(contribution => new ReportDatum(
+                contribution.MonthYearLabel,
+                contribution.PaidAmount,
+                contribution.Balance <= 0 ? "#0F8A50" : "#D97706",
+                $"{FormatCurrency(contribution.ExpectedAmount)} expected"))
+            .ToList();
+
+    private decimal GetMemberContributionHistoryMax() =>
+        Math.Max(1, recentContributions.Count == 0 ? CurrentContributionTotal : recentContributions.Max(contribution => contribution.ExpectedAmount));
+
+    private IReadOnlyList<ReportDatum> GetMemberFineReportSegments()
+    {
+        var paid = memberFines
+            .Where(fine => fine.Status == FineStatus.Paid)
+            .Sum(fine => fine.Amount);
+        var open = memberFines
+            .Where(fine => fine.Status == FineStatus.Unpaid)
+            .Sum(fine => fine.Amount);
+        var waived = memberFines
+            .Where(fine => fine.Status == FineStatus.Waived)
+            .Sum(fine => fine.Amount);
+
+        return
+        [
+            new("Paid", paid, "#0F8A50", $"{PaidFinesCount} paid"),
+            new("Open", open, "#B94242", $"{OpenFinesCount} unpaid"),
+            new("Waived", waived, "#64746B", "Waived or cleared")
+        ];
     }
 
     private string GetApologyType(Guid meetingId)

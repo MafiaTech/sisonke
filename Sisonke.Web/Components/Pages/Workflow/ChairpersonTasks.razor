@@ -12,6 +12,7 @@
 @inject MemberAccessService MemberAccessService
 @inject FuneralClaimService FuneralClaimService
 @inject MeetingService MeetingService
+@inject RotationalTaskService RotationalTaskService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Chairperson Approval Tasks</PageTitle>
@@ -57,6 +58,10 @@ else
             <div>
                 <span>Minutes awaiting approval</span>
                 <strong>@minutesAwaitingApprovalCount</strong>
+            </div>
+            <div>
+                <span>Rotational payouts</span>
+                <strong>@RotationalApprovalTaskCount</strong>
             </div>
         </div>
     </section>
@@ -137,6 +142,56 @@ else
     <section class="sisonke-card">
         <div class="sisonke-card-head">
             <div>
+                <h2>Rotational Payout Approval</h2>
+                <p>Secretary-reviewed rotational payouts ready for chairperson decision.</p>
+            </div>
+            <span class="sisonke-badge sisonke-badge-blue">@RotationalApprovalTaskCount</span>
+        </div>
+        <div class="sisonke-card-body">
+            @if (rotationalTaskState?.PendingApprovalPayout is null)
+            {
+                <div class="sisonke-alert sisonke-alert-green mb-0">
+                    No rotational payouts are currently awaiting chairperson approval.
+                </div>
+            }
+            else
+            {
+                var payout = rotationalTaskState.PendingApprovalPayout;
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Cycle</th>
+                                <th>Payout Member</th>
+                                <th>Amount</th>
+                                <th>Secretary Review</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="fw-semibold">@payout.Cycle.CycleName</td>
+                                <td>@DisplayOrDash(payout.PayoutMember.FullName)</td>
+                                <td>@FormatZAR(payout.PayoutAmount)</td>
+                                <td><span class="sisonke-badge sisonke-badge-green">Complete</span></td>
+                                <td><span class="sisonke-badge sisonke-badge-gold">Awaiting approval</span></td>
+                                <td class="text-end">
+                                    <a class="sisonke-btn sisonke-btn-primary" href="@RotationalManagementHref">
+                                        <i class="bi bi-check2-circle me-1"></i>Approve Payout
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="sisonke-card">
+        <div class="sisonke-card-head">
+            <div>
                 <h2>Minutes Awaiting Approval</h2>
                 <p>Submitted meeting minutes ready for chairperson review.</p>
             </div>
@@ -162,7 +217,7 @@ else
 <style>
     .chairperson-tasks-hero-meta {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: .75rem;
         min-width: min(18rem, 100%);
     }
@@ -192,12 +247,15 @@ else
 @code {
     private List<FuneralClaim> claimsAwaitingApproval = [];
     private int minutesAwaitingApprovalCount;
+    private RotationalTaskState? rotationalTaskState;
     private bool isLoading = true;
     private bool canViewChairpersonTasks;
     private bool canViewSecretaryTasks;
+    private int RotationalApprovalTaskCount => rotationalTaskState?.PendingApprovalPayout is not null ? 1 : 0;
     private string DashboardHref => $"/stokvel-dashboard/{StokvelId}";
     private string SecretaryTasksHref => $"/secretary-tasks/{StokvelId}";
     private string MeetingsHref => $"/meetings/{StokvelId}";
+    private string RotationalManagementHref => $"/rotational/management/{StokvelId}";
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -207,6 +265,7 @@ else
         isLoading = true;
         claimsAwaitingApproval = [];
         minutesAwaitingApprovalCount = 0;
+        rotationalTaskState = null;
         canViewChairpersonTasks = false;
         canViewSecretaryTasks = false;
 
@@ -230,6 +289,7 @@ else
 
         claimsAwaitingApproval = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalByStokvelIdAsync(StokvelId);
         minutesAwaitingApprovalCount = await MeetingService.GetMinutesAwaitingApprovalCountByStokvelIdAsync(StokvelId);
+        rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
         isLoading = false;
     }
 
@@ -258,4 +318,7 @@ else
             _ => "sisonke-badge sisonke-badge-gray"
         };
     }
+
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
 }

@@ -272,7 +272,7 @@
 }
 
 /* ── Quick actions grid ──────────────────────────────────── */
-.sm-quick-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.sm-quick-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
 .sm-quick-btn {
     background: var(--sm-card);
     border: 1.5px solid var(--sm-border);
@@ -523,9 +523,18 @@
 .sm-doc-meta { font-size: 11px; color: var(--sm-muted); }
 
 /* ── Layout grids ────────────────────────────────────────── */
-.sm-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
-.sm-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 22px; }
-.sm-grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 22px; }
+.sm-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+.sm-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+.sm-grid-1-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; margin-bottom: 22px; }
+
+.sm-grid-3 > *,
+.sm-grid-2 > *,
+.sm-grid-1-2 > *,
+.sm-quick-actions > *,
+.sm-card,
+.sm-panel {
+    min-width: 0;
+}
 
 /* ── Empty state ─────────────────────────────────────────── */
 .sm-empty { text-align: center; padding: 28px 20px; color: var(--sm-muted); }
@@ -741,10 +750,10 @@
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 900px) {
-    .sm-grid-3     { grid-template-columns: repeat(2, 1fr); }
+    .sm-grid-3     { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sm-grid-2     { grid-template-columns: 1fr; }
     .sm-grid-1-2   { grid-template-columns: 1fr; }
-    .sm-quick-actions { grid-template-columns: repeat(2, 1fr); }
+    .sm-quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sm-hero-body  { flex-direction: column; gap: 16px; }
     .sm-hero-stats { align-items: flex-start; }
     .sm-hero-stat-label { text-align: left; }
@@ -755,7 +764,22 @@
 }
 @media (max-width: 480px) {
     .sm-grid-3 { grid-template-columns: 1fr; }
+    .sm-quick-actions { grid-template-columns: 1fr; }
     .sm-hero   { padding: 20px; }
     .sm-hero-name { font-size: 24px; }
-    .sm-page   { padding: 16px 12px; }
+    .sm-page   { max-width: 100%; overflow-x: hidden; padding: 16px 10px 96px; }
+    .sm-card,
+    .sm-panel,
+    .sm-modal {
+        max-width: 100%;
+    }
+    .sm-table,
+    .sm-card table,
+    .sm-panel table {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }

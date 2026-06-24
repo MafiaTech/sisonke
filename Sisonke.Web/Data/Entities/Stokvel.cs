@@ -54,9 +54,24 @@ public class Stokvel
 
     public bool IsActive { get; set; } = true;
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
+    [MaxLength(450)]
+    public string? DeletedBy { get; set; }
+
+    [MaxLength(500)]
+    public string? DeleteReason { get; set; }
+
     public bool IsSetupComplete { get; set; }
 
     public DateTime? SetupCompletedAt { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? UpdatedAt { get; set; }
+
+    [MaxLength(450)]
+    public string? UpdatedBy { get; set; }
 }

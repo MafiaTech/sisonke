@@ -126,9 +126,9 @@ public class SisonkeEmailSender : IEmailSender<ApplicationUser>, IEmailSender
 
             using var msg = new MailMessage
             {
-                From       = new MailAddress(_settings.FromAddress, _settings.FromName),
-                Subject    = subject,
-                Body       = htmlBody,
+                From = new MailAddress(_settings.FromAddress, _settings.FromName),
+                Subject = subject,
+                Body = htmlBody,
                 IsBodyHtml = true
             };
             msg.To.Add(to);

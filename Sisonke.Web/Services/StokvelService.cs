@@ -18,7 +18,9 @@ public class StokvelService(
         DateTime? establishedDate,
         int? expectedMemberCount,
         Guid subscriptionPlanId,
-        string? description)
+        string? description,
+        StokvelBankingDetails? bankingDetails = null,
+        string? currentUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -34,6 +36,11 @@ public class StokvelService(
                 subscriptionPlan.Name != "Pilot");
 
         if (plan is null)
+        {
+            return null;
+        }
+
+        if (HasBankingDetails(bankingDetails) && !IsValidBankingDetails(bankingDetails!))
         {
             return null;
         }
@@ -84,6 +91,29 @@ public class StokvelService(
         });
 
         context.Stokvels.Add(stokvel);
+
+        if (HasBankingDetails(bankingDetails))
+        {
+            context.StokvelBankingDetails.Add(new StokvelBankingDetails
+            {
+                Id = Guid.NewGuid(),
+                StokvelId = stokvel.Id,
+                Stokvel = stokvel,
+                BankName = bankingDetails!.BankName.Trim(),
+                AccountHolderName = bankingDetails.AccountHolderName.Trim(),
+                AccountNumber = bankingDetails.AccountNumber.Trim(),
+                AccountType = bankingDetails.AccountType,
+                BranchCode = NullIfWhiteSpace(bankingDetails.BranchCode),
+                BranchName = NullIfWhiteSpace(bankingDetails.BranchName),
+                PaymentReferenceFormat = NullIfWhiteSpace(bankingDetails.PaymentReferenceFormat),
+                Notes = NullIfWhiteSpace(bankingDetails.Notes),
+                IsPrimary = true,
+                IsActive = true,
+                CreatedAt = createdAt,
+                CreatedBy = currentUserId
+            });
+        }
+
         await context.SaveChangesAsync();
 
         return stokvel;
@@ -164,7 +194,7 @@ public class StokvelService(
 
         return await context.Stokvels
             .Include(stokvel => stokvel.Tenant)
-            .Where(stokvel => stokvel.IsActive)
+            .Where(stokvel => stokvel.IsActive && !stokvel.IsDeleted)
             .OrderBy(stokvel => stokvel.Name)
             .ToListAsync();
     }
@@ -177,7 +207,125 @@ public class StokvelService(
             .Include(stokvel => stokvel.Tenant)
             .SingleOrDefaultAsync(stokvel =>
                 stokvel.Id == stokvelId &&
-                stokvel.IsActive);
+                stokvel.IsActive &&
+                !stokvel.IsDeleted);
+    }
+
+    public async Task<Stokvel?> GetStokvelForSettingsAsync(Guid stokvelId)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        return await context.Stokvels
+            .Include(stokvel => stokvel.Tenant)
+            .SingleOrDefaultAsync(stokvel => stokvel.Id == stokvelId);
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateStokvelDetailsAsync(
+        Guid stokvelId,
+        string name,
+        StokvelArchetype archetype,
+        string? description,
+        string? province,
+        string? townOrArea,
+        DateTime? establishedDate,
+        int? expectedMemberCount,
+        string currentUserId)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (false, "Stokvel name is required.");
+        }
+
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(s => s.Id == stokvelId && s.IsActive && !s.IsDeleted);
+
+        if (stokvel is null)
+        {
+            return (false, "Stokvel not found.");
+        }
+
+        var trimmedName = name.Trim();
+
+        var nameConflict = await context.Stokvels
+            .AnyAsync(s =>
+                s.Id != stokvelId &&
+                s.TenantId == stokvel.TenantId &&
+                s.Name == trimmedName &&
+                !s.IsDeleted);
+
+        if (nameConflict)
+        {
+            return (false, "A stokvel with that name already exists.");
+        }
+
+        stokvel.Name = trimmedName;
+        stokvel.Type = MapArchetypeToStokvelType(archetype);
+        archetypeConfigurationService.ApplyDefaults(stokvel, archetype);
+        stokvel.Description = description?.Trim();
+        stokvel.Province = province?.Trim();
+        stokvel.TownOrArea = townOrArea?.Trim();
+        stokvel.EstablishedDate = establishedDate;
+        stokvel.ExpectedMemberCount = expectedMemberCount;
+        stokvel.UpdatedAt = DateTime.UtcNow;
+        stokvel.UpdatedBy = currentUserId;
+
+        await context.SaveChangesAsync();
+
+        return (true, null);
+    }
+
+    public static StokvelType MapArchetypeToStokvelType(StokvelArchetype archetype) =>
+        archetype switch
+        {
+            StokvelArchetype.BurialSociety => StokvelType.BurialSociety,
+            StokvelArchetype.Rotational => StokvelType.RotationalStokvel,
+            StokvelArchetype.Grocery => StokvelType.GroceryStokvel,
+            StokvelArchetype.InvestmentClub => StokvelType.InvestmentStokvel,
+            StokvelArchetype.SavingsClub => StokvelType.SavingsStokvel,
+            StokvelArchetype.Education => StokvelType.SavingsStokvel,
+            StokvelArchetype.Borrowing => StokvelType.LoanStokvel,
+            StokvelArchetype.Travel => StokvelType.SavingsStokvel,
+            StokvelArchetype.SocialClub => StokvelType.SocialClub,
+            _ => StokvelType.BurialSociety
+        };
+
+    public async Task<(bool Success, string? Error)> SoftDeleteStokvelAsync(
+        Guid stokvelId,
+        string currentUserId,
+        string deleteReason,
+        string confirmationName)
+    {
+        if (string.IsNullOrWhiteSpace(deleteReason))
+        {
+            return (false, "A reason for deletion is required.");
+        }
+
+        await using var context = await dbFactory.CreateDbContextAsync();
+
+        var stokvel = await context.Stokvels
+            .SingleOrDefaultAsync(s => s.Id == stokvelId && !s.IsDeleted);
+
+        if (stokvel is null)
+        {
+            return (false, "Stokvel not found.");
+        }
+
+        if (!string.Equals(confirmationName.Trim(), stokvel.Name, StringComparison.Ordinal))
+        {
+            return (false, "The stokvel name you entered does not match. Deletion cancelled.");
+        }
+
+        stokvel.IsDeleted = true;
+        stokvel.IsActive = false;
+        stokvel.DeletedAt = DateTime.UtcNow;
+        stokvel.DeletedBy = currentUserId;
+        stokvel.DeleteReason = deleteReason.Trim();
+
+        await context.SaveChangesAsync();
+
+        return (true, null);
     }
 
     public async Task<Stokvel?> GetStokvelByTenantIdAsync(Guid tenantId)
@@ -345,4 +493,25 @@ public class StokvelService(
             ? "STK"
             : code;
     }
+
+    private static bool HasBankingDetails(StokvelBankingDetails? bankingDetails) =>
+        bankingDetails is not null &&
+        (!string.IsNullOrWhiteSpace(bankingDetails.BankName) ||
+         !string.IsNullOrWhiteSpace(bankingDetails.AccountHolderName) ||
+         !string.IsNullOrWhiteSpace(bankingDetails.AccountNumber) ||
+         !string.IsNullOrWhiteSpace(bankingDetails.BranchCode) ||
+         !string.IsNullOrWhiteSpace(bankingDetails.BranchName) ||
+         !string.IsNullOrWhiteSpace(bankingDetails.PaymentReferenceFormat) ||
+         !string.IsNullOrWhiteSpace(bankingDetails.Notes));
+
+    private static string? NullIfWhiteSpace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool IsValidBankingDetails(StokvelBankingDetails bankingDetails) =>
+        !string.IsNullOrWhiteSpace(bankingDetails.BankName) &&
+        !string.IsNullOrWhiteSpace(bankingDetails.AccountHolderName) &&
+        !string.IsNullOrWhiteSpace(bankingDetails.AccountNumber) &&
+        bankingDetails.AccountNumber.All(char.IsDigit) &&
+        (string.IsNullOrWhiteSpace(bankingDetails.BranchCode) || bankingDetails.BranchCode.All(char.IsDigit)) &&
+        Enum.IsDefined(bankingDetails.AccountType);
 }

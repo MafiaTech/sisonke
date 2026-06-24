@@ -9,6 +9,7 @@ public sealed class MemberFinancialStatementDto
     public string? CellphoneNumber { get; set; }
     public string? Email { get; set; }
     public string StokvelName { get; set; } = string.Empty;
+    public bool IsRotationalStokvel { get; set; }
     public decimal TotalExpectedContributions { get; set; }
     public decimal TotalContributionPaid { get; set; }
     public decimal TotalContributionOutstanding { get; set; }

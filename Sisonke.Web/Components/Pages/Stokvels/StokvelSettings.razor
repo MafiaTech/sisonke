@@ -1,0 +1,486 @@
+@page "/stokvel-settings/{StokvelId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+
+@inject StokvelService StokvelService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Stokvel Settings</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading settings…
+    </div>
+}
+else if (stokvel is null)
+{
+    <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
+    <a class="back-nav" href="/my-stokvels"><i class="bi bi-chevron-left"></i>Back to My Stokvels</a>
+}
+else if (!canEdit && !canDelete)
+{
+    <AlertBanner Type="warning"
+                 Title="Access restricted."
+                 Message="You do not have permission to manage settings for this stokvel."
+                 Icon="bi bi-exclamation-triangle-fill" />
+    <a class="back-nav" href="@($"/stokvel-dashboard/{StokvelId}")">
+        <i class="bi bi-chevron-left"></i>Back to Dashboard
+    </a>
+}
+else
+{
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Stokvel Settings</h1>
+            <p class="page-subtitle">
+                <span class="fw-semibold">@stokvel.Name</span>
+            </p>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" href="@($"/stokvel-dashboard/{StokvelId}")">
+            <i class="bi bi-chevron-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(saveSuccess))
+    {
+        <AlertBanner Type="success" Title="@saveSuccess" Message="" Icon="bi bi-check-circle-fill" />
+    }
+    @if (!string.IsNullOrWhiteSpace(saveError))
+    {
+        <AlertBanner Type="danger" Title="@saveError" Message="" Icon="bi bi-exclamation-triangle-fill" />
+    }
+
+    <!-- ── Edit Details ── -->
+    @if (canEdit)
+    {
+        <div class="settings-card mb-4">
+            <div class="settings-card-header">
+                <i class="bi bi-pencil-square me-2"></i>Edit Stokvel Details
+            </div>
+            <div class="settings-card-body">
+                <EditForm Model="editModel" OnValidSubmit="HandleSave">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Stokvel Name <span class="text-danger">*</span></label>
+                            <InputText @bind-Value="editModel.Name" class="form-control" maxlength="150" placeholder="Enter stokvel name" />
+                            <ValidationMessage For="() => editModel.Name" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Description</label>
+                            <InputTextArea @bind-Value="editModel.Description" class="form-control" rows="3" maxlength="500"
+                                          placeholder="Briefly describe this stokvel's purpose…" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Province</label>
+                            <InputText @bind-Value="editModel.Province" class="form-control" maxlength="100" placeholder="e.g. Gauteng" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Town / Area</label>
+                            <InputText @bind-Value="editModel.TownOrArea" class="form-control" maxlength="100" placeholder="e.g. Soweto" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Established Date</label>
+                            <InputDate @bind-Value="editModel.EstablishedDate" class="form-control" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Expected Member Count</label>
+                            <InputNumber @bind-Value="editModel.ExpectedMemberCount" class="form-control" min="1" max="10000"
+                                         placeholder="e.g. 20" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" for="stokvel-archetype">Stokvel Type</label>
+                            <InputSelect id="stokvel-archetype" class="form-select" @bind-Value="editModel.Archetype">
+                                @foreach (var option in archetypeOptions)
+                                {
+                                    <option value="@option">@GetArchetypeLabel(option)</option>
+                                }
+                            </InputSelect>
+                            <div class="form-text">
+                                Changing this updates the stokvel module flags, for example enabling rotation tools for a rotational stokvel.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2 flex-wrap">
+                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            Save Changes
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="ResetEdit" disabled="@isSaving">
+                            Reset
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <!-- ── Danger Zone ── -->
+    @if (canDelete)
+    {
+        <div class="settings-card settings-card-danger mb-4">
+            <div class="settings-card-header settings-card-header-danger">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone
+            </div>
+            <div class="settings-card-body">
+                <p class="text-muted mb-3">
+                    Permanently deactivate this stokvel. All historical records are preserved — this action cannot be undone.
+                </p>
+
+                @if (!showDeleteForm)
+                {
+                    <button class="btn btn-outline-danger" @onclick="ShowDeleteForm">
+                        <i class="bi bi-trash me-1"></i>Delete Stokvel
+                    </button>
+                }
+                else
+                {
+                    <div class="delete-confirm-box p-3 rounded border border-danger-subtle bg-danger-subtle">
+                        <p class="fw-semibold text-danger mb-2">
+                            <i class="bi bi-shield-exclamation me-1"></i>This action is irreversible. Confirm before proceeding.
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Reason for deletion <span class="text-danger">*</span></label>
+                            <InputTextArea @bind-Value="deleteReason" class="form-control" rows="2" maxlength="500"
+                                          placeholder="Explain why this stokvel is being removed…" />
+                            @if (showDeleteValidation && string.IsNullOrWhiteSpace(deleteReason))
+                            {
+                                <div class="text-danger small mt-1">Reason is required.</div>
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Type the stokvel name to confirm: <strong>@stokvel.Name</strong>
+                            </label>
+                            <InputText @bind-Value="deleteConfirmName" class="form-control"
+                                       placeholder="@stokvel.Name" />
+                            @if (showDeleteValidation && deleteConfirmName != stokvel.Name)
+                            {
+                                <div class="text-danger small mt-1">Name does not match.</div>
+                            }
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-danger" @onclick="HandleDelete" disabled="@isDeleting">
+                                @if (isDeleting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                }
+                                Permanently Delete
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="CancelDelete" disabled="@isDeleting">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Save confirmation modal -->
+    <ConfirmationModal IsVisible="showSaveConfirm"
+                       Title="Save Changes"
+                       Message="@SaveConfirmationMessage"
+                       ConfirmButtonText="Save"
+                       CancelButtonText="Go back"
+                       ModalType="info"
+                       OnConfirm="ConfirmSave"
+                       OnCancel="CancelSaveConfirm" />
+}
+
+<style>
+    .settings-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.875rem;
+        overflow: hidden;
+    }
+
+    .settings-card-danger {
+        border-color: #fca5a5;
+    }
+
+    .settings-card-header {
+        padding: 1rem 1.25rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e5e7eb;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        color: #1e293b;
+    }
+
+    .settings-card-header-danger {
+        background: #fff5f5;
+        border-bottom-color: #fca5a5;
+        color: #dc2626;
+    }
+
+    .settings-card-body {
+        padding: 1.25rem;
+    }
+
+    .delete-confirm-box {
+        border-radius: 0.625rem;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Guid StokvelId { get; set; }
+
+    private Stokvel? stokvel;
+    private bool isLoading = true;
+    private bool canEdit;
+    private bool canDelete;
+
+    private bool isSaving;
+    private bool isDeleting;
+    private bool showSaveConfirm;
+    private bool showDeleteForm;
+    private bool showDeleteValidation;
+
+    private string? saveSuccess;
+    private string? saveError;
+
+    private string deleteReason = string.Empty;
+    private string deleteConfirmName = string.Empty;
+
+    private string? currentUserId;
+
+    private EditModel editModel = new();
+    private readonly StokvelArchetype[] archetypeOptions =
+    [
+        StokvelArchetype.BurialSociety,
+        StokvelArchetype.Rotational,
+        StokvelArchetype.SavingsClub,
+        StokvelArchetype.Grocery,
+        StokvelArchetype.InvestmentClub,
+        StokvelArchetype.Education,
+        StokvelArchetype.Borrowing,
+        StokvelArchetype.Travel,
+        StokvelArchetype.SocialClub
+    ];
+
+    private string SaveConfirmationMessage =>
+        stokvel is not null && editModel.Archetype != stokvel.Archetype
+            ? $"Save these changes and change this stokvel from {GetArchetypeLabel(stokvel.Archetype)} to {GetArchetypeLabel(editModel.Archetype)}?"
+            : "Are you sure you want to save these changes to the stokvel details?";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        stokvel = await StokvelService.GetStokvelForSettingsAsync(StokvelId);
+
+        if (stokvel is not null && !string.IsNullOrWhiteSpace(currentUserId))
+        {
+            canEdit = await MemberAccessService.CanEditStokvelAsync(currentUserId, StokvelId);
+            canDelete = await MemberAccessService.CanDeleteStokvelAsync(currentUserId, StokvelId);
+        }
+
+        if (stokvel is not null)
+        {
+            PopulateEditModel();
+        }
+
+        isLoading = false;
+    }
+
+    private void PopulateEditModel()
+    {
+        editModel = new EditModel
+        {
+            Name = stokvel!.Name,
+            Archetype = stokvel.Archetype,
+            Description = stokvel.Description,
+            Province = stokvel.Province,
+            TownOrArea = stokvel.TownOrArea,
+            EstablishedDate = stokvel.EstablishedDate,
+            ExpectedMemberCount = stokvel.ExpectedMemberCount
+        };
+    }
+
+    private void ResetEdit()
+    {
+        saveSuccess = null;
+        saveError = null;
+        PopulateEditModel();
+    }
+
+    private void HandleSave()
+    {
+        saveSuccess = null;
+        saveError = null;
+        showSaveConfirm = true;
+    }
+
+    private void CancelSaveConfirm()
+    {
+        showSaveConfirm = false;
+    }
+
+    private async Task ConfirmSave()
+    {
+        showSaveConfirm = false;
+        isSaving = true;
+
+        try
+        {
+            var (success, error) = await StokvelService.UpdateStokvelDetailsAsync(
+                StokvelId,
+                editModel.Name,
+                editModel.Archetype,
+                editModel.Description,
+                editModel.Province,
+                editModel.TownOrArea,
+                editModel.EstablishedDate,
+                editModel.ExpectedMemberCount,
+                currentUserId!);
+
+            if (success)
+            {
+                stokvel = await StokvelService.GetStokvelForSettingsAsync(StokvelId);
+                if (stokvel is not null)
+                {
+                    PopulateEditModel();
+                }
+                saveSuccess = "Stokvel details updated successfully.";
+            }
+            else
+            {
+                saveError = error ?? "An unexpected error occurred.";
+            }
+        }
+        catch
+        {
+            saveError = "An unexpected error occurred. Please try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ShowDeleteForm()
+    {
+        showDeleteForm = true;
+        showDeleteValidation = false;
+        deleteReason = string.Empty;
+        deleteConfirmName = string.Empty;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteForm = false;
+        showDeleteValidation = false;
+        deleteReason = string.Empty;
+        deleteConfirmName = string.Empty;
+    }
+
+    private async Task HandleDelete()
+    {
+        showDeleteValidation = true;
+
+        if (string.IsNullOrWhiteSpace(deleteReason) || deleteConfirmName != stokvel?.Name)
+        {
+            return;
+        }
+
+        isDeleting = true;
+
+        try
+        {
+            var (success, error) = await StokvelService.SoftDeleteStokvelAsync(
+                StokvelId,
+                currentUserId!,
+                deleteReason,
+                deleteConfirmName);
+
+            if (success)
+            {
+                NavigationManager.NavigateTo("/my-stokvels");
+            }
+            else
+            {
+                saveError = error ?? "Deletion failed. Please try again.";
+                showDeleteForm = false;
+            }
+        }
+        catch
+        {
+            saveError = "An unexpected error occurred. Please try again.";
+            showDeleteForm = false;
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private sealed class EditModel
+    {
+        [Required(ErrorMessage = "Stokvel name is required.")]
+        [MaxLength(150)]
+        public string Name { get; set; } = string.Empty;
+
+        public StokvelArchetype Archetype { get; set; } = StokvelArchetype.BurialSociety;
+
+        [MaxLength(500)]
+        public string? Description { get; set; }
+
+        [MaxLength(100)]
+        public string? Province { get; set; }
+
+        [MaxLength(100)]
+        public string? TownOrArea { get; set; }
+
+        public DateTime? EstablishedDate { get; set; }
+
+        [Range(1, 10000)]
+        public int? ExpectedMemberCount { get; set; }
+    }
+
+    private static string GetArchetypeLabel(StokvelArchetype archetype) =>
+        archetype switch
+        {
+            StokvelArchetype.BurialSociety  => "Burial Society",
+            StokvelArchetype.Rotational     => "Rotational Stokvel",
+            StokvelArchetype.SavingsClub    => "Savings Club",
+            StokvelArchetype.Grocery        => "Grocery Stokvel",
+            StokvelArchetype.InvestmentClub => "Investment Club",
+            StokvelArchetype.Education      => "Education Stokvel",
+            StokvelArchetype.Borrowing      => "Borrowing Stokvel",
+            StokvelArchetype.Travel         => "Travel Stokvel",
+            StokvelArchetype.SocialClub     => "Social Club",
+            _                               => archetype.ToString()
+        };
+}

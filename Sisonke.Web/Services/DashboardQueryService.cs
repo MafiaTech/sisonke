@@ -108,13 +108,13 @@ public sealed class DashboardQueryService
 
             return new StokvelDashboardSummary
             {
-                TotalMembers                 = reader.GetInt32(reader.GetOrdinal("TotalMembers")),
-                ActiveMembers                = reader.GetInt32(reader.GetOrdinal("ActiveMembers")),
-                TotalContributionsExpected   = reader.GetDecimal(reader.GetOrdinal("TotalContributionsExpected")),
-                TotalContributionsPaid       = reader.GetDecimal(reader.GetOrdinal("TotalContributionsPaid")),
-                TotalContributionsOutstanding= reader.GetDecimal(reader.GetOrdinal("TotalContributionsOutstanding")),
-                OpenClaims                   = reader.GetInt32(reader.GetOrdinal("OpenClaims")),
-                UpcomingMeetings             = reader.GetInt32(reader.GetOrdinal("UpcomingMeetings")),
+                TotalMembers = reader.GetInt32(reader.GetOrdinal("TotalMembers")),
+                ActiveMembers = reader.GetInt32(reader.GetOrdinal("ActiveMembers")),
+                TotalContributionsExpected = reader.GetDecimal(reader.GetOrdinal("TotalContributionsExpected")),
+                TotalContributionsPaid = reader.GetDecimal(reader.GetOrdinal("TotalContributionsPaid")),
+                TotalContributionsOutstanding = reader.GetDecimal(reader.GetOrdinal("TotalContributionsOutstanding")),
+                OpenClaims = reader.GetInt32(reader.GetOrdinal("OpenClaims")),
+                UpcomingMeetings = reader.GetInt32(reader.GetOrdinal("UpcomingMeetings")),
             };
         }
         finally
@@ -147,16 +147,16 @@ public sealed class DashboardQueryService
                 .GroupBy(_ => 1)
                 .Select(g => new
                 {
-                    Expected    = g.Sum(mc => mc.ExpectedAmount),
-                    Paid        = g.Sum(mc => mc.PaidAmount),
+                    Expected = g.Sum(mc => mc.ExpectedAmount),
+                    Paid = g.Sum(mc => mc.PaidAmount),
                     Outstanding = g.Sum(mc => mc.OutstandingAmount),
                 })
                 .FirstOrDefaultAsync();
 
             if (sums is not null)
             {
-                expectedTotal    = sums.Expected;
-                paidTotal        = sums.Paid;
+                expectedTotal = sums.Expected;
+                paidTotal = sums.Paid;
                 outstandingTotal = sums.Outstanding;
             }
         }
@@ -175,13 +175,13 @@ public sealed class DashboardQueryService
 
         return new StokvelDashboardSummary
         {
-            TotalMembers                  = totalMembers,
-            ActiveMembers                 = activeMembers,
-            TotalContributionsExpected    = expectedTotal,
-            TotalContributionsPaid        = paidTotal,
+            TotalMembers = totalMembers,
+            ActiveMembers = activeMembers,
+            TotalContributionsExpected = expectedTotal,
+            TotalContributionsPaid = paidTotal,
             TotalContributionsOutstanding = outstandingTotal,
-            OpenClaims                    = openClaims,
-            UpcomingMeetings              = upcomingMeetings,
+            OpenClaims = openClaims,
+            UpcomingMeetings = upcomingMeetings,
         };
     }
 
@@ -224,17 +224,17 @@ public sealed class DashboardQueryService
             {
                 rows.Add(new MemberContributionStatusRow
                 {
-                    MemberId        = reader.GetGuid(reader.GetOrdinal("MemberId")),
-                    MemberName      = reader.GetString(reader.GetOrdinal("MemberName")),
-                    MemberNumber    = reader.GetString(reader.GetOrdinal("MemberNumber")),
-                    CycleId         = reader.GetGuid(reader.GetOrdinal("CycleId")),
-                    CycleName       = reader.GetString(reader.GetOrdinal("CycleName")),
-                    PeriodStart     = reader.GetDateTime(reader.GetOrdinal("PeriodStart")),
-                    DueDate         = reader.GetDateTime(reader.GetOrdinal("DueDate")),
-                    ExpectedAmount  = reader.GetDecimal(reader.GetOrdinal("ExpectedAmount")),
-                    PaidAmount      = reader.GetDecimal(reader.GetOrdinal("PaidAmount")),
+                    MemberId = reader.GetGuid(reader.GetOrdinal("MemberId")),
+                    MemberName = reader.GetString(reader.GetOrdinal("MemberName")),
+                    MemberNumber = reader.GetString(reader.GetOrdinal("MemberNumber")),
+                    CycleId = reader.GetGuid(reader.GetOrdinal("CycleId")),
+                    CycleName = reader.GetString(reader.GetOrdinal("CycleName")),
+                    PeriodStart = reader.GetDateTime(reader.GetOrdinal("PeriodStart")),
+                    DueDate = reader.GetDateTime(reader.GetOrdinal("DueDate")),
+                    ExpectedAmount = reader.GetDecimal(reader.GetOrdinal("ExpectedAmount")),
+                    PaidAmount = reader.GetDecimal(reader.GetOrdinal("PaidAmount")),
                     OutstandingAmount = reader.GetDecimal(reader.GetOrdinal("OutstandingAmount")),
-                    StatusCode      = reader.GetInt32(reader.GetOrdinal("StatusCode")),
+                    StatusCode = reader.GetInt32(reader.GetOrdinal("StatusCode")),
                 });
             }
         }
@@ -260,24 +260,24 @@ public sealed class DashboardQueryService
             .Where(mc => mc.TenantId == tenantId && openCycleIds.Contains(mc.ContributionCycleId))
             .Join(_context.Members,
                 mc => mc.MemberId,
-                m  => m.Id,
+                m => m.Id,
                 (mc, m) => new { mc, m })
             .Join(_context.ContributionCycles,
-                x  => x.mc.ContributionCycleId,
+                x => x.mc.ContributionCycleId,
                 cc => cc.Id,
                 (x, cc) => new MemberContributionStatusRow
                 {
-                    MemberId          = x.m.Id,
-                    MemberName        = x.m.FullName,
-                    MemberNumber      = x.m.MemberNumber,
-                    CycleId           = cc.Id,
-                    CycleName         = cc.Name,
-                    PeriodStart       = cc.PeriodStart,
-                    DueDate           = cc.DueDate,
-                    ExpectedAmount    = x.mc.ExpectedAmount,
-                    PaidAmount        = x.mc.PaidAmount,
+                    MemberId = x.m.Id,
+                    MemberName = x.m.FullName,
+                    MemberNumber = x.m.MemberNumber,
+                    CycleId = cc.Id,
+                    CycleName = cc.Name,
+                    PeriodStart = cc.PeriodStart,
+                    DueDate = cc.DueDate,
+                    ExpectedAmount = x.mc.ExpectedAmount,
+                    PaidAmount = x.mc.PaidAmount,
                     OutstandingAmount = x.mc.OutstandingAmount,
-                    StatusCode        = (int)x.mc.Status,
+                    StatusCode = (int)x.mc.Status,
                 })
             .OrderBy(r => r.MemberName)
             .ThenBy(r => r.PeriodStart)
@@ -323,15 +323,15 @@ public sealed class DashboardQueryService
             {
                 rows.Add(new OutstandingContributionRow
                 {
-                    MemberId          = reader.GetGuid(reader.GetOrdinal("MemberId")),
-                    MemberName        = reader.GetString(reader.GetOrdinal("MemberName")),
-                    MemberNumber      = reader.GetString(reader.GetOrdinal("MemberNumber")),
-                    CycleId           = reader.GetGuid(reader.GetOrdinal("CycleId")),
-                    CycleName         = reader.GetString(reader.GetOrdinal("CycleName")),
-                    PeriodStart       = reader.GetDateTime(reader.GetOrdinal("PeriodStart")),
-                    DueDate           = reader.GetDateTime(reader.GetOrdinal("DueDate")),
+                    MemberId = reader.GetGuid(reader.GetOrdinal("MemberId")),
+                    MemberName = reader.GetString(reader.GetOrdinal("MemberName")),
+                    MemberNumber = reader.GetString(reader.GetOrdinal("MemberNumber")),
+                    CycleId = reader.GetGuid(reader.GetOrdinal("CycleId")),
+                    CycleName = reader.GetString(reader.GetOrdinal("CycleName")),
+                    PeriodStart = reader.GetDateTime(reader.GetOrdinal("PeriodStart")),
+                    DueDate = reader.GetDateTime(reader.GetOrdinal("DueDate")),
                     OutstandingAmount = reader.GetDecimal(reader.GetOrdinal("OutstandingAmount")),
-                    StatusCode        = reader.GetInt32(reader.GetOrdinal("StatusCode")),
+                    StatusCode = reader.GetInt32(reader.GetOrdinal("StatusCode")),
                 });
             }
         }
@@ -364,22 +364,22 @@ public sealed class DashboardQueryService
                       && mc.OutstandingAmount > 0)
             .Join(_context.Members,
                 mc => mc.MemberId,
-                m  => m.Id,
+                m => m.Id,
                 (mc, m) => new { mc, m })
             .Join(_context.ContributionCycles.Where(cc => relevantStatuses.Contains(cc.Status)),
-                x  => x.mc.ContributionCycleId,
+                x => x.mc.ContributionCycleId,
                 cc => cc.Id,
                 (x, cc) => new OutstandingContributionRow
                 {
-                    MemberId          = x.m.Id,
-                    MemberName        = x.m.FullName,
-                    MemberNumber      = x.m.MemberNumber,
-                    CycleId           = cc.Id,
-                    CycleName         = cc.Name,
-                    PeriodStart       = cc.PeriodStart,
-                    DueDate           = cc.DueDate,
+                    MemberId = x.m.Id,
+                    MemberName = x.m.FullName,
+                    MemberNumber = x.m.MemberNumber,
+                    CycleId = cc.Id,
+                    CycleName = cc.Name,
+                    PeriodStart = cc.PeriodStart,
+                    DueDate = cc.DueDate,
                     OutstandingAmount = x.mc.OutstandingAmount,
-                    StatusCode        = (int)x.mc.Status,
+                    StatusCode = (int)x.mc.Status,
                 })
             .OrderByDescending(r => r.OutstandingAmount)
             .ThenBy(r => r.DueDate)
