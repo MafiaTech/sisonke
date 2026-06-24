@@ -1,0 +1,12 @@
+
+# Build artifacts
+bin/
+obj/
+**/bin/
+**/obj/
+publish/
+**/publish/
+
+# User uploads / generated files
+wwwroot/uploads/
+**/wwwroot/uploads/
