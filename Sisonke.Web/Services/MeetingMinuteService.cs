@@ -14,6 +14,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
     private const string StatusDraft = "Draft";
     private const string StatusSubmitted = "Submitted";
     private const string StatusApproved = "Approved";
+    private const string StatusRejected = "Rejected";
 
     public async Task<MeetingMinute?> GetMinutesByMeetingIdAsync(Guid meetingId)
     {
@@ -110,7 +111,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
             .Where(existingMinutes => existingMinutes.Id == meetingMinuteId)
             .FirstOrDefaultAsync();
 
-        if (minutes is null || minutes.Status != StatusDraft)
+        if (minutes is null || minutes.Status is not (StatusDraft or StatusRejected))
         {
             return false;
         }
@@ -121,6 +122,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
             .ToListAsync();
         var closedVotes = await GetClosedVoteResultsByMeetingIdAsync(minutes.MeetingId);
 
+        minutes.Status = StatusDraft;
         minutes.DecisionsTaken = BuildAgendaLinkedDecisions(agendaItems, closedVotes);
         minutes.UpdatedByMemberId = updatedByMemberId;
         minutes.UpdatedAt = DateTime.UtcNow;
@@ -145,11 +147,12 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
             .Where(existingMinutes => existingMinutes.Id == meetingMinuteId)
             .FirstOrDefaultAsync();
 
-        if (minutes is null || minutes.Status != StatusDraft)
+        if (minutes is null || minutes.Status is not (StatusDraft or StatusRejected))
         {
             return false;
         }
 
+        minutes.Status = StatusDraft;
         minutes.OpeningNotes = openingNotes.Trim();
         minutes.AttendanceSummary = attendanceSummary.Trim();
         minutes.ApologySummary = apologySummary.Trim();
@@ -171,7 +174,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
             .Where(existingMinutes => existingMinutes.Id == meetingMinuteId)
             .FirstOrDefaultAsync();
 
-        if (minutes is null || minutes.Status != StatusDraft)
+        if (minutes is null || minutes.Status is not (StatusDraft or StatusRejected))
         {
             return false;
         }
@@ -202,6 +205,26 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
         minutes.ApprovedAt = now;
         minutes.UpdatedByMemberId = approvedByMemberId;
         minutes.UpdatedAt = now;
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<bool> RejectMinutesAsync(Guid meetingMinuteId, Guid rejectedByMemberId)
+    {
+        var minutes = await context.MeetingMinutes
+            .Where(existingMinutes => existingMinutes.Id == meetingMinuteId)
+            .FirstOrDefaultAsync();
+
+        if (minutes is null || minutes.Status != StatusSubmitted)
+        {
+            return false;
+        }
+
+        minutes.Status = StatusRejected;
+        minutes.UpdatedByMemberId = rejectedByMemberId;
+        minutes.UpdatedAt = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
 

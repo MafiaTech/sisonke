@@ -18,7 +18,7 @@
 }
 else if (state is null)
 {
-    <div class="alert alert-warning">Stokvel or linked membership not found.</div>
+    <div class="sisonke-alert sisonke-alert-gold">Stokvel or linked membership not found.</div>
 }
 else if (state.Stokvel.Archetype == StokvelArchetype.BurialSociety)
 {
@@ -34,17 +34,26 @@ else
 {
     <StokvelSubNav StokvelId="@StokvelId" IsRotational="@(state.Stokvel.Archetype == StokvelArchetype.Rotational)" />
 
-    <div class="page-header">
+    <section class="sisonke-hero-card mb-4">
         <div>
+            <span class="sisonke-badge sisonke-badge-gold">Finance</span>
             <h1>Loans &amp; Wallet</h1>
-            <p class="text-muted mb-0">@state.Stokvel.Name</p>
+            <p>@state.Stokvel.Name</p>
         </div>
-        <a class="btn btn-outline-secondary" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
-    </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel/{StokvelId}/loans")">
+                <i class="bi bi-bank2 me-1"></i>Loans
+            </a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel/{StokvelId}/wallet")">
+                <i class="bi bi-wallet2 me-1"></i>Wallet
+            </a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+        </div>
+    </section>
 
     @if (errors.Count > 0)
     {
-        <div class="alert alert-danger">
+        <div class="sisonke-alert sisonke-alert-red">
             <ul class="mb-0">
                 @foreach (var e in errors) { <li>@e</li> }
             </ul>
@@ -52,33 +61,27 @@ else
     }
     @if (!string.IsNullOrWhiteSpace(success))
     {
-        <div class="alert alert-success">@success</div>
+        <div class="sisonke-alert sisonke-alert-green">@success</div>
     }
 
     @* Summary strip *@
-    <div class="row g-3 mb-3">
-        <div class="col-md-4">
-            <div class="sisonke-card h-100">
-                <div class="sisonke-card-body">
-                    <div class="detail-mini-label">Loan eligibility</div>
-                    <div class="fw-semibold">@state.EligibilityMessage</div>
-                </div>
+    <div class="loans-wallet-summary mb-4">
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="detail-mini-label">Loan eligibility</div>
+                <div class="fw-semibold">@state.EligibilityMessage</div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="sisonke-card h-100">
-                <div class="sisonke-card-body">
-                    <div class="detail-mini-label">Available surplus</div>
-                    <div class="h4 mb-0">@Money(state.Wallet?.AvailableBalance ?? 0)</div>
-                </div>
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="detail-mini-label">Available wallet</div>
+                <div class="h4 mb-0">@Money(WalletBalance)</div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="sisonke-card h-100">
-                <div class="sisonke-card-body">
-                    <div class="detail-mini-label">Active loan</div>
-                    <div class="fw-semibold">@(MyActiveLoan is null ? "None" : $"{Money(MyActiveLoan.OutstandingBalance)} outstanding")</div>
-                </div>
+        <div class="sisonke-card">
+            <div class="sisonke-card-body">
+                <div class="detail-mini-label">Active loan</div>
+                <div class="fw-semibold">@(MyActiveLoan is null ? "None" : $"{Money(MyActiveLoan.OutstandingBalance)} outstanding")</div>
             </div>
         </div>
     </div>
@@ -283,38 +286,77 @@ else
         </div>
     </section>
 
-    @if (state.EligibilityMessage.StartsWith("Eligible", StringComparison.OrdinalIgnoreCase))
+    @if (CanRequestLoan)
     {
-        <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>Request Loan</h2><div class="row g-3">
-            <div class="col-md-3"><label class="form-label">Amount</label><InputNumber class="form-control" @bind-Value="loanAmount" /></div>
-            <div class="col-md-3"><label class="form-label">Repayment months</label><InputNumber class="form-control" @bind-Value="loanMonths" /></div>
-            <div class="col-md-6"><label class="form-label">Reason</label><InputText class="form-control" @bind-Value="loanReason" /></div>
-        </div><div class="text-muted mt-2">Estimated monthly repayment: @Money(EstimatedMonthly)</div><button class="btn btn-primary mt-3" @onclick="RequestLoanAsync">Submit Loan Request</button></div></section>
+        <section class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3">
+                    <div>
+                        <h2>Request Loan</h2>
+                        <p>Your wallet balance is applied first as an early payout. Only the remaining amount becomes a loan.</p>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Amount needed</label>
+                        <InputNumber class="form-control" @bind-Value="loanAmount" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Repayment months</label>
+                        <InputNumber class="form-control" @bind-Value="loanMonths" disabled="@(NetLoanAmount <= 0)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Reason</label>
+                        <InputText class="form-control" @bind-Value="loanReason" />
+                    </div>
+                </div>
+                @if (loanAmount > 0)
+                {
+                    <div class="loan-estimate-grid mt-3">
+                        <div>
+                            <div class="detail-mini-label">Wallet early payout</div>
+                            <div class="detail-mini-value">@Money(WalletEarlyPayoutAmount)</div>
+                        </div>
+                        <div>
+                            <div class="detail-mini-label">Loan amount after wallet</div>
+                            <div class="detail-mini-value">@Money(NetLoanAmount)</div>
+                        </div>
+                        <div>
+                            <div class="detail-mini-label">Estimated monthly repayment</div>
+                            <div class="detail-mini-value">@Money(EstimatedMonthly)</div>
+                        </div>
+                    </div>
+                }
+                <button class="sisonke-btn sisonke-btn-primary mt-3" type="button" @onclick="RequestLoanAsync">
+                    <i class="bi bi-send me-1"></i>Submit Request
+                </button>
+            </div>
+        </section>
     }
 
     <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>@(state.CanViewAll ? "Loan Requests & Active Loans" : "My Loans")</h2>
         @if (state.Loans.Count == 0) { <div class="text-muted">No loan records.</div> }
-        else { <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Member</th><th>Requested</th><th>Approved</th><th>Months</th><th>Status</th><th>Outstanding</th><th></th></tr></thead><tbody>
-            @foreach (var loan in state.Loans) { <tr><td>@loan.Member.FullName</td><td>@Money(loan.RequestedAmount)</td><td>@Money(loan.ApprovedAmount ?? 0)</td><td>@loan.RepaymentMonths</td><td>@loan.LoanStatus</td><td>@Money(loan.OutstandingBalance)</td><td class="text-end">
-                @if (state.CanApprove && loan.LoanStatus == MemberLoanStatus.PendingApproval) { <button class="btn btn-sm btn-primary me-1" @onclick="() => OpenLoanApproval(loan)">Approve</button><button class="btn btn-sm btn-outline-danger" @onclick="() => OpenLoanRejection(loan)">Reject</button> }
-                @if (state.CanConfirmMoney && loan.LoanStatus == MemberLoanStatus.DisbursementPending) { <button class="btn btn-sm btn-primary" @onclick="() => OpenDisbursement(loan)">Confirm Disbursement</button> }
+        else { <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Borrowed Amount</th><th>Approved</th><th>Months</th><th>Status</th><th>Outstanding</th><th></th></tr></thead><tbody>
+            @foreach (var loan in state.Loans) { <tr><td class="fw-semibold">@loan.Member.FullName</td><td><div>@Money(loan.RequestedAmount)</div>@if (!string.IsNullOrWhiteSpace(loan.Notes)) { <div class="text-muted small">@loan.Notes</div> }</td><td>@Money(loan.ApprovedAmount ?? 0)</td><td>@loan.RepaymentMonths</td><td><span class="sisonke-badge @LoanStatusBadge(loan.LoanStatus)">@loan.LoanStatus</span></td><td>@Money(loan.OutstandingBalance)</td><td class="text-end">
+                @if (state.CanApprove && loan.LoanStatus == MemberLoanStatus.PendingApproval) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm me-1" @onclick="() => OpenLoanApproval(loan)">Approve</button><button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm" style="color:var(--sk-danger)" @onclick="() => OpenLoanRejection(loan)">Reject</button> }
+                @if (state.CanConfirmMoney && loan.LoanStatus == MemberLoanStatus.DisbursementPending) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm" @onclick="() => OpenDisbursement(loan)">Confirm Disbursement</button> }
             </td></tr> }
         </tbody></table></div> }
     </div></section>
 
     <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>Loan Repayment Register</h2>
         @if (state.Repayments.Count == 0) { <div class="text-muted">No repayment schedule yet.</div> }
-        else { <div class="table-responsive"><table class="table"><thead><tr><th>Due</th><th>Expected</th><th>Paid</th><th>Fine</th><th>Status</th><th></th></tr></thead><tbody>@foreach (var repayment in state.Repayments) { <tr><td>@repayment.DueDate.ToString("dd MMM yyyy")</td><td>@Money(repayment.ExpectedAmount)</td><td>@Money(repayment.PaidAmount)</td><td>@Money(repayment.FineAmount)</td><td>@(repayment.PaymentStatus == LoanRepaymentStatus.Pending && repayment.DueDate.Date < DateTime.Today ? "Overdue" : repayment.PaymentStatus.ToString())</td><td>@if (state.CanConfirmMoney && repayment.PaymentStatus is not (LoanRepaymentStatus.Paid or LoanRepaymentStatus.Waived)) { <button class="btn btn-sm btn-primary" @onclick="() => OpenRepayment(repayment)">Confirm Repayment</button> }</td></tr> }</tbody></table></div> }
+        else { <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Due</th><th>Expected</th><th>Paid</th><th>Fine</th><th>Status</th><th></th></tr></thead><tbody>@foreach (var repayment in state.Repayments) { var isOverdue = repayment.PaymentStatus == LoanRepaymentStatus.Pending && repayment.DueDate.Date < DateTime.Today; <tr><td>@repayment.DueDate.ToString("dd MMM yyyy")</td><td>@Money(repayment.ExpectedAmount)</td><td>@Money(repayment.PaidAmount)</td><td>@Money(repayment.FineAmount)</td><td><span class="sisonke-badge @(isOverdue ? "sisonke-badge-red" : RepaymentStatusBadge(repayment.PaymentStatus))">@(isOverdue ? "Overdue" : repayment.PaymentStatus.ToString())</span></td><td>@if (state.CanConfirmMoney && repayment.PaymentStatus is not (LoanRepaymentStatus.Paid or LoanRepaymentStatus.Waived)) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm" @onclick="() => OpenRepayment(repayment)">Confirm</button> }</td></tr> }</tbody></table></div> }
     </div></section>
 
-    <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>My Surplus Wallet</h2><div class="row"><div class="col-md-4"><strong>Available:</strong> @Money(state.Wallet?.AvailableBalance ?? 0)</div><div class="col-md-4"><strong>Total credited:</strong> @Money(state.Wallet?.TotalCredits ?? 0)</div><div class="col-md-4"><strong>Total withdrawn:</strong> @Money(state.Wallet?.TotalWithdrawals ?? 0)</div></div>
-        @if ((state.Wallet?.AvailableBalance ?? 0) > 0) { <div class="row g-2 mt-2"><div class="col-md-3"><InputNumber class="form-control" @bind-Value="withdrawalAmount" placeholder="Amount" /></div><div class="col-md-6"><InputText class="form-control" @bind-Value="withdrawalReason" placeholder="Reason" /></div><div class="col-md-3"><button class="btn btn-primary" @onclick="RequestWithdrawalAsync">Request Withdrawal</button></div></div> }
-        @if (state.Transactions.Count > 0) { <h3 class="h6 mt-3">Recent transactions</h3><ul class="list-group">@foreach (var tx in state.Transactions) { <li class="list-group-item d-flex justify-content-between"><span>@tx.TransactionType · @tx.Description</span><span>@Money(tx.Amount) · Balance @Money(tx.BalanceAfterTransaction)</span></li> }</ul> }
+    <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>My Surplus Wallet</h2><div class="loan-estimate-grid"><div><div class="detail-mini-label">Available</div><div class="detail-mini-value">@Money(WalletBalance)</div></div><div><div class="detail-mini-label">Total credited</div><div class="detail-mini-value">@Money(state.Wallet?.TotalCredits ?? 0)</div></div><div><div class="detail-mini-label">Total withdrawn</div><div class="detail-mini-value">@Money(state.Wallet?.TotalWithdrawals ?? 0)</div></div></div>
+        @if (WalletBalance > 0) { <div class="row g-2 mt-3"><div class="col-md-3"><label class="form-label">Amount</label><InputNumber class="form-control" @bind-Value="withdrawalAmount" /></div><div class="col-md-6"><label class="form-label">Reason</label><InputText class="form-control" @bind-Value="withdrawalReason" /></div><div class="col-md-3 d-flex align-items-end"><button class="sisonke-btn sisonke-btn-primary w-100" @onclick="RequestWithdrawalAsync">Request Withdrawal</button></div></div> }
+        @if (state.Transactions.Count > 0) { <h3 class="h6 mt-3">Recent transactions</h3><div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Type</th><th>Description</th><th>Amount</th><th>Balance After</th></tr></thead><tbody>@foreach (var tx in state.Transactions) { <tr><td><span class="sisonke-badge sisonke-badge-blue">@tx.TransactionType</span></td><td>@tx.Description</td><td>@Money(tx.Amount)</td><td>@Money(tx.BalanceAfterTransaction)</td></tr> }</tbody></table></div> }
     </div></section>
 
     <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>@(state.CanViewAll ? "Surplus Withdrawal Requests" : "My Withdrawal Requests")</h2>
         @if (state.Withdrawals.Count == 0) { <div class="text-muted">No withdrawal requests.</div> }
-        else { <div class="table-responsive"><table class="table"><thead><tr><th>Member</th><th>Amount</th><th>Status</th><th>Reason</th><th></th></tr></thead><tbody>@foreach (var item in state.Withdrawals) { <tr><td>@item.Member.FullName</td><td>@Money(item.RequestedAmount)</td><td>@item.WithdrawalStatus</td><td>@item.RequestReason</td><td>@if (state.CanApprove && item.WithdrawalStatus == SurplusWithdrawalStatus.PendingApproval) { <button class="btn btn-sm btn-primary me-1" @onclick="() => ApproveWithdrawalAsync(item.Id)">Approve</button><button class="btn btn-sm btn-outline-danger" @onclick="() => OpenWithdrawalRejection(item)">Reject</button> } @if (state.CanConfirmMoney && item.WithdrawalStatus == SurplusWithdrawalStatus.PaymentPending) { <button class="btn btn-sm btn-primary" @onclick="() => OpenWithdrawalPayment(item)">Confirm Paid</button> }</td></tr> }</tbody></table></div> }
+        else { <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Amount</th><th>Status</th><th>Reason</th><th></th></tr></thead><tbody>@foreach (var item in state.Withdrawals) { <tr><td class="fw-semibold">@item.Member.FullName</td><td>@Money(item.RequestedAmount)</td><td><span class="sisonke-badge @WithdrawalStatusBadge(item.WithdrawalStatus)">@item.WithdrawalStatus</span></td><td>@item.RequestReason</td><td>@if (state.CanApprove && item.WithdrawalStatus == SurplusWithdrawalStatus.PendingApproval) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm me-1" @onclick="() => ApproveWithdrawalAsync(item.Id)">Approve</button><button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm" style="color:var(--sk-danger)" @onclick="() => OpenWithdrawalRejection(item)">Reject</button> } @if (state.CanConfirmMoney && item.WithdrawalStatus == SurplusWithdrawalStatus.PaymentPending) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm" @onclick="() => OpenWithdrawalPayment(item)">Confirm Paid</button> }</td></tr> }</tbody></table></div> }
     </div></section>
 }
 
@@ -332,8 +374,8 @@ else
                     <p class="mb-0 text-muted">Any existing active configuration will be replaced. Are you sure you want to continue?</p>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-outline-secondary" @onclick="() => showConfigConfirm = false">Cancel</button>
-                    <button class="btn btn-primary" @onclick="ExecuteSaveConfigurationAsync">
+                    <button class="sisonke-btn sisonke-btn-outline" @onclick="() => showConfigConfirm = false">Cancel</button>
+                    <button class="sisonke-btn sisonke-btn-primary" @onclick="ExecuteSaveConfigurationAsync">
                         <i class="bi bi-check2 me-1"></i>Confirm &amp; Save
                     </button>
                 </div>
@@ -357,8 +399,30 @@ else
             <div><label>Notes</label><InputTextArea class="form-control" @bind-Value="actionNotes" /></div>
             @if (dialogKind == "repayment") { <div class="form-check mt-2"><InputCheckbox class="form-check-input" @bind-Value="actionApplyFine" /><label class="form-check-label">Apply suggested late fine</label></div><div class="form-check"><InputCheckbox class="form-check-input" @bind-Value="actionWaive" /><label class="form-check-label">Waive repayment</label></div> }
         }
-    </div><div class="modal-footer"><button class="btn btn-outline-secondary" @onclick="CloseDialog">Cancel</button><button class="btn btn-primary" @onclick="SubmitDialogAsync">Confirm</button></div></div></div></div>
+    </div><div class="modal-footer"><button class="sisonke-btn sisonke-btn-outline" @onclick="CloseDialog">Cancel</button><button class="sisonke-btn sisonke-btn-primary" @onclick="SubmitDialogAsync">Confirm</button></div></div></div></div>
 }
+
+<style>
+    .loans-wallet-summary,
+    .loan-estimate-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    }
+
+    .loan-estimate-grid {
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        background: #fff;
+        padding: 1rem;
+    }
+
+    .loans-wallet-page-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+</style>
 
 @code {
     [Parameter] public Guid StokvelId { get; set; }
@@ -387,8 +451,12 @@ else
     private string actionNotes = "";
     private bool actionApplyFine;
     private bool actionWaive;
+    private decimal WalletBalance => state?.Wallet?.AvailableBalance ?? 0;
+    private bool CanRequestLoan => state?.EligibilityMessage.StartsWith("Eligible", StringComparison.OrdinalIgnoreCase) == true && state.Configuration?.LoansEnabled == true;
+    private decimal WalletEarlyPayoutAmount => loanAmount <= 0 ? 0 : Math.Min(loanAmount, WalletBalance);
+    private decimal NetLoanAmount => loanAmount <= 0 ? 0 : Math.Max(0, loanAmount - WalletEarlyPayoutAmount);
     private MemberLoan? MyActiveLoan => state?.Loans.FirstOrDefault(x => x.MemberId == state.CurrentMember?.Id && x.LoanStatus is MemberLoanStatus.Active or MemberLoanStatus.Overdue);
-    private decimal EstimatedMonthly => loanMonths <= 0 ? 0 : Math.Round(loanAmount / loanMonths, 2);
+    private decimal EstimatedMonthly => loanMonths <= 0 || NetLoanAmount <= 0 ? 0 : Math.Round(NetLoanAmount / loanMonths, 2);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -439,7 +507,7 @@ else
         success = null;
         var result = await task;
         errors = result.Errors;
-        if (result.Success) { success = message; CloseDialog(); await ReloadAsync(); }
+        if (result.Success) { success = result.Message ?? message; CloseDialog(); await ReloadAsync(); }
     }
 
     private Task RequestLoanAsync() => RunAsync(Service.RequestLoanAsync(StokvelId, currentUserId, loanAmount, loanMonths, loanReason), "Loan request submitted.");
@@ -463,6 +531,30 @@ else
         else if (dialogKind == "withdraw-pay") await RunAsync(Service.ConfirmWithdrawalPaidAsync(actionId, currentUserId, actionMethod, actionReference, actionDate, actionNotes), "Withdrawal payment confirmed.");
     }
     private static string Money(decimal x) => x.ToString("C2", new System.Globalization.CultureInfo("en-ZA"));
+    private static string LoanStatusBadge(MemberLoanStatus s) => s switch
+    {
+        MemberLoanStatus.Active or MemberLoanStatus.FullyRepaid => "sisonke-badge-green",
+        MemberLoanStatus.PendingApproval or MemberLoanStatus.Approved or MemberLoanStatus.DisbursementPending => "sisonke-badge-gold",
+        MemberLoanStatus.Overdue or MemberLoanStatus.Rejected => "sisonke-badge-red",
+        _ => "sisonke-badge-gray"
+    };
+
+    private static string RepaymentStatusBadge(LoanRepaymentStatus s) => s switch
+    {
+        LoanRepaymentStatus.Paid or LoanRepaymentStatus.Late => "sisonke-badge-green",
+        LoanRepaymentStatus.PartiallyPaid => "sisonke-badge-gold",
+        LoanRepaymentStatus.Waived => "sisonke-badge-blue",
+        _ => "sisonke-badge-gray"
+    };
+
+    private static string WithdrawalStatusBadge(SurplusWithdrawalStatus s) => s switch
+    {
+        SurplusWithdrawalStatus.Paid => "sisonke-badge-green",
+        SurplusWithdrawalStatus.PendingApproval or SurplusWithdrawalStatus.Approved or SurplusWithdrawalStatus.PaymentPending => "sisonke-badge-gold",
+        SurplusWithdrawalStatus.Rejected => "sisonke-badge-red",
+        _ => "sisonke-badge-gray"
+    };
+
     private static StokvelLoanConfiguration NewConfig() => new()
     {
         LoansEnabled = false, MinLoanAmount = 0, MaxLoanAmount = 0,

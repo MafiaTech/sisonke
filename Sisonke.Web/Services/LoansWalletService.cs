@@ -104,27 +104,47 @@ public sealed class LoansWalletService(
         var access = await GetAccessAsync(context, stokvelId, currentUserId);
         if (access.Stokvel is null || access.Member is null) return FinanceOperationResult.Failed("Membership was not found.");
         var config = await context.StokvelLoanConfigurations.AsNoTracking().Where(x => x.StokvelId == stokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
+        var wallet = await context.MemberSurplusWallets
+            .FirstOrDefaultAsync(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.IsActive);
+        var walletEarlyPayoutAmount = Math.Min(amount, wallet?.AvailableBalance ?? 0);
+        var netLoanAmount = Math.Max(0, amount - walletEarlyPayoutAmount);
         var errors = new List<string>();
         if (!IsFeatureAllowed(access.Stokvel)) errors.Add("Loans are not available for Burial Societies.");
         if (config?.LoansEnabled != true) errors.Add("Loans are not enabled for this stokvel.");
         if (!IsEligibleMember(access.Member)) errors.Add("Suspended, expelled, deceased, or inactive members cannot request loans.");
-        if (config is not null && (amount < config.MinLoanAmount || amount > config.MaxLoanAmount)) errors.Add("Requested amount is outside the configured loan limits.");
-        if (config is not null && (repaymentMonths <= 0 || repaymentMonths > config.MaxRepaymentMonths)) errors.Add("Repayment period is outside the configured limit.");
+        if (amount <= 0) errors.Add("Requested amount must be greater than zero.");
+        if (config is not null && netLoanAmount > 0 && (netLoanAmount < config.MinLoanAmount || netLoanAmount > config.MaxLoanAmount)) errors.Add("Borrowed amount after wallet early payout is outside the configured loan limits.");
+        if (config is not null && netLoanAmount > 0 && (repaymentMonths <= 0 || repaymentMonths > config.MaxRepaymentMonths)) errors.Add("Repayment period is outside the configured limit.");
         if (string.IsNullOrWhiteSpace(reason)) errors.Add("Loan reason is required.");
-        if (await context.MemberLoans.AnyAsync(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.IsActive && BlockingLoanStatuses.Contains(x.LoanStatus))) errors.Add("You already have an active or pending loan.");
+        if (netLoanAmount > 0 && await context.MemberLoans.AnyAsync(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.IsActive && BlockingLoanStatuses.Contains(x.LoanStatus))) errors.Add("You already have an active or pending loan.");
         var nextDate = await context.MemberLoans.Where(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.LoanStatus == MemberLoanStatus.FullyRepaid)
             .OrderByDescending(x => x.FullyRepaidAt).Select(x => x.NextEligibleLoanDate).FirstOrDefaultAsync();
-        if (nextDate > DateTime.UtcNow) errors.Add($"You are in a loan freeze period until {nextDate:dd MMM yyyy}.");
+        if (netLoanAmount > 0 && nextDate > DateTime.UtcNow) errors.Add($"You are in a loan freeze period until {nextDate:dd MMM yyyy}.");
         if (errors.Count > 0) return FinanceOperationResult.Failed(errors);
         var now = DateTime.UtcNow;
+        await using var tx = await context.Database.BeginTransactionAsync();
+        if (netLoanAmount <= 0)
+        {
+            if (wallet is null || walletEarlyPayoutAmount <= 0)
+            {
+                return FinanceOperationResult.Failed("No wallet balance is available for an early payout.");
+            }
+
+            ApplyWalletEarlyPayout(context, wallet, walletEarlyPayoutAmount, null, now, currentUserId, "Wallet early payout covered the full request.");
+            await context.SaveChangesAsync();
+            await tx.CommitAsync();
+            return FinanceOperationResult.Succeeded("Wallet early payout processed. No loan balance was created.");
+        }
+
         var loan = new MemberLoan
         {
             Id = Guid.NewGuid(),
             StokvelId = stokvelId,
             MemberId = access.Member.Id,
-            RequestedAmount = amount,
+            RequestedAmount = netLoanAmount,
             RepaymentMonths = repaymentMonths,
             RequestReason = reason.Trim(),
+            Notes = BuildEarlyPayoutNote(amount, walletEarlyPayoutAmount, netLoanAmount),
             LoanStatus = config!.RequireChairpersonApproval
                 ? MemberLoanStatus.PendingApproval
                 : config.RequireTreasurerDisbursementConfirmation
@@ -145,8 +165,16 @@ public sealed class LoansWalletService(
             ActivateLoanAndCreateSchedule(context, loan, now, currentUserId, "Loan activated automatically by stokvel loan rules.");
         }
         context.MemberLoans.Add(loan);
+        if (wallet is not null && walletEarlyPayoutAmount > 0)
+        {
+            ApplyWalletEarlyPayout(context, wallet, walletEarlyPayoutAmount, loan.Id, now, currentUserId, $"Wallet early payout applied to loan request {loan.Id}.");
+        }
+
         await context.SaveChangesAsync();
-        return FinanceOperationResult.Succeeded();
+        await tx.CommitAsync();
+        return FinanceOperationResult.Succeeded(walletEarlyPayoutAmount > 0
+            ? $"Loan request submitted. Wallet early payout applied: {FormatMoney(walletEarlyPayoutAmount)}. Borrowed amount: {FormatMoney(netLoanAmount)}."
+            : "Loan request submitted.");
     }
 
     public async Task<FinanceOperationResult> ApproveLoanAsync(Guid loanId, string currentUserId, decimal approvedAmount, int months)
@@ -342,6 +370,47 @@ public sealed class LoansWalletService(
     private static decimal CalculateTotal(decimal amount, StokvelLoanConfiguration config) => config.LoanInterestType switch { LoanInterestType.FixedAmount => amount + config.LoanInterestRate, LoanInterestType.Percentage => Math.Round(amount * (1 + config.LoanInterestRate / 100), 2), _ => amount };
     private static decimal CalculateFine(decimal expected, StokvelLoanConfiguration config) => config.LateRepaymentFineType switch { LatePenaltyType.FixedAmount => config.LateRepaymentFineAmount ?? 0, LatePenaltyType.Percentage => Math.Round(expected * (config.LateRepaymentFineAmount ?? 0) / 100, 2), _ => 0 };
     private static string? Trim(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string FormatMoney(decimal value) => value.ToString("C2", new System.Globalization.CultureInfo("en-ZA"));
+    private static string? BuildEarlyPayoutNote(decimal requestedAmount, decimal earlyPayoutAmount, decimal netLoanAmount)
+    {
+        if (earlyPayoutAmount <= 0)
+        {
+            return null;
+        }
+
+        return $"Original request {FormatMoney(requestedAmount)}. Wallet early payout applied {FormatMoney(earlyPayoutAmount)}. Net loan amount {FormatMoney(netLoanAmount)}.";
+    }
+
+    private static void ApplyWalletEarlyPayout(
+        ApplicationDbContext context,
+        MemberSurplusWallet wallet,
+        decimal amount,
+        Guid? loanId,
+        DateTime now,
+        string currentUserId,
+        string description)
+    {
+        wallet.AvailableBalance -= amount;
+        wallet.TotalWithdrawals += amount;
+        wallet.UpdatedAt = now;
+        wallet.UpdatedBy = currentUserId;
+        context.MemberSurplusWalletTransactions.Add(new()
+        {
+            Id = Guid.NewGuid(),
+            StokvelId = wallet.StokvelId,
+            WalletId = wallet.Id,
+            MemberId = wallet.MemberId,
+            TransactionType = WalletTransactionType.Debit,
+            Amount = amount,
+            BalanceAfterTransaction = wallet.AvailableBalance,
+            SourceType = WalletTransactionSourceType.ManualDebit,
+            SourceReferenceId = loanId,
+            Description = description,
+            CreatedAt = now,
+            CreatedBy = currentUserId
+        });
+    }
+
     private static void ApplyLoanApproval(MemberLoan loan, decimal approvedAmount, int months, StokvelLoanConfiguration config, DateTime approvedAt, string approvedBy)
     {
         var total = CalculateTotal(approvedAmount, config);
@@ -419,6 +488,6 @@ public sealed class LoansWalletService(
 }
 
 public sealed record LoansWalletPageState(Stokvel Stokvel, Member? CurrentMember, StokvelLoanConfiguration? Configuration, List<MemberLoan> Loans, List<MemberLoanRepayment> Repayments, MemberSurplusWallet? Wallet, List<MemberSurplusWalletTransaction> Transactions, List<MemberSurplusWithdrawalRequest> Withdrawals, bool CanConfigure, bool CanViewAll, bool CanApprove, bool CanConfirmMoney, string EligibilityMessage);
-public sealed record FinanceOperationResult(bool Success, List<string> Errors) { public static FinanceOperationResult Succeeded() => new(true, []); public static FinanceOperationResult Failed(string error) => new(false, [error]); public static FinanceOperationResult Failed(List<string> errors) => new(false, errors); }
+public sealed record FinanceOperationResult(bool Success, List<string> Errors, string? Message = null) { public static FinanceOperationResult Succeeded(string? message = null) => new(true, [], message); public static FinanceOperationResult Failed(string error) => new(false, [error]); public static FinanceOperationResult Failed(List<string> errors) => new(false, errors); }
 public sealed record LoanConfigurationResult(bool Success, StokvelLoanConfiguration? Configuration, List<string> Errors) { public static LoanConfigurationResult Succeeded(StokvelLoanConfiguration x) => new(true, x, []); public static LoanConfigurationResult Failed(List<string> e) => new(false, null, e); }
 public sealed record LoansWalletTaskCounts(int PendingLoanApprovals, int LoansAwaitingDisbursement, int RepaymentsAwaitingConfirmation, int PendingWithdrawalApprovals, int WithdrawalsAwaitingPayment);

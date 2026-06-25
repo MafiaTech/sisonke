@@ -274,6 +274,39 @@ else
     </div>
 }
 
+<style>
+    .burial-readiness-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: .85rem;
+    }
+
+    .burial-readiness-card {
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        background: #fff;
+        padding: 1rem;
+        min-height: 8.5rem;
+    }
+
+    .burial-readiness-value {
+        color: var(--sk-text);
+        font-size: 1.45rem;
+        font-weight: 800;
+        line-height: 1.15;
+        margin: .3rem 0 .4rem;
+    }
+
+    .detail-mini-label {
+        color: var(--sk-text-muted);
+        font-size: .6875rem;
+        font-weight: 700;
+        letter-spacing: .05em;
+        margin-bottom: .15rem;
+        text-transform: uppercase;
+    }
+</style>
+
 @code {
     private Stokvel? stokvel;
     private bool isLoading = true;

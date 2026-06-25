@@ -3,6 +3,7 @@
 @attribute [Authorize]
 
 @using System.Security.Claims
+@using System.Text
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
@@ -65,9 +66,19 @@ else
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a class="sisonke-btn sisonke-btn-outline" href="@($"/meeting/{MeetingId}")">Back to Meeting</a>
+            @if (meetingMinutes is not null)
+            {
+                <a class="sisonke-btn sisonke-btn-outline" href="@BuildMinutesDownloadHref()" download="@BuildMinutesDownloadFileName()">
+                    Download Minutes
+                </a>
+            }
             @if (canManageMinutes && meetingMinutes is null && linkedMember is not null)
             {
-                <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="GenerateDraftMinutesAsync">
+                <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="GenerateDraftMinutesAsync" disabled="@isGeneratingMinutes">
+                    @if (isGeneratingMinutes)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    }
                     Generate Draft Minutes from Agenda
                 </button>
             }
@@ -97,7 +108,7 @@ else
                 <h2>Agenda-linked minutes</h2>
                 <p>Agenda item discussion notes are used to build the decisions section.</p>
             </div>
-            @if (canManageMinutes && meetingMinutes?.Status == StatusDraft)
+            @if (canManageMinutes && meetingMinutes?.Status is StatusDraft or StatusRejected)
             {
                 <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="RegenerateFromAgendaAsync">
                     Regenerate From Agenda
@@ -192,7 +203,7 @@ else
         </div>
     </section>
 
-    @if (canManageMinutes && meetingMinutes is not null && meetingMinutes.Status == StatusDraft)
+    @if (canManageMinutes && meetingMinutes is not null && meetingMinutes.Status is StatusDraft or StatusRejected)
     {
         <section class="sisonke-card mb-4">
             <div class="sisonke-card-head">
@@ -226,6 +237,18 @@ else
                 <div class="sisonke-alert sisonke-alert-blue mb-0">
                     No minutes exist for this meeting yet. Generate a draft to start from the agenda, attendance and apologies.
                 </div>
+                @if (canManageMinutes && linkedMember is not null)
+                {
+                    <div class="mt-3">
+                        <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="GenerateDraftMinutesAsync" disabled="@isGeneratingMinutes">
+                            @if (isGeneratingMinutes)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            }
+                            Generate Draft Minutes
+                        </button>
+                    </div>
+                }
             </div>
         </section>
     }
@@ -290,7 +313,7 @@ else
                 </div>
 
                 <div class="d-flex flex-wrap gap-2 mt-4">
-                    @if (canManageMinutes && meetingMinutes.Status == StatusDraft)
+                    @if (canManageMinutes && meetingMinutes.Status is StatusDraft or StatusRejected)
                     {
                         <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="SaveDraftMinutesAsync">
                             Save Draft
@@ -304,9 +327,16 @@ else
                     }
                     @if (meetingMinutes.Status == StatusSubmitted && canApproveMinutes)
                     {
-                        <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="ApproveMinutesAsync">
-                            Approve Minutes
-                        </button>
+                        <div class="minutes-decision-control">
+                            <label class="visually-hidden" for="minutes-decision">Minutes decision</label>
+                            <select id="minutes-decision" class="form-select" @bind="selectedMinutesDecision">
+                                <option value="@DecisionApprove">Approve Minutes</option>
+                                <option value="@DecisionReject">Reject Minutes</option>
+                            </select>
+                            <button class="sisonke-btn sisonke-btn-gold" type="button" @onclick="ApplyMinutesDecisionAsync">
+                                Apply Decision
+                            </button>
+                        </div>
                     }
                     <a class="sisonke-btn sisonke-btn-outline" href="@($"/meeting/{MeetingId}")">Back to Meeting</a>
                 </div>
@@ -342,6 +372,18 @@ else
         grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
     }
 
+    .minutes-decision-control {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+        min-width: min(100%, 22rem);
+    }
+
+    .minutes-decision-control .form-select {
+        flex: 1 1 12rem;
+        min-width: 12rem;
+    }
+
     .minutes-meta-label {
         color: var(--muted, var(--sk-text-muted));
         font-size: .72rem;
@@ -369,6 +411,9 @@ else
     private const string StatusSubmitted = "Submitted";
     private const string StatusApproved = "Approved";
     private const string StatusPublished = "Published";
+    private const string StatusRejected = "Rejected";
+    private const string DecisionApprove = "Approve";
+    private const string DecisionReject = "Reject";
 
     private Meeting? meeting;
     private MeetingMinute? meetingMinutes;
@@ -380,9 +425,11 @@ else
     private bool canManageMinutes;
     private bool canApproveMinutes;
     private bool canViewApprovedMinutes;
+    private bool isGeneratingMinutes;
     private string? successMessage;
     private string? errorMessage;
     private bool isAiImproving;
+    private string selectedMinutesDecision = DecisionApprove;
     private string openingNotes = string.Empty;
     private string attendanceSummary = string.Empty;
     private string apologySummary = string.Empty;
@@ -391,7 +438,7 @@ else
     private string actionItems = string.Empty;
     private string closingNotes = string.Empty;
 
-    private bool IsReadOnly => !canManageMinutes || meetingMinutes?.Status != StatusDraft;
+    private bool IsReadOnly => !canManageMinutes || meetingMinutes?.Status is not (StatusDraft or StatusRejected);
     private bool MinutesAreApprovedForMembers =>
         meetingMinutes?.Status == StatusApproved || meetingMinutes?.Status == StatusPublished;
 
@@ -419,6 +466,7 @@ else
         canManageMinutes = false;
         canApproveMinutes = false;
         canViewApprovedMinutes = false;
+        selectedMinutesDecision = DecisionApprove;
 
         if (meeting is null)
         {
@@ -476,7 +524,9 @@ else
             return;
         }
 
+        isGeneratingMinutes = true;
         meetingMinutes = await MeetingMinuteService.GenerateDraftMinutesAsync(MeetingId, linkedMember.Id);
+        isGeneratingMinutes = false;
 
         if (meetingMinutes is null)
         {
@@ -528,7 +578,7 @@ else
         successMessage = null;
         errorMessage = null;
 
-        if (!canManageMinutes || meetingMinutes is null || linkedMember is null || meetingMinutes.Status != StatusDraft)
+        if (!canManageMinutes || meetingMinutes is null || linkedMember is null || meetingMinutes.Status is not (StatusDraft or StatusRejected))
         {
             return;
         }
@@ -566,7 +616,7 @@ else
         successMessage = null;
         errorMessage = null;
 
-        if (!canManageMinutes || meetingMinutes is null || linkedMember is null || meetingMinutes.Status != StatusDraft)
+        if (!canManageMinutes || meetingMinutes is null || linkedMember is null || meetingMinutes.Status is not (StatusDraft or StatusRejected))
         {
             return;
         }
@@ -645,6 +695,44 @@ else
         successMessage = "Minutes approved.";
     }
 
+    private async Task RejectMinutesAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (meetingMinutes is null || linkedMember is null || !canApproveMinutes)
+        {
+            errorMessage = "Only Chairperson, Creator, or Admin can reject submitted minutes.";
+            return;
+        }
+
+        var rejected = await MeetingMinuteService.RejectMinutesAsync(meetingMinutes.Id, linkedMember.Id);
+
+        if (!rejected)
+        {
+            errorMessage = "Minutes could not be rejected.";
+            return;
+        }
+
+        meetingMinutes = await MeetingMinuteService.GetMinutesByMeetingIdAsync(MeetingId);
+        approvedByMember = meetingMinutes?.ApprovedByMemberId is null
+            ? null
+            : await MemberService.GetMemberByIdAsync(meetingMinutes.ApprovedByMemberId.Value);
+        PopulateForm();
+        successMessage = "Minutes rejected and returned to the Secretary for changes.";
+    }
+
+    private async Task ApplyMinutesDecisionAsync()
+    {
+        if (selectedMinutesDecision == DecisionReject)
+        {
+            await RejectMinutesAsync();
+            return;
+        }
+
+        await ApproveMinutesAsync();
+    }
+
     private static string DisplayOrDash(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value;
@@ -675,6 +763,7 @@ else
             "Submitted" => "sisonke-badge sisonke-badge-blue",
             "Approved" => "sisonke-badge sisonke-badge-green",
             "Published" => "sisonke-badge sisonke-badge-green",
+            "Rejected" => "sisonke-badge sisonke-badge-red",
             _ => "sisonke-badge sisonke-badge-gray"
         };
     }
@@ -687,6 +776,7 @@ else
             StatusSubmitted => "sisonke-alert sisonke-alert-blue mb-4",
             StatusApproved => "sisonke-alert sisonke-alert-green mb-4",
             StatusPublished => "sisonke-alert sisonke-alert-green mb-4",
+            StatusRejected => "sisonke-alert sisonke-alert-gold mb-4",
             _ => "sisonke-alert sisonke-alert-blue mb-4"
         };
     }
@@ -699,7 +789,50 @@ else
             StatusSubmitted => "These minutes have been submitted and are awaiting approval.",
             StatusApproved => "These minutes have been approved and are available for viewing.",
             StatusPublished => "These minutes have been approved and are available for viewing.",
+            StatusRejected => "These minutes were rejected and need Secretary changes before resubmission.",
             _ => "These minutes are being processed."
         };
+    }
+
+    private string BuildMinutesDownloadHref()
+    {
+        return $"data:text/plain;charset=utf-8,{Uri.EscapeDataString(BuildMinutesDownloadText())}";
+    }
+
+    private string BuildMinutesDownloadFileName()
+    {
+        var title = meetingMinutes?.Title ?? meeting?.Title ?? "meeting-minutes";
+        var safeTitle = new string(title.Select(ch => char.IsLetterOrDigit(ch) ? ch : '-').ToArray())
+            .Trim('-')
+            .ToLowerInvariant();
+
+        return $"{(string.IsNullOrWhiteSpace(safeTitle) ? "meeting-minutes" : safeTitle)}.txt";
+    }
+
+    private string BuildMinutesDownloadText()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(meetingMinutes?.Title ?? "Meeting Minutes");
+        sb.AppendLine($"Meeting: {meeting?.Title ?? "Not available"}");
+        sb.AppendLine($"Date: {meeting?.MeetingDate.ToString("dd MMM yyyy HH:mm") ?? "Not available"}");
+        sb.AppendLine($"Venue: {DisplayOrDash(meeting?.Venue)}");
+        sb.AppendLine($"Status: {meetingMinutes?.Status ?? "Not available"}");
+        sb.AppendLine();
+        AppendMinutesSection(sb, "Attendance Summary", attendanceSummary);
+        AppendMinutesSection(sb, "Apology Summary", apologySummary);
+        AppendMinutesSection(sb, "Opening Notes", openingNotes);
+        AppendMinutesSection(sb, "Matters Arising", mattersArising);
+        AppendMinutesSection(sb, "Decisions Taken", decisionsTaken);
+        AppendMinutesSection(sb, "Action Items", actionItems);
+        AppendMinutesSection(sb, "Closing Notes", closingNotes);
+
+        return sb.ToString().Trim();
+    }
+
+    private static void AppendMinutesSection(StringBuilder sb, string title, string value)
+    {
+        sb.AppendLine(title);
+        sb.AppendLine(string.IsNullOrWhiteSpace(value) ? "Not available" : value.Trim());
+        sb.AppendLine();
     }
 }

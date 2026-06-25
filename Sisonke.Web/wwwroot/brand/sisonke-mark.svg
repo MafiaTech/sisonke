@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Sisonke logo mark</title>
+  <desc id="desc">Circular stokvel community mark with a gold S coin in the centre.</desc>
+  <defs>
+    <linearGradient id="navy" x1="22" y1="14" x2="108" y2="108" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#082B5F"/>
+      <stop offset="1" stop-color="#041A3E"/>
+    </linearGradient>
+    <linearGradient id="green" x1="8" y1="40" x2="56" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#36B83C"/>
+      <stop offset="1" stop-color="#11853D"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="42" y1="88" x2="96" y2="126" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#09A7B0"/>
+      <stop offset="1" stop-color="#057986"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="74" y1="34" x2="124" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F2C339"/>
+      <stop offset="1" stop-color="#C99500"/>
+    </linearGradient>
+    <radialGradient id="coin" cx="45%" cy="35%" r="70%">
+      <stop stop-color="#FFE46B"/>
+      <stop offset=".55" stop-color="#D9A313"/>
+      <stop offset="1" stop-color="#A77300"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="60" fill="#fff"/>
+  <path fill="url(#navy)" d="M51 14a37 37 0 0 1 38 8l11-5 7 28-28-7 7-5A27 27 0 0 0 51 27a27 27 0 0 0-18 22l-13-2A40 40 0 0 1 51 14Z"/>
+  <path fill="url(#gold)" d="M104 35a39 39 0 0 1 6 43l8 9-29 4 10-27 4 6a27 27 0 0 0-7-27Z"/>
+  <path fill="url(#teal)" d="M81 104a39 39 0 0 1-45-6l-10 6-5-29 27 9-6 5a27 27 0 0 0 35 4Z"/>
+  <path fill="url(#green)" d="M24 86a39 39 0 0 1 7-44l-8-8 29-5-11 27-4-5a27 27 0 0 0-2 29Z"/>
+  <circle cx="64" cy="64" r="29" fill="#fff"/>
+  <circle cx="64" cy="64" r="24" fill="url(#coin)" stroke="#B98200" stroke-width="2"/>
+  <circle cx="64" cy="64" r="18" fill="none" stroke="#F7D24A" stroke-opacity=".75" stroke-width="2"/>
+  <text x="64" y="76" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="35" font-weight="900" fill="#8D6200">S</text>
+  <circle cx="64" cy="13" r="9" fill="url(#navy)" stroke="#fff" stroke-width="4"/>
+  <circle cx="115" cy="64" r="9" fill="url(#gold)" stroke="#fff" stroke-width="4"/>
+  <circle cx="64" cy="115" r="9" fill="url(#teal)" stroke="#fff" stroke-width="4"/>
+  <circle cx="13" cy="64" r="9" fill="url(#green)" stroke="#fff" stroke-width="4"/>
+</svg>

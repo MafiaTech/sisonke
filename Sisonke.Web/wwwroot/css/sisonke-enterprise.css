@@ -141,6 +141,13 @@ a:hover {
     border-radius: 13px;
     background: rgba(255, 255, 255, .12);
     color: #c9f8dd;
+    overflow: hidden;
+}
+
+.sisonke-app-shell .sisonke-sidebar-mark img {
+    display: block;
+    width: 34px;
+    height: 34px;
 }
 
 .sisonke-app-shell .sisonke-sidebar-name {
@@ -978,8 +985,16 @@ input[type="password"] {
         height: 30px;
         place-items: center;
         border-radius: 10px;
-        background: var(--se-dark);
+        background: #fff;
         color: #fff;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 43, 26, .12);
+    }
+
+    .sisonke-mobile-brand-mark img {
+        display: block;
+        width: 25px;
+        height: 25px;
     }
 
     .sisonke-app-shell .sisonke-sidebar {

@@ -131,16 +131,17 @@ body:has(.auth-split) {
 .auth-logo-mark {
     width: 46px;
     height: 46px;
-    background: var(--auth-gold);
+    background: #fff url('/brand/sisonke-mark.svg') center / 39px 39px no-repeat;
     border-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: 'Playfair Display', serif;
-    font-size: 22px;
+    font-size: 0;
     font-weight: 700;
-    color: var(--auth-forest);
+    color: transparent;
     flex-shrink: 0;
+    overflow: hidden;
 }
 .auth-logo-name {
     font-family: 'Playfair Display', serif;
@@ -259,15 +260,16 @@ body:has(.auth-split) {
 .auth-mobile-logo-mark {
     width: 38px;
     height: 38px;
-    background: var(--auth-forest);
+    background: #fff url('/brand/sisonke-mark.svg') center / 32px 32px no-repeat;
     border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: 'Playfair Display', serif;
-    font-size: 19px;
+    font-size: 0;
     font-weight: 700;
-    color: var(--auth-gold);
+    color: transparent;
+    overflow: hidden;
 }
 .auth-mobile-logo-name {
     font-family: 'Playfair Display', serif;

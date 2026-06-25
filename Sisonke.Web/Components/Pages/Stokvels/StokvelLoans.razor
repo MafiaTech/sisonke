@@ -78,6 +78,12 @@ else
             </div>
             <div class="col-md-4">
                 <div class="sisonke-card h-100"><div class="sisonke-card-body">
+                    <div class="detail-mini-label">Available Wallet</div>
+                    <div class="fw-semibold">@Money(WalletBalance)</div>
+                </div></div>
+            </div>
+            <div class="col-md-4">
+                <div class="sisonke-card h-100"><div class="sisonke-card-body">
                     <div class="detail-mini-label">My Active Loan</div>
                     <div class="fw-semibold">@(MyActiveLoan is null ? "None" : $"{Money(MyActiveLoan.OutstandingBalance)} outstanding")</div>
                 </div></div>
@@ -194,14 +200,15 @@ else
             <section class="sisonke-card mb-3">
                 <div class="sisonke-card-body">
                     <h2>Request a Loan</h2>
+                    <p class="text-muted mb-3">Your wallet balance is applied first as an early payout. Only the remaining amount becomes a loan.</p>
                     <div class="row g-3">
                         <div class="col-md-3">
-                            <label class="form-label">Amount (R)</label>
+                            <label class="form-label">Amount needed</label>
                             <InputNumber class="form-control" @bind-Value="loanAmount" />
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Repayment Months</label>
-                            <InputNumber class="form-control" @bind-Value="loanMonths" />
+                            <InputNumber class="form-control" @bind-Value="loanMonths" disabled="@(NetLoanAmount <= 0)" />
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Reason</label>
@@ -210,7 +217,20 @@ else
                     </div>
                     @if (loanMonths > 0 && loanAmount > 0)
                     {
-                        <div class="text-muted small mt-2">Estimated monthly repayment: @Money(EstimatedMonthly)</div>
+                        <div class="loan-estimate-grid mt-3">
+                            <div>
+                                <div class="detail-mini-label">Wallet early payout</div>
+                                <div class="detail-mini-value">@Money(WalletEarlyPayoutAmount)</div>
+                            </div>
+                            <div>
+                                <div class="detail-mini-label">Loan amount after wallet</div>
+                                <div class="detail-mini-value">@Money(NetLoanAmount)</div>
+                            </div>
+                            <div>
+                                <div class="detail-mini-label">Estimated monthly repayment</div>
+                                <div class="detail-mini-value">@Money(EstimatedMonthly)</div>
+                            </div>
+                        </div>
                     }
                     <button class="sisonke-btn sisonke-btn-primary mt-3" @onclick="RequestLoanAsync">
                         <i class="bi bi-send me-1"></i>Submit Loan Request
@@ -247,7 +267,13 @@ else
                                 {
                                     <tr>
                                         <td class="fw-semibold">@loan.Member.FullName</td>
-                                        <td>@Money(loan.RequestedAmount)</td>
+                                        <td>
+                                            <div>@Money(loan.RequestedAmount)</div>
+                                            @if (!string.IsNullOrWhiteSpace(loan.Notes))
+                                            {
+                                                <div class="text-muted small">@loan.Notes</div>
+                                            }
+                                        </td>
                                         <td>@Money(loan.ApprovedAmount ?? 0)</td>
                                         <td>@loan.RepaymentMonths</td>
                                         <td><span class="sisonke-badge @LoanStatusBadge(loan.LoanStatus)">@loan.LoanStatus</span></td>
@@ -406,6 +432,18 @@ else
     </div>
 }
 
+<style>
+    .loan-estimate-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-sm);
+        background: #fff;
+        padding: 1rem;
+    }
+</style>
+
 @code {
     [Parameter] public Guid StokvelId { get; set; }
     private LoansWalletPageState? state;
@@ -428,12 +466,15 @@ else
     private string actionNotes = "";
     private bool actionApplyFine;
     private bool actionWaive;
+    private decimal WalletBalance => state?.Wallet?.AvailableBalance ?? 0;
+    private decimal WalletEarlyPayoutAmount => loanAmount <= 0 ? 0 : Math.Min(loanAmount, WalletBalance);
+    private decimal NetLoanAmount => loanAmount <= 0 ? 0 : Math.Max(0, loanAmount - WalletEarlyPayoutAmount);
 
     private MemberLoan? MyActiveLoan => state?.Loans.FirstOrDefault(x =>
         x.MemberId == state.CurrentMember?.Id &&
         x.LoanStatus is MemberLoanStatus.Active or MemberLoanStatus.Overdue);
 
-    private decimal EstimatedMonthly => loanMonths <= 0 ? 0 : Math.Round(loanAmount / loanMonths, 2);
+    private decimal EstimatedMonthly => loanMonths <= 0 || NetLoanAmount <= 0 ? 0 : Math.Round(NetLoanAmount / loanMonths, 2);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -453,7 +494,7 @@ else
         success = null;
         var result = await task;
         errors = result.Errors;
-        if (result.Success) { success = message; CloseDialog(); state = await Service.GetPageStateAsync(StokvelId, currentUserId); }
+        if (result.Success) { success = result.Message ?? message; CloseDialog(); state = await Service.GetPageStateAsync(StokvelId, currentUserId); }
     }
 
     private Task RequestLoanAsync() => RunAsync(Service.RequestLoanAsync(StokvelId, currentUserId, loanAmount, loanMonths, loanReason), "Loan request submitted.");

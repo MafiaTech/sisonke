@@ -58,7 +58,7 @@
 .sm-topbar-logo-mark {
     width: 36px;
     height: 36px;
-    background: var(--sm-gold);
+    background: #fff;
     border-radius: 9px;
     display: flex;
     align-items: center;
@@ -68,6 +68,12 @@
     font-weight: 700;
     color: var(--sm-forest);
     flex-shrink: 0;
+    overflow: hidden;
+}
+.sm-topbar-logo-mark img {
+    display: block;
+    width: 31px;
+    height: 31px;
 }
 .sm-topbar-name {
     font-family: 'Playfair Display', serif;
