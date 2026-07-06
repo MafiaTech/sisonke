@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Sisonke simplified mark: four-colour unity ring around the gold S coin -->
+  <g fill="none" stroke-width="9" stroke-linecap="round">
+    <path d="M 15.9 15.9 A 22.7 22.7 0 0 1 48.1 15.9" stroke="#062F66"/>
+    <path d="M 48.1 15.9 A 22.7 22.7 0 0 1 48.1 48.1" stroke="#CA950A"/>
+    <path d="M 48.1 48.1 A 22.7 22.7 0 0 1 15.9 48.1" stroke="#027D8A"/>
+    <path d="M 15.9 48.1 A 22.7 22.7 0 0 1 15.9 15.9" stroke="#399D39"/>
+  </g>
+  <circle cx="32" cy="32" r="14.5" fill="#EFBF3A" stroke="#C08A1E" stroke-width="2"/>
+  <text x="32" y="40" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="800" fill="#062F66">S</text>
+</svg>
