@@ -6,5 +6,6 @@ public enum RotationalPayoutStatus
     Approved = 2,
     Rejected = 3,
     Paid = 4,
-    Cancelled = 5
+    Cancelled = 5,
+    ReturnedToSecretary = 6
 }

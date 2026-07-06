@@ -395,6 +395,7 @@ public class RotationalContributionPaymentService(
         }
 
         wallet.AvailableBalance += surplusDelta;
+        wallet.SurplusEquityBalance = Math.Max(0, wallet.SurplusEquityBalance + surplusDelta);
         wallet.TotalCredits = Math.Max(0, wallet.TotalCredits + surplusDelta);
         wallet.UpdatedAt = now;
         wallet.UpdatedBy = currentUserId;

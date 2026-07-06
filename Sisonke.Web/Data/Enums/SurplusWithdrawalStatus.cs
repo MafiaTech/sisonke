@@ -8,5 +8,8 @@ public enum SurplusWithdrawalStatus
     PaymentPending = 4,
     Paid = 5,
     Rejected = 6,
-    Cancelled = 7
+    Cancelled = 7,
+    PendingSecretaryReview = 8,
+    AwaitingChairpersonApproval = 9,
+    AwaitingTreasurerPayout = 10
 }

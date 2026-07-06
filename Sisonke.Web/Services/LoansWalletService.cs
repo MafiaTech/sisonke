@@ -14,7 +14,16 @@ public sealed class LoansWalletService(
          MemberLoanStatus.DisbursementPending, MemberLoanStatus.Active, MemberLoanStatus.Overdue];
     private static readonly SurplusWithdrawalStatus[] PendingWithdrawalStatuses =
         [SurplusWithdrawalStatus.Submitted, SurplusWithdrawalStatus.PendingApproval,
-         SurplusWithdrawalStatus.Approved, SurplusWithdrawalStatus.PaymentPending];
+         SurplusWithdrawalStatus.Approved, SurplusWithdrawalStatus.PaymentPending,
+         SurplusWithdrawalStatus.PendingSecretaryReview, SurplusWithdrawalStatus.AwaitingChairpersonApproval,
+         SurplusWithdrawalStatus.AwaitingTreasurerPayout];
+    private static readonly SurplusWithdrawalStatus[] SecretaryReviewWithdrawalStatuses =
+        [SurplusWithdrawalStatus.Submitted, SurplusWithdrawalStatus.PendingApproval, SurplusWithdrawalStatus.PendingSecretaryReview];
+    private static readonly SurplusWithdrawalStatus[] TreasurerPayoutWithdrawalStatuses =
+        [SurplusWithdrawalStatus.Approved, SurplusWithdrawalStatus.PaymentPending, SurplusWithdrawalStatus.AwaitingTreasurerPayout];
+    private static readonly RotationalCycleStatus[] FuturePayoutCycleStatuses =
+        [RotationalCycleStatus.Pending, RotationalCycleStatus.Open, RotationalCycleStatus.ContributionsDue,
+         RotationalCycleStatus.ReadyForPayout, RotationalCycleStatus.PayoutPending];
 
     public async Task<LoansWalletPageState?> GetPageStateAsync(Guid stokvelId, string currentUserId)
     {
@@ -28,18 +37,22 @@ public sealed class LoansWalletService(
         var member = await context.Members.AsNoTracking()
             .Where(x => x.TenantId == stokvel.TenantId && x.ApplicationUserId == currentUserId)
             .OrderBy(x => x.CreatedAt).FirstOrDefaultAsync();
-        if (member is null) return new(stokvel, null, null, [], [], null, [], [], false, false, false, false, "No linked membership was found.");
+        if (member is null) return new(stokvel, null, null, [], [], null, [], [], [], [], null, false, false, false, false, false, false, "No linked membership was found.");
 
         var allowed = IsFeatureAllowed(stokvel);
         var role = member.DefaultRole;
         var canConfigure = IsConfigurationRole(role);
         var canViewAll = IsOfficeBearer(role);
-        var canApprove = role == SisonkeRole.Chairperson;
+        var canApprove = role == SisonkeRole.Treasurer;
         var canConfirm = role == SisonkeRole.Treasurer;
+        var canReviewWithdrawals = role == SisonkeRole.Secretary;
+        var canApproveWithdrawals = role == SisonkeRole.Chairperson;
         var config = await context.StokvelLoanConfigurations.AsNoTracking()
             .Where(x => x.StokvelId == stokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
 
-        var loansQuery = context.MemberLoans.AsNoTracking().Include(x => x.Member)
+        var loansQuery = context.MemberLoans.AsNoTracking()
+            .Include(x => x.Member)
+            .Include(x => x.Guarantors).ThenInclude(x => x.GuarantorMember)
             .Where(x => x.StokvelId == stokvelId && x.IsActive);
         if (!canViewAll) loansQuery = loansQuery.Where(x => x.MemberId == member.Id);
         var loans = await loansQuery.OrderByDescending(x => x.RequestedAt).ToListAsync();
@@ -52,11 +65,33 @@ public sealed class LoansWalletService(
             .Where(x => x.WalletId == wallet.Id).OrderByDescending(x => x.CreatedAt).Take(20).ToListAsync();
         var withdrawalsQuery = context.MemberSurplusWithdrawalRequests.AsNoTracking().Include(x => x.Member)
             .Where(x => x.StokvelId == stokvelId && x.IsActive);
-        if (!canViewAll) withdrawalsQuery = withdrawalsQuery.Where(x => x.MemberId == member.Id);
+        withdrawalsQuery = role switch
+        {
+            SisonkeRole.Creator or SisonkeRole.StokvelAdmin => withdrawalsQuery,
+            SisonkeRole.Secretary => withdrawalsQuery.Where(x => x.MemberId == member.Id || SecretaryReviewWithdrawalStatuses.Contains(x.WithdrawalStatus)),
+            SisonkeRole.Chairperson => withdrawalsQuery.Where(x => x.MemberId == member.Id || x.WithdrawalStatus == SurplusWithdrawalStatus.AwaitingChairpersonApproval),
+            SisonkeRole.Treasurer => withdrawalsQuery.Where(x => x.MemberId == member.Id || TreasurerPayoutWithdrawalStatuses.Contains(x.WithdrawalStatus)),
+            _ => withdrawalsQuery.Where(x => x.MemberId == member.Id)
+        };
         var withdrawals = await withdrawalsQuery.OrderByDescending(x => x.RequestedAt).ToListAsync();
+        var guarantorRequests = await context.MemberLoanGuarantors.AsNoTracking()
+            .Include(x => x.Loan).ThenInclude(x => x.Member)
+            .Where(x => x.GuarantorMemberId == member.Id && x.Loan.StokvelId == stokvelId)
+            .OrderByDescending(x => x.RequestedAt)
+            .ToListAsync();
+        var eligibleGuarantors = await context.Members.AsNoTracking()
+            .Where(x => x.TenantId == stokvel.TenantId && x.Id != member.Id &&
+                x.Status == MemberStatus.Active &&
+                x.GovernanceStatus == MemberGovernanceStatus.Active &&
+                !x.IsDeceased &&
+                x.SuspendedAt == null &&
+                x.ExpelledAt == null)
+            .OrderBy(x => x.FullName)
+            .ToListAsync();
+        var futurePayoutCycle = await FindFuturePayoutCycleAsync(context, stokvelId, member.Id);
         var eligibility = await GetEligibilityMessageAsync(context, stokvel, member, config);
-        return new(stokvel, member, config, loans, repayments, wallet, transactions, withdrawals,
-            canConfigure, canViewAll, canApprove, canConfirm, allowed ? eligibility : "Loans and surplus wallets are not available for Burial Societies.");
+        return new(stokvel, member, config, loans, repayments, wallet, transactions, withdrawals, guarantorRequests, eligibleGuarantors, futurePayoutCycle,
+            canConfigure, canViewAll, canApprove, canConfirm, canReviewWithdrawals, canApproveWithdrawals, allowed ? eligibility : "Loans and surplus wallets are not available for Burial Societies.");
     }
 
     public async Task<LoanConfigurationResult> SaveConfigurationAsync(
@@ -88,6 +123,11 @@ public sealed class LoansWalletService(
             FreezePeriodAfterFullRepaymentDays = model.FreezePeriodAfterFullRepaymentDays <= 0 ? 30 : model.FreezePeriodAfterFullRepaymentDays,
             RequireChairpersonApproval = model.RequireChairpersonApproval,
             RequireTreasurerDisbursementConfirmation = model.RequireTreasurerDisbursementConfirmation,
+            SurplusBackedLoansEnabled = model.SurplusBackedLoansEnabled,
+            SurplusEquityLoanMultiplier = model.SurplusEquityLoanMultiplier <= 0 ? 1 : model.SurplusEquityLoanMultiplier,
+            EarlyPayoutLoansEnabled = model.EarlyPayoutLoansEnabled,
+            EarlyPayoutDiscountRatePercent = model.EarlyPayoutDiscountRatePercent,
+            RequiredGuarantorCount = model.RequiredGuarantorCount <= 0 ? 2 : model.RequiredGuarantorCount,
             IsActive = true,
             CreatedAt = now,
             CreatedBy = currentUserId
@@ -114,7 +154,7 @@ public sealed class LoansWalletService(
         if (!IsEligibleMember(access.Member)) errors.Add("Suspended, expelled, deceased, or inactive members cannot request loans.");
         if (amount <= 0) errors.Add("Requested amount must be greater than zero.");
         if (config is not null && netLoanAmount > 0 && (netLoanAmount < config.MinLoanAmount || netLoanAmount > config.MaxLoanAmount)) errors.Add("Borrowed amount after wallet early payout is outside the configured loan limits.");
-        if (config is not null && netLoanAmount > 0 && (repaymentMonths <= 0 || repaymentMonths > config.MaxRepaymentMonths)) errors.Add("Repayment period is outside the configured limit.");
+        if (config is not null && (repaymentMonths < 1 || repaymentMonths > config.MaxRepaymentMonths)) errors.Add("Repayment period is outside the configured limit.");
         if (string.IsNullOrWhiteSpace(reason)) errors.Add("Loan reason is required.");
         if (netLoanAmount > 0 && await context.MemberLoans.AnyAsync(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.IsActive && BlockingLoanStatuses.Contains(x.LoanStatus))) errors.Add("You already have an active or pending loan.");
         var nextDate = await context.MemberLoans.Where(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.LoanStatus == MemberLoanStatus.FullyRepaid)
@@ -158,10 +198,12 @@ public sealed class LoansWalletService(
         };
         if (!config.RequireChairpersonApproval)
         {
-            ApplyLoanApproval(loan, amount, repaymentMonths, config, now, currentUserId);
+            ApplyLoanApproval(loan, netLoanAmount, repaymentMonths, config, now, currentUserId);
         }
         if (loan.LoanStatus == MemberLoanStatus.Active)
         {
+            var collateralError = await LockCollateralIfNeededAsync(context, loan, now, currentUserId);
+            if (collateralError is not null) return FinanceOperationResult.Failed(collateralError);
             ActivateLoanAndCreateSchedule(context, loan, now, currentUserId, "Loan activated automatically by stokvel loan rules.");
         }
         context.MemberLoans.Add(loan);
@@ -180,11 +222,12 @@ public sealed class LoansWalletService(
     public async Task<FinanceOperationResult> ApproveLoanAsync(Guid loanId, string currentUserId, decimal approvedAmount, int months)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
-        var loan = await context.MemberLoans.FirstOrDefaultAsync(x => x.Id == loanId && x.IsActive);
+        var loan = await context.MemberLoans.Include(x => x.Guarantors).FirstOrDefaultAsync(x => x.Id == loanId && x.IsActive);
         if (loan is null) return FinanceOperationResult.Failed("Loan not found.");
-        if (await GetRoleAsync(context, loan.StokvelId, currentUserId) != SisonkeRole.Chairperson) return FinanceOperationResult.Failed("Only the Chairperson can approve loans.");
+        if (await GetRoleAsync(context, loan.StokvelId, currentUserId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can approve loans.");
         var config = await context.StokvelLoanConfigurations.AsNoTracking().Where(x => x.StokvelId == loan.StokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstAsync();
         if (loan.LoanStatus != MemberLoanStatus.PendingApproval) return FinanceOperationResult.Failed("Loan is not awaiting approval.");
+        if (!HasRequiredAcceptedGuarantors(loan, config)) return FinanceOperationResult.Failed("Required guarantors must accept before this loan can be approved.");
         if (approvedAmount < config.MinLoanAmount || approvedAmount > config.MaxLoanAmount) return FinanceOperationResult.Failed("Approved amount is outside configured limits.");
         if (months <= 0 || months > config.MaxRepaymentMonths) return FinanceOperationResult.Failed("Repayment period is outside configured limits.");
         var now = DateTime.UtcNow;
@@ -192,10 +235,161 @@ public sealed class LoansWalletService(
         loan.LoanStatus = config.RequireTreasurerDisbursementConfirmation ? MemberLoanStatus.DisbursementPending : MemberLoanStatus.Active;
         if (loan.LoanStatus == MemberLoanStatus.Active)
         {
+            if (!HasRequiredAcceptedGuarantors(loan, config)) return FinanceOperationResult.Failed("Required guarantors must accept before this loan can be activated.");
+            var collateralError = await LockCollateralIfNeededAsync(context, loan, now, currentUserId);
+            if (collateralError is not null) return FinanceOperationResult.Failed(collateralError);
             ActivateLoanAndCreateSchedule(context, loan, now, currentUserId, "Loan activated automatically after Chairperson approval.");
         }
         await context.SaveChangesAsync(); return FinanceOperationResult.Succeeded();
     }
+
+    public async Task<FinanceOperationResult> RequestSurplusBackedLoanAsync(
+        Guid stokvelId, string currentUserId, decimal amount, int repaymentMonths, string reason)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+        await using var tx = await context.Database.BeginTransactionAsync();
+        var access = await GetAccessAsync(context, stokvelId, currentUserId);
+        if (access.Stokvel is null || access.Member is null) return FinanceOperationResult.Failed("Membership was not found.");
+        if (!IsFeatureAllowed(access.Stokvel)) return FinanceOperationResult.Failed("Loans are not available for Burial Societies.");
+        var config = await context.StokvelLoanConfigurations.Where(x => x.StokvelId == stokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
+        if (config?.LoansEnabled != true || !config.SurplusBackedLoansEnabled) return FinanceOperationResult.Failed("Surplus-backed loans are not enabled for this stokvel.");
+        if (!IsEligibleMember(access.Member)) return FinanceOperationResult.Failed("Your membership is not eligible for a loan.");
+        if (string.IsNullOrWhiteSpace(reason)) return FinanceOperationResult.Failed("Loan reason is required.");
+        if (amount <= 0) return FinanceOperationResult.Failed("Requested amount must be greater than zero.");
+        if (repaymentMonths <= 0 || repaymentMonths > config.MaxRepaymentMonths) return FinanceOperationResult.Failed("Repayment period is outside the configured limit.");
+        if (await HasBlockingLoanAsync(context, stokvelId, access.Member.Id)) return FinanceOperationResult.Failed("You already have an active or pending loan.");
+        var nextDate = await GetNextEligibleLoanDateAsync(context, stokvelId, access.Member.Id);
+        if (nextDate > DateTime.UtcNow) return FinanceOperationResult.Failed($"You are in a loan freeze period until {nextDate:dd MMM yyyy}.");
+        var wallet = await context.MemberSurplusWallets.FirstOrDefaultAsync(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.IsActive);
+        if (wallet is null) return FinanceOperationResult.Failed("No surplus wallet was found for this member.");
+        var multiplier = config.SurplusEquityLoanMultiplier <= 0 ? 1 : config.SurplusEquityLoanMultiplier;
+        var availableEquity = GetAvailableSurplusEquity(wallet);
+        var maxLoan = Math.Round(availableEquity * multiplier, 2);
+        if (amount > maxLoan) return FinanceOperationResult.Failed($"Requested amount exceeds the surplus-backed limit of {FormatMoney(maxLoan)}.");
+        var collateralRequired = Math.Round(amount / multiplier, 2);
+        var now = DateTime.UtcNow;
+        var loan = new MemberLoan
+        {
+            Id = Guid.NewGuid(),
+            StokvelId = stokvelId,
+            MemberId = access.Member.Id,
+            LoanType = MemberLoanType.SurplusBackedEquity,
+            RequestedAmount = amount,
+            RepaymentMonths = repaymentMonths,
+            RequestReason = reason.Trim(),
+            CollateralWalletId = wallet.Id,
+            CollateralLockedAmount = collateralRequired,
+            LoanStatus = config.RequireChairpersonApproval
+                ? MemberLoanStatus.PendingApproval
+                : config.RequireTreasurerDisbursementConfirmation
+                    ? MemberLoanStatus.DisbursementPending
+                    : MemberLoanStatus.Active,
+            RequestedAt = now,
+            RequestedBy = currentUserId,
+            IsActive = true,
+            CreatedAt = now,
+            CreatedBy = currentUserId
+        };
+        if (!config.RequireChairpersonApproval)
+        {
+            ApplyLoanApproval(loan, amount, repaymentMonths, config, now, currentUserId);
+        }
+        context.MemberLoans.Add(loan);
+        if (loan.LoanStatus == MemberLoanStatus.Active)
+        {
+            var collateralError = await LockCollateralIfNeededAsync(context, loan, now, currentUserId);
+            if (collateralError is not null) return FinanceOperationResult.Failed(collateralError);
+            ActivateLoanAndCreateSchedule(context, loan, now, currentUserId, "Surplus-backed equity loan activated automatically by stokvel loan rules.");
+        }
+        await context.SaveChangesAsync();
+        await tx.CommitAsync();
+        return FinanceOperationResult.Succeeded($"Surplus-backed loan request submitted. Collateral required: {FormatMoney(collateralRequired)}.");
+    }
+
+    public async Task<FinanceOperationResult> RequestAcceleratedPayoutLoanAsync(
+        Guid stokvelId, string currentUserId, IReadOnlyCollection<Guid> guarantorMemberIds, string reason)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+        await using var tx = await context.Database.BeginTransactionAsync();
+        var access = await GetAccessAsync(context, stokvelId, currentUserId);
+        if (access.Stokvel is null || access.Member is null) return FinanceOperationResult.Failed("Membership was not found.");
+        if (!IsFeatureAllowed(access.Stokvel)) return FinanceOperationResult.Failed("Loans are not available for Burial Societies.");
+        var config = await context.StokvelLoanConfigurations.Where(x => x.StokvelId == stokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
+        if (config?.LoansEnabled != true || !config.EarlyPayoutLoansEnabled) return FinanceOperationResult.Failed("Accelerated payout loans are not enabled for this stokvel.");
+        if (!IsEligibleMember(access.Member)) return FinanceOperationResult.Failed("Your membership is not eligible for a loan.");
+        if (string.IsNullOrWhiteSpace(reason)) return FinanceOperationResult.Failed("Loan reason is required.");
+        if (await HasBlockingLoanAsync(context, stokvelId, access.Member.Id)) return FinanceOperationResult.Failed("You already have an active or pending loan.");
+        var guarantorErrors = await ValidateGuarantorsAsync(context, access.Stokvel, access.Member, guarantorMemberIds, config.RequiredGuarantorCount);
+        if (guarantorErrors.Count > 0) return FinanceOperationResult.Failed(guarantorErrors);
+        var cycle = await FindFuturePayoutCycleAsync(context, stokvelId, access.Member.Id);
+        if (cycle is null) return FinanceOperationResult.Failed("No future unpaid rotational payout slot was found for this member.");
+        var gross = cycle.ExpectedPayoutAmount;
+        var rate = Math.Max(0, config.EarlyPayoutDiscountRatePercent);
+        var discount = Math.Round(gross * rate / 100, 2);
+        var net = Math.Max(0, gross - discount);
+        if (net <= 0) return FinanceOperationResult.Failed("The configured discount leaves no payable amount.");
+        var now = DateTime.UtcNow;
+        var loan = new MemberLoan
+        {
+            Id = Guid.NewGuid(),
+            StokvelId = stokvelId,
+            MemberId = access.Member.Id,
+            LoanType = MemberLoanType.AcceleratedRotationalPayout,
+            RequestedAmount = net,
+            RepaymentMonths = 1,
+            RequestReason = reason.Trim(),
+            OriginalPayoutOrderId = cycle.PayoutOrderId,
+            OriginalContributionCycleId = cycle.Id,
+            EarlyPayoutGrossAmount = gross,
+            EarlyPayoutDiscountRatePercent = rate,
+            EarlyPayoutDiscountAmount = discount,
+            EarlyPayoutNetDisbursedAmount = net,
+            LoanStatus = config.RequireChairpersonApproval ? MemberLoanStatus.PendingApproval : MemberLoanStatus.DisbursementPending,
+            RequestedAt = now,
+            RequestedBy = currentUserId,
+            Notes = $"Accelerated payout against {cycle.CycleName}. Gross {FormatMoney(gross)}, discount retained {FormatMoney(discount)}, net {FormatMoney(net)}.",
+            IsActive = true,
+            CreatedAt = now,
+            CreatedBy = currentUserId
+        };
+        ApplyLoanApproval(loan, net, 1, config, now, currentUserId);
+        context.MemberLoans.Add(loan);
+        foreach (var guarantorId in guarantorMemberIds.Distinct())
+        {
+            context.MemberLoanGuarantors.Add(new MemberLoanGuarantor
+            {
+                Id = Guid.NewGuid(),
+                LoanId = loan.Id,
+                GuarantorMemberId = guarantorId,
+                Status = MemberLoanGuarantorStatus.Pending,
+                RequestedAt = now,
+                RequestedByUserId = currentUserId
+            });
+        }
+        if (discount > 0)
+        {
+            context.StokvelReserveTransactions.Add(new StokvelReserveTransaction
+            {
+                Id = Guid.NewGuid(),
+                StokvelId = stokvelId,
+                MemberLoanId = loan.Id,
+                Amount = discount,
+                TransactionType = StokvelReserveTransactionType.EarlyPayoutDiscountRetained,
+                Description = $"Early payout discount retained for {access.Member.FullName}.",
+                CreatedAt = now,
+                CreatedByUserId = currentUserId
+            });
+        }
+        await context.SaveChangesAsync();
+        await tx.CommitAsync();
+        return FinanceOperationResult.Succeeded($"Accelerated payout request submitted. Net payout: {FormatMoney(net)}. Reserve retained: {FormatMoney(discount)}.");
+    }
+
+    public Task<FinanceOperationResult> AcceptGuarantorRequestAsync(Guid guarantorId, string currentUserId, string? notes = null) =>
+        RespondToGuarantorRequestAsync(guarantorId, currentUserId, true, notes, null);
+
+    public Task<FinanceOperationResult> RejectGuarantorRequestAsync(Guid guarantorId, string currentUserId, string reason) =>
+        RespondToGuarantorRequestAsync(guarantorId, currentUserId, false, null, reason);
 
     public async Task<FinanceOperationResult> RejectLoanAsync(Guid loanId, string currentUserId, string reason)
     {
@@ -203,7 +397,7 @@ public sealed class LoansWalletService(
         await using var context = await dbFactory.CreateDbContextAsync();
         var loan = await context.MemberLoans.FirstOrDefaultAsync(x => x.Id == loanId && x.IsActive);
         if (loan is null) return FinanceOperationResult.Failed("Loan not found.");
-        if (await GetRoleAsync(context, loan.StokvelId, currentUserId) != SisonkeRole.Chairperson) return FinanceOperationResult.Failed("Only the Chairperson can reject loans.");
+        if (await GetRoleAsync(context, loan.StokvelId, currentUserId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can reject loans.");
         if (loan.LoanStatus != MemberLoanStatus.PendingApproval) return FinanceOperationResult.Failed("Loan is not awaiting approval.");
         loan.LoanStatus = MemberLoanStatus.Rejected; loan.RejectionReason = reason.Trim(); loan.RejectedAt = DateTime.UtcNow;
         loan.RejectedByChairpersonId = currentUserId; loan.UpdatedAt = DateTime.UtcNow; loan.UpdatedBy = currentUserId;
@@ -218,9 +412,14 @@ public sealed class LoansWalletService(
         if (loan is null) return FinanceOperationResult.Failed("Loan not found.");
         if (await GetRoleAsync(context, loan.StokvelId, currentUserId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can confirm loan disbursement.");
         if (loan.LoanStatus is not (MemberLoanStatus.DisbursementPending or MemberLoanStatus.Approved)) return FinanceOperationResult.Failed("Loan is not awaiting disbursement.");
+        var config = await context.StokvelLoanConfigurations.AsNoTracking().Where(x => x.StokvelId == loan.StokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstAsync();
+        await context.Entry(loan).Collection(x => x.Guarantors).LoadAsync();
+        if (!HasRequiredAcceptedGuarantors(loan, config)) return FinanceOperationResult.Failed("Required guarantors must accept before this loan can be disbursed.");
         var now = DateTime.UtcNow;
         loan.LoanStatus = MemberLoanStatus.Active; loan.DisbursementMethod = method; loan.DisbursementReference = reference.Trim();
         loan.DisbursedAt = date; loan.DisbursedByTreasurerId = currentUserId; loan.Notes = Trim(notes);
+        var collateralError = await LockCollateralIfNeededAsync(context, loan, now, currentUserId);
+        if (collateralError is not null) return FinanceOperationResult.Failed(collateralError);
         ActivateLoanAndCreateSchedule(context, loan, date.Value, currentUserId, null);
         await context.SaveChangesAsync(); await tx.CommitAsync(); return FinanceOperationResult.Succeeded();
     }
@@ -248,6 +447,7 @@ public sealed class LoansWalletService(
         {
             var repaid = DateTime.UtcNow; repayment.Loan.LoanStatus = MemberLoanStatus.FullyRepaid; repayment.Loan.FullyRepaidAt = repaid;
             repayment.Loan.NextEligibleLoanDate = repaid.AddDays(config.FreezePeriodAfterFullRepaymentDays);
+            await UnlockCollateralIfNeededAsync(context, repayment.Loan, repaid, currentUserId);
         }
         repayment.Loan.UpdatedAt = DateTime.UtcNow; repayment.Loan.UpdatedBy = currentUserId;
         await context.SaveChangesAsync(); await tx.CommitAsync(); return FinanceOperationResult.Succeeded();
@@ -266,6 +466,7 @@ public sealed class LoansWalletService(
         if (wallet is null) { wallet = new() { Id = Guid.NewGuid(), StokvelId = stokvelId, MemberId = memberId, IsActive = true, CreatedAt = DateTime.UtcNow, CreatedBy = currentUserId }; context.MemberSurplusWallets.Add(wallet); }
         if (delta < 0 && wallet.AvailableBalance < Math.Abs(delta)) return;
         wallet.AvailableBalance += delta;
+        wallet.SurplusEquityBalance = Math.Max(0, wallet.SurplusEquityBalance + delta);
         wallet.TotalCredits = Math.Max(0, wallet.TotalCredits + delta);
         wallet.UpdatedAt = DateTime.UtcNow; wallet.UpdatedBy = currentUserId;
         context.MemberSurplusWalletTransactions.Add(new() { Id = Guid.NewGuid(), StokvelId = stokvelId, WalletId = wallet.Id, MemberId = memberId, TransactionType = delta > 0 ? WalletTransactionType.Credit : WalletTransactionType.Debit, Amount = Math.Abs(delta), BalanceAfterTransaction = wallet.AvailableBalance, SourceType = WalletTransactionSourceType.ContributionOverpayment, SourceReferenceId = paymentId, Description = delta > 0 ? "Contribution overpayment" : "Contribution overpayment adjustment", CreatedAt = DateTime.UtcNow, CreatedBy = currentUserId });
@@ -273,7 +474,7 @@ public sealed class LoansWalletService(
         logger.LogInformation("Surplus wallet adjusted from contribution payment {PaymentId}", paymentId);
     }
 
-    public async Task<FinanceOperationResult> RequestWithdrawalAsync(Guid stokvelId, string currentUserId, decimal amount, string reason)
+    public async Task<FinanceOperationResult> RequestWithdrawalAsync(Guid stokvelId, string currentUserId, decimal amount, string reason, string? reasonNotes = null)
     {
         await using var context = await dbFactory.CreateDbContextAsync(); var access = await GetAccessAsync(context, stokvelId, currentUserId);
         if (access.Stokvel is null || access.Member is null) return FinanceOperationResult.Failed("Membership was not found.");
@@ -281,12 +482,35 @@ public sealed class LoansWalletService(
         if (!IsEligibleMember(access.Member)) return FinanceOperationResult.Failed("Your membership is not eligible for withdrawals.");
         var wallet = await context.MemberSurplusWallets.FirstOrDefaultAsync(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.IsActive);
         if (wallet is null || amount <= 0 || amount > wallet.AvailableBalance) return FinanceOperationResult.Failed("Requested amount exceeds the available surplus balance.");
-        if (string.IsNullOrWhiteSpace(reason)) return FinanceOperationResult.Failed("Withdrawal reason is required.");
+        if (amount > GetAvailableSurplusEquity(wallet)) return FinanceOperationResult.Failed("Requested amount would use surplus equity locked as loan collateral.");
+        var reasonError = ValidateWithdrawalReason(reason, reasonNotes);
+        if (reasonError is not null) return FinanceOperationResult.Failed(reasonError);
         if (await context.MemberSurplusWithdrawalRequests.AnyAsync(x => x.StokvelId == stokvelId && x.MemberId == access.Member.Id && x.IsActive && PendingWithdrawalStatuses.Contains(x.WithdrawalStatus))) return FinanceOperationResult.Failed("You already have a pending withdrawal request.");
-        var now = DateTime.UtcNow; var request = new MemberSurplusWithdrawalRequest { Id = Guid.NewGuid(), StokvelId = stokvelId, MemberId = access.Member.Id, WalletId = wallet.Id, RequestedAmount = amount, RequestReason = reason.Trim(), WithdrawalStatus = SurplusWithdrawalStatus.PendingApproval, RequestedAt = now, RequestedBy = currentUserId, IsActive = true, CreatedAt = now, CreatedBy = currentUserId };
+        var now = DateTime.UtcNow; var request = new MemberSurplusWithdrawalRequest { Id = Guid.NewGuid(), StokvelId = stokvelId, MemberId = access.Member.Id, WalletId = wallet.Id, RequestedAmount = amount, RequestReason = reason.Trim(), RequestReasonNotes = Trim(reasonNotes), WithdrawalStatus = SurplusWithdrawalStatus.PendingSecretaryReview, RequestedAt = now, RequestedBy = currentUserId, IsActive = true, CreatedAt = now, CreatedBy = currentUserId };
         context.MemberSurplusWithdrawalRequests.Add(request);
         context.MemberSurplusWalletTransactions.Add(new() { Id = Guid.NewGuid(), StokvelId = stokvelId, WalletId = wallet.Id, MemberId = wallet.MemberId, TransactionType = WalletTransactionType.WithdrawalRequested, Amount = amount, BalanceAfterTransaction = wallet.AvailableBalance, SourceType = WalletTransactionSourceType.Withdrawal, SourceReferenceId = request.Id, Description = "Withdrawal requested", CreatedAt = now, CreatedBy = currentUserId });
         await context.SaveChangesAsync(); return FinanceOperationResult.Succeeded();
+    }
+
+    public async Task<FinanceOperationResult> ReviewWithdrawalAsSecretaryAsync(Guid id, string userId, bool recommendApproval, string? notes)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+        var request = await context.MemberSurplusWithdrawalRequests.FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
+        if (request is null) return FinanceOperationResult.Failed("Withdrawal request not found.");
+        if (await GetRoleAsync(context, request.StokvelId, userId) != SisonkeRole.Secretary) return FinanceOperationResult.Failed("Only the Secretary can review withdrawal requests.");
+        if (!IsAwaitingSecretaryReview(request.WithdrawalStatus)) return FinanceOperationResult.Failed("Withdrawal is not awaiting secretary review.");
+        var now = DateTime.UtcNow;
+        request.SecretaryReviewedAt = now;
+        request.SecretaryReviewedByUserId = userId;
+        request.SecretaryRecommendedApproval = recommendApproval;
+        request.SecretaryReviewNotes = Trim(notes);
+        request.WithdrawalStatus = SurplusWithdrawalStatus.AwaitingChairpersonApproval;
+        request.UpdatedAt = now;
+        request.UpdatedBy = userId;
+        await context.SaveChangesAsync();
+        return FinanceOperationResult.Succeeded(recommendApproval
+            ? "Withdrawal reviewed and recommended for approval."
+            : "Withdrawal reviewed and recommended for rejection.");
     }
 
     public Task<FinanceOperationResult> ApproveWithdrawalAsync(Guid id, string userId) => DecideWithdrawalAsync(id, userId, true, null);
@@ -299,10 +523,12 @@ public sealed class LoansWalletService(
         var request = await context.MemberSurplusWithdrawalRequests.Include(x => x.Wallet).FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
         if (request is null) return FinanceOperationResult.Failed("Withdrawal request not found.");
         if (await GetRoleAsync(context, request.StokvelId, userId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can confirm withdrawal payment.");
-        if (request.WithdrawalStatus != SurplusWithdrawalStatus.PaymentPending) return FinanceOperationResult.Failed("Withdrawal is not approved for payment.");
+        if (!IsAwaitingTreasurerPayout(request.WithdrawalStatus)) return FinanceOperationResult.Failed("Withdrawal is not approved for payment.");
         if (request.Wallet.AvailableBalance < request.RequestedAmount) return FinanceOperationResult.Failed("The wallet no longer has sufficient balance.");
+        if (request.RequestedAmount > GetAvailableSurplusEquity(request.Wallet)) return FinanceOperationResult.Failed("This withdrawal would use surplus equity locked as loan collateral.");
         request.Wallet.AvailableBalance -= request.RequestedAmount; request.Wallet.TotalWithdrawals += request.RequestedAmount; request.Wallet.UpdatedAt = DateTime.UtcNow; request.Wallet.UpdatedBy = userId;
-        request.WithdrawalStatus = SurplusWithdrawalStatus.Paid; request.PaidAt = paidAt; request.PaidByTreasurerId = userId; request.PaymentMethod = method; request.PaymentReference = reference.Trim(); request.Notes = Trim(notes); request.UpdatedAt = DateTime.UtcNow; request.UpdatedBy = userId;
+        request.Wallet.SurplusEquityBalance = Math.Max(0, request.Wallet.SurplusEquityBalance - request.RequestedAmount);
+        request.WithdrawalStatus = SurplusWithdrawalStatus.Paid; request.PaidAt = paidAt; request.PaidByTreasurerId = userId; request.PaymentMethod = method; request.PaymentReference = reference.Trim(); request.PaymentNotes = Trim(notes); request.Notes = Trim(notes); request.UpdatedAt = DateTime.UtcNow; request.UpdatedBy = userId;
         context.MemberSurplusWalletTransactions.Add(new() { Id = Guid.NewGuid(), StokvelId = request.StokvelId, WalletId = request.WalletId, MemberId = request.MemberId, TransactionType = WalletTransactionType.WithdrawalPaid, Amount = request.RequestedAmount, BalanceAfterTransaction = request.Wallet.AvailableBalance, SourceType = WalletTransactionSourceType.Withdrawal, SourceReferenceId = request.Id, Description = "Withdrawal paid", CreatedAt = DateTime.UtcNow, CreatedBy = userId });
         await context.SaveChangesAsync(); await tx.CommitAsync(); return FinanceOperationResult.Succeeded();
     }
@@ -319,8 +545,18 @@ public sealed class LoansWalletService(
                 (x.PaymentStatus == LoanRepaymentStatus.Pending ||
                  x.PaymentStatus == LoanRepaymentStatus.PartiallyPaid ||
                  x.PaymentStatus == LoanRepaymentStatus.Missed)),
-            await context.MemberSurplusWithdrawalRequests.CountAsync(x => x.StokvelId == stokvelId && x.IsActive && x.WithdrawalStatus == SurplusWithdrawalStatus.PendingApproval),
-            await context.MemberSurplusWithdrawalRequests.CountAsync(x => x.StokvelId == stokvelId && x.IsActive && x.WithdrawalStatus == SurplusWithdrawalStatus.PaymentPending));
+            await context.MemberSurplusWithdrawalRequests.CountAsync(x => x.StokvelId == stokvelId && x.IsActive && SecretaryReviewWithdrawalStatuses.Contains(x.WithdrawalStatus)),
+            await context.MemberSurplusWithdrawalRequests.CountAsync(x => x.StokvelId == stokvelId && x.IsActive && TreasurerPayoutWithdrawalStatuses.Contains(x.WithdrawalStatus)));
+    }
+
+    public async Task<List<MemberSurplusWithdrawalRequest>> GetWithdrawalRequestsAwaitingSecretaryReviewAsync(Guid stokvelId)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+        return await context.MemberSurplusWithdrawalRequests.AsNoTracking()
+            .Include(x => x.Member)
+            .Where(x => x.StokvelId == stokvelId && x.IsActive && SecretaryReviewWithdrawalStatuses.Contains(x.WithdrawalStatus))
+            .OrderBy(x => x.RequestedAt)
+            .ToListAsync();
     }
 
     public async Task<StokvelLoanConfiguration?> GetActiveLoanConfigurationAsync(Guid stokvelId)
@@ -348,11 +584,39 @@ public sealed class LoansWalletService(
         await using var context = await dbFactory.CreateDbContextAsync(); var request = await context.MemberSurplusWithdrawalRequests.Include(x => x.Wallet).FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
         if (request is null) return FinanceOperationResult.Failed("Withdrawal request not found.");
         if (await GetRoleAsync(context, request.StokvelId, userId) != SisonkeRole.Chairperson) return FinanceOperationResult.Failed("Only the Chairperson can approve or reject withdrawals.");
-        if (request.WithdrawalStatus != SurplusWithdrawalStatus.PendingApproval) return FinanceOperationResult.Failed("Withdrawal is not awaiting approval.");
+        if (request.WithdrawalStatus != SurplusWithdrawalStatus.AwaitingChairpersonApproval) return FinanceOperationResult.Failed("Withdrawal is not awaiting chairperson approval.");
         var now = DateTime.UtcNow;
-        if (approve) { if (request.Wallet.AvailableBalance < request.RequestedAmount) return FinanceOperationResult.Failed("Wallet balance is insufficient."); request.WithdrawalStatus = SurplusWithdrawalStatus.PaymentPending; request.ApprovedAt = now; request.ApprovedByChairpersonId = userId; }
+        request.ChairpersonReviewedAt = now;
+        request.ChairpersonReviewedByUserId = userId;
+        request.ChairpersonNotes = Trim(reason);
+        if (approve) { if (request.Wallet.AvailableBalance < request.RequestedAmount) return FinanceOperationResult.Failed("Wallet balance is insufficient."); if (request.RequestedAmount > GetAvailableSurplusEquity(request.Wallet)) return FinanceOperationResult.Failed("This withdrawal would use surplus equity locked as loan collateral."); request.WithdrawalStatus = SurplusWithdrawalStatus.AwaitingTreasurerPayout; request.ApprovedAt = now; request.ApprovedByChairpersonId = userId; }
         else { request.WithdrawalStatus = SurplusWithdrawalStatus.Rejected; request.RejectedAt = now; request.RejectedByChairpersonId = userId; request.RejectionReason = reason!.Trim(); context.MemberSurplusWalletTransactions.Add(new() { Id = Guid.NewGuid(), StokvelId = request.StokvelId, WalletId = request.WalletId, MemberId = request.MemberId, TransactionType = WalletTransactionType.WithdrawalRejected, Amount = request.RequestedAmount, BalanceAfterTransaction = request.Wallet.AvailableBalance, SourceType = WalletTransactionSourceType.Withdrawal, SourceReferenceId = request.Id, Description = "Withdrawal rejected", CreatedAt = now, CreatedBy = userId }); }
         request.UpdatedAt = now; request.UpdatedBy = userId; await context.SaveChangesAsync(); return FinanceOperationResult.Succeeded();
+    }
+
+    private async Task<FinanceOperationResult> RespondToGuarantorRequestAsync(Guid guarantorId, string currentUserId, bool accept, string? notes, string? reason)
+    {
+        if (!accept && string.IsNullOrWhiteSpace(reason)) return FinanceOperationResult.Failed("Rejection reason is required.");
+        await using var context = await dbFactory.CreateDbContextAsync();
+        var request = await context.MemberLoanGuarantors
+            .Include(x => x.Loan).ThenInclude(x => x.Member)
+            .Include(x => x.GuarantorMember)
+            .FirstOrDefaultAsync(x => x.Id == guarantorId);
+        if (request is null) return FinanceOperationResult.Failed("Guarantor request not found.");
+        var member = await context.Members.AsNoTracking().FirstOrDefaultAsync(x =>
+            x.Id == request.GuarantorMemberId &&
+            x.ApplicationUserId == currentUserId &&
+            x.TenantId == request.GuarantorMember.TenantId);
+        if (member is null) return FinanceOperationResult.Failed("Only the assigned guarantor can respond to this request.");
+        if (request.Status != MemberLoanGuarantorStatus.Pending) return FinanceOperationResult.Failed("This guarantor request has already been answered.");
+        var now = DateTime.UtcNow;
+        request.Status = accept ? MemberLoanGuarantorStatus.Accepted : MemberLoanGuarantorStatus.Rejected;
+        request.RespondedAt = now;
+        request.RespondedByUserId = currentUserId;
+        request.Notes = Trim(notes);
+        request.Reason = Trim(reason);
+        await context.SaveChangesAsync();
+        return FinanceOperationResult.Succeeded(accept ? "Guarantor request accepted." : "Guarantor request rejected.");
     }
 
     private static async Task<(Stokvel? Stokvel, Member? Member, SisonkeRole? Role)> GetAccessAsync(ApplicationDbContext context, Guid stokvelId, string userId)
@@ -365,12 +629,162 @@ public sealed class LoansWalletService(
     private static async Task<SisonkeRole?> GetRoleAsync(ApplicationDbContext context, Guid stokvelId, string userId) => (await GetAccessAsync(context, stokvelId, userId)).Role;
     private static bool IsFeatureAllowed(Stokvel stokvel) => stokvel.Archetype != StokvelArchetype.BurialSociety;
     private static bool IsOfficeBearer(SisonkeRole? role) => role is SisonkeRole.Creator or SisonkeRole.StokvelAdmin or SisonkeRole.Chairperson or SisonkeRole.Secretary or SisonkeRole.Treasurer;
-    private static bool IsConfigurationRole(SisonkeRole? role) => IsOfficeBearer(role) || role is SisonkeRole.PlatformSuperAdmin or SisonkeRole.PlatformSupportAdmin;
+    private static bool IsConfigurationRole(SisonkeRole? role) => role is SisonkeRole.Creator or SisonkeRole.StokvelAdmin or SisonkeRole.Treasurer;
     private static bool IsEligibleMember(Member member) => member.Status == MemberStatus.Active && member.GovernanceStatus == MemberGovernanceStatus.Active && !member.IsDeceased && member.SuspendedAt is null && member.ExpelledAt is null;
+    private static bool IsAwaitingSecretaryReview(SurplusWithdrawalStatus status) => SecretaryReviewWithdrawalStatuses.Contains(status);
+    private static bool IsAwaitingTreasurerPayout(SurplusWithdrawalStatus status) => TreasurerPayoutWithdrawalStatuses.Contains(status);
     private static decimal CalculateTotal(decimal amount, StokvelLoanConfiguration config) => config.LoanInterestType switch { LoanInterestType.FixedAmount => amount + config.LoanInterestRate, LoanInterestType.Percentage => Math.Round(amount * (1 + config.LoanInterestRate / 100), 2), _ => amount };
     private static decimal CalculateFine(decimal expected, StokvelLoanConfiguration config) => config.LateRepaymentFineType switch { LatePenaltyType.FixedAmount => config.LateRepaymentFineAmount ?? 0, LatePenaltyType.Percentage => Math.Round(expected * (config.LateRepaymentFineAmount ?? 0) / 100, 2), _ => 0 };
     private static string? Trim(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static string FormatMoney(decimal value) => value.ToString("C2", new System.Globalization.CultureInfo("en-ZA"));
+    private static string? ValidateWithdrawalReason(string reason, string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) return "Withdrawal reason is required.";
+        var trimmed = reason.Trim();
+        var valid = WithdrawalReasonOptions.Contains(trimmed);
+        if (trimmed == "Other" && string.IsNullOrWhiteSpace(notes)) return "Please provide a short explanation for Other.";
+        return null;
+    }
+
+    private static readonly string[] WithdrawalReasonOptions =
+    [
+        "Emergency",
+        "School fees / Education",
+        "Medical expenses",
+        "Funeral / Family support",
+        "Transport",
+        "Groceries / Household needs",
+        "Debt repayment",
+        "Business / Income opportunity",
+        "Other",
+        "Prefer not to say"
+    ];
+    private static decimal GetAvailableSurplusEquity(MemberSurplusWallet wallet)
+    {
+        var equity = wallet.SurplusEquityBalance > 0 ? wallet.SurplusEquityBalance : wallet.AvailableBalance;
+        return Math.Max(0, equity - wallet.LockedSurplusEquityBalance);
+    }
+
+    private static async Task<bool> HasBlockingLoanAsync(ApplicationDbContext context, Guid stokvelId, Guid memberId) =>
+        await context.MemberLoans.AnyAsync(x => x.StokvelId == stokvelId && x.MemberId == memberId && x.IsActive && BlockingLoanStatuses.Contains(x.LoanStatus));
+
+    private static async Task<DateTime?> GetNextEligibleLoanDateAsync(ApplicationDbContext context, Guid stokvelId, Guid memberId) =>
+        await context.MemberLoans
+            .Where(x => x.StokvelId == stokvelId && x.MemberId == memberId && x.LoanStatus == MemberLoanStatus.FullyRepaid)
+            .OrderByDescending(x => x.FullyRepaidAt)
+            .Select(x => x.NextEligibleLoanDate)
+            .FirstOrDefaultAsync();
+
+    private static bool HasRequiredAcceptedGuarantors(MemberLoan loan, StokvelLoanConfiguration config)
+    {
+        if (loan.LoanType != MemberLoanType.AcceleratedRotationalPayout)
+        {
+            return true;
+        }
+
+        var required = Math.Max(2, config.RequiredGuarantorCount);
+        return loan.Guarantors.Count(x => x.Status == MemberLoanGuarantorStatus.Accepted) >= required;
+    }
+
+    private static async Task<List<string>> ValidateGuarantorsAsync(
+        ApplicationDbContext context,
+        Stokvel stokvel,
+        Member borrower,
+        IReadOnlyCollection<Guid> guarantorMemberIds,
+        int requiredCount)
+    {
+        var required = Math.Max(2, requiredCount);
+        var distinct = guarantorMemberIds.Where(x => x != Guid.Empty).Distinct().ToList();
+        var errors = new List<string>();
+        if (distinct.Count < required) errors.Add($"At least {required} different guarantors are required.");
+        if (distinct.Contains(borrower.Id)) errors.Add("Borrower cannot be their own guarantor.");
+        var guarantors = await context.Members.AsNoTracking()
+            .Where(x => distinct.Contains(x.Id))
+            .ToListAsync();
+        if (guarantors.Count != distinct.Count) errors.Add("One or more selected guarantors could not be found.");
+        if (guarantors.Any(x => x.TenantId != stokvel.TenantId)) errors.Add("Guarantors must belong to the same stokvel.");
+        if (guarantors.Any(x => !IsEligibleMember(x))) errors.Add("Guarantors must be active eligible members.");
+        return errors.Distinct().ToList();
+    }
+
+    private static async Task<RotationalContributionCycle?> FindFuturePayoutCycleAsync(
+        ApplicationDbContext context,
+        Guid stokvelId,
+        Guid memberId)
+    {
+        var currentCycleNumber = await context.RotationalContributionCycles.AsNoTracking()
+            .Where(x => x.StokvelId == stokvelId && x.IsActive &&
+                (x.Status == RotationalCycleStatus.Open ||
+                 x.Status == RotationalCycleStatus.ContributionsDue ||
+                 x.Status == RotationalCycleStatus.ReadyForPayout ||
+                 x.Status == RotationalCycleStatus.PayoutPending))
+            .OrderBy(x => x.CycleNumber)
+            .Select(x => (int?)x.CycleNumber)
+            .FirstOrDefaultAsync();
+
+        var query = context.RotationalContributionCycles
+            .Where(x => x.StokvelId == stokvelId && x.IsActive &&
+                x.PayoutMemberId == memberId &&
+                FuturePayoutCycleStatuses.Contains(x.Status));
+
+        if (currentCycleNumber.HasValue)
+        {
+            query = query.Where(x => x.CycleNumber > currentCycleNumber.Value);
+        }
+
+        return await query.OrderBy(x => x.CycleNumber).FirstOrDefaultAsync();
+    }
+
+    private static async Task<string?> LockCollateralIfNeededAsync(ApplicationDbContext context, MemberLoan loan, DateTime now, string currentUserId)
+    {
+        if (loan.LoanType != MemberLoanType.SurplusBackedEquity ||
+            loan.CollateralWalletId is null ||
+            loan.CollateralLockedAt is not null ||
+            loan.CollateralLockedAmount <= 0)
+        {
+            return null;
+        }
+
+        var wallet = await context.MemberSurplusWallets.FirstOrDefaultAsync(x => x.Id == loan.CollateralWalletId.Value && x.IsActive);
+        if (wallet is null)
+        {
+            return "Collateral wallet was not found.";
+        }
+
+        if (GetAvailableSurplusEquity(wallet) < loan.CollateralLockedAmount)
+        {
+            return "Available surplus equity is insufficient to lock collateral.";
+        }
+
+        wallet.LockedSurplusEquityBalance += loan.CollateralLockedAmount;
+        wallet.UpdatedAt = now;
+        wallet.UpdatedBy = currentUserId;
+        loan.CollateralLockedAt = now;
+        return null;
+    }
+
+    private static async Task UnlockCollateralIfNeededAsync(ApplicationDbContext context, MemberLoan loan, DateTime now, string currentUserId)
+    {
+        if (loan.LoanType != MemberLoanType.SurplusBackedEquity ||
+            loan.CollateralWalletId is null ||
+            loan.CollateralLockedAmount <= 0 ||
+            loan.CollateralUnlockedAt is not null)
+        {
+            return;
+        }
+
+        var wallet = await context.MemberSurplusWallets.FirstOrDefaultAsync(x => x.Id == loan.CollateralWalletId.Value && x.IsActive);
+        if (wallet is null)
+        {
+            return;
+        }
+
+        wallet.LockedSurplusEquityBalance = Math.Max(0, wallet.LockedSurplusEquityBalance - loan.CollateralLockedAmount);
+        wallet.UpdatedAt = now;
+        wallet.UpdatedBy = currentUserId;
+        loan.CollateralUnlockedAt = now;
+    }
+
     private static string? BuildEarlyPayoutNote(decimal requestedAmount, decimal earlyPayoutAmount, decimal netLoanAmount)
     {
         if (earlyPayoutAmount <= 0)
@@ -391,6 +805,7 @@ public sealed class LoansWalletService(
         string description)
     {
         wallet.AvailableBalance -= amount;
+        wallet.SurplusEquityBalance = Math.Max(0, wallet.SurplusEquityBalance - amount);
         wallet.TotalWithdrawals += amount;
         wallet.UpdatedAt = now;
         wallet.UpdatedBy = currentUserId;
@@ -476,7 +891,11 @@ public sealed class LoansWalletService(
         if (x.MaxRepaymentMonths <= 0 || x.DefaultRepaymentMonths <= 0 || x.DefaultRepaymentMonths > x.MaxRepaymentMonths) e.Add("Repayment month limits are invalid.");
         if (x.LoanInterestType == LoanInterestType.Percentage && (x.LoanInterestRate < 1 || x.LoanInterestRate > 100)) e.Add("Interest percentage must be between 1 and 100.");
         if (x.LateRepaymentFineType != LatePenaltyType.None && (!x.LateRepaymentFineAmount.HasValue || x.LateRepaymentFineAmount <= 0)) e.Add("Late repayment fine amount is required.");
-        if (x.LateRepaymentFineType == LatePenaltyType.Percentage && x.LateRepaymentFineAmount > 100) e.Add("Late fine percentage cannot exceed 100."); return e;
+        if (x.LateRepaymentFineType == LatePenaltyType.Percentage && x.LateRepaymentFineAmount > 100) e.Add("Late fine percentage cannot exceed 100.");
+        if (x.SurplusBackedLoansEnabled && x.SurplusEquityLoanMultiplier <= 0) e.Add("Surplus equity loan multiplier must be greater than zero.");
+        if (x.EarlyPayoutDiscountRatePercent < 0 || x.EarlyPayoutDiscountRatePercent > 100) e.Add("Early payout discount rate must be between 0 and 100.");
+        if (x.EarlyPayoutLoansEnabled && x.RequiredGuarantorCount < 2) e.Add("Accelerated payout loans require at least two guarantors.");
+        return e;
     }
     private static async Task<string> GetEligibilityMessageAsync(ApplicationDbContext context, Stokvel stokvel, Member member, StokvelLoanConfiguration? config)
     {
@@ -487,7 +906,7 @@ public sealed class LoansWalletService(
     }
 }
 
-public sealed record LoansWalletPageState(Stokvel Stokvel, Member? CurrentMember, StokvelLoanConfiguration? Configuration, List<MemberLoan> Loans, List<MemberLoanRepayment> Repayments, MemberSurplusWallet? Wallet, List<MemberSurplusWalletTransaction> Transactions, List<MemberSurplusWithdrawalRequest> Withdrawals, bool CanConfigure, bool CanViewAll, bool CanApprove, bool CanConfirmMoney, string EligibilityMessage);
+public sealed record LoansWalletPageState(Stokvel Stokvel, Member? CurrentMember, StokvelLoanConfiguration? Configuration, List<MemberLoan> Loans, List<MemberLoanRepayment> Repayments, MemberSurplusWallet? Wallet, List<MemberSurplusWalletTransaction> Transactions, List<MemberSurplusWithdrawalRequest> Withdrawals, List<MemberLoanGuarantor> GuarantorRequests, List<Member> EligibleGuarantors, RotationalContributionCycle? FuturePayoutCycle, bool CanConfigure, bool CanViewAll, bool CanApprove, bool CanConfirmMoney, bool CanReviewWithdrawals, bool CanApproveWithdrawals, string EligibilityMessage);
 public sealed record FinanceOperationResult(bool Success, List<string> Errors, string? Message = null) { public static FinanceOperationResult Succeeded(string? message = null) => new(true, [], message); public static FinanceOperationResult Failed(string error) => new(false, [error]); public static FinanceOperationResult Failed(List<string> errors) => new(false, errors); }
 public sealed record LoanConfigurationResult(bool Success, StokvelLoanConfiguration? Configuration, List<string> Errors) { public static LoanConfigurationResult Succeeded(StokvelLoanConfiguration x) => new(true, x, []); public static LoanConfigurationResult Failed(List<string> e) => new(false, null, e); }
 public sealed record LoansWalletTaskCounts(int PendingLoanApprovals, int LoansAwaitingDisbursement, int RepaymentsAwaitingConfirmation, int PendingWithdrawalApprovals, int WithdrawalsAwaitingPayment);

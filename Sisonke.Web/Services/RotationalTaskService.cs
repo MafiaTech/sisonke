@@ -15,18 +15,21 @@ public sealed class RotationalTaskService(IDbContextFactory<ApplicationDbContext
     {
         await using var context = await dbFactory.CreateDbContextAsync();
 
-        // Active non-terminal payouts — ReadyForApproval or Approved
+        // Active non-terminal payouts — chairperson approval, secretary correction, or treasurer payment
         var pendingPayouts = await context.RotationalPayouts
             .AsNoTracking()
             .Include(p => p.PayoutMember)
             .Include(p => p.Cycle)
             .Where(p => p.StokvelId == stokvelId && p.IsActive &&
                         (p.PayoutStatus == RotationalPayoutStatus.ReadyForApproval ||
+                         p.PayoutStatus == RotationalPayoutStatus.ReturnedToSecretary ||
                          p.PayoutStatus == RotationalPayoutStatus.Approved))
             .ToListAsync();
 
         var pendingApproval = pendingPayouts
             .FirstOrDefault(p => p.PayoutStatus == RotationalPayoutStatus.ReadyForApproval);
+        var returnedForCorrection = pendingPayouts
+            .FirstOrDefault(p => p.PayoutStatus == RotationalPayoutStatus.ReturnedToSecretary);
         var approved = pendingPayouts
             .FirstOrDefault(p => p.PayoutStatus == RotationalPayoutStatus.Approved);
 
@@ -71,6 +74,7 @@ public sealed class RotationalTaskService(IDbContextFactory<ApplicationDbContext
 
         return new RotationalTaskState(
             PendingApprovalPayout: pendingApproval,
+            ReturnedForCorrectionPayout: returnedForCorrection,
             ApprovedPayout: approved,
             CurrentCycle: currentCycle,
             UnpaidContributionCount: unpaidCount,
@@ -133,6 +137,7 @@ public sealed class RotationalTaskService(IDbContextFactory<ApplicationDbContext
 
 public sealed record RotationalTaskState(
     RotationalPayout? PendingApprovalPayout,
+    RotationalPayout? ReturnedForCorrectionPayout,
     RotationalPayout? ApprovedPayout,
     RotationalContributionCycle? CurrentCycle,
     int UnpaidContributionCount,
@@ -144,13 +149,14 @@ public sealed record RotationalTaskState(
     bool HasBankingDetails)
 {
     public bool HasAnyPayoutTask =>
-        PendingApprovalPayout is not null || ApprovedPayout is not null;
+        PendingApprovalPayout is not null || ReturnedForCorrectionPayout is not null || ApprovedPayout is not null;
 
     public bool HasContributionTask =>
         UnpaidContributionCount > 0 && CurrentCycle is not null;
 
     public int RotationalPendingCount =>
         (PendingApprovalPayout is not null ? 1 : 0) +
+        (ReturnedForCorrectionPayout is not null ? 1 : 0) +
         (ApprovedPayout is not null ? 1 : 0) +
         (HasContributionTask ? 1 : 0);
 }

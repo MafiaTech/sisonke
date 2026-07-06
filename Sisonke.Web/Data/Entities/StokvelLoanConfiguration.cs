@@ -36,6 +36,16 @@ public class StokvelLoanConfiguration
 
     public bool RequireTreasurerDisbursementConfirmation { get; set; }
 
+    public bool SurplusBackedLoansEnabled { get; set; }
+
+    public decimal SurplusEquityLoanMultiplier { get; set; } = 1;
+
+    public bool EarlyPayoutLoansEnabled { get; set; }
+
+    public decimal EarlyPayoutDiscountRatePercent { get; set; }
+
+    public int RequiredGuarantorCount { get; set; } = 2;
+
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

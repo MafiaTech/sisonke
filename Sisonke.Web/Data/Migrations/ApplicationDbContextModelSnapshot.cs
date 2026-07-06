@@ -1484,6 +1484,21 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<decimal>("CollateralLockedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<DateTime?>("CollateralLockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CollateralUnlockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CollateralWalletId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1508,6 +1523,30 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<DateTime?>("DueStartDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal>("EarlyPayoutDiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("EarlyPayoutDiscountRatePercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("EarlyPayoutGrossAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("EarlyPayoutNetDisbursedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<DateTime?>("ExpectedFinalPaymentDate")
                         .HasColumnType("datetime2");
 
@@ -1519,6 +1558,11 @@ namespace Sisonke.Web.Data.Migrations
 
                     b.Property<int>("LoanStatus")
                         .HasColumnType("int");
+
+                    b.Property<int>("LoanType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<Guid>("MemberId")
                         .HasColumnType("uniqueidentifier");
@@ -1533,6 +1577,12 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("OriginalContributionCycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("OriginalPayoutOrderId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("OutstandingBalance")
                         .HasPrecision(18, 2)
@@ -1584,11 +1634,64 @@ namespace Sisonke.Web.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CollateralWalletId");
+
                     b.HasIndex("MemberId");
+
+                    b.HasIndex("OriginalContributionCycleId");
+
+                    b.HasIndex("OriginalPayoutOrderId");
 
                     b.HasIndex("StokvelId");
 
                     b.ToTable("MemberLoans");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoanGuarantor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("GuarantorMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RespondedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuarantorMemberId");
+
+                    b.HasIndex("LoanId", "GuarantorMemberId")
+                        .IsUnique();
+
+                    b.ToTable("MemberLoanGuarantors");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoanRepayment", b =>
@@ -1679,6 +1782,12 @@ namespace Sisonke.Web.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("CoreSavingsBalance")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1689,11 +1798,23 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<decimal>("LockedSurplusEquityBalance")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<Guid>("MemberId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("StokvelId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("SurplusEquityBalance")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<decimal>("TotalCredits")
                         .HasPrecision(18, 2)
@@ -1784,6 +1905,17 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("ChairpersonNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ChairpersonReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ChairpersonReviewedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1811,6 +1943,10 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<int?>("PaymentMethod")
                         .HasColumnType("int");
 
+                    b.Property<string>("PaymentNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("PaymentReference")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1831,6 +1967,10 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("RequestReasonNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<decimal>("RequestedAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1839,6 +1979,20 @@ namespace Sisonke.Web.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("RequestedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool?>("SecretaryRecommendedApproval")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SecretaryReviewNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("SecretaryReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SecretaryReviewedByUserId")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
@@ -2417,6 +2571,21 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("ChairpersonDecision")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("ChairpersonReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ChairpersonReviewedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ChairpersonReviewNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -2891,6 +3060,17 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<int>("DefaultRepaymentMonths")
                         .HasColumnType("int");
 
+                    b.Property<decimal>("EarlyPayoutDiscountRatePercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<bool>("EarlyPayoutLoansEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("FreezePeriodAfterFullRepaymentDays")
                         .HasColumnType("int");
 
@@ -2934,8 +3114,24 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<bool>("RequireTreasurerDisbursementConfirmation")
                         .HasColumnType("bit");
 
+                    b.Property<int>("RequiredGuarantorCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(2);
+
                     b.Property<Guid>("StokvelId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("SurplusBackedLoansEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<decimal>("SurplusEquityLoanMultiplier")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)")
+                        .HasDefaultValue(1m);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -3128,6 +3324,45 @@ namespace Sisonke.Web.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("StokvelQuestionnaireAnswers");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.StokvelReserveTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("MemberLoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("TransactionType")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberLoanId");
+
+                    b.HasIndex("StokvelId");
+
+                    b.ToTable("StokvelReserveTransactions");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionPlan", b =>
@@ -3786,13 +4021,53 @@ namespace Sisonke.Web.Data.Migrations
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoan", b =>
                 {
+                    b.HasOne("Sisonke.Web.Data.Entities.MemberSurplusWallet", "CollateralWallet")
+                        .WithMany()
+                        .HasForeignKey("CollateralWalletId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
                         .WithMany()
                         .HasForeignKey("MemberId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Sisonke.Web.Data.Entities.RotationalContributionCycle", "OriginalContributionCycle")
+                        .WithMany()
+                        .HasForeignKey("OriginalContributionCycleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sisonke.Web.Data.Entities.RotationalPayoutOrder", "OriginalPayoutOrder")
+                        .WithMany()
+                        .HasForeignKey("OriginalPayoutOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CollateralWallet");
+
                     b.Navigation("Member");
+
+                    b.Navigation("OriginalContributionCycle");
+
+                    b.Navigation("OriginalPayoutOrder");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoanGuarantor", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "GuarantorMember")
+                        .WithMany()
+                        .HasForeignKey("GuarantorMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.MemberLoan", "Loan")
+                        .WithMany("Guarantors")
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GuarantorMember");
+
+                    b.Navigation("Loan");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoanRepayment", b =>
@@ -4167,6 +4442,24 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.StokvelReserveTransaction", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.MemberLoan", "MemberLoan")
+                        .WithMany()
+                        .HasForeignKey("MemberLoanId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MemberLoan");
+
+                    b.Navigation("Stokvel");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.TenantSubscription", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.SubscriptionPlan", "SubscriptionPlan")
@@ -4246,6 +4539,8 @@ namespace Sisonke.Web.Data.Migrations
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberLoan", b =>
                 {
+                    b.Navigation("Guarantors");
+
                     b.Navigation("Repayments");
                 });
 

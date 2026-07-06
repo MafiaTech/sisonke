@@ -15,6 +15,20 @@ public sealed class RotationalPayoutService(
         return await CurrentPayoutQuery(context, stokvelId).FirstOrDefaultAsync();
     }
 
+    public async Task<List<RotationalPayout>> GetRecentPaidPayoutsAsync(Guid stokvelId, int take = 10)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+        return await context.RotationalPayouts.AsNoTracking()
+            .Include(payout => payout.Cycle)
+            .Include(payout => payout.PayoutMember)
+            .Where(payout => payout.StokvelId == stokvelId &&
+                payout.IsActive &&
+                payout.PayoutStatus == RotationalPayoutStatus.Paid)
+            .OrderByDescending(payout => payout.PaidAt ?? payout.UpdatedAt ?? payout.CreatedAt)
+            .Take(Math.Max(1, take))
+            .ToListAsync();
+    }
+
     public async Task<PayoutSummary> GetPayoutSummaryAsync(Guid stokvelId, string? currentUserId)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
@@ -86,10 +100,97 @@ public sealed class RotationalPayoutService(
     }
 
     public Task<PayoutOperationResult> ApprovePayoutAsync(Guid payoutId, string currentUserId) =>
-        DecidePayoutAsync(payoutId, currentUserId, true, null);
+        SubmitChairpersonDecisionAsync(payoutId, currentUserId, RotationalPayoutDecision.Approve, null);
 
     public Task<PayoutOperationResult> RejectPayoutAsync(Guid payoutId, string currentUserId, string reason) =>
-        DecidePayoutAsync(payoutId, currentUserId, false, reason);
+        SubmitChairpersonDecisionAsync(payoutId, currentUserId, RotationalPayoutDecision.Reject, reason);
+
+    public Task<PayoutOperationResult> RequestPayoutChangesAsync(Guid payoutId, string currentUserId, string notes) =>
+        SubmitChairpersonDecisionAsync(payoutId, currentUserId, RotationalPayoutDecision.RequestChanges, notes);
+
+    public async Task<PayoutOperationResult> ResubmitPayoutForApprovalAsync(Guid payoutId, string currentUserId)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+        var payout = await context.RotationalPayouts
+            .Include(item => item.Cycle)
+            .FirstOrDefaultAsync(item => item.Id == payoutId && item.IsActive);
+        if (payout is null) return PayoutOperationResult.Failed(["Payout not found."]);
+        var role = await GetCurrentRoleAsync(context, payout.StokvelId, currentUserId);
+        if (role is not (SisonkeRole.Secretary or SisonkeRole.Creator or SisonkeRole.StokvelAdmin))
+            return PayoutOperationResult.Failed(["Only the Secretary or stokvel admins can resubmit payout changes for approval."]);
+        if (payout.PayoutStatus != RotationalPayoutStatus.ReturnedToSecretary)
+            return PayoutOperationResult.Failed(["Only payouts returned to the Secretary can be resubmitted."]);
+
+        var now = DateTime.UtcNow;
+        payout.PayoutStatus = RotationalPayoutStatus.ReadyForApproval;
+        payout.RequestedAt = now;
+        payout.RequestedBy = currentUserId;
+        payout.Cycle.Status = RotationalCycleStatus.PayoutPending;
+        payout.Cycle.UpdatedAt = now;
+        payout.Cycle.UpdatedBy = currentUserId;
+        payout.UpdatedAt = now;
+        payout.UpdatedBy = currentUserId;
+        await context.SaveChangesAsync();
+        logger.LogInformation("Payout {PayoutId} resubmitted for chairperson approval", payoutId);
+        return PayoutOperationResult.Succeeded(payout);
+    }
+
+    public async Task<PayoutOperationResult> SubmitChairpersonDecisionAsync(
+        Guid payoutId,
+        string currentUserId,
+        RotationalPayoutDecision decision,
+        string? notes)
+    {
+        var trimmedNotes = NullIfWhiteSpace(notes);
+        if (decision is RotationalPayoutDecision.Reject or RotationalPayoutDecision.RequestChanges &&
+            string.IsNullOrWhiteSpace(trimmedNotes))
+            return PayoutOperationResult.Failed(["Decision notes are required for reject or request changes."]);
+
+        await using var context = await dbFactory.CreateDbContextAsync();
+        var payout = await context.RotationalPayouts
+            .Include(item => item.Cycle)
+            .FirstOrDefaultAsync(item => item.Id == payoutId && item.IsActive);
+        if (payout is null) return PayoutOperationResult.Failed(["Payout not found."]);
+        if (await GetCurrentRoleAsync(context, payout.StokvelId, currentUserId) != SisonkeRole.Chairperson)
+            return PayoutOperationResult.Failed(["Only the Chairperson can submit payout decisions."]);
+        if (payout.PayoutStatus != RotationalPayoutStatus.ReadyForApproval)
+            return PayoutOperationResult.Failed(["Only payouts ready for approval can receive a chairperson decision."]);
+
+        var now = DateTime.UtcNow;
+        payout.ChairpersonDecision = decision.ToString();
+        payout.ChairpersonReviewedAt = now;
+        payout.ChairpersonReviewedByUserId = currentUserId;
+        payout.ChairpersonReviewNotes = trimmedNotes;
+
+        switch (decision)
+        {
+            case RotationalPayoutDecision.Approve:
+                payout.PayoutStatus = RotationalPayoutStatus.Approved;
+                payout.ApprovedByChairpersonId = currentUserId;
+                payout.ApprovedAt = now;
+                break;
+            case RotationalPayoutDecision.Reject:
+                payout.PayoutStatus = RotationalPayoutStatus.Rejected;
+                payout.RejectedByChairpersonId = currentUserId;
+                payout.RejectedAt = now;
+                payout.RejectionReason = trimmedNotes;
+                break;
+            case RotationalPayoutDecision.RequestChanges:
+                payout.PayoutStatus = RotationalPayoutStatus.ReturnedToSecretary;
+                payout.Cycle.Status = RotationalCycleStatus.ReadyForPayout;
+                payout.Cycle.UpdatedAt = now;
+                payout.Cycle.UpdatedBy = currentUserId;
+                break;
+            default:
+                return PayoutOperationResult.Failed(["Unsupported payout decision."]);
+        }
+
+        payout.UpdatedAt = now;
+        payout.UpdatedBy = currentUserId;
+        await context.SaveChangesAsync();
+        logger.LogInformation("Payout {PayoutId} chairperson decision recorded as {Decision}", payoutId, decision);
+        return PayoutOperationResult.Succeeded(payout);
+    }
 
     public async Task<PayoutOperationResult> ConfirmPayoutPaidAsync(
         Guid payoutId, string currentUserId, ConfirmPayoutPaidRequest request)
@@ -154,36 +255,6 @@ public sealed class RotationalPayoutService(
         return await GetCurrentRoleAsync(context, stokvelId, currentUserId) == SisonkeRole.Treasurer;
     }
 
-    private async Task<PayoutOperationResult> DecidePayoutAsync(
-        Guid payoutId, string currentUserId, bool approve, string? reason)
-    {
-        if (!approve && string.IsNullOrWhiteSpace(reason))
-            return PayoutOperationResult.Failed(["Rejection reason is required."]);
-        await using var context = await dbFactory.CreateDbContextAsync();
-        var payout = await context.RotationalPayouts.FirstOrDefaultAsync(item => item.Id == payoutId && item.IsActive);
-        if (payout is null) return PayoutOperationResult.Failed(["Payout not found."]);
-        if (await GetCurrentRoleAsync(context, payout.StokvelId, currentUserId) != SisonkeRole.Chairperson)
-            return PayoutOperationResult.Failed(["Only the Chairperson can approve or reject payouts."]);
-        if (payout.PayoutStatus != RotationalPayoutStatus.ReadyForApproval)
-            return PayoutOperationResult.Failed(["Only payouts ready for approval can be approved or rejected."]);
-        var now = DateTime.UtcNow;
-        if (approve)
-        {
-            payout.PayoutStatus = RotationalPayoutStatus.Approved;
-            payout.ApprovedByChairpersonId = currentUserId; payout.ApprovedAt = now;
-        }
-        else
-        {
-            payout.PayoutStatus = RotationalPayoutStatus.Rejected;
-            payout.RejectedByChairpersonId = currentUserId; payout.RejectedAt = now;
-            payout.RejectionReason = reason!.Trim();
-        }
-        payout.UpdatedAt = now; payout.UpdatedBy = currentUserId;
-        await context.SaveChangesAsync();
-        logger.LogInformation("Payout {PayoutId} status changed to {Status}", payoutId, payout.PayoutStatus);
-        return PayoutOperationResult.Succeeded(payout);
-    }
-
     private static IQueryable<RotationalPayout> CurrentPayoutQuery(ApplicationDbContext context, Guid stokvelId) =>
         context.RotationalPayouts.AsNoTracking()
             .Include(payout => payout.Cycle).Include(payout => payout.PayoutMember)
@@ -224,6 +295,12 @@ public sealed class RotationalPayoutService(
 
 public sealed record ConfirmPayoutPaidRequest(
     PaymentMethod? PaymentMethod, string? PaymentReference, DateTime? PaidAt, string? Notes);
+public enum RotationalPayoutDecision
+{
+    Approve = 1,
+    Reject = 2,
+    RequestChanges = 3
+}
 public sealed record PayoutOperationResult(bool Success, RotationalPayout? Payout, List<string> Errors)
 {
     public static PayoutOperationResult Succeeded(RotationalPayout payout) => new(true, payout, []);
