@@ -89,26 +89,9 @@ else
     @* ── Loan Configuration ── *@
     <section class="sisonke-card mb-3">
         <div class="sisonke-card-body">
-            @if (state.Configuration is null)
+            @if (showConfigForm && state.CanConfigure)
             {
-                <h2>Loan Rules</h2>
-                <div class="sisonke-alert sisonke-alert-blue mb-3">
-                    Loan rules have not been configured yet for this stokvel.
-                </div>
-                @if (state.CanConfigure)
-                {
-                    <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="() => { showConfigForm = true; errors = []; success = null; }">
-                        <i class="bi bi-gear-fill me-1"></i>Configure Loan Rules
-                    </button>
-                }
-                else
-                {
-                    <p class="text-muted mb-0">Loan rules will appear once office bearers configure them.</p>
-                }
-            }
-            else if (showConfigForm && state.CanConfigure)
-            {
-                <h2>Edit Loan Rules</h2>
+                <h2>@(state.Configuration is null ? "Configure Loan Rules" : "Edit Loan Rules")</h2>
                 <EditForm Model="configForm" OnSubmit="OpenConfigConfirmation">
                     <div class="row g-3">
                         <div class="col-12">
@@ -188,6 +171,30 @@ else
                                 <label class="form-check-label" for="reqTreasurer">Require Treasurer disbursement confirmation</label>
                             </div>
                         </div>
+                        <div class="col-12 col-md-6">
+                            <div class="form-check">
+                                <InputCheckbox class="form-check-input" id="surplusBacked" @bind-Value="configForm.SurplusBackedLoansEnabled" />
+                                <label class="form-check-label" for="surplusBacked">Enable surplus-backed equity loans</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Surplus equity multiplier</label>
+                            <InputNumber class="form-control" @bind-Value="configForm.SurplusEquityLoanMultiplier" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="form-check">
+                                <InputCheckbox class="form-check-input" id="earlyPayoutLoans" @bind-Value="configForm.EarlyPayoutLoansEnabled" />
+                                <label class="form-check-label" for="earlyPayoutLoans">Enable accelerated payout loans</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Early payout discount (%)</label>
+                            <InputNumber class="form-control" @bind-Value="configForm.EarlyPayoutDiscountRatePercent" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Required guarantors</label>
+                            <InputNumber class="form-control" @bind-Value="configForm.RequiredGuarantorCount" />
+                        </div>
                     </div>
                     <div class="d-flex gap-2 mt-3">
                         <button class="sisonke-btn sisonke-btn-primary" type="submit">
@@ -196,6 +203,23 @@ else
                         <button class="sisonke-btn sisonke-btn-outline" type="button" @onclick="CancelConfigEdit">Cancel</button>
                     </div>
                 </EditForm>
+            }
+            else if (state.Configuration is null)
+            {
+                <h2>Loan Rules</h2>
+                <div class="sisonke-alert sisonke-alert-blue mb-3">
+                    Loan rules have not been configured yet for this stokvel.
+                </div>
+                @if (state.CanConfigure)
+                {
+                    <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="OpenConfigEdit">
+                        <i class="bi bi-gear-fill me-1"></i>Configure Loan Rules
+                    </button>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">Loan rules will appear once office bearers configure them.</p>
+                }
             }
             else
             {
@@ -209,7 +233,7 @@ else
                     </div>
                     @if (state.CanConfigure)
                     {
-                        <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="() => { showConfigForm = true; errors = []; success = null; }">
+                        <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="OpenConfigEdit">
                             <i class="bi bi-pencil me-1"></i>Edit Loan Rules
                         </button>
                     }
@@ -281,6 +305,14 @@ else
                         <div class="detail-mini-label">Treasurer Disbursement Confirmation Required</div>
                         <div class="detail-mini-value">@(state.Configuration.RequireTreasurerDisbursementConfirmation ? "Yes" : "No")</div>
                     </div>
+                    <div class="col-6 col-md-4">
+                        <div class="detail-mini-label">Surplus-Backed Equity Loans</div>
+                        <div class="detail-mini-value">@(state.Configuration.SurplusBackedLoansEnabled ? $"Yes · x{state.Configuration.SurplusEquityLoanMultiplier}" : "No")</div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="detail-mini-label">Accelerated Payout Loans</div>
+                        <div class="detail-mini-value">@(state.Configuration.EarlyPayoutLoansEnabled ? $"{state.Configuration.EarlyPayoutDiscountRatePercent}% discount · {state.Configuration.RequiredGuarantorCount} guarantors" : "No")</div>
+                    </div>
                 </div>
             }
         </div>
@@ -303,7 +335,12 @@ else
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Repayment months</label>
-                        <InputNumber class="form-control" @bind-Value="loanMonths" disabled="@(NetLoanAmount <= 0)" />
+                        <InputSelect class="form-select" @bind-Value="loanMonths">
+                            @foreach (var month in Enumerable.Range(1, MaxLoanRepaymentMonths))
+                            {
+                                <option value="@month">@month</option>
+                            }
+                        </InputSelect>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Reason</label>
@@ -334,29 +371,100 @@ else
         </section>
     }
 
+    @if (CanRequestSurplusBackedLoan)
+    {
+        <section class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <h2>Request Surplus-Backed Equity Loan</h2>
+                <div class="loan-estimate-grid mb-3">
+                    <div><div class="detail-mini-label">Available surplus equity</div><div class="detail-mini-value">@Money(AvailableSurplusEquity)</div></div>
+                    <div><div class="detail-mini-label">Maximum borrowing amount</div><div class="detail-mini-value">@Money(MaxSurplusBackedLoan)</div></div>
+                    <div><div class="detail-mini-label">Collateral required</div><div class="detail-mini-value">@Money(EstimatedSurplusCollateral)</div></div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-3"><label class="form-label">Amount</label><InputNumber class="form-control" @bind-Value="surplusLoanAmount" /></div>
+                    <div class="col-md-3"><label class="form-label">Repayment months</label><InputNumber class="form-control" @bind-Value="surplusLoanMonths" /></div>
+                    <div class="col-md-6"><label class="form-label">Reason</label><InputText class="form-control" @bind-Value="surplusLoanReason" /></div>
+                </div>
+                <button class="sisonke-btn sisonke-btn-primary mt-3" type="button" @onclick="RequestSurplusBackedLoanAsync">Submit Surplus-Backed Request</button>
+            </div>
+        </section>
+    }
+
+    @if (CanRequestAcceleratedPayoutLoan)
+    {
+        <section class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <h2>Request Accelerated Payout Loan</h2>
+                <div class="loan-estimate-grid mb-3">
+                    <div><div class="detail-mini-label">Future payout</div><div class="detail-mini-value">@Money(EarlyPayoutGross)</div></div>
+                    <div><div class="detail-mini-label">Reserve retained</div><div class="detail-mini-value">@Money(EarlyPayoutDiscount)</div></div>
+                    <div><div class="detail-mini-label">Net paid</div><div class="detail-mini-value">@Money(EarlyPayoutNet)</div></div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Guarantor 1</label>
+                        <InputSelect class="form-select" @bind-Value="earlyGuarantorOneId">
+                            <option value="@Guid.Empty">Select guarantor</option>
+                            @foreach (var member in state.EligibleGuarantors)
+                            {
+                                <option value="@member.Id">@member.FullName</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Guarantor 2</label>
+                        <InputSelect class="form-select" @bind-Value="earlyGuarantorTwoId">
+                            <option value="@Guid.Empty">Select guarantor</option>
+                            @foreach (var member in state.EligibleGuarantors)
+                            {
+                                <option value="@member.Id">@member.FullName</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4"><label class="form-label">Reason</label><InputText class="form-control" @bind-Value="earlyPayoutReason" /></div>
+                </div>
+                <button class="sisonke-btn sisonke-btn-primary mt-3" type="button" @onclick="RequestAcceleratedPayoutLoanAsync">Submit Accelerated Payout Request</button>
+            </div>
+        </section>
+    }
+
     <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>@(state.CanViewAll ? "Loan Requests & Active Loans" : "My Loans")</h2>
         @if (state.Loans.Count == 0) { <div class="text-muted">No loan records.</div> }
-        else { <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Borrowed Amount</th><th>Approved</th><th>Months</th><th>Status</th><th>Outstanding</th><th></th></tr></thead><tbody>
-            @foreach (var loan in state.Loans) { <tr><td class="fw-semibold">@loan.Member.FullName</td><td><div>@Money(loan.RequestedAmount)</div>@if (!string.IsNullOrWhiteSpace(loan.Notes)) { <div class="text-muted small">@loan.Notes</div> }</td><td>@Money(loan.ApprovedAmount ?? 0)</td><td>@loan.RepaymentMonths</td><td><span class="sisonke-badge @LoanStatusBadge(loan.LoanStatus)">@loan.LoanStatus</span></td><td>@Money(loan.OutstandingBalance)</td><td class="text-end">
+        else { <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Type</th><th>Borrowed Amount</th><th>Approved</th><th>Months</th><th>Status</th><th>Outstanding</th><th></th></tr></thead><tbody>
+            @foreach (var loan in state.Loans) { <tr><td class="fw-semibold">@loan.Member.FullName</td><td>@loan.LoanType</td><td><div>@Money(loan.RequestedAmount)</div>@if (!string.IsNullOrWhiteSpace(loan.Notes)) { <div class="text-muted small">@loan.Notes</div> } @if (loan.LoanType == MemberLoanType.SurplusBackedEquity) { <div class="text-muted small">Collateral locked: @Money(loan.CollateralLockedAmount)</div> } @if (loan.LoanType == MemberLoanType.AcceleratedRotationalPayout) { <div class="text-muted small">Gross @Money(loan.EarlyPayoutGrossAmount) · Reserve @Money(loan.EarlyPayoutDiscountAmount) · Net @Money(loan.EarlyPayoutNetDisbursedAmount)</div> }</td><td>@Money(loan.ApprovedAmount ?? 0)</td><td>@loan.RepaymentMonths</td><td><span class="sisonke-badge @LoanStatusBadge(loan.LoanStatus)">@loan.LoanStatus</span></td><td>@Money(loan.OutstandingBalance)</td><td class="text-end">
                 @if (state.CanApprove && loan.LoanStatus == MemberLoanStatus.PendingApproval) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm me-1" @onclick="() => OpenLoanApproval(loan)">Approve</button><button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm" style="color:var(--sk-danger)" @onclick="() => OpenLoanRejection(loan)">Reject</button> }
                 @if (state.CanConfirmMoney && loan.LoanStatus == MemberLoanStatus.DisbursementPending) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm" @onclick="() => OpenDisbursement(loan)">Confirm Disbursement</button> }
+                @if (loan.Guarantors.Count > 0) { <div class="small text-muted mt-1">@string.Join(", ", loan.Guarantors.Select(g => $"{g.GuarantorMember.FullName}: {g.Status}"))</div> }
             </td></tr> }
         </tbody></table></div> }
     </div></section>
+
+    @if (state.GuarantorRequests.Count > 0)
+    {
+        <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>My Guarantor Requests</h2>
+            <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Borrower</th><th>Loan</th><th>Status</th><th></th></tr></thead><tbody>
+                @foreach (var item in state.GuarantorRequests)
+                {
+                    <tr><td class="fw-semibold">@item.Loan.Member.FullName</td><td>@item.Loan.LoanType · @Money(item.Loan.RequestedAmount)</td><td><span class="sisonke-badge @GuarantorStatusBadge(item.Status)">@item.Status</span></td><td class="text-end">@if (item.Status == MemberLoanGuarantorStatus.Pending) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm me-1" @onclick="() => AcceptGuarantorAsync(item.Id)">Accept</button><button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm" style="color:var(--sk-danger)" @onclick="() => OpenGuarantorRejection(item)">Reject</button> }</td></tr>
+                }
+            </tbody></table></div>
+        </div></section>
+    }
 
     <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>Loan Repayment Register</h2>
         @if (state.Repayments.Count == 0) { <div class="text-muted">No repayment schedule yet.</div> }
         else { <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Due</th><th>Expected</th><th>Paid</th><th>Fine</th><th>Status</th><th></th></tr></thead><tbody>@foreach (var repayment in state.Repayments) { var isOverdue = repayment.PaymentStatus == LoanRepaymentStatus.Pending && repayment.DueDate.Date < DateTime.Today; <tr><td>@repayment.DueDate.ToString("dd MMM yyyy")</td><td>@Money(repayment.ExpectedAmount)</td><td>@Money(repayment.PaidAmount)</td><td>@Money(repayment.FineAmount)</td><td><span class="sisonke-badge @(isOverdue ? "sisonke-badge-red" : RepaymentStatusBadge(repayment.PaymentStatus))">@(isOverdue ? "Overdue" : repayment.PaymentStatus.ToString())</span></td><td>@if (state.CanConfirmMoney && repayment.PaymentStatus is not (LoanRepaymentStatus.Paid or LoanRepaymentStatus.Waived)) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm" @onclick="() => OpenRepayment(repayment)">Confirm</button> }</td></tr> }</tbody></table></div> }
     </div></section>
 
-    <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>My Surplus Wallet</h2><div class="loan-estimate-grid"><div><div class="detail-mini-label">Available</div><div class="detail-mini-value">@Money(WalletBalance)</div></div><div><div class="detail-mini-label">Total credited</div><div class="detail-mini-value">@Money(state.Wallet?.TotalCredits ?? 0)</div></div><div><div class="detail-mini-label">Total withdrawn</div><div class="detail-mini-value">@Money(state.Wallet?.TotalWithdrawals ?? 0)</div></div></div>
-        @if (WalletBalance > 0) { <div class="row g-2 mt-3"><div class="col-md-3"><label class="form-label">Amount</label><InputNumber class="form-control" @bind-Value="withdrawalAmount" /></div><div class="col-md-6"><label class="form-label">Reason</label><InputText class="form-control" @bind-Value="withdrawalReason" /></div><div class="col-md-3 d-flex align-items-end"><button class="sisonke-btn sisonke-btn-primary w-100" @onclick="RequestWithdrawalAsync">Request Withdrawal</button></div></div> }
+    <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>My Surplus Wallet</h2><div class="loan-estimate-grid"><div><div class="detail-mini-label">Available</div><div class="detail-mini-value">@Money(WalletBalance)</div></div><div><div class="detail-mini-label">Core savings</div><div class="detail-mini-value">@Money(state.Wallet?.CoreSavingsBalance ?? 0)</div></div><div><div class="detail-mini-label">Surplus equity</div><div class="detail-mini-value">@Money(SurplusEquity)</div></div><div><div class="detail-mini-label">Locked surplus equity</div><div class="detail-mini-value">@Money(LockedSurplusEquity)</div></div><div><div class="detail-mini-label">Available surplus equity</div><div class="detail-mini-value">@Money(AvailableSurplusEquity)</div></div><div><div class="detail-mini-label">Total credited</div><div class="detail-mini-value">@Money(state.Wallet?.TotalCredits ?? 0)</div></div><div><div class="detail-mini-label">Total withdrawn</div><div class="detail-mini-value">@Money(state.Wallet?.TotalWithdrawals ?? 0)</div></div></div>
+        @if (WalletBalance > 0) { <div class="row g-2 mt-3"><div class="col-md-3"><label class="form-label">Amount</label><InputNumber class="form-control" @bind-Value="withdrawalAmount" /></div><div class="col-md-3"><label class="form-label">Reason</label><InputSelect class="form-select" @bind-Value="withdrawalReason">@foreach (var option in WithdrawalReasonOptions) { <option value="@option">@option</option> }</InputSelect></div>@if (withdrawalReason == "Other") { <div class="col-md-3"><label class="form-label">Explanation</label><InputText class="form-control" @bind-Value="withdrawalReasonNotes" /></div> }<div class="col-md-3 d-flex align-items-end"><button class="sisonke-btn sisonke-btn-primary w-100" @onclick="RequestWithdrawalAsync">Request Withdrawal</button></div></div> }
         @if (state.Transactions.Count > 0) { <h3 class="h6 mt-3">Recent transactions</h3><div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Type</th><th>Description</th><th>Amount</th><th>Balance After</th></tr></thead><tbody>@foreach (var tx in state.Transactions) { <tr><td><span class="sisonke-badge sisonke-badge-blue">@tx.TransactionType</span></td><td>@tx.Description</td><td>@Money(tx.Amount)</td><td>@Money(tx.BalanceAfterTransaction)</td></tr> }</tbody></table></div> }
     </div></section>
 
     <section class="sisonke-card mb-3"><div class="sisonke-card-body"><h2>@(state.CanViewAll ? "Surplus Withdrawal Requests" : "My Withdrawal Requests")</h2>
         @if (state.Withdrawals.Count == 0) { <div class="text-muted">No withdrawal requests.</div> }
-        else { <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Amount</th><th>Status</th><th>Reason</th><th></th></tr></thead><tbody>@foreach (var item in state.Withdrawals) { <tr><td class="fw-semibold">@item.Member.FullName</td><td>@Money(item.RequestedAmount)</td><td><span class="sisonke-badge @WithdrawalStatusBadge(item.WithdrawalStatus)">@item.WithdrawalStatus</span></td><td>@item.RequestReason</td><td>@if (state.CanApprove && item.WithdrawalStatus == SurplusWithdrawalStatus.PendingApproval) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm me-1" @onclick="() => ApproveWithdrawalAsync(item.Id)">Approve</button><button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm" style="color:var(--sk-danger)" @onclick="() => OpenWithdrawalRejection(item)">Reject</button> } @if (state.CanConfirmMoney && item.WithdrawalStatus == SurplusWithdrawalStatus.PaymentPending) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm" @onclick="() => OpenWithdrawalPayment(item)">Confirm Paid</button> }</td></tr> }</tbody></table></div> }
+        else { <div class="table-responsive"><table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Amount</th><th>Status</th><th>Reason</th><th></th></tr></thead><tbody>@foreach (var item in state.Withdrawals) { <tr><td class="fw-semibold">@item.Member.FullName</td><td>@Money(item.RequestedAmount)</td><td><span class="sisonke-badge @WithdrawalStatusBadge(item.WithdrawalStatus)">@WithdrawalStatusText(item.WithdrawalStatus)</span></td><td>@WithdrawalReasonText(item)</td><td>@if (state.CanReviewWithdrawals && IsAwaitingSecretaryReview(item.WithdrawalStatus)) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm me-1" @onclick="() => OpenWithdrawalSecretaryReview(item, true)">Recommend Approval</button><button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm" style="color:var(--sk-danger)" @onclick="() => OpenWithdrawalSecretaryReview(item, false)">Recommend Rejection</button> } @if (state.CanApproveWithdrawals && item.WithdrawalStatus == SurplusWithdrawalStatus.AwaitingChairpersonApproval) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm me-1" @onclick="() => ApproveWithdrawalAsync(item.Id)">Approve</button><button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm" style="color:var(--sk-danger)" @onclick="() => OpenWithdrawalRejection(item)">Reject</button> } @if (state.CanConfirmMoney && IsAwaitingTreasurerPayout(item.WithdrawalStatus)) { <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm" @onclick="() => OpenWithdrawalPayment(item)">Confirm Paid</button> }</td></tr> }</tbody></table></div> }
     </div></section>
 }
 
@@ -389,7 +497,8 @@ else
 {
     <div class="modal d-block" style="background:rgba(0,0,0,.45)" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5>@dialogTitle</h5></div><div class="modal-body">
         @if (dialogKind == "loan-approve") { <label>Approved amount</label><InputNumber class="form-control mb-2" @bind-Value="actionAmount" /><label>Repayment months</label><InputNumber class="form-control" @bind-Value="actionMonths" /> }
-        else if (dialogKind is "loan-reject" or "withdraw-reject") { <label>Rejection reason</label><InputTextArea class="form-control" @bind-Value="actionReason" /> }
+        else if (dialogKind == "withdraw-secretary") { <label>Secretary review notes</label><InputTextArea class="form-control" @bind-Value="actionReason" /> }
+        else if (dialogKind is "loan-reject" or "withdraw-reject" or "guarantor-reject") { <label>Rejection reason</label><InputTextArea class="form-control" @bind-Value="actionReason" /> }
         else if (dialogKind is "disburse" or "withdraw-pay" or "repayment")
         {
             @if (dialogKind == "repayment") { <label>Paid amount</label><InputNumber class="form-control mb-2" @bind-Value="actionAmount" /> }
@@ -438,7 +547,14 @@ else
     private int loanMonths = 1;
     private string loanReason = "";
     private decimal withdrawalAmount;
-    private string withdrawalReason = "";
+    private string withdrawalReason = "Emergency";
+    private string withdrawalReasonNotes = "";
+    private decimal surplusLoanAmount;
+    private int surplusLoanMonths = 1;
+    private string surplusLoanReason = "";
+    private string earlyPayoutReason = "";
+    private Guid earlyGuarantorOneId = Guid.Empty;
+    private Guid earlyGuarantorTwoId = Guid.Empty;
     private string? dialogKind;
     private string dialogTitle = "";
     private Guid actionId;
@@ -451,10 +567,35 @@ else
     private string actionNotes = "";
     private bool actionApplyFine;
     private bool actionWaive;
+    private bool actionRecommendation;
+    private static readonly string[] WithdrawalReasonOptions =
+    [
+        "Emergency",
+        "School fees / Education",
+        "Medical expenses",
+        "Funeral / Family support",
+        "Transport",
+        "Groceries / Household needs",
+        "Debt repayment",
+        "Business / Income opportunity",
+        "Other",
+        "Prefer not to say"
+    ];
     private decimal WalletBalance => state?.Wallet?.AvailableBalance ?? 0;
     private bool CanRequestLoan => state?.EligibilityMessage.StartsWith("Eligible", StringComparison.OrdinalIgnoreCase) == true && state.Configuration?.LoansEnabled == true;
+    private bool CanRequestSurplusBackedLoan => CanRequestLoan && state?.Configuration?.SurplusBackedLoansEnabled == true && MaxSurplusBackedLoan > 0;
+    private bool CanRequestAcceleratedPayoutLoan => CanRequestLoan && state?.Configuration?.EarlyPayoutLoansEnabled == true && state.FuturePayoutCycle is not null && state.EligibleGuarantors.Count >= Math.Max(2, state.Configuration.RequiredGuarantorCount);
+    private int MaxLoanRepaymentMonths => Math.Max(1, state?.Configuration?.MaxRepaymentMonths ?? 1);
     private decimal WalletEarlyPayoutAmount => loanAmount <= 0 ? 0 : Math.Min(loanAmount, WalletBalance);
     private decimal NetLoanAmount => loanAmount <= 0 ? 0 : Math.Max(0, loanAmount - WalletEarlyPayoutAmount);
+    private decimal SurplusEquity => state?.Wallet?.SurplusEquityBalance > 0 ? state.Wallet.SurplusEquityBalance : WalletBalance;
+    private decimal LockedSurplusEquity => state?.Wallet?.LockedSurplusEquityBalance ?? 0;
+    private decimal AvailableSurplusEquity => Math.Max(0, SurplusEquity - LockedSurplusEquity);
+    private decimal MaxSurplusBackedLoan => Math.Round(AvailableSurplusEquity * (state?.Configuration?.SurplusEquityLoanMultiplier > 0 ? state.Configuration.SurplusEquityLoanMultiplier : 1), 2);
+    private decimal EstimatedSurplusCollateral => surplusLoanAmount <= 0 ? 0 : Math.Round(surplusLoanAmount / (state?.Configuration?.SurplusEquityLoanMultiplier > 0 ? state.Configuration.SurplusEquityLoanMultiplier : 1), 2);
+    private decimal EarlyPayoutGross => state?.FuturePayoutCycle?.ExpectedPayoutAmount ?? 0;
+    private decimal EarlyPayoutDiscount => Math.Round(EarlyPayoutGross * (state?.Configuration?.EarlyPayoutDiscountRatePercent ?? 0) / 100, 2);
+    private decimal EarlyPayoutNet => Math.Max(0, EarlyPayoutGross - EarlyPayoutDiscount);
     private MemberLoan? MyActiveLoan => state?.Loans.FirstOrDefault(x => x.MemberId == state.CurrentMember?.Id && x.LoanStatus is MemberLoanStatus.Active or MemberLoanStatus.Overdue);
     private decimal EstimatedMonthly => loanMonths <= 0 || NetLoanAmount <= 0 ? 0 : Math.Round(NetLoanAmount / loanMonths, 2);
 
@@ -475,7 +616,16 @@ else
     {
         state = await Service.GetPageStateAsync(StokvelId, currentUserId);
         configForm = state?.Configuration is not null ? Clone(state.Configuration) : NewConfig();
-        loanMonths = state?.Configuration?.DefaultRepaymentMonths ?? 1;
+        loanMonths = Math.Clamp(loanMonths, 1, MaxLoanRepaymentMonths);
+        surplusLoanMonths = state?.Configuration?.DefaultRepaymentMonths ?? 1;
+    }
+
+    private void OpenConfigEdit()
+    {
+        configForm = state?.Configuration is not null ? Clone(state.Configuration) : NewConfig();
+        showConfigForm = true;
+        errors = [];
+        success = null;
     }
 
     private void OpenConfigConfirmation() => showConfigConfirm = true;
@@ -511,14 +661,19 @@ else
     }
 
     private Task RequestLoanAsync() => RunAsync(Service.RequestLoanAsync(StokvelId, currentUserId, loanAmount, loanMonths, loanReason), "Loan request submitted.");
-    private Task RequestWithdrawalAsync() => RunAsync(Service.RequestWithdrawalAsync(StokvelId, currentUserId, withdrawalAmount, withdrawalReason), "Withdrawal request submitted.");
+    private Task RequestSurplusBackedLoanAsync() => RunAsync(Service.RequestSurplusBackedLoanAsync(StokvelId, currentUserId, surplusLoanAmount, surplusLoanMonths, surplusLoanReason), "Surplus-backed loan request submitted.");
+    private Task RequestAcceleratedPayoutLoanAsync() => RunAsync(Service.RequestAcceleratedPayoutLoanAsync(StokvelId, currentUserId, [earlyGuarantorOneId, earlyGuarantorTwoId], earlyPayoutReason), "Accelerated payout request submitted.");
+    private Task RequestWithdrawalAsync() => RunAsync(Service.RequestWithdrawalAsync(StokvelId, currentUserId, withdrawalAmount, withdrawalReason, withdrawalReasonNotes), "Withdrawal request submitted.");
     private Task ApproveWithdrawalAsync(Guid id) => RunAsync(Service.ApproveWithdrawalAsync(id, currentUserId), "Withdrawal approved for payment.");
+    private Task AcceptGuarantorAsync(Guid id) => RunAsync(Service.AcceptGuarantorRequestAsync(id, currentUserId), "Guarantor request accepted.");
     private void OpenLoanApproval(MemberLoan x) { dialogKind = "loan-approve"; dialogTitle = "Approve Loan"; actionId = x.Id; actionAmount = x.RequestedAmount; actionMonths = x.RepaymentMonths; }
     private void OpenLoanRejection(MemberLoan x) { dialogKind = "loan-reject"; dialogTitle = "Reject Loan"; actionId = x.Id; actionReason = ""; }
     private void OpenDisbursement(MemberLoan x) { dialogKind = "disburse"; dialogTitle = "Confirm Loan Disbursement"; actionId = x.Id; ResetPayment(); }
     private void OpenRepayment(MemberLoanRepayment x) { dialogKind = "repayment"; dialogTitle = "Confirm Loan Repayment"; actionId = x.Id; actionAmount = x.ExpectedAmount; ResetPayment(); }
+    private void OpenWithdrawalSecretaryReview(MemberSurplusWithdrawalRequest x, bool recommendApproval) { dialogKind = "withdraw-secretary"; dialogTitle = recommendApproval ? "Recommend Withdrawal Approval" : "Recommend Withdrawal Rejection"; actionId = x.Id; actionRecommendation = recommendApproval; actionReason = ""; }
     private void OpenWithdrawalRejection(MemberSurplusWithdrawalRequest x) { dialogKind = "withdraw-reject"; dialogTitle = "Reject Surplus Withdrawal"; actionId = x.Id; actionReason = ""; }
     private void OpenWithdrawalPayment(MemberSurplusWithdrawalRequest x) { dialogKind = "withdraw-pay"; dialogTitle = "Confirm Surplus Withdrawal Paid"; actionId = x.Id; ResetPayment(); }
+    private void OpenGuarantorRejection(MemberLoanGuarantor x) { dialogKind = "guarantor-reject"; dialogTitle = "Reject Guarantor Request"; actionId = x.Id; actionReason = ""; }
     private void ResetPayment() { actionMethod = PaymentMethod.EFT; actionReference = ""; actionDate = DateTime.Today; actionNotes = ""; actionApplyFine = false; actionWaive = false; }
     private void CloseDialog() => dialogKind = null;
     private async Task SubmitDialogAsync()
@@ -527,8 +682,10 @@ else
         else if (dialogKind == "loan-reject") await RunAsync(Service.RejectLoanAsync(actionId, currentUserId, actionReason), "Loan rejected.");
         else if (dialogKind == "disburse") await RunAsync(Service.ConfirmDisbursementAsync(actionId, currentUserId, actionMethod, actionReference, actionDate, actionNotes), "Loan disbursed and repayment schedule generated.");
         else if (dialogKind == "repayment") await RunAsync(Service.ConfirmRepaymentAsync(actionId, currentUserId, actionAmount, actionDate, actionMethod, actionReference, actionWaive, actionApplyFine, actionNotes), "Repayment confirmed.");
+        else if (dialogKind == "withdraw-secretary") await RunAsync(Service.ReviewWithdrawalAsSecretaryAsync(actionId, currentUserId, actionRecommendation, actionReason), "Withdrawal review saved.");
         else if (dialogKind == "withdraw-reject") await RunAsync(Service.RejectWithdrawalAsync(actionId, currentUserId, actionReason), "Withdrawal rejected.");
         else if (dialogKind == "withdraw-pay") await RunAsync(Service.ConfirmWithdrawalPaidAsync(actionId, currentUserId, actionMethod, actionReference, actionDate, actionNotes), "Withdrawal payment confirmed.");
+        else if (dialogKind == "guarantor-reject") await RunAsync(Service.RejectGuarantorRequestAsync(actionId, currentUserId, actionReason), "Guarantor request rejected.");
     }
     private static string Money(decimal x) => x.ToString("C2", new System.Globalization.CultureInfo("en-ZA"));
     private static string LoanStatusBadge(MemberLoanStatus s) => s switch
@@ -550,9 +707,35 @@ else
     private static string WithdrawalStatusBadge(SurplusWithdrawalStatus s) => s switch
     {
         SurplusWithdrawalStatus.Paid => "sisonke-badge-green",
-        SurplusWithdrawalStatus.PendingApproval or SurplusWithdrawalStatus.Approved or SurplusWithdrawalStatus.PaymentPending => "sisonke-badge-gold",
+        SurplusWithdrawalStatus.PendingApproval or SurplusWithdrawalStatus.PendingSecretaryReview or SurplusWithdrawalStatus.AwaitingChairpersonApproval or SurplusWithdrawalStatus.Approved or SurplusWithdrawalStatus.PaymentPending or SurplusWithdrawalStatus.AwaitingTreasurerPayout => "sisonke-badge-gold",
         SurplusWithdrawalStatus.Rejected => "sisonke-badge-red",
         _ => "sisonke-badge-gray"
+    };
+
+    private static bool IsAwaitingSecretaryReview(SurplusWithdrawalStatus status) =>
+        status is SurplusWithdrawalStatus.Submitted or SurplusWithdrawalStatus.PendingApproval or SurplusWithdrawalStatus.PendingSecretaryReview;
+
+    private static bool IsAwaitingTreasurerPayout(SurplusWithdrawalStatus status) =>
+        status is SurplusWithdrawalStatus.Approved or SurplusWithdrawalStatus.PaymentPending or SurplusWithdrawalStatus.AwaitingTreasurerPayout;
+
+    private static string WithdrawalStatusText(SurplusWithdrawalStatus status) => status switch
+    {
+        SurplusWithdrawalStatus.Submitted or SurplusWithdrawalStatus.PendingApproval or SurplusWithdrawalStatus.PendingSecretaryReview => "Awaiting Secretary Review",
+        SurplusWithdrawalStatus.AwaitingChairpersonApproval => "Awaiting Chairperson Approval",
+        SurplusWithdrawalStatus.Approved or SurplusWithdrawalStatus.PaymentPending or SurplusWithdrawalStatus.AwaitingTreasurerPayout => "Awaiting Treasurer Payout",
+        _ => status.ToString()
+    };
+
+    private static string WithdrawalReasonText(MemberSurplusWithdrawalRequest request) =>
+        string.IsNullOrWhiteSpace(request.RequestReasonNotes)
+            ? request.RequestReason
+            : $"{request.RequestReason} - {request.RequestReasonNotes}";
+
+    private static string GuarantorStatusBadge(MemberLoanGuarantorStatus s) => s switch
+    {
+        MemberLoanGuarantorStatus.Accepted => "sisonke-badge-green",
+        MemberLoanGuarantorStatus.Rejected => "sisonke-badge-red",
+        _ => "sisonke-badge-gold"
     };
 
     private static StokvelLoanConfiguration NewConfig() => new()
@@ -562,7 +745,9 @@ else
         LoanInterestType = LoanInterestType.None, LoanInterestRate = 0,
         LateRepaymentFineType = LatePenaltyType.None, LateRepaymentFineAmount = null,
         GracePeriodDays = 0, FreezePeriodAfterFullRepaymentDays = 30,
-        RequireChairpersonApproval = true, RequireTreasurerDisbursementConfirmation = true
+        RequireChairpersonApproval = true, RequireTreasurerDisbursementConfirmation = true,
+        SurplusBackedLoansEnabled = false, SurplusEquityLoanMultiplier = 1,
+        EarlyPayoutLoansEnabled = false, EarlyPayoutDiscountRatePercent = 0, RequiredGuarantorCount = 2
     };
     private static StokvelLoanConfiguration Clone(StokvelLoanConfiguration x) => new()
     {
@@ -572,6 +757,11 @@ else
         LateRepaymentFineType = x.LateRepaymentFineType, LateRepaymentFineAmount = x.LateRepaymentFineAmount,
         GracePeriodDays = x.GracePeriodDays, FreezePeriodAfterFullRepaymentDays = x.FreezePeriodAfterFullRepaymentDays,
         RequireChairpersonApproval = x.RequireChairpersonApproval,
-        RequireTreasurerDisbursementConfirmation = x.RequireTreasurerDisbursementConfirmation
+        RequireTreasurerDisbursementConfirmation = x.RequireTreasurerDisbursementConfirmation,
+        SurplusBackedLoansEnabled = x.SurplusBackedLoansEnabled,
+        SurplusEquityLoanMultiplier = x.SurplusEquityLoanMultiplier,
+        EarlyPayoutLoansEnabled = x.EarlyPayoutLoansEnabled,
+        EarlyPayoutDiscountRatePercent = x.EarlyPayoutDiscountRatePercent,
+        RequiredGuarantorCount = x.RequiredGuarantorCount
     };
 }

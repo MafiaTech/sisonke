@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Sisonke.Web.Data.Entities;
 
@@ -12,6 +13,15 @@ public class MemberSurplusWallet
     public Member Member { get; set; } = default!;
 
     public decimal AvailableBalance { get; set; }
+
+    public decimal CoreSavingsBalance { get; set; }
+
+    public decimal SurplusEquityBalance { get; set; }
+
+    public decimal LockedSurplusEquityBalance { get; set; }
+
+    [NotMapped]
+    public decimal AvailableSurplusEquity => Math.Max(0, SurplusEquityBalance - LockedSurplusEquityBalance);
 
     public decimal TotalCredits { get; set; }
 

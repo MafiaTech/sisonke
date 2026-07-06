@@ -19,6 +19,17 @@ public class RotationalPayout
 
     public RotationalPayoutStatus PayoutStatus { get; set; } = RotationalPayoutStatus.ReadyForApproval;
 
+    [MaxLength(50)]
+    public string? ChairpersonDecision { get; set; }
+
+    public DateTime? ChairpersonReviewedAt { get; set; }
+
+    [MaxLength(450)]
+    public string? ChairpersonReviewedByUserId { get; set; }
+
+    [MaxLength(1000)]
+    public string? ChairpersonReviewNotes { get; set; }
+
     public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
 
     [MaxLength(450)]

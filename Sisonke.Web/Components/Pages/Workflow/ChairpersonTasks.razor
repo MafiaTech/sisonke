@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -13,6 +14,7 @@
 @inject FuneralClaimService FuneralClaimService
 @inject MeetingService MeetingService
 @inject RotationalTaskService RotationalTaskService
+@inject RotationalPayoutService RotationalPayoutService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Chairperson Approval Tasks</PageTitle>
@@ -148,6 +150,23 @@ else
             <span class="sisonke-badge sisonke-badge-blue">@RotationalApprovalTaskCount</span>
         </div>
         <div class="sisonke-card-body">
+            @if (!string.IsNullOrWhiteSpace(payoutDecisionSuccessMessage))
+            {
+                <div class="sisonke-alert sisonke-alert-green">
+                    @payoutDecisionSuccessMessage
+                </div>
+            }
+            @if (payoutDecisionErrors.Count > 0)
+            {
+                <div class="sisonke-alert sisonke-alert-red">
+                    <ul class="mb-0 ps-3">
+                        @foreach (var error in payoutDecisionErrors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </div>
+            }
             @if (rotationalTaskState?.PendingApprovalPayout is null)
             {
                 <div class="sisonke-alert sisonke-alert-green mb-0">
@@ -176,10 +195,27 @@ else
                                 <td>@FormatZAR(payout.PayoutAmount)</td>
                                 <td><span class="sisonke-badge sisonke-badge-green">Complete</span></td>
                                 <td><span class="sisonke-badge sisonke-badge-gold">Awaiting approval</span></td>
-                                <td class="text-end">
-                                    <a class="sisonke-btn sisonke-btn-primary" href="@RotationalManagementHref">
-                                        <i class="bi bi-check2-circle me-1"></i>Approve Payout
-                                    </a>
+                                <td>
+                                    <div class="payout-decision-form">
+                                        <label class="visually-hidden" for="payout-decision">Payout decision</label>
+                                        <select id="payout-decision" class="form-select form-select-sm" @bind="payoutDecision">
+                                            <option value="@RotationalPayoutDecision.Approve">Approve payout</option>
+                                            <option value="@RotationalPayoutDecision.Reject">Reject payout</option>
+                                            <option value="@RotationalPayoutDecision.RequestChanges">Send back to Secretary / Request changes</option>
+                                        </select>
+                                        <label class="visually-hidden" for="payout-decision-notes">Decision notes</label>
+                                        <textarea id="payout-decision-notes"
+                                                  class="form-control form-control-sm"
+                                                  rows="2"
+                                                  @bind="payoutDecisionNotes"
+                                                  placeholder="@PayoutDecisionNotesPlaceholder"></textarea>
+                                        <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm"
+                                                type="button"
+                                                disabled="@(!CanSubmitPayoutDecision)"
+                                                @onclick="SubmitPayoutDecisionAsync">
+                                            Submit Decision
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -242,6 +278,13 @@ else
         font-size: 1.8rem;
         line-height: 1.1;
     }
+
+    .payout-decision-form {
+        display: grid;
+        grid-template-columns: minmax(13rem, 1fr);
+        gap: .45rem;
+        min-width: min(22rem, 100%);
+    }
 </style>
 
 @code {
@@ -251,11 +294,22 @@ else
     private bool isLoading = true;
     private bool canViewChairpersonTasks;
     private bool canViewSecretaryTasks;
+    private bool isSubmittingPayoutDecision;
+    private string? currentUserId;
+    private string? payoutDecisionNotes;
+    private string? payoutDecisionSuccessMessage;
+    private List<string> payoutDecisionErrors = [];
+    private RotationalPayoutDecision payoutDecision = RotationalPayoutDecision.Approve;
     private int RotationalApprovalTaskCount => rotationalTaskState?.PendingApprovalPayout is not null ? 1 : 0;
     private string DashboardHref => $"/stokvel-dashboard/{StokvelId}";
     private string SecretaryTasksHref => $"/secretary-tasks/{StokvelId}";
     private string MeetingsHref => $"/meetings/{StokvelId}";
-    private string RotationalManagementHref => $"/rotational/management/{StokvelId}";
+    private string PayoutDecisionNotesPlaceholder => payoutDecision == RotationalPayoutDecision.Approve
+        ? "Decision notes (optional)"
+        : "Notes required";
+    private bool CanSubmitPayoutDecision =>
+        !isSubmittingPayoutDecision &&
+        (payoutDecision == RotationalPayoutDecision.Approve || !string.IsNullOrWhiteSpace(payoutDecisionNotes));
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -268,9 +322,15 @@ else
         rotationalTaskState = null;
         canViewChairpersonTasks = false;
         canViewSecretaryTasks = false;
+        payoutDecisionErrors = [];
+        payoutDecisionSuccessMessage = null;
+        payoutDecisionNotes = null;
+        payoutDecision = RotationalPayoutDecision.Approve;
+        currentUserId = null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        currentUserId = userId;
 
         if (string.IsNullOrWhiteSpace(userId))
         {
@@ -291,6 +351,49 @@ else
         minutesAwaitingApprovalCount = await MeetingService.GetMinutesAwaitingApprovalCountByStokvelIdAsync(StokvelId);
         rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
         isLoading = false;
+    }
+
+    private async Task SubmitPayoutDecisionAsync()
+    {
+        payoutDecisionErrors = [];
+        payoutDecisionSuccessMessage = null;
+
+        if (rotationalTaskState?.PendingApprovalPayout is null || string.IsNullOrWhiteSpace(currentUserId))
+        {
+            payoutDecisionErrors = ["No payout is available for decision."];
+            return;
+        }
+
+        if (payoutDecision != RotationalPayoutDecision.Approve && string.IsNullOrWhiteSpace(payoutDecisionNotes))
+        {
+            payoutDecisionErrors = ["Decision notes are required for reject or request changes."];
+            return;
+        }
+
+        isSubmittingPayoutDecision = true;
+        var result = await RotationalPayoutService.SubmitChairpersonDecisionAsync(
+            rotationalTaskState.PendingApprovalPayout.Id,
+            currentUserId,
+            payoutDecision,
+            payoutDecisionNotes);
+        isSubmittingPayoutDecision = false;
+
+        if (!result.Success)
+        {
+            payoutDecisionErrors = result.Errors;
+            return;
+        }
+
+        payoutDecisionSuccessMessage = payoutDecision switch
+        {
+            RotationalPayoutDecision.Approve => "Payout approved. Treasurer payment is still required.",
+            RotationalPayoutDecision.Reject => "Payout rejected.",
+            RotationalPayoutDecision.RequestChanges => "Payout sent back to the Secretary for changes.",
+            _ => "Payout decision submitted."
+        };
+        payoutDecisionNotes = null;
+        payoutDecision = RotationalPayoutDecision.Approve;
+        rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
     }
 
     private static string DisplayOrDash(string? value)

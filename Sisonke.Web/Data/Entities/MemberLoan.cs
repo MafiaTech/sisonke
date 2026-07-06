@@ -12,6 +12,8 @@ public class MemberLoan
     public Guid MemberId { get; set; }
     public Member Member { get; set; } = default!;
 
+    public MemberLoanType LoanType { get; set; } = MemberLoanType.Standard;
+
     public decimal RequestedAmount { get; set; }
 
     public decimal? ApprovedAmount { get; set; }
@@ -65,6 +67,29 @@ public class MemberLoan
 
     public DateTime? NextEligibleLoanDate { get; set; }
 
+    public Guid? CollateralWalletId { get; set; }
+    public MemberSurplusWallet? CollateralWallet { get; set; }
+
+    public decimal CollateralLockedAmount { get; set; }
+
+    public DateTime? CollateralLockedAt { get; set; }
+
+    public DateTime? CollateralUnlockedAt { get; set; }
+
+    public Guid? OriginalPayoutOrderId { get; set; }
+    public RotationalPayoutOrder? OriginalPayoutOrder { get; set; }
+
+    public Guid? OriginalContributionCycleId { get; set; }
+    public RotationalContributionCycle? OriginalContributionCycle { get; set; }
+
+    public decimal EarlyPayoutGrossAmount { get; set; }
+
+    public decimal EarlyPayoutDiscountRatePercent { get; set; }
+
+    public decimal EarlyPayoutDiscountAmount { get; set; }
+
+    public decimal EarlyPayoutNetDisbursedAmount { get; set; }
+
     [MaxLength(1000)]
     public string? Notes { get; set; }
 
@@ -81,4 +106,6 @@ public class MemberLoan
     public string? UpdatedBy { get; set; }
 
     public ICollection<MemberLoanRepayment> Repayments { get; set; } = [];
+
+    public ICollection<MemberLoanGuarantor> Guarantors { get; set; } = [];
 }

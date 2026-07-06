@@ -15,6 +15,8 @@
 @inject FineService FineService
 @inject FuneralClaimService FuneralClaimService
 @inject ContributionPaymentService ContributionPaymentService
+@inject RotationalTaskService RotationalTaskService
+@inject RotationalPayoutService RotationalPayoutService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Treasurer Task List</PageTitle>
@@ -54,7 +56,7 @@ else
         </div>
     </section>
 
-    @if (outstandingFines.Count == 0 && approvedClaimsAwaitingPayout.Count == 0)
+    @if (outstandingFines.Count == 0 && approvedClaimsAwaitingPayout.Count == 0 && RotationalPayoutTask is null)
     {
         <div class="sisonke-alert sisonke-alert-green mb-4">
             No pending finance tasks. Everything is up to date.
@@ -177,20 +179,141 @@ else
         </div>
     </div>
 
+    <div class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Rotational Payouts Awaiting Payment</h2>
+                    <p>Chairperson-approved rotational payouts that still need Treasurer payment confirmation.</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-gold">@RotationalPayoutTaskCount Open</span>
+            </div>
+
+            @if (RotationalPayoutTask is null)
+            {
+                <div class="sisonke-alert sisonke-alert-green mb-0">
+                    No rotational payouts are awaiting Treasurer payment.
+                </div>
+            }
+            else
+            {
+                var payout = RotationalPayoutTask;
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Cycle</th>
+                                <th>Payout Member</th>
+                                <th>Amount</th>
+                                <th>Chairperson Review</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="fw-semibold">@payout.Cycle.CycleName</td>
+                                <td>@DisplayOrDash(payout.PayoutMember.FullName)</td>
+                                <td>@FormatZAR(payout.PayoutAmount)</td>
+                                <td>
+                                    <div><span class="sisonke-badge sisonke-badge-green">Approved</span></div>
+                                    <div class="text-muted small mt-1">@DisplayOrDash(payout.ChairpersonReviewNotes)</div>
+                                </td>
+                                <td><span class="sisonke-badge sisonke-badge-gold">Awaiting Treasurer payout</span></td>
+                                <td>
+                                    @if (canManagePayments)
+                                    {
+                                        <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm"
+                                                type="button"
+                                                @onclick="OpenRotationalPayoutPayment"
+                                                disabled="@isConfirmingRotationalPayout">
+                                            Capture Payout Payment
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (showRotationalPayoutPaymentForm)
+                {
+                    <div class="rotational-payout-payment-form mt-3">
+                        <div>
+                            <label class="form-label" for="rotational-payout-method">Payment method</label>
+                            <InputSelect id="rotational-payout-method" class="form-select form-select-sm" @bind-Value="rotationalPayoutPaymentMethod">
+                                <option value="">Select method</option>
+                                <option value="@PaymentMethod.EFT">EFT</option>
+                                <option value="@PaymentMethod.Cash">Cash</option>
+                                <option value="@PaymentMethod.BankDeposit">Bank deposit</option>
+                                <option value="@PaymentMethod.MobilePayment">Mobile payment</option>
+                                <option value="@PaymentMethod.Other">Other</option>
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="form-label" for="rotational-payout-reference">Payment reference</label>
+                            <InputText id="rotational-payout-reference" class="form-control form-control-sm" @bind-Value="rotationalPayoutPaymentReference" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="rotational-payout-date">Paid date</label>
+                            <InputDate id="rotational-payout-date" class="form-control form-control-sm" @bind-Value="rotationalPayoutPaidAt" />
+                        </div>
+                        <div class="rotational-payout-payment-notes">
+                            <label class="form-label" for="rotational-payout-notes">Notes</label>
+                            <InputTextArea id="rotational-payout-notes" class="form-control form-control-sm" rows="2" @bind-Value="rotationalPayoutNotes" />
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-end">
+                            <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm"
+                                    type="button"
+                                    @onclick="ConfirmRotationalPayoutPaidAsync"
+                                    disabled="@isConfirmingRotationalPayout">
+                                Mark Payout Paid
+                            </button>
+                            <button class="sisonke-btn sisonke-btn-outline sisonke-btn-sm"
+                                    type="button"
+                                    @onclick="CloseRotationalPayoutPayment"
+                                    disabled="@isConfirmingRotationalPayout">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                @if (rotationalPayoutErrors.Count > 0)
+                {
+                    <div class="sisonke-alert sisonke-alert-red mt-3 mb-0">
+                        <ul class="mb-0 ps-3">
+                            @foreach (var error in rotationalPayoutErrors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(rotationalPayoutSuccessMessage))
+                {
+                    <div class="sisonke-alert sisonke-alert-green mt-3 mb-0">
+                        @rotationalPayoutSuccessMessage
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
     <div id="payout-audit" class="sisonke-card mb-4">
         <div class="sisonke-card-body">
             <div class="sisonke-card-head">
                 <div>
                     <h2>Recent Payout Activity</h2>
-                    <p>Recently captured claim payout actions.</p>
+                    <p>Recently captured claim and rotational payout actions.</p>
                 </div>
-                <span class="sisonke-badge sisonke-badge-gold">@recentPayoutActivity.Count Recent</span>
+                <span class="sisonke-badge sisonke-badge-gold">@(recentPayoutActivity.Count + recentRotationalPayoutActivity.Count) Recent</span>
             </div>
 
-            @if (recentPayoutActivity.Count == 0)
+            @if (recentPayoutActivity.Count == 0 && recentRotationalPayoutActivity.Count == 0)
             {
                 <div class="sisonke-alert sisonke-alert-blue mb-0">
-                    No claim payout activity has been recorded yet.
+                    No payout activity has been recorded yet.
                 </div>
 
                 @if (canManagePayments)
@@ -231,6 +354,37 @@ else
                                     <td>
                                         <a class="sisonke-btn sisonke-btn-outline" href="@($"/claim/{audit.FuneralClaimId}")">Open Claim</a>
                                     </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (recentRotationalPayoutActivity.Count > 0)
+            {
+                <div class="table-responsive mt-3">
+                    <table class="sisonke-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Cycle</th>
+                                <th>Payout Member</th>
+                                <th>Amount</th>
+                                <th>Reference</th>
+                                <th>Method</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var payout in recentRotationalPayoutActivity)
+                            {
+                                <tr>
+                                    <td class="text-muted small">@(payout.PaidAt?.ToLocalTime().ToString("dd MMM yyyy") ?? "-")</td>
+                                    <td class="fw-semibold">@payout.Cycle.CycleName</td>
+                                    <td>@DisplayOrDash(payout.PayoutMember.FullName)</td>
+                                    <td>@FormatZAR(payout.PayoutAmount)</td>
+                                    <td>@DisplayOrDash(payout.PaymentReference)</td>
+                                    <td>@(payout.PaymentMethod?.ToString() ?? "-")</td>
                                 </tr>
                             }
                         </tbody>
@@ -308,18 +462,53 @@ else
     </div>
 }
 
+<style>
+    .rotational-payout-payment-form {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .75rem;
+        padding: 1rem;
+        border: 1px solid var(--sk-border, #e5e7eb);
+        border-radius: var(--r-md, .5rem);
+        background: var(--sk-surface-2, #f8f9fa);
+    }
+
+    .rotational-payout-payment-notes {
+        grid-column: 1 / -1;
+    }
+
+    @@media (max-width: 768px) {
+        .rotational-payout-payment-form {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
 @code {
     private bool isLoading = true;
     private bool isBackfillingPayoutAudits;
+    private bool isConfirmingRotationalPayout;
+    private bool showRotationalPayoutPaymentForm;
     private bool canViewTreasurerTasks;
     private bool canManagePayments;
+    private string? currentUserId;
     private Guid? loggedInTreasurerMemberId;
     private List<MemberFine> outstandingFines = [];
     private List<FuneralClaim> approvedClaimsAwaitingPayout = [];
     private List<ClaimPayoutAudit> recentPayoutActivity = [];
+    private List<RotationalPayout> recentRotationalPayoutActivity = [];
     private List<MemberContribution> currentMonthContributions = [];
     private ContributionMonthSummaryDto currentMonthContributionSummary = new();
+    private RotationalTaskState? rotationalTaskState;
+    private PaymentMethod? rotationalPayoutPaymentMethod;
+    private string? rotationalPayoutPaymentReference;
+    private DateTime? rotationalPayoutPaidAt;
+    private string? rotationalPayoutNotes;
+    private string? rotationalPayoutSuccessMessage;
+    private List<string> rotationalPayoutErrors = [];
     private string CurrentMonthLabel => DateTime.Today.ToString("MMMM yyyy");
+    private RotationalPayout? RotationalPayoutTask => rotationalTaskState?.ApprovedPayout;
+    private int RotationalPayoutTaskCount => RotationalPayoutTask is null ? 0 : 1;
     private int CurrentMonthPaidContributionCount => currentMonthContributions.Count(contribution => contribution.Status == PaymentStatus.Paid);
     private int CurrentMonthOpenContributionCount => currentMonthContributions.Count(contribution =>
         contribution.Status is PaymentStatus.Unpaid or PaymentStatus.PartiallyPaid or PaymentStatus.Late);
@@ -331,18 +520,26 @@ else
     {
         isLoading = true;
         isBackfillingPayoutAudits = false;
+        isConfirmingRotationalPayout = false;
+        showRotationalPayoutPaymentForm = false;
         canViewTreasurerTasks = false;
         canManagePayments = false;
+        currentUserId = null;
         loggedInTreasurerMemberId = null;
         outstandingFines = [];
         approvedClaimsAwaitingPayout = [];
         recentPayoutActivity = [];
+        recentRotationalPayoutActivity = [];
         currentMonthContributions = [];
         currentMonthContributionSummary = new();
+        rotationalTaskState = null;
+        rotationalPayoutErrors = [];
+        rotationalPayoutSuccessMessage = null;
         payoutAuditBackfillMessage = null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        currentUserId = userId;
 
         if (string.IsNullOrWhiteSpace(userId))
         {
@@ -367,6 +564,8 @@ else
 
         outstandingFines = await FineService.GetOutstandingFinesByStokvelIdAsync(StokvelId);
         approvedClaimsAwaitingPayout = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutByStokvelIdAsync(StokvelId);
+        rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
+        recentRotationalPayoutActivity = await RotationalPayoutService.GetRecentPaidPayoutsAsync(StokvelId, 10);
         recentPayoutActivity = await FuneralClaimService.GetClaimPayoutAuditsByStokvelIdAsync(StokvelId, 10);
         currentMonthContributions = await ContributionPaymentService.GetMonthlyContributionsAsync(
             StokvelId,
@@ -377,6 +576,57 @@ else
             DateTime.Today.Year,
             DateTime.Today.Month);
         isLoading = false;
+    }
+
+    private void OpenRotationalPayoutPayment()
+    {
+        rotationalPayoutPaymentMethod = PaymentMethod.EFT;
+        rotationalPayoutPaymentReference = null;
+        rotationalPayoutPaidAt = DateTime.Today;
+        rotationalPayoutNotes = null;
+        rotationalPayoutErrors = [];
+        rotationalPayoutSuccessMessage = null;
+        showRotationalPayoutPaymentForm = true;
+    }
+
+    private void CloseRotationalPayoutPayment()
+    {
+        showRotationalPayoutPaymentForm = false;
+        rotationalPayoutErrors = [];
+    }
+
+    private async Task ConfirmRotationalPayoutPaidAsync()
+    {
+        rotationalPayoutErrors = [];
+        rotationalPayoutSuccessMessage = null;
+
+        if (RotationalPayoutTask is null || string.IsNullOrWhiteSpace(currentUserId))
+        {
+            rotationalPayoutErrors = ["No rotational payout is awaiting payment."];
+            return;
+        }
+
+        isConfirmingRotationalPayout = true;
+        var result = await RotationalPayoutService.ConfirmPayoutPaidAsync(
+            RotationalPayoutTask.Id,
+            currentUserId,
+            new ConfirmPayoutPaidRequest(
+                rotationalPayoutPaymentMethod,
+                rotationalPayoutPaymentReference,
+                rotationalPayoutPaidAt,
+                rotationalPayoutNotes));
+        isConfirmingRotationalPayout = false;
+
+        if (!result.Success)
+        {
+            rotationalPayoutErrors = result.Errors;
+            return;
+        }
+
+        rotationalPayoutSuccessMessage = "Rotational payout marked as paid.";
+        showRotationalPayoutPaymentForm = false;
+        rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
+        recentRotationalPayoutActivity = await RotationalPayoutService.GetRecentPaidPayoutsAsync(StokvelId, 10);
     }
 
     private async Task BackfillPayoutAuditTrailAsync()
@@ -402,6 +652,9 @@ else
 
     private static string FormatZAR(decimal? amount) =>
         amount?.ToString("C0", new System.Globalization.CultureInfo("en-ZA")) ?? "-";
+
+    private static string DisplayOrDash(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
 
     private static string GetClaimReference(ClaimPayoutAudit audit)
     {

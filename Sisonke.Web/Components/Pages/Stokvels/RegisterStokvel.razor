@@ -301,7 +301,10 @@ else
                                         </div>
                                         <div class="archetype-title">@option.Title</div>
                                         <div class="archetype-description">@option.Description</div>
-                                        <span class="@GetArchetypeBadgeClass(option)">@option.StatusText</span>
+                                        @if (option.IsComingSoon)
+                                        {
+                                            <span class="@GetArchetypeBadgeClass(option)">@option.StatusText</span>
+                                        }
                                     </label>
                                 }
                             </div>
@@ -433,7 +436,6 @@ else
                                         </div>
                                         <div>
                                             <div class="fw-700">@SelectedArchetypeOption.Title</div>
-                                            <span class="@GetArchetypeBadgeClass(SelectedArchetypeOption)">@SelectedArchetypeOption.StatusText</span>
                                         </div>
                                     </div>
                                     <p class="text-muted small mb-0">@SelectedArchetypeOption.Description</p>

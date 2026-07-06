@@ -115,10 +115,9 @@ else
                         Payout amount: @FormatZAR(p.PayoutAmount).
                     </div>
                 </div>
-                <button class="sisonke-btn sisonke-btn-gold sisonke-btn-sm"
-                        @onclick="() => showPayoutApprovalModal = true">
-                    <i class="bi bi-check-circle me-1"></i>Approve Payout
-                </button>
+                <a class="sisonke-btn sisonke-btn-gold sisonke-btn-sm" href="#payout-decision-panel">
+                    <i class="bi bi-check-circle me-1"></i>Review Decision
+                </a>
             </div>
         }
         else if (p.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && !payoutSummary.CanApprove)
@@ -699,7 +698,7 @@ else
     <!-- ── Bottom Row ─────────────────────────────────────────────── -->
     <div class="row g-3 mb-4">
 
-    <section class="sisonke-card mb-3">
+    <section class="sisonke-card mb-3" id="payout-decision-panel">
         <div class="sisonke-card-body">
             <div class="sisonke-card-head mb-3"><div><h2>Current Cycle Payout</h2><p class="text-muted mb-0">Chairperson approval and Treasurer payment confirmation.</p></div></div>
             @if (payoutSummary?.Payout is null)
@@ -723,6 +722,7 @@ else
                 </div>
                 @if (payoutSummary.IsRecipient) { <div class="sisonke-alert sisonke-alert-green mb-3">You are the current payout recipient.</div> }
                 @if (payout.PayoutStatus == RotationalPayoutStatus.Rejected) { <div class="sisonke-alert sisonke-alert-red mb-3"><strong>Payout rejected.</strong> @payout.RejectionReason</div> }
+                @if (payout.PayoutStatus == RotationalPayoutStatus.ReturnedToSecretary) { <div class="sisonke-alert sisonke-alert-gold mb-3"><strong>Changes requested.</strong> @payout.ChairpersonReviewNotes</div> }
                 @if (payout.PayoutStatus == RotationalPayoutStatus.Paid) { <div class="sisonke-alert sisonke-alert-green mb-3">Paid on @payout.PaidAt?.ToLocalTime().ToString("dd MMM yyyy"). Reference: @payout.PaymentReference</div> }
                 <div class="border rounded p-3 mb-3">
                     <div class="fw-semibold mb-2">Contribution Banking Details</div>
@@ -731,10 +731,41 @@ else
                     <a class="btn btn-sm btn-outline-secondary mt-2" href="@($"/stokvel-settings/{StokvelId}")">View Banking Details</a>
                 </div>
                 @if (payout.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && payoutSummary.CanApprove)
-                { <div class="d-flex gap-2"><button class="btn btn-primary" @onclick="() => showPayoutApprovalModal = true">Approve Payout</button><button class="btn btn-outline-danger" @onclick="() => showPayoutRejectionModal = true">Reject Payout</button></div> }
+                {
+                    <div class="payout-decision-form">
+                        <label class="form-label mb-0" for="management-payout-decision">Chairperson decision</label>
+                        <select id="management-payout-decision" class="form-select form-select-sm" @bind="payoutDecision">
+                            <option value="@RotationalPayoutDecision.Approve">Approve payout</option>
+                            <option value="@RotationalPayoutDecision.Reject">Reject payout</option>
+                            <option value="@RotationalPayoutDecision.RequestChanges">Send back to Secretary / Request changes</option>
+                        </select>
+                        <label class="form-label mb-0" for="management-payout-decision-notes">Notes</label>
+                        <InputTextArea id="management-payout-decision-notes"
+                                       class="form-control form-control-sm"
+                                       rows="3"
+                                       @bind-Value="payoutDecisionNotes"
+                                       placeholder="@PayoutDecisionNotesPlaceholder" />
+                        <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm"
+                                type="button"
+                                disabled="@(!CanSubmitPayoutDecision)"
+                                @onclick="SubmitPayoutDecisionAsync">
+                            Submit Decision
+                        </button>
+                    </div>
+                }
                 else if (payout.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && payoutSummary.CanConfirmPaid) { <div class="text-muted">Waiting for Chairperson approval.</div> }
                 else if (payout.PayoutStatus == RotationalPayoutStatus.Approved && payoutSummary.CanConfirmPaid) { <button class="btn btn-primary" @onclick="OpenPayoutConfirmation">Confirm Payout Paid</button> }
                 else if (payout.PayoutStatus == RotationalPayoutStatus.Approved) { <div class="text-muted">Approved, waiting for Treasurer payment confirmation.</div> }
+                else if (payout.PayoutStatus == RotationalPayoutStatus.ReturnedToSecretary && CanResubmitReturnedPayout)
+                {
+                    <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm"
+                            type="button"
+                            disabled="@isProcessingPayout"
+                            @onclick="ResubmitPayoutForApprovalAsync">
+                        Resubmit for Chairperson Approval
+                    </button>
+                }
+                else if (payout.PayoutStatus == RotationalPayoutStatus.ReturnedToSecretary) { <div class="text-muted">Returned to Secretary for review or correction.</div> }
                 @if (payoutErrors.Count > 0) { <div class="alert alert-danger mt-3">@string.Join(" ", payoutErrors)</div> }
             }
         </div>
@@ -1342,20 +1373,14 @@ else
         border-top: 2px solid var(--sk-green-700, #15803d);
         border-radius: 0 0 .5rem .5rem;
     }
+
+    .payout-decision-form {
+        display: grid;
+        gap: .5rem;
+        max-width: 30rem;
+    }
 </style>
 
-@if (showPayoutApprovalModal && payoutSummary?.Payout is not null)
-{
-    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.45)"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Approve Payout</h5></div><div class="modal-body">
-        <p><strong>Cycle:</strong> @payoutSummary.Payout.Cycle.CycleName</p><p><strong>Recipient:</strong> @payoutSummary.Payout.PayoutMember.FullName</p><p><strong>Amount:</strong> @FormatZAR(payoutSummary.Payout.PayoutAmount)</p>
-        <p><strong>Contributions:</strong> @payoutSummary.ContributionSummary.PaidCount paid of @payoutSummary.ContributionSummary.TotalExpected</p>
-        @if (payoutSummary.BankingDetails is null) { <div class="alert alert-warning">Banking details have not been captured for this stokvel.</div> }
-    </div><div class="modal-footer"><button class="btn btn-outline-secondary" @onclick="() => showPayoutApprovalModal = false">Cancel</button><button class="btn btn-primary" @onclick="ApprovePayoutAsync" disabled="@isProcessingPayout">Approve</button></div></div></div></div>
-}
-@if (showPayoutRejectionModal && payoutSummary?.Payout is not null)
-{
-    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.45)"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reject Payout</h5></div><div class="modal-body"><label class="form-label">Rejection reason *</label><InputTextArea class="form-control" rows="3" @bind-Value="payoutRejectionReason" /></div><div class="modal-footer"><button class="btn btn-outline-secondary" @onclick="() => showPayoutRejectionModal = false">Cancel</button><button class="btn btn-danger" @onclick="RejectPayoutAsync" disabled="@isProcessingPayout">Reject Payout</button></div></div></div></div>
-}
 @if (showPayoutConfirmationModal && payoutSummary?.Payout is not null)
 {
     <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.45)"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Confirm Payout Payment</h5></div><div class="modal-body">
@@ -1416,16 +1441,23 @@ else
     private List<string> paymentErrors = [];
     private string? paymentSuccessMessage;
     private PayoutSummary? payoutSummary;
-    private bool showPayoutApprovalModal;
-    private bool showPayoutRejectionModal;
     private bool showPayoutConfirmationModal;
     private bool isProcessingPayout;
-    private string? payoutRejectionReason;
+    private RotationalPayoutDecision payoutDecision = RotationalPayoutDecision.Approve;
+    private string? payoutDecisionNotes;
     private PaymentMethod? payoutPaymentMethod;
     private string? payoutPaymentReference;
     private DateTime? payoutPaidAt;
     private string? payoutNotes;
     private List<string> payoutErrors = [];
+    private string PayoutDecisionNotesPlaceholder => payoutDecision == RotationalPayoutDecision.Approve
+        ? "Decision notes (optional)"
+        : "Notes required";
+    private bool CanSubmitPayoutDecision =>
+        !isProcessingPayout &&
+        (payoutDecision == RotationalPayoutDecision.Approve || !string.IsNullOrWhiteSpace(payoutDecisionNotes));
+    private bool CanResubmitReturnedPayout =>
+        linkedMember?.DefaultRole is SisonkeRole.Secretary or SisonkeRole.Creator or SisonkeRole.StokvelAdmin;
 
     private RotationalPayoutOrderItem? NextRecipient =>
         activeOrder.FirstOrDefault(item => !item.HasReceivedPayout);
@@ -1446,6 +1478,7 @@ else
                 RotationalPayoutStatus.Approved => ("Payout approved", "success"),
                 RotationalPayoutStatus.Rejected => ("Payout rejected", "danger"),
                 RotationalPayoutStatus.Paid => ("Payout paid", "success"),
+                RotationalPayoutStatus.ReturnedToSecretary => ("Changes requested", "warning"),
                 _ => ("Payout pending", "warning")
             };
         }
@@ -1836,26 +1869,34 @@ else
         activeOrder = await RotationOrderService.GetActiveRotationOrderAsync(StokvelId);
     }
 
-    private async Task ApprovePayoutAsync()
+    private async Task SubmitPayoutDecisionAsync()
     {
         if (payoutSummary?.Payout is null || string.IsNullOrWhiteSpace(currentUserId)) return;
+        payoutErrors = [];
+        if (payoutDecision != RotationalPayoutDecision.Approve && string.IsNullOrWhiteSpace(payoutDecisionNotes))
+        {
+            payoutErrors = ["Decision notes are required for reject or request changes."];
+            return;
+        }
         isProcessingPayout = true;
-        var result = await PayoutService.ApprovePayoutAsync(payoutSummary.Payout.Id, currentUserId);
+        var result = await PayoutService.SubmitChairpersonDecisionAsync(
+            payoutSummary.Payout.Id, currentUserId, payoutDecision, payoutDecisionNotes);
         payoutErrors = result.Errors; isProcessingPayout = false;
         if (!result.Success) return;
-        showPayoutApprovalModal = false;
+        payoutDecision = RotationalPayoutDecision.Approve;
+        payoutDecisionNotes = null;
         await RefreshPayoutAsync();
     }
 
-    private async Task RejectPayoutAsync()
+    private async Task ResubmitPayoutForApprovalAsync()
     {
         if (payoutSummary?.Payout is null || string.IsNullOrWhiteSpace(currentUserId)) return;
+        payoutErrors = [];
         isProcessingPayout = true;
-        var result = await PayoutService.RejectPayoutAsync(
-            payoutSummary.Payout.Id, currentUserId, payoutRejectionReason ?? string.Empty);
-        payoutErrors = result.Errors; isProcessingPayout = false;
+        var result = await PayoutService.ResubmitPayoutForApprovalAsync(payoutSummary.Payout.Id, currentUserId);
+        payoutErrors = result.Errors;
+        isProcessingPayout = false;
         if (!result.Success) return;
-        showPayoutRejectionModal = false;
         await RefreshPayoutAsync();
     }
 
@@ -1886,6 +1927,7 @@ else
     {
         RotationalPayoutStatus.ReadyForApproval => "Ready for approval",
         RotationalPayoutStatus.Approved => "Approved — awaiting payment",
+        RotationalPayoutStatus.ReturnedToSecretary => "Returned to Secretary",
         _ => status.ToString()
     };
 
@@ -1894,6 +1936,7 @@ else
         RotationalPayoutStatus.Paid => "success",
         RotationalPayoutStatus.Rejected or RotationalPayoutStatus.Cancelled => "danger",
         RotationalPayoutStatus.Approved => "info",
+        RotationalPayoutStatus.ReturnedToSecretary => "warning",
         _ => "warning"
     };
 

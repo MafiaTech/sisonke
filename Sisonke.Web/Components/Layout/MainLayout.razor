@@ -3,7 +3,6 @@
 @implements IDisposable
 
 @inject NavigationManager NavigationManager
-@inject IConfiguration Configuration
 
 <div class="sisonke-app-shell sisonke-shell sisonke-role-member">
     <input id="sisonke-mobile-nav-toggle" class="sisonke-mobile-nav-toggle" type="checkbox" aria-hidden="true" />
@@ -55,14 +54,6 @@
         </div>
 
         <div class="sisonke-content">
-
-            @if (EnvironmentBannerEnabled && !string.IsNullOrWhiteSpace(EnvironmentBannerText))
-            {
-                <div class="pilot-banner">
-                    @EnvironmentBannerText
-                </div>
-            }
-
             @Body
         </div>
 
@@ -94,9 +85,6 @@
 </div>
 
 @code {
-    private bool EnvironmentBannerEnabled => Configuration.GetValue("EnvironmentBanner:Enabled", false);
-    private string? EnvironmentBannerText => Configuration["EnvironmentBanner:Text"];
-
     private string CurrentAreaLabel => GetCurrentAreaLabel();
 
     protected override void OnInitialized()

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data.Entities;
+using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Data;
 
@@ -57,9 +58,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<StokvelLoanConfiguration> StokvelLoanConfigurations => Set<StokvelLoanConfiguration>();
     public DbSet<MemberLoan> MemberLoans => Set<MemberLoan>();
     public DbSet<MemberLoanRepayment> MemberLoanRepayments => Set<MemberLoanRepayment>();
+    public DbSet<MemberLoanGuarantor> MemberLoanGuarantors => Set<MemberLoanGuarantor>();
     public DbSet<MemberSurplusWallet> MemberSurplusWallets => Set<MemberSurplusWallet>();
     public DbSet<MemberSurplusWalletTransaction> MemberSurplusWalletTransactions => Set<MemberSurplusWalletTransaction>();
     public DbSet<MemberSurplusWithdrawalRequest> MemberSurplusWithdrawalRequests => Set<MemberSurplusWithdrawalRequest>();
+    public DbSet<StokvelReserveTransaction> StokvelReserveTransactions => Set<StokvelReserveTransaction>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -823,6 +826,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .Property(c => c.LoanInterestRate).HasPrecision(18, 4);
         builder.Entity<StokvelLoanConfiguration>()
             .Property(c => c.LateRepaymentFineAmount).HasPrecision(18, 2);
+        builder.Entity<StokvelLoanConfiguration>()
+            .Property(c => c.SurplusEquityLoanMultiplier).HasPrecision(18, 4).HasDefaultValue(1m);
+        builder.Entity<StokvelLoanConfiguration>()
+            .Property(c => c.EarlyPayoutDiscountRatePercent).HasPrecision(18, 4).HasDefaultValue(0m);
+        builder.Entity<StokvelLoanConfiguration>()
+            .Property(c => c.SurplusBackedLoansEnabled).HasDefaultValue(false);
+        builder.Entity<StokvelLoanConfiguration>()
+            .Property(c => c.EarlyPayoutLoansEnabled).HasDefaultValue(false);
+        builder.Entity<StokvelLoanConfiguration>()
+            .Property(c => c.RequiredGuarantorCount).HasDefaultValue(2);
 
         builder.Entity<StokvelLoanConfiguration>()
             .HasIndex(c => c.StokvelId);
@@ -841,6 +854,32 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<MemberLoan>()
+            .HasMany(l => l.Guarantors)
+            .WithOne(g => g.Loan)
+            .HasForeignKey(g => g.LoanId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MemberLoan>()
+            .HasOne(l => l.CollateralWallet)
+            .WithMany()
+            .HasForeignKey(l => l.CollateralWalletId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberLoan>()
+            .HasOne(l => l.OriginalPayoutOrder)
+            .WithMany()
+            .HasForeignKey(l => l.OriginalPayoutOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberLoan>()
+            .HasOne(l => l.OriginalContributionCycle)
+            .WithMany()
+            .HasForeignKey(l => l.OriginalContributionCycleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberLoan>()
+            .Property(l => l.LoanType).HasDefaultValue(MemberLoanType.Standard);
+        builder.Entity<MemberLoan>()
             .Property(l => l.RequestedAmount).HasPrecision(18, 2);
         builder.Entity<MemberLoan>()
             .Property(l => l.ApprovedAmount).HasPrecision(18, 2);
@@ -850,11 +889,35 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .Property(l => l.MonthlyRepaymentAmount).HasPrecision(18, 2);
         builder.Entity<MemberLoan>()
             .Property(l => l.OutstandingBalance).HasPrecision(18, 2);
+        builder.Entity<MemberLoan>()
+            .Property(l => l.CollateralLockedAmount).HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Entity<MemberLoan>()
+            .Property(l => l.EarlyPayoutGrossAmount).HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Entity<MemberLoan>()
+            .Property(l => l.EarlyPayoutDiscountRatePercent).HasPrecision(18, 4).HasDefaultValue(0m);
+        builder.Entity<MemberLoan>()
+            .Property(l => l.EarlyPayoutDiscountAmount).HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Entity<MemberLoan>()
+            .Property(l => l.EarlyPayoutNetDisbursedAmount).HasPrecision(18, 2).HasDefaultValue(0m);
 
         builder.Entity<MemberLoan>()
             .HasIndex(l => l.StokvelId);
         builder.Entity<MemberLoan>()
             .HasIndex(l => l.MemberId);
+
+        // ── Member Loan Guarantor ─────────────────────────────────────────────
+        builder.Entity<MemberLoanGuarantor>()
+            .HasOne(g => g.GuarantorMember)
+            .WithMany()
+            .HasForeignKey(g => g.GuarantorMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MemberLoanGuarantor>()
+            .HasIndex(g => new { g.LoanId, g.GuarantorMemberId })
+            .IsUnique();
+
+        builder.Entity<MemberLoanGuarantor>()
+            .HasIndex(g => g.GuarantorMemberId);
 
         // ── Member Loan Repayment ─────────────────────────────────────────────
         builder.Entity<MemberLoanRepayment>()
@@ -876,6 +939,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<MemberSurplusWallet>()
             .Property(w => w.AvailableBalance).HasPrecision(18, 2);
+        builder.Entity<MemberSurplusWallet>()
+            .Property(w => w.CoreSavingsBalance).HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Entity<MemberSurplusWallet>()
+            .Property(w => w.SurplusEquityBalance).HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Entity<MemberSurplusWallet>()
+            .Property(w => w.LockedSurplusEquityBalance).HasPrecision(18, 2).HasDefaultValue(0m);
         builder.Entity<MemberSurplusWallet>()
             .Property(w => w.TotalCredits).HasPrecision(18, 2);
         builder.Entity<MemberSurplusWallet>()
@@ -921,5 +990,26 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(r => r.StokvelId);
         builder.Entity<MemberSurplusWithdrawalRequest>()
             .HasIndex(r => r.MemberId);
+
+        // ── Stokvel Reserve Transaction ───────────────────────────────────────
+        builder.Entity<StokvelReserveTransaction>()
+            .HasOne(t => t.Stokvel)
+            .WithMany()
+            .HasForeignKey(t => t.StokvelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<StokvelReserveTransaction>()
+            .HasOne(t => t.MemberLoan)
+            .WithMany()
+            .HasForeignKey(t => t.MemberLoanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StokvelReserveTransaction>()
+            .Property(t => t.Amount).HasPrecision(18, 2);
+
+        builder.Entity<StokvelReserveTransaction>()
+            .HasIndex(t => t.StokvelId);
+        builder.Entity<StokvelReserveTransaction>()
+            .HasIndex(t => t.MemberLoanId);
     }
 }

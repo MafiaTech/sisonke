@@ -20,12 +20,33 @@ public class MemberSurplusWithdrawalRequest
     [MaxLength(1000)]
     public string RequestReason { get; set; } = string.Empty;
 
+    [MaxLength(1000)]
+    public string? RequestReasonNotes { get; set; }
+
     public SurplusWithdrawalStatus WithdrawalStatus { get; set; } = SurplusWithdrawalStatus.Submitted;
 
     public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
 
     [MaxLength(450)]
     public string? RequestedBy { get; set; }
+
+    public DateTime? SecretaryReviewedAt { get; set; }
+
+    [MaxLength(450)]
+    public string? SecretaryReviewedByUserId { get; set; }
+
+    public bool? SecretaryRecommendedApproval { get; set; }
+
+    [MaxLength(1000)]
+    public string? SecretaryReviewNotes { get; set; }
+
+    public DateTime? ChairpersonReviewedAt { get; set; }
+
+    [MaxLength(450)]
+    public string? ChairpersonReviewedByUserId { get; set; }
+
+    [MaxLength(1000)]
+    public string? ChairpersonNotes { get; set; }
 
     public DateTime? ApprovedAt { get; set; }
 
@@ -52,6 +73,9 @@ public class MemberSurplusWithdrawalRequest
 
     [MaxLength(1000)]
     public string? Notes { get; set; }
+
+    [MaxLength(1000)]
+    public string? PaymentNotes { get; set; }
 
     public bool IsActive { get; set; } = true;
 
