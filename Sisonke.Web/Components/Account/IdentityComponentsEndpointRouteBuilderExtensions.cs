@@ -45,8 +45,11 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             [FromServices] SignInManager<ApplicationUser> signInManager,
             [FromForm] string returnUrl) =>
         {
+            var redirectUri = GetSafeLogoutReturnUrl(returnUrl);
             await signInManager.SignOutAsync();
-            return TypedResults.LocalRedirect($"~/{returnUrl}");
+            return Results.SignOut(
+                new AuthenticationProperties { RedirectUri = redirectUri },
+                [IdentityConstants.ApplicationScheme, "MicrosoftEntraExternalId"]);
         });
 
         var manageGroup = accountGroup.MapGroup("/Manage").RequireAuthorization();
@@ -108,5 +111,13 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
         });
 
         return accountGroup;
+    }
+
+    private static string GetSafeLogoutReturnUrl(string? returnUrl)
+    {
+        return string.IsNullOrWhiteSpace(returnUrl) ||
+            !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)
+            ? "/"
+            : "/";
     }
 }

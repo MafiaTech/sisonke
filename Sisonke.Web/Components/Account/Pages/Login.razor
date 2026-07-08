@@ -1,16 +1,18 @@
-@page "/Account/Login"
+@page "/Account/LocalLogin"
 @layout AuthLayout
 
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using Sisonke.Web.Data
+@using Sisonke.Web.Services
 
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject FeatureFlags FeatureFlags
 
 <PageTitle>Sign In — Sisonke</PageTitle>
 
@@ -93,7 +95,7 @@
 
             <!-- Tab switcher -->
             <div class="auth-tabs">
-                <a href="Account/Login" class="auth-tab active">Sign In</a>
+                <a href="Account/LocalLogin" class="auth-tab active">Sign In</a>
                 <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))" class="auth-tab">Create Account</a>
             </div>
 
@@ -215,6 +217,14 @@
         Input ??= new();
 
         editContext = new EditContext(Input);
+
+        if (!FeatureFlags.UseLocalLoginFallback)
+        {
+            RedirectManager.RedirectTo(NavigationManager.GetUriWithQueryParameters(
+                "/Auth/Login",
+                new Dictionary<string, object?> { ["returnUrl"] = ReturnUrl ?? "/my-memberships" }));
+            return;
+        }
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {

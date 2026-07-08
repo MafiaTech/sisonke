@@ -8,4 +8,11 @@ public class FeatureFlags
     /// Azure env var: Features__ShowPilotBanner
     /// </summary>
     public bool ShowPilotBanner { get; set; } = false;
+
+    /// <summary>
+    /// Allows the emergency local Identity email/password login at /Account/LocalLogin when true.
+    /// Default false so Entra External ID remains the normal login flow.
+    /// Azure env var: Features__UseLocalLoginFallback
+    /// </summary>
+    public bool UseLocalLoginFallback { get; set; } = false;
 }

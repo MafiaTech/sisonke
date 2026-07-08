@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Components;
 using Sisonke.Web.Components.Account;
@@ -40,12 +42,123 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
-builder.Services.AddAuthentication(options =>
+var authenticationBuilder = builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultChallengeScheme = "MicrosoftEntraExternalId";
+    options.DefaultSignInScheme = IdentityConstants.ApplicationScheme;
+});
+
+authenticationBuilder.AddIdentityCookies();
+
+authenticationBuilder.AddOpenIdConnect("MicrosoftEntraExternalId", options =>
+{
+    var clientId = builder.Configuration["AzureAd:ClientId"];
+    if (string.IsNullOrWhiteSpace(clientId))
     {
-        options.DefaultScheme = IdentityConstants.ApplicationScheme;
-        options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-    })
-    .AddIdentityCookies();
+        throw new InvalidOperationException("AzureAd:ClientId is not configured.");
+    }
+
+    var clientSecret = builder.Configuration["AzureAd:ClientSecret"];
+    if (string.IsNullOrWhiteSpace(clientSecret))
+    {
+        throw new InvalidOperationException("AzureAd:ClientSecret is not configured.");
+    }
+
+    var metadataAddress = builder.Configuration["AzureAd:MetadataAddress"]?.Trim();
+    string? authority = null;
+    if (!string.IsNullOrWhiteSpace(metadataAddress))
+    {
+        if (!metadataAddress.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("AzureAd:MetadataAddress must start with https://.");
+        }
+
+        options.MetadataAddress = metadataAddress;
+    }
+    else
+    {
+        var instance = builder.Configuration["AzureAd:Instance"]?.TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(instance))
+        {
+            throw new InvalidOperationException("AzureAd:Instance is not configured. For Entra External ID / CIAM, use https://<external-tenant-subdomain>.ciamlogin.com/.");
+        }
+
+        if (!instance.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("AzureAd:Instance must start with https://.");
+        }
+
+        var domain = builder.Configuration["AzureAd:Domain"];
+        var tenantId = builder.Configuration["AzureAd:TenantId"];
+        var tenantSegment = !string.IsNullOrWhiteSpace(domain) ? domain.Trim() : tenantId?.Trim();
+        if (string.IsNullOrWhiteSpace(tenantSegment))
+        {
+            throw new InvalidOperationException("Either AzureAd:Domain or AzureAd:TenantId must be configured.");
+        }
+
+        authority = $"{instance}/{tenantSegment}/v2.0";
+        options.Authority = authority;
+    }
+
+    if (builder.Environment.IsDevelopment())
+    {
+        if (!string.IsNullOrWhiteSpace(metadataAddress))
+        {
+            Console.WriteLine($"[Sisonke] Entra External ID metadata address: {metadataAddress}");
+        }
+        else
+        {
+            Console.WriteLine($"[Sisonke] Entra External ID authority: {authority}");
+            Console.WriteLine($"[Sisonke] Entra External ID metadata address pattern: {authority}/.well-known/openid-configuration");
+        }
+    }
+
+    options.ClientId = clientId;
+    options.ClientSecret = clientSecret;
+    var callbackPath = builder.Configuration["AzureAd:CallbackPath"];
+    options.CallbackPath = string.IsNullOrWhiteSpace(callbackPath) ? "/signin-oidc" : callbackPath;
+    options.ResponseType = "code";
+    options.SaveTokens = true;
+    options.SignInScheme = IdentityConstants.ApplicationScheme;
+
+    options.Scope.Clear();
+    options.Scope.Add("openid");
+    options.Scope.Add("profile");
+    options.Scope.Add("email");
+
+    options.Events = new OpenIdConnectEvents
+    {
+        OnRedirectToIdentityProvider = context =>
+        {
+            if (builder.Environment.IsDevelopment())
+            {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("Sisonke.EntraExternalId");
+                logger.LogInformation(
+                    "Redirecting to Entra External ID. RedirectUri={RedirectUri}; CallbackPath={CallbackPath}; Scheme={Scheme}",
+                    context.ProtocolMessage.RedirectUri,
+                    context.Options.CallbackPath,
+                    context.Scheme.Name);
+            }
+
+            return Task.CompletedTask;
+        },
+        OnRemoteFailure = context =>
+        {
+            if (builder.Environment.IsDevelopment())
+            {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("Sisonke.EntraExternalId");
+                logger.LogWarning("Entra External ID remote failure. Error={Error}", context.Failure?.Message ?? "(no exception message)");
+            }
+
+            return Task.CompletedTask;
+        }
+    };
+});
 
 string connectionString;
 
@@ -375,6 +488,8 @@ else
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
@@ -415,6 +530,34 @@ app.MapPost("/Account/RegisterSubmit", RegistrationSubmitEndpoint.HandleAsync)
     .DisableAntiforgery()
     .WithName("RegisterSubmit");
 
+app.MapGet("/Auth/Login", (
+    HttpContext context,
+    [FromQuery] string? returnUrl) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        return Results.LocalRedirect(GetSafeLocalReturnUrl(returnUrl, "/my-memberships"));
+    }
+
+    return Results.Challenge(
+        new AuthenticationProperties { RedirectUri = GetSafeLocalReturnUrl(returnUrl, "/my-memberships") },
+        ["MicrosoftEntraExternalId"]);
+}).AllowAnonymous();
+
+app.MapGet("/Account/Login", (
+    HttpContext context,
+    [FromQuery] string? returnUrl) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        return Results.LocalRedirect(GetSafeLocalReturnUrl(returnUrl, "/my-memberships"));
+    }
+
+    return Results.Challenge(
+        new AuthenticationProperties { RedirectUri = GetSafeLocalReturnUrl(returnUrl, "/my-memberships") },
+        ["MicrosoftEntraExternalId"]);
+}).AllowAnonymous();
+
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
 
@@ -452,6 +595,18 @@ static string MaskConnectionString(string value)
     {
         return "(configured)";
     }
+}
+
+static string GetSafeLocalReturnUrl(string? returnUrl, string fallback)
+{
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        return fallback;
+    }
+
+    return Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)
+        ? returnUrl
+        : fallback;
 }
 
 static async Task SeedAdminUserAsync(IServiceProvider serviceProvider, IConfiguration configuration)
