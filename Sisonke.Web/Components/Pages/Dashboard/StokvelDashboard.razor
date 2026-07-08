@@ -562,7 +562,7 @@ else
                         @if (stokvel.EnableRotation && rotationalTaskState?.HasContributionTask == true)
                         {
                             var ts = rotationalTaskState;
-                            <div class="executive-task-card task-accent-gold" style="border-top:3px solid #d97706">
+                            <div class="executive-task-card task-accent-gold" style="border-top:3px solid #9A7108">
                                 <div class="detail-mini-label">
                                     <span class="sisonke-badge sisonke-badge-gold me-1">Rotational</span>
                                     Confirm Contribution Payments
@@ -1064,7 +1064,7 @@ else
                 <div class="card h-100">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center gap-2 mb-3">
-                            <div class="dash-card-icon-sm" style="background:#FEF3C7;color:#D97706">
+                            <div class="dash-card-icon-sm" style="background:#F6E7B8;color:#9A7108">
                                 <i class="bi bi-patch-check-fill"></i>
                             </div>
                             <h2 class="h6 mb-0 fw-700">Subscription Package</h2>
@@ -1565,16 +1565,16 @@ else
 
     private IReadOnlyList<ReportDatum> GetMonthlyContributionMixSegments() =>
     [
-        new("Collected", monthlyContributionSummary.ActualContributions, "#0F8A50", $"{monthlyContributionSummary.PaidCount} paid"),
-        new("Outstanding", monthlyContributionSummary.OutstandingContributions, "#D97706", $"{monthlyContributionSummary.UnpaidCount + monthlyContributionSummary.PartiallyPaidCount + monthlyContributionSummary.OverdueCount} open")
+        new("Collected", monthlyContributionSummary.ActualContributions, "#399D39", $"{monthlyContributionSummary.PaidCount} paid"),
+        new("Outstanding", monthlyContributionSummary.OutstandingContributions, "#9A7108", $"{monthlyContributionSummary.UnpaidCount + monthlyContributionSummary.PartiallyPaidCount + monthlyContributionSummary.OverdueCount} open")
     ];
 
     private IReadOnlyList<ReportDatum> GetMonthlyContributionStatusBars() =>
     [
-        new("Paid", monthlyContributionSummary.PaidCount, "#0F8A50"),
-        new("Partial", monthlyContributionSummary.PartiallyPaidCount, "#D97706"),
-        new("Overdue", monthlyContributionSummary.OverdueCount, "#B94242"),
-        new("Unpaid", monthlyContributionSummary.UnpaidCount, "#64746B")
+        new("Paid", monthlyContributionSummary.PaidCount, "#399D39"),
+        new("Partial", monthlyContributionSummary.PartiallyPaidCount, "#9A7108"),
+        new("Overdue", monthlyContributionSummary.OverdueCount, "#B3261E"),
+        new("Unpaid", monthlyContributionSummary.UnpaidCount, "#4B5568")
     ];
 
     private IReadOnlyList<ReportDatum> GetContributionTrendBars() =>
@@ -1583,7 +1583,7 @@ else
             .Select(trend => new ReportDatum(
                 trend.MonthName,
                 trend.ActualContributions,
-                trend.CollectionRatePercentage >= 90 ? "#0F8A50" : trend.CollectionRatePercentage >= 60 ? "#D97706" : "#B94242",
+                trend.CollectionRatePercentage >= 90 ? "#399D39" : trend.CollectionRatePercentage >= 60 ? "#9A7108" : "#B3261E",
                 $"{FormatZAR(trend.ExpectedContributions)} expected"))
             .ToList();
 
@@ -1593,7 +1593,7 @@ else
             .Select(trend => new ReportDatum(
                 trend.MonthName,
                 trend.OutstandingContributions,
-                trend.OutstandingContributions <= 0 ? "#0F8A50" : "#D97706",
+                trend.OutstandingContributions <= 0 ? "#399D39" : "#9A7108",
                 $"{FormatPercentage(trend.CollectionRatePercentage)} collected"))
             .ToList();
 

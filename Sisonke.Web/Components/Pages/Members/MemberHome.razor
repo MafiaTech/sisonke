@@ -1398,8 +1398,8 @@ else
 
         return
         [
-            new("Paid", paid, "#0F8A50", "Confirmed payments"),
-            new("Outstanding", balance, "#D97706", "Balance still open")
+            new("Paid", paid, "#399D39", "Confirmed payments"),
+            new("Outstanding", balance, "#9A7108", "Balance still open")
         ];
     }
 
@@ -1409,7 +1409,7 @@ else
             .Select(contribution => new ReportDatum(
                 contribution.MonthYearLabel,
                 contribution.PaidAmount,
-                contribution.Balance <= 0 ? "#0F8A50" : "#D97706",
+                contribution.Balance <= 0 ? "#399D39" : "#9A7108",
                 $"{FormatCurrency(contribution.ExpectedAmount)} expected"))
             .ToList();
 
@@ -1430,7 +1430,7 @@ else
 
         return
         [
-            new("Paid", paid, "#0F8A50", $"{PaidFinesCount} paid"),
+            new("Paid", paid, "#399D39", $"{PaidFinesCount} paid"),
             new("Open", open, "#B94242", $"{OpenFinesCount} unpaid"),
             new("Waived", waived, "#64746B", "Waived or cleared")
         ];

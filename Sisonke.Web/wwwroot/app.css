@@ -9,45 +9,45 @@
     --sisonke-content-padding-x: 2.5rem;
     --sisonke-content-padding-y: 2rem;
 
-    /* Green scale */
-    --sk-green-900:   #0d2218;
-    --sk-green-800:   #1B4332;
-    --sk-green-700:   #2D6A4F;
-    --sk-green-600:   #40916C;
-    --sk-green-100:   #d8f3dc;
-    --sk-green-50:    #f0fdf4;
+    /* Navy scale (primary brand) */
+    --sk-green-900:   #041B3D;
+    --sk-green-800:   #062F66;
+    --sk-green-700:   #0B3E82;
+    --sk-green-600:   #2C5AA0;
+    --sk-green-100:   #DCE6F2;
+    --sk-green-50:    #EEF3F9;
 
-    /* Deep navy scale (secondary accent) */
-    --sk-navy-900:    #0c1e3c;
-    --sk-navy-800:    #0f2d5c;
-    --sk-navy-700:    #1a3f73;
-    --sk-navy-100:    #dbe9ff;
-    --sk-navy-50:     #eff5ff;
+    /* Teal scale (secondary accent) */
+    --sk-navy-900:    #014D56;
+    --sk-navy-800:    #027D8A;
+    --sk-navy-700:    #0592A2;
+    --sk-navy-100:    #DCEFF1;
+    --sk-navy-50:     #EAF6F7;
 
     /* Gold accent */
-    --sk-gold:        #F59E0B;
-    --sk-gold-dark:   #D97706;
-    --sk-gold-light:  #FEF3C7;
+    --sk-gold:        #CA950A;
+    --sk-gold-dark:   #9A7108;
+    --sk-gold-light:  #F6E7B8;
 
     /* Semantic colours */
-    --sk-success:     #10B981;
-    --sk-success-bg:  #ECFDF5;
-    --sk-danger:      #EF4444;
-    --sk-danger-bg:   #FEF2F2;
-    --sk-warning:     #F59E0B;
-    --sk-warning-bg:  #FFFBEB;
-    --sk-info:        #3B82F6;
-    --sk-info-bg:     #EFF6FF;
+    --sk-success:     #399D39;
+    --sk-success-bg:  #E4F2E3;
+    --sk-danger:      #B3261E;
+    --sk-danger-bg:   #F7DEDC;
+    --sk-warning:     #CA950A;
+    --sk-warning-bg:  #F6E7B8;
+    --sk-info:        #027D8A;
+    --sk-info-bg:     #DCEFF1;
 
     /* Surface */
-    --sk-bg:          #F4F6F9;
+    --sk-bg:          #FAF8F2;
     --sk-card:        #FFFFFF;
     --sk-border:      #E5E7EB;
     --sk-border-dark: #D1D5DB;
 
     /* Typography */
-    --sk-text:        #111827;
-    --sk-text-muted:  #6B7280;
+    --sk-text:        #1B2433;
+    --sk-text-muted:  #4B5568;
     --sk-text-light:  #9CA3AF;
 
     /* Radii */
@@ -69,7 +69,7 @@
 
 /* ── Reset / base ───────────────────────────────────────── */
 html, body {
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Instrument Sans', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--sk-bg);
     color: var(--sk-text);
     font-size: 15px;
@@ -2194,31 +2194,31 @@ a, .btn-link { color: var(--sk-green-700); }
    ======================================================================== */
 
 :root {
-    --forest: #123f2c;
-    --forest-mid: #1b5a40;
-    --forest-light: #e6f4ed;
-    --sage: #6f9f86;
-    --sage-pale: #edf6f1;
-    --gold: #c9922a;
-    --gold-light: #e1b85d;
-    --gold-pale: #fff6dc;
-    --cream: #fbf8ef;
-    --red: #c94a4a;
-    --red-pale: #fff0f0;
+    --forest: #062F66;
+    --forest-mid: #0B3E82;
+    --forest-light: #DCE6F2;
+    --sage: #027D8A;
+    --sage-pale: #DCEFF1;
+    --gold: #CA950A;
+    --gold-light: #EFBF3A;
+    --gold-pale: #F6E7B8;
+    --cream: #FAF8F2;
+    --red: #B3261E;
+    --red-pale: #F7DEDC;
     --blue: #3d7ec7;
     --blue-pale: #edf5ff;
     --indigo: #313a8a;
     --indigo-pale: #eef0ff;
-    --teal: #147a78;
-    --teal-pale: #e6f7f6;
+    --teal: #027D8A;
+    --teal-pale: #DCEFF1;
     --slate: #152033;
-    --text: #18202f;
-    --muted: #6f7886;
+    --text: #1B2433;
+    --muted: #4B5568;
     --border: #e5e0d3;
     --card: #ffffff;
-    --shadow-sm: 0 1px 3px rgba(21, 32, 51, .08), 0 1px 2px rgba(21, 32, 51, .04);
-    --shadow-md: 0 10px 30px rgba(21, 32, 51, .10);
-    --shadow-lg: 0 24px 70px rgba(21, 32, 51, .16);
+    --shadow-sm: 0 1px 3px rgba(27, 36, 51, .08), 0 1px 2px rgba(27, 36, 51, .04);
+    --shadow-md: 0 10px 30px rgba(27, 36, 51, .10);
+    --shadow-lg: 0 24px 70px rgba(27, 36, 51, .16);
     --r-sm: .5rem;
     --r-md: .75rem;
     --r-lg: 1rem;
@@ -2242,7 +2242,7 @@ a, .btn-link { color: var(--sk-green-700); }
     --sisonke-accent: var(--forest);
     --sisonke-accent-mid: var(--forest-mid);
     --sisonke-accent-pale: var(--forest-light);
-    --sisonke-sidebar-bg: linear-gradient(180deg, #0e3022, var(--forest));
+    --sisonke-sidebar-bg: linear-gradient(180deg, #041B3D, var(--forest));
 }
 
 .sisonke-role-executive {
@@ -2325,7 +2325,7 @@ a, .btn-link { color: var(--sk-green-700); }
 .sisonke-sidebar-name {
     color: #fff;
     display: block;
-    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-family: "Archivo", Georgia, "Times New Roman", serif;
     font-size: 1.1rem;
     font-weight: 700;
     line-height: 1.15;
@@ -2417,7 +2417,7 @@ a, .btn-link { color: var(--sk-green-700); }
 .sisonke-page-header h1,
 .sisonke-hero-card h1 {
     color: var(--text);
-    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-family: "Archivo", Georgia, "Times New Roman", serif;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1.1;
@@ -2507,7 +2507,7 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .sisonke-stat-value {
     color: var(--text);
-    font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+    font-family: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
     font-size: 1.9rem;
     font-weight: 800;
     letter-spacing: 0;
@@ -2705,7 +2705,7 @@ a, .btn-link { color: var(--sk-green-700); }
     align-items: center;
     background:
         radial-gradient(circle at 92% 20%, rgba(201, 146, 42, .2), transparent 32%),
-        linear-gradient(135deg, var(--forest, #173d20), var(--forest-mid, #1e5228));
+        linear-gradient(135deg, var(--forest, #062F66), var(--forest-mid, #0B3E82));
     color: #fff;
     display: flex;
     gap: 1rem;
@@ -2715,7 +2715,7 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .executive-task-panel-header h2 {
     color: #fff;
-    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-family: "Archivo", Georgia, "Times New Roman", serif;
     font-size: 1.25rem;
     font-weight: 700;
     letter-spacing: 0;
@@ -2891,7 +2891,7 @@ a, .btn-link { color: var(--sk-green-700); }
   border-radius: var(--r-xl, 28px);
   background:
     radial-gradient(circle at 78% 25%, rgba(214, 166, 74, .24), transparent 34%),
-    linear-gradient(135deg, var(--forest, #173d20) 0%, var(--forest-mid, #1e5228) 58%, var(--forest-light, #2d6a3b) 100%);
+    linear-gradient(135deg, var(--forest, #062F66) 0%, var(--forest-mid, #0B3E82) 58%, var(--forest-light, #1E5AA8) 100%);
 }
 
 .member-hero-grid {
@@ -2938,7 +2938,7 @@ a, .btn-link { color: var(--sk-green-700); }
   min-height: 98px;
   border-radius: var(--r-md, 14px);
   background: var(--sage-pale, #e6f2ea);
-  color: var(--forest, #173d20);
+  color: var(--forest, #062F66);
   border: 1px solid rgba(23, 61, 32, .12);
 }
 
@@ -2962,7 +2962,7 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .member-meeting-content h3 {
   margin: 0;
-  color: var(--text, #172117);
+  color: var(--text, #1B2433);
   font-size: 1rem;
   font-weight: 800;
 }
@@ -3018,7 +3018,7 @@ a, .btn-link { color: var(--sk-green-700); }
   padding: 18px 12px;
   text-align: center;
   text-decoration: none;
-  color: var(--text, #172117);
+  color: var(--text, #1B2433);
   background: var(--card, #fff);
   border: 1px solid var(--border, #e5ded4);
   border-radius: var(--r-lg, 20px);
@@ -3027,7 +3027,7 @@ a, .btn-link { color: var(--sk-green-700); }
 }
 
 .member-quick-action-tile:hover {
-  color: var(--forest, #173d20);
+  color: var(--forest, #062F66);
   border-color: rgba(23, 61, 32, .28);
   box-shadow: var(--shadow-md, 0 8px 24px rgba(20, 28, 20, .12));
   transform: translateY(-2px);
@@ -3061,7 +3061,7 @@ a, .btn-link { color: var(--sk-green-700); }
 }
 
 .member-quick-action-disabled:hover {
-  color: var(--text, #172117);
+  color: var(--text, #1B2433);
   border-color: var(--border, #e5ded4);
   box-shadow: var(--shadow-sm, 0 2px 10px rgba(20, 28, 20, .08));
   transform: none;
@@ -3097,7 +3097,7 @@ a, .btn-link { color: var(--sk-green-700); }
 .sisonke-page-container .sisonke-hero-card {
     background:
         radial-gradient(ellipse at 82% 30%, rgba(201, 146, 42, .22) 0%, transparent 54%),
-        linear-gradient(140deg, var(--forest, #123f2c) 0%, var(--forest-mid, #1b5a40) 62%, #2d6a3b 100%);
+        linear-gradient(140deg, var(--forest, #062F66) 0%, var(--forest-mid, #0B3E82) 62%, #1E5AA8 100%);
     border: 1px solid rgba(255, 255, 255, .08);
     border-radius: var(--r-xl, 1.4rem);
     box-shadow: var(--shadow-lg, 0 24px 70px rgba(21, 32, 51, .16));
@@ -3105,7 +3105,7 @@ a, .btn-link { color: var(--sk-green-700); }
 }
 
 .sisonke-page-container .sisonke-hero-card h1 {
-    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-family: "Archivo", Georgia, "Times New Roman", serif;
     font-size: clamp(2rem, 3vw, 2.75rem);
     font-weight: 700;
     letter-spacing: 0;
@@ -3151,7 +3151,7 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .sisonke-standard-heading {
     color: var(--text, #18202f);
-    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-family: "Archivo", Georgia, "Times New Roman", serif;
     font-weight: 700;
     letter-spacing: 0;
 }
@@ -3244,11 +3244,11 @@ a, .btn-link { color: var(--sk-green-700); }
 .claim-timeline-complete .claim-timeline-dot {
     background: var(--sage-pale, #edf6f1);
     border-color: rgba(27, 90, 64, .25);
-    color: var(--forest-mid, #1b5a40);
+    color: var(--forest-mid, #0B3E82);
 }
 
 .claim-timeline-complete .claim-timeline-connector {
-    background: var(--forest-mid, #1b5a40);
+    background: var(--forest-mid, #0B3E82);
 }
 
 /* State: pending */
@@ -3352,7 +3352,7 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .account-nav-item:hover {
     background: var(--sage-pale, #edf6f1);
-    color: var(--forest, #123f2c);
+    color: var(--forest, #062F66);
     text-decoration: none;
 }
 
@@ -3386,7 +3386,7 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .account-settings-card-head h3 {
     color: var(--text, #18202f);
-    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-family: "Archivo", Georgia, "Times New Roman", serif;
     font-size: 1.1rem;
     font-weight: 700;
     margin: 0 0 .2rem;
@@ -3561,17 +3561,17 @@ a, .btn-link { color: var(--sk-green-700); }
 }
 
 .dashboard-redesign-page {
-    --dash-forest: #003d25;
-    --dash-green: #006b3f;
-    --dash-accent: #0f8a50;
-    --dash-mint: #eaf7ef;
-    --dash-bg: #faf8f1;
+    --dash-forest: #041B3D;
+    --dash-green: #062F66;
+    --dash-accent: #027D8A;
+    --dash-mint: #EEF3F9;
+    --dash-bg: #FAF8F2;
     --dash-card: #ffffff;
     --dash-border: #e6e1d6;
-    --dash-text: #10251b;
-    --dash-muted: #66756b;
-    --dash-amber: #b7791f;
-    --dash-red: #c04444;
+    --dash-text: #1B2433;
+    --dash-muted: #4B5568;
+    --dash-amber: #9A7108;
+    --dash-red: #B3261E;
     color: var(--dash-text);
 }
 
@@ -3819,26 +3819,26 @@ a, .btn-link { color: var(--sk-green-700); }
 
 .dashboard-redesign-page .sisonke-badge-green,
 .dashboard-redesign-page .badge.bg-success {
-    background: #e1f6ea !important;
-    color: #006b3f !important;
+    background: #E4F2E3 !important;
+    color: #20641F !important;
 }
 
 .dashboard-redesign-page .sisonke-badge-gold,
 .dashboard-redesign-page .badge.bg-warning {
-    background: #fff3d8 !important;
-    color: #8a5a0a !important;
+    background: #F6E7B8 !important;
+    color: #9A7108 !important;
 }
 
 .dashboard-redesign-page .sisonke-badge-red,
 .dashboard-redesign-page .badge.bg-danger {
-    background: #fdeaea !important;
+    background: #F7DEDC !important;
     color: var(--dash-red) !important;
 }
 
 .dashboard-redesign-page .sisonke-badge-blue,
 .dashboard-redesign-page .badge.bg-info {
-    background: #e7f1ff !important;
-    color: #245181 !important;
+    background: #DCEFF1 !important;
+    color: #027D8A !important;
 }
 
 .dashboard-redesign-page .sisonke-badge-gray,
@@ -3970,14 +3970,14 @@ a, .btn-link { color: var(--sk-green-700); }
 /* Sidebar quick-action navigation refresh */
 .sisonke-role-member,
 .sisonke-role-executive {
-    --sisonke-sidebar-bg: linear-gradient(180deg, #003d25 0%, #0b3323 100%);
+    --sisonke-sidebar-bg: linear-gradient(180deg, #062F66 0%, #041B3D 100%);
     --sisonke-sidebar-text: rgba(255, 255, 255, .78);
-    --sisonke-accent: #0f8a50;
-    --sisonke-accent-mid: #19a663;
+    --sisonke-accent: #027D8A;
+    --sisonke-accent-mid: #0592A2;
 }
 
 .sisonke-sidebar {
-    box-shadow: 10px 0 32px rgba(0, 61, 37, .16);
+    box-shadow: 10px 0 32px rgba(4, 27, 61, .16);
 }
 
 .sisonke-nav-section {

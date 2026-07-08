@@ -290,8 +290,8 @@ else
 
         return
         [
-            new("Collected", report.ActualContributions, "#0F8A50", "Actual member payments"),
-            new("Outstanding", report.OutstandingContributions, "#D97706", "Still due")
+            new("Collected", report.ActualContributions, "#399D39", "Actual member payments"),
+            new("Outstanding", report.OutstandingContributions, "#9A7108", "Still due")
         ];
     }
 
@@ -304,10 +304,10 @@ else
 
         return
         [
-            new("Paid", report.PaidCount, "#0F8A50"),
-            new("Partial", report.PartiallyPaidCount, "#D97706"),
-            new("Overdue", report.OverdueCount, "#B94242"),
-            new("Unpaid", report.UnpaidCount, "#64746B")
+            new("Paid", report.PaidCount, "#399D39"),
+            new("Partial", report.PartiallyPaidCount, "#9A7108"),
+            new("Overdue", report.OverdueCount, "#B3261E"),
+            new("Unpaid", report.UnpaidCount, "#4B5568")
         ];
     }
 
@@ -320,8 +320,8 @@ else
 
         return
         [
-            new("Outstanding fines", report.OutstandingFinesTotal, "#B94242", $"{report.OutstandingFinesCount} unpaid"),
-            new("Claims awaiting payout", report.ApprovedClaimsAwaitingPayoutTotal, "#D97706", $"{report.ApprovedClaimsAwaitingPayoutCount} approved")
+            new("Outstanding fines", report.OutstandingFinesTotal, "#B3261E", $"{report.OutstandingFinesCount} unpaid"),
+            new("Claims awaiting payout", report.ApprovedClaimsAwaitingPayoutTotal, "#9A7108", $"{report.ApprovedClaimsAwaitingPayoutCount} approved")
         ];
     }
 

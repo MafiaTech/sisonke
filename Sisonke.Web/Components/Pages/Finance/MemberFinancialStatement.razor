@@ -295,8 +295,8 @@ else
 
         return
         [
-            new("Paid", statement.TotalContributionPaid, "#0F8A50", "Confirmed contribution payments"),
-            new("Outstanding", statement.TotalContributionOutstanding, "#D97706", "Still due")
+            new("Paid", statement.TotalContributionPaid, "#399D39", "Confirmed contribution payments"),
+            new("Outstanding", statement.TotalContributionOutstanding, "#9A7108", "Still due")
         ];
     }
 
@@ -312,7 +312,7 @@ else
             .Select(contribution => new ReportDatum(
                 contribution.MonthYear,
                 contribution.PaidAmount,
-                contribution.Balance <= 0 ? "#0F8A50" : "#D97706",
+                contribution.Balance <= 0 ? "#399D39" : "#9A7108",
                 $"{FormatZAR(contribution.ExpectedAmount)} expected"))
             .ToList();
     }
@@ -338,7 +338,7 @@ else
 
         return
         [
-            new("Paid", paid, "#0F8A50", "Fine payments"),
+            new("Paid", paid, "#399D39", "Fine payments"),
             new("Outstanding", statement.TotalOutstandingFines, "#B94242", $"{statement.OutstandingFineCount} open")
         ];
     }

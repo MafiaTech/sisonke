@@ -1,29 +1,36 @@
 :root {
-    --se-deep: #002b1a;
-    --se-dark: #003d25;
-    --se-primary: #006b3f;
-    --se-accent: #0f8a50;
-    --se-pale: #eaf7ef;
-    --se-bg: #faf8f1;
+    --se-deep: #041B3D;
+    --se-dark: #062F66;
+    --se-primary: #062F66;
+    --se-accent: #027D8A;
+    --se-pale: #EEF3F9;
+    --se-bg: #FAF8F2;
     --se-card: #ffffff;
     --se-border: #e7e2d7;
-    --se-text: #10251b;
-    --se-muted: #64746b;
-    --se-warning: #b7791f;
-    --se-warning-bg: #fff4d8;
-    --se-danger: #b94242;
-    --se-danger-bg: #fdeaea;
-    --se-success: #0f8a50;
-    --se-success-bg: #eaf7ef;
+    --se-text: #1B2433;
+    --se-muted: #4B5568;
+    --se-warning: #9A7108;
+    --se-warning-bg: #F6E7B8;
+    --se-danger: #B3261E;
+    --se-danger-bg: #F7DEDC;
+    --se-success: #399D39;
+    --se-success-bg: #E4F2E3;
     --se-sidebar-width: 280px;
     --se-radius-sm: 10px;
     --se-radius: 14px;
     --se-radius-lg: 18px;
-    --se-shadow: 0 14px 38px rgba(16, 37, 27, .08);
-    --se-shadow-sm: 0 8px 22px rgba(16, 37, 27, .06);
-    --se-focus: 0 0 0 3px rgba(15, 138, 80, .22);
-    --se-font: "DM Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --se-shadow: 0 14px 38px rgba(6, 47, 102, .08);
+    --se-shadow-sm: 0 8px 22px rgba(6, 47, 102, .06);
+    --se-focus: 0 0 0 3px rgba(202, 149, 10, .25);
+    --se-font: "Instrument Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --se-font-display: "Archivo", "Segoe UI", system-ui, sans-serif;
     --se-font-mono: "DM Mono", "Cascadia Code", Consolas, monospace;
+}
+
+h1, h2, h3, h4, h5, h6,
+.display-1, .display-2, .display-3, .display-4 {
+    font-family: var(--se-font-display);
+    font-weight: 700;
 }
 
 *,
@@ -93,7 +100,7 @@ a:hover {
     min-height: 100dvh;
     overflow-x: clip;
     background:
-        radial-gradient(circle at 82% 0%, rgba(234, 247, 239, .75), transparent 30rem),
+        radial-gradient(circle at 82% 0%, rgba(238, 243, 249, .75), transparent 30rem),
         var(--se-bg);
     color: var(--se-text);
 }
@@ -109,7 +116,7 @@ a:hover {
     background: linear-gradient(180deg, var(--se-dark) 0%, var(--se-deep) 100%) !important;
     color: rgba(255, 255, 255, .82);
     padding: 18px 14px;
-    box-shadow: 18px 0 44px rgba(0, 43, 26, .18);
+    box-shadow: 18px 0 44px rgba(4, 27, 61, .18);
 }
 
 .sisonke-app-shell .sisonke-sidebar::-webkit-scrollbar {
@@ -140,7 +147,7 @@ a:hover {
     border: 1px solid rgba(255, 255, 255, .22);
     border-radius: 13px;
     background: rgba(255, 255, 255, .12);
-    color: #c9f8dd;
+    color: #EFBF3A;
     overflow: hidden;
 }
 
@@ -202,7 +209,7 @@ a:hover {
 .sisonke-app-shell .sisonke-nav-item-active {
     background: linear-gradient(135deg, var(--se-accent), var(--se-primary));
     color: #fff;
-    box-shadow: 0 10px 26px rgba(15, 138, 80, .3);
+    box-shadow: 0 10px 26px rgba(2, 125, 138, .3);
 }
 
 .sisonke-app-shell .sisonke-nav-item-disabled {
@@ -503,7 +510,7 @@ a:hover {
 .btn-outline-secondary:hover,
 .btn-outline-primary:hover,
 .sisonke-btn-outline:hover {
-    border-color: #bfdbc9 !important;
+    border-color: rgba(6, 47, 102, .25) !important;
     background: var(--se-pale) !important;
     color: var(--se-primary) !important;
 }
@@ -578,7 +585,7 @@ input[type="password"] {
 .modal-content {
     border: 1px solid var(--se-border);
     border-radius: var(--se-radius-lg);
-    box-shadow: 0 28px 70px rgba(16, 37, 27, .22);
+    box-shadow: 0 28px 70px rgba(27, 36, 51, .22);
 }
 
 .modal-header,
@@ -650,7 +657,7 @@ input[type="password"] {
     border-radius: 13px;
     padding: 15px;
     background: #fffdfa;
-    box-shadow: 0 8px 18px rgba(16, 37, 27, .04);
+    box-shadow: 0 8px 18px rgba(27, 36, 51, .04);
 }
 
 .executive-task-card p {
@@ -679,7 +686,7 @@ input[type="password"] {
 }
 
 .task-accent-gold {
-    border-top-color: #d97706;
+    border-top-color: #CA950A;
 }
 
 .task-accent-red {
@@ -765,7 +772,7 @@ input[type="password"] {
     min-width: 132px;
     place-items: center;
     border-radius: 50%;
-    box-shadow: inset 0 0 0 1px rgba(16, 37, 27, .06);
+    box-shadow: inset 0 0 0 1px rgba(27, 36, 51, .06);
 }
 
 .report-donut-center {
@@ -776,7 +783,7 @@ input[type="password"] {
     border-radius: 50%;
     background: #fffdfa;
     text-align: center;
-    box-shadow: 0 8px 18px rgba(16, 37, 27, .08);
+    box-shadow: 0 8px 18px rgba(27, 36, 51, .08);
 }
 
 .report-donut-center strong {
@@ -903,10 +910,10 @@ input[type="password"] {
 
 .pilot-banner {
     margin-bottom: 18px;
-    border: 1px solid #f1d994;
+    border: 1px solid #EFBF3A;
     border-radius: var(--se-radius);
     background: var(--se-warning-bg);
-    color: #76520d;
+    color: var(--se-warning);
 }
 
 .top-row-user {
@@ -988,7 +995,7 @@ input[type="password"] {
         background: #fff;
         color: #fff;
         overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0, 43, 26, .12);
+        box-shadow: 0 2px 8px rgba(4, 27, 61, .12);
     }
 
     .sisonke-mobile-brand-mark img {
@@ -1013,7 +1020,7 @@ input[type="password"] {
         position: fixed;
         inset: 0;
         z-index: 1035;
-        background: rgba(0, 43, 26, .45);
+        background: rgba(4, 27, 61, .45);
     }
 
     .sisonke-app-shell .sisonke-main {
@@ -1174,7 +1181,7 @@ input[type="password"] {
         border-radius: 18px;
         padding: 7px;
         background: rgba(255, 255, 255, .94);
-        box-shadow: 0 18px 44px rgba(16, 37, 27, .16);
+        box-shadow: 0 18px 44px rgba(27, 36, 51, .16);
         backdrop-filter: blur(14px);
     }
 
