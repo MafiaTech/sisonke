@@ -26,9 +26,11 @@ authSettings.RequireConfirmedAccount = builder.Configuration.GetValue("Auth:Requ
 authSettings.SessionTimeoutMinutes = builder.Configuration.GetValue("Auth:SessionTimeoutMinutes", 60);
 var appSettings = builder.Configuration.GetSection("App").Get<AppSettings>() ?? new AppSettings();
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings();
+var featureFlags = builder.Configuration.GetSection("Features").Get<FeatureFlags>() ?? new FeatureFlags();
 builder.Services.AddSingleton(authSettings);
 builder.Services.AddSingleton(appSettings);
 builder.Services.AddSingleton(emailSettings);
+builder.Services.AddSingleton(featureFlags);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
