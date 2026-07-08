@@ -13,6 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Development-only settings (local DB credentials) must never ship in a publish/deploy package. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="Sisonke.MigrationTool\**\*.cs" />
     <Content Remove="Sisonke.MigrationTool\**" />
   </ItemGroup>

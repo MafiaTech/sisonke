@@ -1,0 +1,28 @@
+# Local development database for Sisonke.Web.
+# Not used in production/Azure — see DEV_SETUP.md.
+#
+# Start:  docker compose -f docker-compose.dev.yml up -d
+# Stop:   docker compose -f docker-compose.dev.yml down
+# Reset:  docker compose -f docker-compose.dev.yml down -v
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sisonke-dev-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Sisonke_Dev_L0cal!2026"
+      MSSQL_PID: "Developer"
+    ports:
+      - "14333:1433"
+    volumes:
+      - sisonke-dev-sql-data:/var/opt/mssql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  sisonke-dev-sql-data:

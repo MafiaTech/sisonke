@@ -369,16 +369,49 @@ using (var scope = app.Services.CreateScope())
         seedDataEnabled,
         builder.Configuration.GetValue("AdminSeed:Enabled", false));
 
-    try
+    // Auto-migrate in Development by default. Elsewhere, only migrate when explicitly
+    // opted in via Database:MigrateOnStartup — otherwise log pending migrations as a
+    // warning instead of failing startup, since schema changes should be applied through
+    // a controlled deployment step in Production.
+    var migrateOnStartup = builder.Configuration.GetValue(
+        "Database:MigrateOnStartup",
+        builder.Environment.IsDevelopment());
+
+    if (migrateOnStartup)
     {
-        startupLogger.LogInformation("[Startup] Applying pending migrations...");
-        await context.Database.MigrateAsync();
-        startupLogger.LogInformation("[Startup] Migrations applied successfully.");
+        try
+        {
+            startupLogger.LogInformation("[Startup] Applying pending migrations...");
+            await context.Database.MigrateAsync();
+            startupLogger.LogInformation("[Startup] Migrations applied successfully.");
+        }
+        catch (Exception ex)
+        {
+            startupLogger.LogCritical(ex, "[Startup] Database migration failed. The application cannot start safely.");
+            throw;
+        }
     }
-    catch (Exception ex)
+    else
     {
-        startupLogger.LogCritical(ex, "[Startup] Database migration failed. The application cannot start safely.");
-        throw;
+        try
+        {
+            var pendingMigrations = (await context.Database.GetPendingMigrationsAsync()).ToList();
+            if (pendingMigrations.Count > 0)
+            {
+                startupLogger.LogWarning(
+                    "[Startup] {Count} pending migration(s) found but Database:MigrateOnStartup is false — schema was NOT updated automatically. Apply migrations via a controlled deployment step. Pending: {Migrations}",
+                    pendingMigrations.Count,
+                    string.Join(", ", pendingMigrations));
+            }
+            else
+            {
+                startupLogger.LogInformation("[Startup] Database schema is up to date. No pending migrations.");
+            }
+        }
+        catch (Exception ex)
+        {
+            startupLogger.LogWarning(ex, "[Startup] Could not check for pending migrations. Continuing startup.");
+        }
     }
 
     if (builder.Configuration.GetValue("AdminSeed:Enabled", false))
