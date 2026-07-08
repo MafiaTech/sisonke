@@ -18,6 +18,18 @@ public class ApplicationUser : IdentityUser
     [MaxLength(250)]
     public string? ResidentialArea { get; set; }
 
+    [MaxLength(50)]
+    public string? ExternalAuthProvider { get; set; }
+
+    [MaxLength(150)]
+    public string? ExternalTenantId { get; set; }
+
+    [MaxLength(150)]
+    public string? ExternalObjectId { get; set; }
+
+    [MaxLength(256)]
+    public string? ExternalEmail { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? CreatedBy { get; set; }
 

@@ -11,6 +11,7 @@
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IServiceScopeFactory ScopeFactory
+@inject MemberAccountLinkingService MemberAccountLinkingService
 
 <PageTitle>My Memberships</PageTitle>
 
@@ -37,7 +38,7 @@ else
         <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-end">
             <div>
                 <p class="my-memberships-eyebrow">
-                    Memberships linked to your registered SA ID number.
+                    Memberships linked to your Sisonke account.
                 </p>
                 <h1>My Memberships</h1>
                 <p class="mt-3">@GetUserDisplayName()</p>
@@ -279,7 +280,7 @@ else
             if (!string.IsNullOrWhiteSpace(userId))
             {
                 currentUser = await LoadCurrentUserAsync(userId);
-                memberships = await LoadMembershipsForUserAsync(userId);
+                memberships = await LoadMembershipsForUserAsync(userId, currentUser);
                 await LoadMembershipAccessAsync();
             }
         }
@@ -296,8 +297,11 @@ else
             return;
         }
 
-        await RefreshUserMembershipLinksAsync(userId, currentUser.IdNumber);
-        memberships = await LoadMembershipsForUserAsync(userId);
+        await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(
+            userId,
+            currentUser.IdNumber,
+            GetVerifiedEmailForFallback(currentUser));
+        memberships = await LoadMembershipsForUserAsync(userId, currentUser);
         await LoadMembershipAccessAsync();
         successMessage = "Membership links refreshed.";
     }
@@ -312,45 +316,12 @@ else
             .FirstOrDefaultAsync(user => user.Id == currentUserId);
     }
 
-    private async Task<List<Member>> LoadMembershipsForUserAsync(string currentUserId)
+    private async Task<List<Member>> LoadMembershipsForUserAsync(string currentUserId, ApplicationUser? user)
     {
-        await using var scope = ScopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        return await db.Members
-            .AsNoTracking()
-            .Include(member => member.Tenant)
-            .Where(member => member.ApplicationUserId == currentUserId)
-            .OrderBy(member => member.FullName)
-            .ToListAsync();
-    }
-
-    private async Task RefreshUserMembershipLinksAsync(string currentUserId, string? idNumber)
-    {
-        var normalizedIdNumber = NormalizeIdNumber(idNumber);
-
-        if (string.IsNullOrWhiteSpace(currentUserId) || string.IsNullOrEmpty(normalizedIdNumber))
-        {
-            return;
-        }
-
-        await using var scope = ScopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var membersToCheck = await db.Members
-            .Where(member => member.IdNumber != null)
-            .ToListAsync();
-
-        var matchingMembers = membersToCheck
-            .Where(member => NormalizeIdNumber(member.IdNumber) == normalizedIdNumber)
-            .ToList();
-
-        foreach (var member in matchingMembers)
-        {
-            member.ApplicationUserId = currentUserId;
-        }
-
-        await db.SaveChangesAsync();
+        return await MemberAccountLinkingService.GetMembershipsForUserAsync(
+            currentUserId,
+            user?.IdNumber,
+            GetVerifiedEmailForFallback(user));
     }
 
     private async Task LoadMembershipAccessAsync()
@@ -427,19 +398,6 @@ else
         return string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
     }
 
-    private static string NormalizeIdNumber(string? idNumber)
-    {
-        if (string.IsNullOrWhiteSpace(idNumber))
-        {
-            return string.Empty;
-        }
-
-        return idNumber
-            .Trim()
-            .Replace(" ", string.Empty)
-            .Replace("-", string.Empty);
-    }
-
     private static bool IsOfficeBearerRole(string? role)
     {
         return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
@@ -455,5 +413,15 @@ else
     private string GetUserDisplayName()
     {
         return currentUser?.FullName ?? currentUser?.Email ?? "Your Sisonke account";
+    }
+
+    private static string? GetVerifiedEmailForFallback(ApplicationUser? user)
+    {
+        if (user?.EmailConfirmed != true)
+        {
+            return null;
+        }
+
+        return user.Email;
     }
 }

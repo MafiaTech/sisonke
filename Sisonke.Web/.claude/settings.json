@@ -12,7 +12,26 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke-Recovered\\\\Sisonke.Web\" -Directory)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mpshe\\\\Projects\\\\Sisonke-Recovered\\\\Sisonke.Web\" -Recurse -Filter \"Stokvel.cs\" -ErrorAction SilentlyContinue)",
       "Bash(Select-Object FullName)",
-      "Bash(dotnet ef *)"
+      "Bash(dotnet ef *)",
+      "Bash(timeout 60 dotnet run --no-launch-profile --urls http://localhost:5230)",
+      "Bash(tee /tmp/sisonke-run-verify.log)",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development timeout 45 dotnet run --no-launch-profile --urls http://localhost:5230)",
+      "Bash(dotnet user-secrets *)",
+      "Bash(tasklist)",
+      "Bash(netstat -ano)",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development timeout 60 dotnet run --no-launch-profile --urls http://localhost:5230)",
+      "Bash(tee /tmp/sisonke-run-verify2.log)",
+      "Bash(xargs grep -l \"StokvelLoanConfigurations\")",
+      "Bash(docker exec *)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec sisonke-dev-sql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Sisonke_Dev_L0cal!2026' -C -d SisonkeDev -Q \"SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(xargs grep -l \"FK_.*_Stokvels_StokvelId\")",
+      "Bash(tee /tmp/sisonke-run-verify3.log)",
+      "Bash(tee /tmp/sisonke-run-verify4.log)",
+      "Bash(tee /tmp/sisonke-run-verify5.log)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5230/ --max-time 5)",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development dotnet ef migrations has-pending-model-changes)"
     ]
   }
 }

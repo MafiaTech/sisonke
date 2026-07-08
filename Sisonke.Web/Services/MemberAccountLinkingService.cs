@@ -19,6 +19,13 @@ public class MemberAccountLinkingService(IDbContextFactory<ApplicationDbContext>
             .Replace("-", string.Empty);
     }
 
+    private static string NormalizeEmail(string? email)
+    {
+        return string.IsNullOrWhiteSpace(email)
+            ? string.Empty
+            : email.Trim().ToUpperInvariant();
+    }
+
     public async Task<List<Member>> FindMembersByIdNumberAsync(string? idNumber)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
@@ -68,18 +75,77 @@ public class MemberAccountLinkingService(IDbContextFactory<ApplicationDbContext>
         return matchingMembers.Count;
     }
 
-    public async Task<int> RefreshUserMembershipLinksAsync(string userId, string? idNumber)
+    public async Task<int> LinkUserToMembersByVerifiedEmailAsync(string userId, string? email)
     {
-        return await LinkUserToMembersByIdNumberAsync(userId, idNumber);
+        await using var context = await dbFactory.CreateDbContextAsync();
+        var normalizedEmail = NormalizeEmail(email);
+
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrEmpty(normalizedEmail))
+        {
+            return 0;
+        }
+
+        var members = await context.Members
+            .Where(member => member.EmailAddress != null)
+            .ToListAsync();
+
+        var matchingMembers = members
+            .Where(member => NormalizeEmail(member.EmailAddress) == normalizedEmail)
+            .ToList();
+
+        if (!IsSafeEmailMatch(matchingMembers))
+        {
+            return 0;
+        }
+
+        foreach (var member in matchingMembers)
+        {
+            member.ApplicationUserId = userId;
+        }
+
+        await context.SaveChangesAsync();
+
+        return matchingMembers.Count;
     }
 
-    public async Task<List<Member>> GetMembershipsForUserAsync(string userId)
+    public async Task<int> RefreshUserMembershipLinksAsync(
+        string userId,
+        string? idNumber,
+        string? verifiedEmail = null)
+    {
+        var normalizedIdNumber = NormalizeIdNumber(idNumber);
+        var linkedById = await LinkUserToMembersByIdNumberAsync(userId, idNumber);
+        if (linkedById > 0 || !string.IsNullOrEmpty(normalizedIdNumber))
+        {
+            return linkedById;
+        }
+
+        return await LinkUserToMembersByVerifiedEmailAsync(userId, verifiedEmail);
+    }
+
+    public async Task<List<Member>> GetMembershipsForUserAsync(
+        string userId,
+        string? idNumber = null,
+        string? verifiedEmail = null)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
         if (string.IsNullOrWhiteSpace(userId))
         {
             return [];
         }
+
+        var linkedMembers = await context.Members
+            .Include(member => member.Tenant)
+            .Where(member => member.ApplicationUserId == userId)
+            .OrderBy(member => member.FullName)
+            .ToListAsync();
+
+        if (linkedMembers.Count > 0)
+        {
+            return linkedMembers;
+        }
+
+        await RefreshUserMembershipLinksAsync(userId, idNumber, verifiedEmail);
 
         return await context.Members
             .Include(member => member.Tenant)
@@ -98,5 +164,21 @@ public class MemberAccountLinkingService(IDbContextFactory<ApplicationDbContext>
 
         return await context.Members
             .AnyAsync(member => member.Id == memberId && member.ApplicationUserId == userId);
+    }
+
+    private static bool IsSafeEmailMatch(List<Member> matchingMembers)
+    {
+        if (matchingMembers.Count == 0)
+        {
+            return false;
+        }
+
+        var distinctCapturedIdNumbers = matchingMembers
+            .Select(member => NormalizeIdNumber(member.IdNumber))
+            .Where(idNumber => !string.IsNullOrWhiteSpace(idNumber))
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+
+        return distinctCapturedIdNumbers <= 1;
     }
 }

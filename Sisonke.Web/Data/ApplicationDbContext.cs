@@ -92,6 +92,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasMaxLength(150)
             .IsRequired();
 
+        builder.Entity<ApplicationUser>()
+            .Property(u => u.ExternalAuthProvider)
+            .HasMaxLength(50);
+
+        builder.Entity<ApplicationUser>()
+            .Property(u => u.ExternalTenantId)
+            .HasMaxLength(150);
+
+        builder.Entity<ApplicationUser>()
+            .Property(u => u.ExternalObjectId)
+            .HasMaxLength(150);
+
+        builder.Entity<ApplicationUser>()
+            .Property(u => u.ExternalEmail)
+            .HasMaxLength(256);
+
+        builder.Entity<ApplicationUser>()
+            .HasIndex(u => new { u.ExternalAuthProvider, u.ExternalObjectId });
+
         builder.Entity<Stokvel>()
             .HasOne(s => s.Tenant)
             .WithMany(t => t.Stokvels)
@@ -540,6 +559,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<ContributionRule>()
             .Property(r => r.LatePaymentFineAmount).HasPrecision(18, 2);
 
+        builder.Entity<StokvelOperatingRules>()
+            .Property(r => r.MonthlyContributionAmount).HasPrecision(18, 2);
+        builder.Entity<StokvelOperatingRules>()
+            .Property(r => r.LatePaymentFineAmount).HasPrecision(18, 2);
+        builder.Entity<StokvelOperatingRules>()
+            .Property(r => r.DefaultClaimPayoutAmount).HasPrecision(18, 2);
+        builder.Entity<StokvelOperatingRules>()
+            .Property(r => r.LateApologyFineAmount).HasPrecision(18, 2);
+        builder.Entity<StokvelOperatingRules>()
+            .Property(r => r.AbsenceWithoutApologyFineAmount).HasPrecision(18, 2);
+        builder.Entity<StokvelOperatingRules>()
+            .Property(r => r.QuorumPercentage).HasPrecision(18, 2);
+        builder.Entity<StokvelOperatingRules>()
+            .Property(r => r.DefaultVotingApprovalThreshold).HasPrecision(18, 2);
+
         builder.Entity<MemberFine>()
             .Property(f => f.Amount).HasPrecision(18, 2);
 
@@ -878,7 +912,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<MemberLoan>()
-            .Property(l => l.LoanType).HasDefaultValue(MemberLoanType.Standard);
+            .Property(l => l.LoanType)
+            .HasDefaultValue(MemberLoanType.Standard)
+            .HasSentinel((MemberLoanType)0);
         builder.Entity<MemberLoan>()
             .Property(l => l.RequestedAmount).HasPrecision(18, 2);
         builder.Entity<MemberLoan>()

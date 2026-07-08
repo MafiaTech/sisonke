@@ -568,6 +568,23 @@ public sealed class LoansWalletService(
             .FirstOrDefaultAsync();
     }
 
+    public async Task<StokvelWalletSummary> GetWalletSummaryAsync(Guid stokvelId)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync();
+        var totalAvailableBalance = await context.MemberSurplusWallets.AsNoTracking()
+            .Where(x => x.StokvelId == stokvelId && x.IsActive)
+            .SumAsync(x => x.AvailableBalance);
+        var activeLoans = await context.MemberLoans.AsNoTracking()
+            .Where(x => x.StokvelId == stokvelId && x.IsActive && (x.LoanStatus == MemberLoanStatus.Active || x.LoanStatus == MemberLoanStatus.Overdue))
+            .ToListAsync();
+        var lastTransactionAt = await context.MemberSurplusWalletTransactions.AsNoTracking()
+            .Where(x => x.StokvelId == stokvelId)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => (DateTime?)x.CreatedAt)
+            .FirstOrDefaultAsync();
+        return new(totalAvailableBalance, activeLoans.Count, activeLoans.Sum(x => x.OutstandingBalance), lastTransactionAt);
+    }
+
     public async Task<bool> IsLoanFeatureAvailableForStokvelAsync(Guid stokvelId)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
@@ -910,3 +927,4 @@ public sealed record LoansWalletPageState(Stokvel Stokvel, Member? CurrentMember
 public sealed record FinanceOperationResult(bool Success, List<string> Errors, string? Message = null) { public static FinanceOperationResult Succeeded(string? message = null) => new(true, [], message); public static FinanceOperationResult Failed(string error) => new(false, [error]); public static FinanceOperationResult Failed(List<string> errors) => new(false, errors); }
 public sealed record LoanConfigurationResult(bool Success, StokvelLoanConfiguration? Configuration, List<string> Errors) { public static LoanConfigurationResult Succeeded(StokvelLoanConfiguration x) => new(true, x, []); public static LoanConfigurationResult Failed(List<string> e) => new(false, null, e); }
 public sealed record LoansWalletTaskCounts(int PendingLoanApprovals, int LoansAwaitingDisbursement, int RepaymentsAwaitingConfirmation, int PendingWithdrawalApprovals, int WithdrawalsAwaitingPayment);
+public sealed record StokvelWalletSummary(decimal TotalAvailableBalance, int ActiveLoanCount, decimal TotalOutstandingLoanBalance, DateTime? LastTransactionAt);

@@ -9,12 +9,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="Data\app.db" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Update="Data\app.db" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Development-only settings (local DB credentials) must never ship in a publish/deploy package. -->
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <Content Remove="artifacts\**" />
+    <None Remove="artifacts\**" />
   </ItemGroup>
 
   <ItemGroup>

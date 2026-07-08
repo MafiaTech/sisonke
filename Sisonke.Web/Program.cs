@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Sisonke.Web.Components;
 using Sisonke.Web.Components.Account;
 using Sisonke.Web.Data;
@@ -129,6 +130,31 @@ authenticationBuilder.AddOpenIdConnect("MicrosoftEntraExternalId", options =>
 
     options.Events = new OpenIdConnectEvents
     {
+        OnTokenValidated = async context =>
+        {
+            if (context.Principal?.Identity is not ClaimsIdentity identity)
+            {
+                return;
+            }
+
+            var currentUserService = context.HttpContext.RequestServices
+                .GetRequiredService<SisonkeCurrentUserService>();
+            var localUser = await currentUserService.ResolveOrCreateEntraUserAsync(context.Principal);
+
+            if (localUser is null)
+            {
+                context.Fail("Could not resolve the Entra account to a Sisonke user.");
+                return;
+            }
+
+            foreach (var claim in identity.FindAll(ClaimTypes.NameIdentifier).ToList())
+            {
+                identity.RemoveClaim(claim);
+            }
+
+            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, localUser.Id));
+            identity.AddClaim(new Claim("sisonke:user_id", localUser.Id));
+        },
         OnRedirectToIdentityProvider = context =>
         {
             if (builder.Environment.IsDevelopment())
@@ -333,6 +359,7 @@ builder.Services.AddScoped<VotingService>();
 builder.Services.AddScoped<FuneralClaimService>();
 builder.Services.AddScoped<ClaimEligibilityService>();
 builder.Services.AddScoped<MemberAccountLinkingService>();
+builder.Services.AddScoped<SisonkeCurrentUserService>();
 builder.Services.AddScoped<MemberAccessService>();
 builder.Services.AddScoped<StokvelArchetypeConfigurationService>();
 builder.Services.AddScoped<RotationalStokvelService>();
