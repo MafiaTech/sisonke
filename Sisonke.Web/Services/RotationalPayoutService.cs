@@ -7,7 +7,8 @@ namespace Sisonke.Web.Services;
 
 public sealed class RotationalPayoutService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
-    ILogger<RotationalPayoutService> logger)
+    ILogger<RotationalPayoutService> logger,
+    AuditLogService auditLogService)
 {
     public async Task<RotationalPayout?> GetCurrentPayoutAsync(Guid stokvelId)
     {
@@ -58,6 +59,7 @@ public sealed class RotationalPayoutService(
         return new(payout, banking, summary,
             role == SisonkeRole.Chairperson,
             role == SisonkeRole.Treasurer,
+            role == SisonkeRole.Secretary || role is SisonkeRole.Creator or SisonkeRole.StokvelAdmin,
             payout?.PayoutMember.ApplicationUserId == currentUserId);
     }
 
@@ -84,7 +86,7 @@ public sealed class RotationalPayoutService(
             CycleId = cycle.Id,
             PayoutMemberId = cycle.PayoutMemberId,
             PayoutAmount = cycle.ExpectedPayoutAmount,
-            PayoutStatus = RotationalPayoutStatus.ReadyForApproval,
+            PayoutStatus = RotationalPayoutStatus.PendingSecretaryReview,
             RequestedAt = now,
             RequestedBy = currentUserId,
             IsActive = true,
@@ -95,7 +97,70 @@ public sealed class RotationalPayoutService(
         cycle.Status = RotationalCycleStatus.PayoutPending;
         cycle.UpdatedAt = now; cycle.UpdatedBy = currentUserId;
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            currentUserId,
+            cycle.StokvelId,
+            "RotationalPayoutScheduled",
+            "RotationalPayout",
+            payout.Id,
+            $"Payout prepared for {cycle.CycleName}.");
         logger.LogInformation("Payout {PayoutId} created for cycle {CycleId}", payout.Id, cycleId);
+        return PayoutOperationResult.Succeeded(payout);
+    }
+
+    public async Task<PayoutOperationResult> ReviewPayoutAsSecretaryAsync(
+        Guid payoutId,
+        string currentUserId,
+        bool recommendApproval,
+        string? notes)
+    {
+        var trimmedNotes = NullIfWhiteSpace(notes);
+        if (!recommendApproval && string.IsNullOrWhiteSpace(trimmedNotes))
+            return PayoutOperationResult.Failed(["Secretary notes are required when recommending rejection."]);
+
+        await using var context = await dbFactory.CreateDbContextAsync();
+        var payout = await context.RotationalPayouts
+            .Include(item => item.Cycle)
+            .FirstOrDefaultAsync(item => item.Id == payoutId && item.IsActive);
+        if (payout is null) return PayoutOperationResult.Failed(["Payout not found."]);
+        var role = await GetCurrentRoleAsync(context, payout.StokvelId, currentUserId);
+        if (role is not (SisonkeRole.Secretary or SisonkeRole.Creator or SisonkeRole.StokvelAdmin))
+            return PayoutOperationResult.Failed(["Only the Secretary or stokvel admins can review payout readiness."]);
+        if (payout.PayoutStatus is not (RotationalPayoutStatus.PendingSecretaryReview or RotationalPayoutStatus.ReturnedToSecretary))
+            return PayoutOperationResult.Failed(["Only payouts awaiting Secretary review can be reviewed."]);
+        if (await IsPayoutRecipientAsync(context, payout, currentUserId))
+            return PayoutOperationResult.Failed(["You cannot review your own payout."]);
+
+        var now = DateTime.UtcNow;
+        payout.SecretaryReviewedAt = now;
+        payout.SecretaryReviewedByUserId = currentUserId;
+        payout.SecretaryRecommendedApproval = recommendApproval;
+        payout.SecretaryReviewNotes = trimmedNotes;
+        payout.PayoutStatus = recommendApproval
+            ? RotationalPayoutStatus.PendingChairpersonApproval
+            : RotationalPayoutStatus.Rejected;
+        if (!recommendApproval)
+        {
+            payout.RejectedAt = now;
+            payout.RejectedByChairpersonId = null;
+            payout.RejectionReason = trimmedNotes;
+        }
+        payout.Cycle.Status = recommendApproval
+            ? RotationalCycleStatus.PayoutPending
+            : RotationalCycleStatus.ReadyForPayout;
+        payout.Cycle.UpdatedAt = now;
+        payout.Cycle.UpdatedBy = currentUserId;
+        payout.UpdatedAt = now;
+        payout.UpdatedBy = currentUserId;
+        await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            currentUserId,
+            payout.StokvelId,
+            "RotationalPayoutSecretaryReviewed",
+            "RotationalPayout",
+            payout.Id,
+            recommendApproval ? "Secretary recommended payout approval." : "Secretary recommended payout rejection.");
+        logger.LogInformation("Payout {PayoutId} secretary review recorded", payoutId);
         return PayoutOperationResult.Succeeded(payout);
     }
 
@@ -122,7 +187,7 @@ public sealed class RotationalPayoutService(
             return PayoutOperationResult.Failed(["Only payouts returned to the Secretary can be resubmitted."]);
 
         var now = DateTime.UtcNow;
-        payout.PayoutStatus = RotationalPayoutStatus.ReadyForApproval;
+        payout.PayoutStatus = RotationalPayoutStatus.PendingChairpersonApproval;
         payout.RequestedAt = now;
         payout.RequestedBy = currentUserId;
         payout.Cycle.Status = RotationalCycleStatus.PayoutPending;
@@ -131,6 +196,13 @@ public sealed class RotationalPayoutService(
         payout.UpdatedAt = now;
         payout.UpdatedBy = currentUserId;
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            currentUserId,
+            payout.StokvelId,
+            "RotationalPayoutSecretaryResubmitted",
+            "RotationalPayout",
+            payout.Id,
+            "Secretary resubmitted payout for chairperson approval.");
         logger.LogInformation("Payout {PayoutId} resubmitted for chairperson approval", payoutId);
         return PayoutOperationResult.Succeeded(payout);
     }
@@ -153,8 +225,10 @@ public sealed class RotationalPayoutService(
         if (payout is null) return PayoutOperationResult.Failed(["Payout not found."]);
         if (await GetCurrentRoleAsync(context, payout.StokvelId, currentUserId) != SisonkeRole.Chairperson)
             return PayoutOperationResult.Failed(["Only the Chairperson can submit payout decisions."]);
-        if (payout.PayoutStatus != RotationalPayoutStatus.ReadyForApproval)
+        if (payout.PayoutStatus is not (RotationalPayoutStatus.PendingChairpersonApproval or RotationalPayoutStatus.ReadyForApproval))
             return PayoutOperationResult.Failed(["Only payouts ready for approval can receive a chairperson decision."]);
+        if (await IsPayoutRecipientAsync(context, payout, currentUserId))
+            return PayoutOperationResult.Failed(["You cannot approve or reject your own payout."]);
 
         var now = DateTime.UtcNow;
         payout.ChairpersonDecision = decision.ToString();
@@ -188,6 +262,15 @@ public sealed class RotationalPayoutService(
         payout.UpdatedAt = now;
         payout.UpdatedBy = currentUserId;
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            currentUserId,
+            payout.StokvelId,
+            decision == RotationalPayoutDecision.Approve ? "RotationalPayoutChairpersonApproved" :
+            decision == RotationalPayoutDecision.Reject ? "RotationalPayoutChairpersonRejected" :
+            "RotationalPayoutChairpersonReturned",
+            "RotationalPayout",
+            payout.Id,
+            $"Chairperson decision recorded as {decision}.");
         logger.LogInformation("Payout {PayoutId} chairperson decision recorded as {Decision}", payoutId, decision);
         return PayoutOperationResult.Succeeded(payout);
     }
@@ -206,6 +289,8 @@ public sealed class RotationalPayoutService(
             return PayoutOperationResult.Failed(["Only the Treasurer can confirm a payout payment."]);
         if (payout.PayoutStatus != RotationalPayoutStatus.Approved)
             return PayoutOperationResult.Failed(["The payout must be approved by the Chairperson before payment."]);
+        if (await IsPayoutRecipientAsync(context, payout, currentUserId))
+            return PayoutOperationResult.Failed(["You cannot pay your own payout."]);
         if (!await context.Stokvels.AsNoTracking().AnyAsync(stokvel =>
                 stokvel.Id == payout.StokvelId && stokvel.IsActive && !stokvel.IsDeleted))
             return PayoutOperationResult.Failed(["Payout cannot be confirmed for an inactive stokvel."]);
@@ -239,6 +324,13 @@ public sealed class RotationalPayoutService(
 
         await context.SaveChangesAsync();
         await transaction.CommitAsync();
+        await auditLogService.RecordAsync(
+            currentUserId,
+            payout.StokvelId,
+            "RotationalPayoutPaid",
+            "RotationalPayout",
+            payout.Id,
+            $"Treasurer recorded payout payment for {FormatMoney(payout.PayoutAmount)}.");
         logger.LogInformation("Payout {PayoutId} confirmed paid", payoutId);
         return PayoutOperationResult.Succeeded(payout);
     }
@@ -271,6 +363,19 @@ public sealed class RotationalPayoutService(
             .Select(member => (SisonkeRole?)member.DefaultRole).FirstOrDefaultAsync();
     }
 
+    private static async Task<bool> IsPayoutRecipientAsync(
+        ApplicationDbContext context,
+        RotationalPayout payout,
+        string currentUserId)
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+            return false;
+
+        return await context.Members.AsNoTracking().AnyAsync(member =>
+            member.Id == payout.PayoutMemberId &&
+            member.ApplicationUserId == currentUserId);
+    }
+
     private static async Task<bool> IsOfficeBearerAsync(
         ApplicationDbContext context, Guid stokvelId, string currentUserId)
     {
@@ -291,6 +396,9 @@ public sealed class RotationalPayoutService(
     }
 
     private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string FormatMoney(decimal value) =>
+        value.ToString("C2", new System.Globalization.CultureInfo("en-ZA"));
 }
 
 public sealed record ConfirmPayoutPaidRequest(
@@ -308,4 +416,4 @@ public sealed record PayoutOperationResult(bool Success, RotationalPayout? Payou
 }
 public sealed record PayoutSummary(
     RotationalPayout? Payout, StokvelBankingDetails? BankingDetails,
-    CycleContributionSummary ContributionSummary, bool CanApprove, bool CanConfirmPaid, bool IsRecipient);
+    CycleContributionSummary ContributionSummary, bool CanApprove, bool CanConfirmPaid, bool CanReviewAsSecretary, bool IsRecipient);

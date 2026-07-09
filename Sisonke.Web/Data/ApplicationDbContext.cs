@@ -877,6 +877,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .Property(p => p.PayoutAmount).HasPrecision(18, 2);
 
         builder.Entity<RotationalPayout>()
+            .Property(p => p.SecretaryReviewedByUserId).HasMaxLength(450);
+        builder.Entity<RotationalPayout>()
+            .Property(p => p.SecretaryReviewNotes).HasMaxLength(1000);
+        builder.Entity<RotationalPayout>()
+            .Property(p => p.ChairpersonDecision).HasMaxLength(50);
+        builder.Entity<RotationalPayout>()
+            .Property(p => p.ChairpersonReviewedByUserId).HasMaxLength(450);
+        builder.Entity<RotationalPayout>()
+            .Property(p => p.ChairpersonReviewNotes).HasMaxLength(1000);
+
+        builder.Entity<RotationalPayout>()
             .HasIndex(p => p.StokvelId);
         builder.Entity<RotationalPayout>()
             .HasIndex(p => p.CycleId);

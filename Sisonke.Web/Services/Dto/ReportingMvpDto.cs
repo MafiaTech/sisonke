@@ -11,6 +11,7 @@ public sealed class ReportingMvpDto
     public DateTime ToDate { get; set; }
     public bool CanViewGroupReports { get; set; }
     public bool FinancialProductsAllowed { get; set; }
+    public bool EarlyPayoutEnabled { get; set; }
     public bool IsBurialStokvel { get; set; }
     public ReportingMemberSummaryDto? MemberSummary { get; set; }
     public ReportingMemberStatementDto MemberStatement { get; set; } = new();

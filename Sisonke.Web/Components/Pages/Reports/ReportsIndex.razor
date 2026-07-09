@@ -196,27 +196,30 @@ else
                 </div>
             </section>
 
-            <section class="sisonke-card mb-4">
-                <div class="sisonke-card-body">
-                    <div class="sisonke-card-head"><div><h2>Early Payout Report</h2><p>Accelerated payout advances and reserve adjustments.</p></div></div>
-                    <div class="sisonke-grid sisonke-grid-4 mb-3">
-                        @MetricCard("Gross Payout", FormatZAR(report.EarlyPayouts.GrossPayoutAmount), "blue")
-                        @MetricCard("Adjusted Paid", FormatZAR(report.EarlyPayouts.AdjustedPayoutAmount), "green")
-                        @MetricCard("Reserve Adjustment", FormatZAR(report.EarlyPayouts.ReserveAdjustmentAmount), "gold")
+            @if (report.EarlyPayoutEnabled)
+            {
+                <section class="sisonke-card mb-4">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head"><div><h2>Early Payout Report</h2><p>Accelerated payout advances and reserve adjustments.</p></div></div>
+                        <div class="sisonke-grid sisonke-grid-4 mb-3">
+                            @MetricCard("Gross Payout", FormatZAR(report.EarlyPayouts.GrossPayoutAmount), "blue")
+                            @MetricCard("Adjusted Paid", FormatZAR(report.EarlyPayouts.AdjustedPayoutAmount), "green")
+                            @MetricCard("Reserve Adjustment", FormatZAR(report.EarlyPayouts.ReserveAdjustmentAmount), "gold")
+                        </div>
+                        <div class="table-responsive">
+                            <table class="sisonke-table mb-0">
+                                <thead><tr><th>Member</th><th>Gross</th><th>Adjusted</th><th>Reserve</th><th>Approval</th><th>Workflow</th></tr></thead>
+                                <tbody>
+                                    @foreach (var item in report.EarlyPayouts.Requests)
+                                    {
+                                        <tr><td class="fw-semibold">@item.MemberName</td><td>@FormatZAR(item.GrossAmount)</td><td>@FormatZAR(item.AdjustedPayoutAmount)</td><td>@FormatZAR(item.ReserveAdjustmentAmount)</td><td><span class="@Badge(item.ApprovalStatus)">@item.ApprovalStatus</span></td><td>@item.WorkflowStatus</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="table-responsive">
-                        <table class="sisonke-table mb-0">
-                            <thead><tr><th>Member</th><th>Gross</th><th>Adjusted</th><th>Reserve</th><th>Approval</th><th>Workflow</th></tr></thead>
-                            <tbody>
-                                @foreach (var item in report.EarlyPayouts.Requests)
-                                {
-                                    <tr><td class="fw-semibold">@item.MemberName</td><td>@FormatZAR(item.GrossAmount)</td><td>@FormatZAR(item.AdjustedPayoutAmount)</td><td>@FormatZAR(item.ReserveAdjustmentAmount)</td><td><span class="@Badge(item.ApprovalStatus)">@item.ApprovalStatus</span></td><td>@item.WorkflowStatus</td></tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
+                </section>
+            }
         }
 
         <section class="sisonke-card mb-4">

@@ -17,7 +17,17 @@ public class RotationalPayout
 
     public decimal PayoutAmount { get; set; }
 
-    public RotationalPayoutStatus PayoutStatus { get; set; } = RotationalPayoutStatus.ReadyForApproval;
+    public RotationalPayoutStatus PayoutStatus { get; set; } = RotationalPayoutStatus.PendingSecretaryReview;
+
+    public DateTime? SecretaryReviewedAt { get; set; }
+
+    [MaxLength(450)]
+    public string? SecretaryReviewedByUserId { get; set; }
+
+    public bool? SecretaryRecommendedApproval { get; set; }
+
+    [MaxLength(1000)]
+    public string? SecretaryReviewNotes { get; set; }
 
     [MaxLength(50)]
     public string? ChairpersonDecision { get; set; }

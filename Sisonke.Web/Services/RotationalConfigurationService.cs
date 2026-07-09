@@ -4,7 +4,9 @@ using Sisonke.Web.Data.Entities;
 
 namespace Sisonke.Web.Services;
 
-public class RotationalConfigurationService(IDbContextFactory<ApplicationDbContext> dbFactory)
+public class RotationalConfigurationService(
+    IDbContextFactory<ApplicationDbContext> dbFactory,
+    AuditLogService auditLogService)
 {
     public async Task<RotationalStokvelConfiguration?> GetActiveConfigurationAsync(Guid stokvelId)
     {
@@ -65,6 +67,13 @@ public class RotationalConfigurationService(IDbContextFactory<ApplicationDbConte
 
         context.RotationalStokvelConfigurations.Add(newConfig);
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            currentUserId,
+            stokvelId,
+            "RotationalConfigurationUpdated",
+            "RotationalStokvelConfiguration",
+            newConfig.Id,
+            "Rotational contribution, payout and cycle configuration saved.");
         return newConfig;
     }
 
@@ -98,6 +107,13 @@ public class RotationalConfigurationService(IDbContextFactory<ApplicationDbConte
         config.UpdatedBy = currentUserId;
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            currentUserId,
+            config.StokvelId,
+            "RotationalConfigurationUpdated",
+            "RotationalStokvelConfiguration",
+            config.Id,
+            "Rotational contribution, payout and cycle configuration updated.");
         return config;
     }
 

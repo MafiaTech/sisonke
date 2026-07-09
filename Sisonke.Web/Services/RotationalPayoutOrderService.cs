@@ -9,7 +9,8 @@ namespace Sisonke.Web.Services;
 public class RotationalPayoutOrderService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     IWebHostEnvironment environment,
-    ILogger<RotationalPayoutOrderService> logger)
+    ILogger<RotationalPayoutOrderService> logger,
+    AuditLogService auditLogService)
 {
     public async Task<RotationalManagementSummary?> GetRotationalManagementSummaryAsync(
         Guid stokvelId,
@@ -287,7 +288,19 @@ public class RotationalPayoutOrderService(
             _ => []
         };
 
-        return await ReplaceActiveOrderAsync(context, stokvelId, orderedMemberIds, currentUserId);
+        var result = await ReplaceActiveOrderAsync(context, stokvelId, orderedMemberIds, currentUserId);
+        if (result.Success)
+        {
+            await auditLogService.RecordAsync(
+                currentUserId,
+                stokvelId,
+                "RotationalScheduleUpdated",
+                "RotationalPayoutOrder",
+                null,
+                $"Rotation order generated using {method}.");
+        }
+
+        return result;
     }
 
     public async Task<RotationOrderSaveResult> SaveManualRotationOrderAsync(
@@ -301,7 +314,19 @@ public class RotationalPayoutOrderService(
             return RotationOrderSaveResult.Failed(["Only office bearers can manage rotation order."]);
         }
 
-        return await ReplaceActiveOrderAsync(context, stokvelId, orderedMemberIds, currentUserId);
+        var result = await ReplaceActiveOrderAsync(context, stokvelId, orderedMemberIds, currentUserId);
+        if (result.Success)
+        {
+            await auditLogService.RecordAsync(
+                currentUserId,
+                stokvelId,
+                "RotationalScheduleUpdated",
+                "RotationalPayoutOrder",
+                null,
+                "Manual rotation order saved.");
+        }
+
+        return result;
     }
 
     public Task<RotationOrderSaveResult> ReorderRotationOrderAsync(

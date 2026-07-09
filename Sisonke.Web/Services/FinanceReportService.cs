@@ -64,6 +64,12 @@ public class FinanceReportService(
         report.MemberSummary.CellphoneNumber = member.CellphoneNumber;
         report.FinancialProductsAllowed = LoansWalletService.IsFinancialProductsAllowed(stokvel);
         report.IsBurialStokvel = IsBurialStokvel(stokvel);
+        report.EarlyPayoutEnabled = report.FinancialProductsAllowed &&
+            await context.StokvelLoanConfigurations.AsNoTracking()
+                .AnyAsync(item => item.StokvelId == selected.StokvelId &&
+                    item.IsActive &&
+                    item.LoansEnabled &&
+                    item.EarlyPayoutLoansEnabled);
 
         var memberIds = report.CanViewGroupReports
             ? await context.Members.AsNoTracking()
@@ -86,7 +92,7 @@ public class FinanceReportService(
         var reportWallet = report.FinancialProductsAllowed ? await GetWalletReportAsync(selected.StokvelId, memberIds, from, to, memberNames) : new ReportingWalletReportDto();
         var memberPayouts = await GetPayoutLinesAsync(stokvel, [selected.MemberId], from, to, memberNames);
         var reportPayouts = await GetPayoutLinesAsync(stokvel, memberIds, from, to, memberNames);
-        var reportEarlyPayouts = GetEarlyPayoutReport(reportLoans);
+        var reportEarlyPayouts = report.EarlyPayoutEnabled ? GetEarlyPayoutReport(reportLoans) : new ReportingEarlyPayoutReportDto();
         var attendance = await GetAttendanceReportAsync(stokvel.TenantId, memberIds, from, to, memberNames);
         var burial = report.IsBurialStokvel
             ? await GetBurialReportAsync(stokvel, memberIds, from, to, memberNames)
@@ -140,7 +146,7 @@ public class FinanceReportService(
             report.Contributions = GetContributionsReport(memberContributions);
             report.Loans = GetLoansReport(memberLoans);
             report.Wallet = memberWallet;
-            report.EarlyPayouts = GetEarlyPayoutReport(memberLoans);
+            report.EarlyPayouts = report.EarlyPayoutEnabled ? GetEarlyPayoutReport(memberLoans) : new ReportingEarlyPayoutReportDto();
             report.Fines.Fines = memberFines;
             report.Fines.FinesIssued = memberFines.Sum(item => item.Amount);
             report.Fines.FinesPaid = memberFines.Sum(item => item.Paid);

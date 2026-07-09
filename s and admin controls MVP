@@ -1,0 +1,20 @@
+warning: in the working copy of 'Sisonke.Web/Components/Layout/NavMenu.razor', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Sisonke.Web/Components/Pages/Error.razor', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Sisonke.Web/Data/ApplicationDbContext.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Sisonke.Web/Program.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Sisonke.Web/Services/ContributionPaymentService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Sisonke.Web/Services/FineService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Sisonke.Web/Services/LoansWalletService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Sisonke.Web/Services/MeetingApologyService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Sisonke.Web/Services/MeetingMinuteService.cs', LF will be replaced by CRLF the next time Git touches it
+ Sisonke.Web/Components/Layout/NavMenu.razor        | 23 [32m++++++++[m
+ Sisonke.Web/Components/Pages/Error.razor           | 29 [32m+++++[m[31m-----[m
+ Sisonke.Web/Data/ApplicationDbContext.cs           | 25 [32m+++++++++[m
+ .../ApplicationDbContextModelSnapshot.cs           | 64 [32m++++++++++++++++++++[m[31m--[m
+ Sisonke.Web/Program.cs                             |  2 [32m+[m
+ Sisonke.Web/Services/ContributionPaymentService.cs |  3 [32m+[m[31m-[m
+ Sisonke.Web/Services/FineService.cs                |  8 [32m++[m[31m-[m
+ Sisonke.Web/Services/LoansWalletService.cs         | 38 [32m++++++++++[m[31m---[m
+ Sisonke.Web/Services/MeetingApologyService.cs      |  4 [32m+[m[31m-[m
+ Sisonke.Web/Services/MeetingMinuteService.cs       |  5 [32m+[m[31m-[m
+ 10 files changed, 167 insertions(+), 34 deletions(-)

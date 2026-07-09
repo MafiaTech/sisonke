@@ -30,6 +30,14 @@ else if (stokvel is null)
 {
     <AlertBanner Type="warning" Title="Stokvel not found." Message="" Icon="bi bi-exclamation-triangle-fill" />
 }
+else if (accessDenied)
+{
+    <AlertBanner
+        Type="warning"
+        Title="You do not have access to this rotation order."
+        Message="Only members linked to this stokvel can view its rotation order."
+        Icon="bi bi-exclamation-triangle-fill" />
+}
 else if (!stokvel.EnableRotation)
 {
     <AlertBanner
@@ -196,6 +204,7 @@ else
     private List<RotationalPayoutOrderItem> activeOrder = [];
     private List<RotationalPayoutOrderItem> editableOrder = [];
     private bool isLoading = true;
+    private bool accessDenied;
     private bool isSaving;
     private bool isEditing;
     private bool canManage;
@@ -214,6 +223,7 @@ else
         errors = [];
         successMessage = null;
         isEditing = false;
+        accessDenied = false;
 
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -222,6 +232,12 @@ else
         if (stokvel is not null && !string.IsNullOrWhiteSpace(currentUserId))
         {
             linkedMember = await MemberAccessService.GetLinkedMemberForUserAsync(currentUserId, StokvelId);
+            if (linkedMember is null)
+            {
+                accessDenied = true;
+                isLoading = false;
+                return;
+            }
             canManage = await MemberAccessService.IsOfficeBearerAsync(currentUserId, StokvelId);
             activeOrder = await RotationOrderService.GetActiveRotationOrderAsync(StokvelId);
         }

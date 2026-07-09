@@ -9,7 +9,8 @@ public class RotationalContributionPaymentService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     MemberAccessService memberAccess,
     RotationalPayoutService payoutService,
-    ILogger<RotationalContributionPaymentService> logger)
+    ILogger<RotationalContributionPaymentService> logger,
+    AuditLogService auditLogService)
 {
     // ── Queries ────────────────────────────────────────────────────────────
 
@@ -268,6 +269,13 @@ public class RotationalContributionPaymentService(
         await context.SaveChangesAsync();
         await transaction.CommitAsync();
         logger.LogInformation("Payment {PaymentId} confirmed by {UserId} — status={Status}", paymentId, currentUserId, newStatus);
+        await auditLogService.RecordAsync(
+            currentUserId,
+            payment.StokvelId,
+            "RotationalContributionCaptured",
+            "RotationalContributionPayment",
+            payment.Id,
+            $"Contribution payment updated to {newStatus}.");
 
         await UpdateCycleStatusFromPaymentsAsync(payment.CycleId, currentUserId);
 

@@ -38,6 +38,17 @@ else if (stokvel is null)
         <i class="bi bi-arrow-left me-2"></i>Back to Workspace
     </a>
 }
+else if (accessDenied)
+{
+    <AlertBanner
+        Type="warning"
+        Title="You do not have access to this rotational stokvel."
+        Message="Only members linked to this stokvel can view rotation management."
+        Icon="bi bi-exclamation-triangle-fill" />
+    <a class="sisonke-btn sisonke-btn-outline mt-3" href="/my-workspace">
+        <i class="bi bi-arrow-left me-2"></i>Back to Workspace
+    </a>
+}
 else if (!stokvel.EnableRotation)
 {
     <AlertBanner
@@ -104,7 +115,7 @@ else
     @if (payoutSummary?.Payout is not null)
     {
         var p = payoutSummary.Payout;
-        @if (p.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && payoutSummary.CanApprove)
+        @if (IsAwaitingChairpersonApproval(p.PayoutStatus) && payoutSummary.CanApprove)
         {
             <div class="rm-task-banner rm-task-banner-green mb-3">
                 <div class="rm-task-banner-icon"><i class="bi bi-check2-circle"></i></div>
@@ -120,7 +131,7 @@ else
                 </a>
             </div>
         }
-        else if (p.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && !payoutSummary.CanApprove)
+        else if (IsAwaitingChairpersonApproval(p.PayoutStatus) && !payoutSummary.CanApprove)
         {
             <div class="rm-task-banner rm-task-banner-blue mb-3">
                 <div class="rm-task-banner-icon"><i class="bi bi-hourglass-split"></i></div>
@@ -700,7 +711,7 @@ else
 
     <section class="sisonke-card mb-3" id="payout-decision-panel">
         <div class="sisonke-card-body">
-            <div class="sisonke-card-head mb-3"><div><h2>Current Cycle Payout</h2><p class="text-muted mb-0">Chairperson approval and Treasurer payment confirmation.</p></div></div>
+            <div class="sisonke-card-head mb-3"><div><h2>Current Cycle Payout</h2><p class="text-muted mb-0">Secretary review, Chairperson decision and Treasurer payment confirmation.</p></div></div>
             @if (payoutSummary?.Payout is null)
             {
                 <div class="sisonke-alert sisonke-alert-blue">Payout will be available once contribution payments are complete.</div>
@@ -724,13 +735,47 @@ else
                 @if (payout.PayoutStatus == RotationalPayoutStatus.Rejected) { <div class="sisonke-alert sisonke-alert-red mb-3"><strong>Payout rejected.</strong> @payout.RejectionReason</div> }
                 @if (payout.PayoutStatus == RotationalPayoutStatus.ReturnedToSecretary) { <div class="sisonke-alert sisonke-alert-gold mb-3"><strong>Changes requested.</strong> @payout.ChairpersonReviewNotes</div> }
                 @if (payout.PayoutStatus == RotationalPayoutStatus.Paid) { <div class="sisonke-alert sisonke-alert-green mb-3">Paid on @payout.PaidAt?.ToLocalTime().ToString("dd MMM yyyy"). Reference: @payout.PaymentReference</div> }
+                @if (payout.SecretaryReviewedAt is not null)
+                {
+                    <div class="sisonke-alert sisonke-alert-blue mb-3">
+                        <strong>Secretary review:</strong>
+                        @(payout.SecretaryRecommendedApproval == true ? "Recommended approval." : "Recommended rejection.")
+                        @payout.SecretaryReviewNotes
+                    </div>
+                }
                 <div class="border rounded p-3 mb-3">
                     <div class="fw-semibold mb-2">Contribution Banking Details</div>
                     @if (payoutSummary.BankingDetails is null) { <div class="text-warning">Banking details have not been captured for this stokvel.</div> }
                     else { <div>@payoutSummary.BankingDetails.BankName · @StokvelBankingDetailsService.MaskAccountNumber(payoutSummary.BankingDetails.AccountNumber)</div><div class="text-muted small">Reference: @(payoutSummary.BankingDetails.PaymentReferenceFormat ?? "Not specified")</div> }
                     <a class="btn btn-sm btn-outline-secondary mt-2" href="@($"/stokvel-settings/{StokvelId}")">View Banking Details</a>
                 </div>
-                @if (payout.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && payoutSummary.CanApprove)
+                @if ((payout.PayoutStatus == RotationalPayoutStatus.PendingSecretaryReview || payout.PayoutStatus == RotationalPayoutStatus.ReturnedToSecretary) && payoutSummary.CanReviewAsSecretary)
+                {
+                    <div class="payout-decision-form">
+                        <label class="form-label mb-0" for="management-secretary-review">Secretary review</label>
+                        <select id="management-secretary-review" class="form-select form-select-sm" @bind="secretaryRecommendApproval">
+                            <option value="true">Recommend approval</option>
+                            <option value="false">Recommend rejection</option>
+                        </select>
+                        <label class="form-label mb-0" for="management-secretary-notes">Review notes</label>
+                        <InputTextArea id="management-secretary-notes"
+                                       class="form-control form-control-sm"
+                                       rows="3"
+                                       @bind-Value="secretaryReviewNotes"
+                                       placeholder="Secretary review notes" />
+                        <button class="sisonke-btn sisonke-btn-primary sisonke-btn-sm"
+                                type="button"
+                                disabled="@(!CanSubmitSecretaryReview)"
+                                @onclick="SubmitSecretaryReviewAsync">
+                            Submit Secretary Review
+                        </button>
+                    </div>
+                }
+                else if (payout.PayoutStatus == RotationalPayoutStatus.PendingSecretaryReview)
+                {
+                    <div class="text-muted">Waiting for Secretary review.</div>
+                }
+                else if (IsAwaitingChairpersonApproval(payout.PayoutStatus) && payoutSummary.CanApprove)
                 {
                     <div class="payout-decision-form">
                         <label class="form-label mb-0" for="management-payout-decision">Chairperson decision</label>
@@ -753,7 +798,7 @@ else
                         </button>
                     </div>
                 }
-                else if (payout.PayoutStatus == RotationalPayoutStatus.ReadyForApproval && payoutSummary.CanConfirmPaid) { <div class="text-muted">Waiting for Chairperson approval.</div> }
+                else if (IsAwaitingChairpersonApproval(payout.PayoutStatus) && payoutSummary.CanConfirmPaid) { <div class="text-muted">Waiting for Chairperson approval.</div> }
                 else if (payout.PayoutStatus == RotationalPayoutStatus.Approved && payoutSummary.CanConfirmPaid) { <button class="btn btn-primary" @onclick="OpenPayoutConfirmation">Confirm Payout Paid</button> }
                 else if (payout.PayoutStatus == RotationalPayoutStatus.Approved) { <div class="text-muted">Approved, waiting for Treasurer payment confirmation.</div> }
                 else if (payout.PayoutStatus == RotationalPayoutStatus.ReturnedToSecretary && CanResubmitReturnedPayout)
@@ -1406,6 +1451,7 @@ else
     private List<RotationalPayoutOrderItem> previewOrder = [];
     private RotationalStokvelConfiguration? activeConfig;
     private bool isLoading = true;
+    private bool accessDenied;
     private bool isSaving;
     private bool isEditing;
     private bool isGeneratingPreview;
@@ -1446,6 +1492,8 @@ else
     private PayoutSummary? payoutSummary;
     private bool showPayoutConfirmationModal;
     private bool isProcessingPayout;
+    private bool secretaryRecommendApproval = true;
+    private string? secretaryReviewNotes;
     private RotationalPayoutDecision payoutDecision = RotationalPayoutDecision.Approve;
     private string? payoutDecisionNotes;
     private PaymentMethod? payoutPaymentMethod;
@@ -1459,6 +1507,9 @@ else
     private bool CanSubmitPayoutDecision =>
         !isProcessingPayout &&
         (payoutDecision == RotationalPayoutDecision.Approve || !string.IsNullOrWhiteSpace(payoutDecisionNotes));
+    private bool CanSubmitSecretaryReview =>
+        !isProcessingPayout &&
+        (secretaryRecommendApproval || !string.IsNullOrWhiteSpace(secretaryReviewNotes));
     private bool CanResubmitReturnedPayout =>
         linkedMember?.DefaultRole is SisonkeRole.Secretary or SisonkeRole.Creator or SisonkeRole.StokvelAdmin;
 
@@ -1478,6 +1529,8 @@ else
             return payoutSummary.Payout.PayoutStatus switch
             {
                 RotationalPayoutStatus.ReadyForApproval => ("Waiting for payout approval", "warning"),
+                RotationalPayoutStatus.PendingSecretaryReview => ("Secretary review pending", "warning"),
+                RotationalPayoutStatus.PendingChairpersonApproval => ("Chairperson approval pending", "warning"),
                 RotationalPayoutStatus.Approved => ("Payout approved", "success"),
                 RotationalPayoutStatus.Rejected => ("Payout rejected", "danger"),
                 RotationalPayoutStatus.Paid => ("Payout paid", "success"),
@@ -1516,6 +1569,7 @@ else
         eligibleMemberCount = 0;
         linkedMember = null;
         canManage = false;
+        accessDenied = false;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -1530,6 +1584,12 @@ else
         }
 
         linkedMember = summary.LinkedMember;
+        if (linkedMember is null)
+        {
+            accessDenied = true;
+            isLoading = false;
+            return;
+        }
         canManage = summary.CanManage;
         activeConfig = summary.ActiveConfiguration;
         activeOrder = summary.ActiveOrder;
@@ -1891,6 +1951,27 @@ else
         await RefreshPayoutAsync();
     }
 
+    private async Task SubmitSecretaryReviewAsync()
+    {
+        if (payoutSummary?.Payout is null || string.IsNullOrWhiteSpace(currentUserId)) return;
+        payoutErrors = [];
+        if (!secretaryRecommendApproval && string.IsNullOrWhiteSpace(secretaryReviewNotes))
+        {
+            payoutErrors = ["Secretary review notes are required when recommending rejection."];
+            return;
+        }
+
+        isProcessingPayout = true;
+        var result = await PayoutService.ReviewPayoutAsSecretaryAsync(
+            payoutSummary.Payout.Id, currentUserId, secretaryRecommendApproval, secretaryReviewNotes);
+        payoutErrors = result.Errors;
+        isProcessingPayout = false;
+        if (!result.Success) return;
+        secretaryRecommendApproval = true;
+        secretaryReviewNotes = null;
+        await RefreshPayoutAsync();
+    }
+
     private async Task ResubmitPayoutForApprovalAsync()
     {
         if (payoutSummary?.Payout is null || string.IsNullOrWhiteSpace(currentUserId)) return;
@@ -1928,6 +2009,9 @@ else
 
     private static string FormatPayoutStatus(RotationalPayoutStatus status) => status switch
     {
+        RotationalPayoutStatus.Scheduled => "Scheduled",
+        RotationalPayoutStatus.PendingSecretaryReview => "Pending Secretary Review",
+        RotationalPayoutStatus.PendingChairpersonApproval => "Pending Chairperson Approval",
         RotationalPayoutStatus.ReadyForApproval => "Ready for approval",
         RotationalPayoutStatus.Approved => "Approved — awaiting payment",
         RotationalPayoutStatus.ReturnedToSecretary => "Returned to Secretary",
@@ -1939,9 +2023,12 @@ else
         RotationalPayoutStatus.Paid => "success",
         RotationalPayoutStatus.Rejected or RotationalPayoutStatus.Cancelled => "danger",
         RotationalPayoutStatus.Approved => "info",
-        RotationalPayoutStatus.ReturnedToSecretary => "warning",
+        RotationalPayoutStatus.ReturnedToSecretary or RotationalPayoutStatus.PendingSecretaryReview or RotationalPayoutStatus.PendingChairpersonApproval => "warning",
         _ => "warning"
     };
+
+    private static bool IsAwaitingChairpersonApproval(RotationalPayoutStatus status) =>
+        status is RotationalPayoutStatus.PendingChairpersonApproval or RotationalPayoutStatus.ReadyForApproval;
 
     private static string FormatZAR(decimal amount) =>
         amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));

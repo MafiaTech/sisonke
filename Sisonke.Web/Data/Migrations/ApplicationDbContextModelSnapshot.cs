@@ -2723,6 +2723,20 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<DateTime?>("SecretaryReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SecretaryReviewedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool?>("SecretaryRecommendedApproval")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SecretaryReviewNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<Guid>("StokvelId")
                         .HasColumnType("uniqueidentifier");
 
