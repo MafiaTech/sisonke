@@ -1,0 +1,430 @@
+@page "/reports"
+@page "/reports/{InitialStokvelId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject FinanceReportService FinanceReportService
+
+<PageTitle>Reports</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <span class="spinner-border spinner-border-sm me-2"></span>Loading reports...
+    </div>
+}
+else if (string.IsNullOrWhiteSpace(currentUserId))
+{
+    <div class="sisonke-alert sisonke-alert-gold">Sign in to view reports.</div>
+}
+else if (report.LinkedStokvels.Count == 0)
+{
+    <div class="sisonke-alert sisonke-alert-blue">No linked stokvel memberships were found for your account.</div>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-blue">Reporting</span>
+            <h1>Reports</h1>
+            <p>@(report.CanViewGroupReports ? "Group finance, attendance and wallet reporting." : "Your member statement for linked stokvels.")</p>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <span class="sisonke-badge sisonke-badge-gray">@report.SelectedStokvelName</span>
+                <span class="sisonke-badge sisonke-badge-gold">@report.FromDate.ToString("dd MMM yyyy") - @report.ToDate.ToString("dd MMM yyyy")</span>
+                <span class="sisonke-badge sisonke-badge-blue">Generated @FormatDateTime(report.GeneratedAt)</span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            @if (report.SelectedStokvelId is Guid stokvelId)
+            {
+                <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{stokvelId}")">Back to Dashboard</a>
+            }
+            <button class="sisonke-btn sisonke-btn-outline" type="button" disabled>Export PDF Coming Soon</button>
+        </div>
+    </section>
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Report Filters</h2>
+                    <p>Select one of your linked stokvels and a reporting period.</p>
+                </div>
+            </div>
+            <div class="reports-filter-row">
+                <div>
+                    <label class="form-label" for="report-stokvel">Stokvel</label>
+                    <select id="report-stokvel" class="form-select" @bind="selectedStokvelIdValue">
+                        @foreach (var option in report.LinkedStokvels)
+                        {
+                            <option value="@option.StokvelId">@option.StokvelName - @option.Role</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="report-from">From</label>
+                    <input id="report-from" class="form-control" type="date" @bind="fromDate" />
+                </div>
+                <div>
+                    <label class="form-label" for="report-to">To</label>
+                    <input id="report-to" class="form-control" type="date" @bind="toDate" />
+                </div>
+                <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="LoadReportAsync" disabled="@isRefreshing">
+                    Load Reports
+                </button>
+            </div>
+        </div>
+    </section>
+
+    @if (isRefreshing)
+    {
+        <div class="sisonke-alert sisonke-alert-blue mb-4">Refreshing reports...</div>
+    }
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Member Statement</h2>
+                    <p>@(report.MemberSummary?.FullName ?? "Linked member")</p>
+                </div>
+                <span class="sisonke-badge sisonke-badge-blue">@(report.MemberSummary?.Role.ToString() ?? "Member")</span>
+            </div>
+            <div class="sisonke-grid sisonke-grid-4 mb-3">
+                @MetricCard("Expected Contributions", FormatZAR(report.MemberStatement.ExpectedContributions), "blue")
+                @MetricCard("Contributions Paid", FormatZAR(report.MemberStatement.ContributionsPaid), "green")
+                @MetricCard("Fines Outstanding", FormatZAR(report.MemberStatement.FinesOutstanding), "red")
+                @MetricCard("Loans Outstanding", FormatZAR(report.MemberStatement.LoansOutstanding), "gold")
+                @MetricCard("Wallet Available", FormatZAR(report.MemberStatement.WalletAvailableBalance), "green")
+                @MetricCard("Surplus Equity", FormatZAR(report.MemberStatement.WalletSurplusEquity), "blue")
+                @MetricCard("Locked Surplus", FormatZAR(report.MemberStatement.WalletLockedSurplus), "gold")
+                @MetricCard("Payouts Received", FormatZAR(report.MemberStatement.PayoutsReceived), "gray")
+            </div>
+            @ContributionTable(report.MemberStatement.Contributions, "Statement Contributions")
+            @FineTable(report.MemberStatement.Fines, "Statement Fines")
+            @LoanTable(report.MemberStatement.Loans, "Statement Loans")
+            @WalletTable(report.MemberStatement.WalletMovements, "Statement Wallet Movements")
+            @PayoutTable(report.MemberStatement.Payouts, "Statement Payouts")
+        </div>
+    </section>
+
+    @if (!report.CanViewGroupReports)
+    {
+        <div class="sisonke-alert sisonke-alert-blue mb-4">
+            Group reports are available to secretary, chairperson, treasurer and admin roles for linked stokvels.
+        </div>
+    }
+    else
+    {
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head"><div><h2>Contributions Report</h2><p>Expected, paid and outstanding contributions.</p></div></div>
+                <div class="sisonke-grid sisonke-grid-4 mb-3">
+                    @MetricCard("Total Expected", FormatZAR(report.Contributions.TotalExpected), "blue")
+                    @MetricCard("Total Paid", FormatZAR(report.Contributions.TotalPaid), "green")
+                    @MetricCard("Outstanding", FormatZAR(report.Contributions.TotalOutstanding), "gold")
+                </div>
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead><tr><th>Member</th><th>Expected</th><th>Paid</th><th>Outstanding</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in report.Contributions.MemberBreakdown)
+                            {
+                                <tr><td class="fw-semibold">@item.MemberName</td><td>@FormatZAR(item.Expected)</td><td>@FormatZAR(item.Paid)</td><td>@FormatZAR(item.Outstanding)</td><td><span class="@Badge(item.Status)">@item.Status</span></td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head"><div><h2>Loans Report</h2><p>Loan status, balances and guarantor position.</p></div></div>
+                <div class="sisonke-grid sisonke-grid-4 mb-3">
+                    @MetricCard("Active", report.Loans.ActiveCount.ToString(), "green")
+                    @MetricCard("Pending", report.Loans.PendingCount.ToString(), "gold")
+                    @MetricCard("Rejected", report.Loans.RejectedCount.ToString(), "red")
+                    @MetricCard("Outstanding", FormatZAR(report.Loans.OutstandingBalances), "gold")
+                </div>
+                @LoanTable(report.Loans.Loans, "Loan Register")
+            </div>
+        </section>
+
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head"><div><h2>Wallet / Surplus Report</h2><p>Balances, ledger and reconciliation status.</p></div><span class="@Badge(report.Wallet.ReconciliationStatus)">@report.Wallet.ReconciliationStatus</span></div>
+                <div class="sisonke-grid sisonke-grid-4 mb-3">
+                    @MetricCard("Core Mandatory", FormatZAR(report.Wallet.CoreMandatoryBalance), "blue")
+                    @MetricCard("Surplus Equity", FormatZAR(report.Wallet.SurplusEquityBalance), "green")
+                    @MetricCard("Locked/Frozen", FormatZAR(report.Wallet.LockedSurplusBalance), "gold")
+                    @MetricCard("Available", FormatZAR(report.Wallet.AvailableSurplusBalance), "green")
+                </div>
+                @WalletTable(report.Wallet.LedgerEntries, "Wallet Ledger")
+            </div>
+        </section>
+
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head"><div><h2>Early Payout Report</h2><p>Accelerated payout advances and reserve adjustments.</p></div></div>
+                <div class="sisonke-grid sisonke-grid-4 mb-3">
+                    @MetricCard("Gross Payout", FormatZAR(report.EarlyPayouts.GrossPayoutAmount), "blue")
+                    @MetricCard("Adjusted Paid", FormatZAR(report.EarlyPayouts.AdjustedPayoutAmount), "green")
+                    @MetricCard("Reserve Adjustment", FormatZAR(report.EarlyPayouts.ReserveAdjustmentAmount), "gold")
+                </div>
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead><tr><th>Member</th><th>Gross</th><th>Adjusted</th><th>Reserve</th><th>Approval</th><th>Workflow</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in report.EarlyPayouts.Requests)
+                            {
+                                <tr><td class="fw-semibold">@item.MemberName</td><td>@FormatZAR(item.GrossAmount)</td><td>@FormatZAR(item.AdjustedPayoutAmount)</td><td>@FormatZAR(item.ReserveAdjustmentAmount)</td><td><span class="@Badge(item.ApprovalStatus)">@item.ApprovalStatus</span></td><td>@item.WorkflowStatus</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head"><div><h2>Fines Report</h2><p>Issued, paid and outstanding fines.</p></div></div>
+                <div class="sisonke-grid sisonke-grid-4 mb-3">
+                    @MetricCard("Issued", FormatZAR(report.Fines.FinesIssued), "blue")
+                    @MetricCard("Paid", FormatZAR(report.Fines.FinesPaid), "green")
+                    @MetricCard("Outstanding", FormatZAR(report.Fines.FinesOutstanding), "red")
+                </div>
+                @FineTable(report.Fines.Fines, "Fine Register")
+            </div>
+        </section>
+
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head"><div><h2>Attendance / Apologies Report</h2><p>Meeting attendance and apology status.</p></div></div>
+                <div class="sisonke-grid sisonke-grid-4 mb-3">
+                    @MetricCard("Meetings", report.Attendance.MeetingCount.ToString(), "blue")
+                    @MetricCard("Present", report.Attendance.PresentCount.ToString(), "green")
+                    @MetricCard("Absent", report.Attendance.AbsentCount.ToString(), "red")
+                    @MetricCard("Apologies", report.Attendance.ApologyCount.ToString(), "gold")
+                </div>
+                <div class="table-responsive">
+                    <table class="sisonke-table mb-0">
+                        <thead><tr><th>Meeting</th><th>Date</th><th>Member</th><th>Attendance</th><th>Late</th><th>Apology</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in report.Attendance.Lines)
+                            {
+                                <tr><td class="fw-semibold">@item.MeetingTitle</td><td>@item.MeetingDate.ToString("dd MMM yyyy")</td><td>@item.MemberName</td><td><span class="@Badge(item.AttendanceStatus)">@item.AttendanceStatus</span></td><td>@(item.IsLate ? "Yes" : "No")</td><td>@DisplayApology(item)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head"><div><h2>Group Financial Summary</h2><p>Consolidated group finance view from existing models.</p></div></div>
+                <div class="sisonke-grid sisonke-grid-4">
+                    @MetricCard("Contributions", FormatZAR(report.GroupFinancialSummary.TotalContributions), "green")
+                    @MetricCard("Fines", FormatZAR(report.GroupFinancialSummary.TotalFines), "blue")
+                    @MetricCard("Loans Issued", FormatZAR(report.GroupFinancialSummary.TotalLoansIssued), "gold")
+                    @MetricCard("Loans Outstanding", FormatZAR(report.GroupFinancialSummary.TotalLoansOutstanding), "red")
+                    @MetricCard("Surplus Wallets", FormatZAR(report.GroupFinancialSummary.TotalSurplusWalletBalances), "green")
+                    @MetricCard("Reserve Balance", FormatZAR(report.GroupFinancialSummary.TotalReserveWalletBalance), "blue")
+                    @MetricCard("Pending Payouts", FormatZAR(report.GroupFinancialSummary.PendingPayouts), "gold")
+                    @MetricCard("Available Cash View", FormatZAR(report.GroupFinancialSummary.AvailableGroupCashView), "gray")
+                </div>
+            </div>
+        </section>
+    }
+}
+
+<style>
+    .reports-filter-row {
+        display: grid;
+        grid-template-columns: minmax(14rem, 2fr) repeat(2, minmax(10rem, 1fr)) auto;
+        gap: 1rem;
+        align-items: end;
+    }
+
+    .reports-section-title {
+        margin: 1.25rem 0 .75rem;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--sk-ink);
+    }
+
+    @@media (max-width: 900px) {
+        .reports-filter-row {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+@code {
+    private string currentUserId = string.Empty;
+    private bool isLoading = true;
+    private bool isRefreshing;
+    private string selectedStokvelIdValue = string.Empty;
+    private DateTime fromDate = DateTime.Today.AddMonths(-6);
+    private DateTime toDate = DateTime.Today;
+    private ReportingMvpDto report = new();
+
+    [Parameter]
+    public Guid? InitialStokvelId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        await LoadReportAsync();
+        isLoading = false;
+    }
+
+    private async Task LoadReportAsync()
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            return;
+        }
+
+        isRefreshing = true;
+        var selectedStokvelId = Guid.TryParse(selectedStokvelIdValue, out var parsed) ? parsed : InitialStokvelId;
+        report = await FinanceReportService.GetReportingMvpAsync(currentUserId, selectedStokvelId, fromDate, toDate);
+        selectedStokvelIdValue = report.SelectedStokvelId?.ToString() ?? string.Empty;
+        fromDate = report.FromDate;
+        toDate = report.ToDate;
+        isRefreshing = false;
+    }
+
+    private static RenderFragment MetricCard(string title, string value, string badgeType) => @<div class="sisonke-card">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head px-0 pt-0">
+                <span class="sisonke-badge sisonke-badge-@badgeType">@title</span>
+            </div>
+            <div class="sisonke-stat-value">@value</div>
+        </div>
+    </div>;
+
+    private static RenderFragment ContributionTable(IReadOnlyList<ReportingContributionLineDto> lines, string title) => @<div>
+        <h3 class="reports-section-title">@title</h3>
+        @if (lines.Count == 0)
+        {
+            <div class="sisonke-alert sisonke-alert-blue">No contribution rows for this period.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="sisonke-table mb-0"><thead><tr><th>Period</th><th>Expected</th><th>Paid</th><th>Outstanding</th><th>Status</th><th>Reference</th></tr></thead><tbody>
+                    @foreach (var item in lines)
+                    {
+                        <tr><td class="fw-semibold">@item.PeriodLabel</td><td>@FormatZAR(item.Expected)</td><td>@FormatZAR(item.Paid)</td><td>@FormatZAR(item.Outstanding)</td><td><span class="@Badge(item.Status)">@item.Status</span></td><td>@Dash(item.Reference)</td></tr>
+                    }
+                </tbody></table>
+            </div>
+        }
+    </div>;
+
+    private static RenderFragment FineTable(IReadOnlyList<ReportingFineLineDto> lines, string title) => @<div>
+        <h3 class="reports-section-title">@title</h3>
+        @if (lines.Count == 0)
+        {
+            <div class="sisonke-alert sisonke-alert-blue">No fines for this period.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Date</th><th>Category</th><th>Amount</th><th>Paid</th><th>Outstanding</th><th>Status</th><th>Reason</th></tr></thead><tbody>
+                    @foreach (var item in lines)
+                    {
+                        <tr><td class="fw-semibold">@item.MemberName</td><td>@item.FineDate.ToString("dd MMM yyyy")</td><td>@item.Category</td><td>@FormatZAR(item.Amount)</td><td>@FormatZAR(item.Paid)</td><td>@FormatZAR(item.Outstanding)</td><td><span class="@Badge(item.Status)">@item.Status</span></td><td>@Dash(item.Reason)</td></tr>
+                    }
+                </tbody></table>
+            </div>
+        }
+    </div>;
+
+    private static RenderFragment LoanTable(IReadOnlyList<ReportingLoanLineDto> lines, string title) => @<div>
+        <h3 class="reports-section-title">@title</h3>
+        @if (lines.Count == 0)
+        {
+            <div class="sisonke-alert sisonke-alert-blue">No loan rows for this period.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Type</th><th>Requested</th><th>Approved</th><th>Outstanding</th><th>Status</th><th>Wallet-backed</th><th>Guarantors</th></tr></thead><tbody>
+                    @foreach (var item in lines)
+                    {
+                        <tr><td class="fw-semibold">@item.MemberName</td><td>@item.LoanType</td><td>@FormatZAR(item.RequestedAmount)</td><td>@FormatZAR(item.ApprovedAmount)</td><td>@FormatZAR(item.OutstandingBalance)</td><td><span class="@Badge(item.Status)">@item.Status</span></td><td>@(item.IsWalletBacked ? "Yes" : "No")</td><td>@item.GuarantorStatus</td></tr>
+                    }
+                </tbody></table>
+            </div>
+        }
+    </div>;
+
+    private static RenderFragment WalletTable(IReadOnlyList<ReportingWalletLedgerLineDto> lines, string title) => @<div>
+        <h3 class="reports-section-title">@title</h3>
+        @if (lines.Count == 0)
+        {
+            <div class="sisonke-alert sisonke-alert-blue">No wallet movements for this period.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="sisonke-table mb-0"><thead><tr><th>Date</th><th>Member</th><th>Type</th><th>Source</th><th>Amount</th><th>Balance After</th><th>Description</th></tr></thead><tbody>
+                    @foreach (var item in lines)
+                    {
+                        <tr><td>@item.Date.ToLocalTime().ToString("dd MMM yyyy")</td><td class="fw-semibold">@item.MemberName</td><td>@item.TransactionType</td><td>@item.SourceType</td><td>@FormatZAR(item.Amount)</td><td>@FormatZAR(item.BalanceAfter)</td><td>@Dash(item.Description)</td></tr>
+                    }
+                </tbody></table>
+            </div>
+        }
+    </div>;
+
+    private static RenderFragment PayoutTable(IReadOnlyList<ReportingPayoutLineDto> lines, string title) => @<div>
+        <h3 class="reports-section-title">@title</h3>
+        @if (lines.Count == 0)
+        {
+            <div class="sisonke-alert sisonke-alert-blue">No payouts for this period.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Type</th><th>Amount</th><th>Status</th><th>Paid</th><th>Reference</th></tr></thead><tbody>
+                    @foreach (var item in lines)
+                    {
+                        <tr><td class="fw-semibold">@item.MemberName</td><td>@item.PayoutType</td><td>@FormatZAR(item.Amount)</td><td><span class="@Badge(item.Status)">@item.Status</span></td><td>@(item.PaidAt?.ToString("dd MMM yyyy") ?? "-")</td><td>@Dash(item.Reference)</td></tr>
+                    }
+                </tbody></table>
+            </div>
+        }
+    </div>;
+
+    private static string FormatZAR(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string FormatDateTime(DateTime value) =>
+        value == default ? "-" : value.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+
+    private static string Dash(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string DisplayApology(ReportingAttendanceLineDto item) =>
+        item.ApologyStatus == "-" ? "-" : $"{item.ApologyStatus} {item.ApologyType}".Trim();
+
+    private static string Badge(string status) => status switch
+    {
+        "Paid" or "Active" or "Present" or "Balanced" or "FullyRepaid" => "sisonke-badge sisonke-badge-green",
+        "Rejected" or "Absent" or "Overdue" or "Review required" or "Unpaid" => "sisonke-badge sisonke-badge-red",
+        "Pending" or "Submitted" or "PendingApproval" or "DisbursementPending" or "Outstanding" or "Approved" or "Apology" => "sisonke-badge sisonke-badge-gold",
+        _ => "sisonke-badge sisonke-badge-gray"
+    };
+}
