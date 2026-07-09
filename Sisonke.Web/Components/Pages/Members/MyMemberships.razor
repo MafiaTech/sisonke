@@ -177,12 +177,9 @@ else
                                     Management Dashboard Unavailable
                                 </button>
                             }
-                            else
-                            {
-                                <a class="sisonke-btn sisonke-btn-primary" href="@($"/member-home/{member.Id}")">
-                                    Open My Member View
-                                </a>
-                            }
+                            <a class="sisonke-btn @(isOfficeBearer ? "sisonke-btn-outline" : "sisonke-btn-primary")" href="@($"/member-home/{member.Id}")">
+                                Open My Member View
+                            </a>
                             <a class="sisonke-btn sisonke-btn-outline" href="@($"/member-profile/{member.Id}")">
                                 View Profile
                             </a>

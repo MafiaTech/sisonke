@@ -370,6 +370,12 @@ else
         successMessage = null;
         warningMessage = null;
         contributions = await ContributionPaymentService.GetMonthlyContributionsAsync(StokvelId, selectedYear, selectedMonth);
+
+        if (contributions.Count == 0 && canManagePayments)
+        {
+            contributions = await ContributionPaymentService.EnsureMonthlyContributionRecordsAsync(StokvelId, selectedYear, selectedMonth);
+        }
+
         monthSummary = await ContributionPaymentService.GetMonthlyContributionSummaryAsync(StokvelId, selectedYear, selectedMonth);
         capturesByContributionId = await ContributionPaymentService.GetLatestCapturesByContributionIdsAsync(contributions.Select(c => c.Id));
         SyncPaymentInputs();

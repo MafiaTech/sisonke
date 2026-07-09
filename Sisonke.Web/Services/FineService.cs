@@ -145,6 +145,23 @@ public class FineService(ApplicationDbContext context)
         return memberFine;
     }
 
+    public async Task<MemberFine?> VoidFineAsync(Guid memberFineId)
+    {
+        var memberFine = await context.MemberFines
+            .SingleOrDefaultAsync(existingMemberFine => existingMemberFine.Id == memberFineId);
+
+        if (memberFine is null)
+        {
+            return null;
+        }
+
+        memberFine.Status = FineStatus.Cancelled;
+
+        await context.SaveChangesAsync();
+
+        return memberFine;
+    }
+
     public async Task EnsureDefaultFineTypesForStokvelAsync(Guid stokvelId)
     {
         var stokvel = await context.Stokvels

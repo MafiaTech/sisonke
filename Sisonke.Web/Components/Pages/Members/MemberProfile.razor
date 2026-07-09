@@ -1,7 +1,9 @@
 @page "/member-profile/{MemberId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
 @using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
@@ -33,6 +35,10 @@
 else if (member is null)
 {
     <AlertBanner Type="danger" Title="Member not found." Message="" Icon="bi bi-x-circle-fill" />
+}
+else if (!canViewProfile)
+{
+    <AlertBanner Type="warning" Title="Access restricted." Message="You do not have access to this member's profile." Icon="bi bi-exclamation-triangle-fill" />
 }
 else
 {
@@ -787,10 +793,16 @@ else
                                             </td>
                                             <td class="text-muted small">@(fine.PaidDate?.ToString("dd MMM yyyy") ?? "—")</td>
                                             <td>
-                                                @if (canManagePayments && fine.Status == FineStatus.Unpaid)
-                                                {
-                                                    <a class="btn btn-sm btn-success" href="@($"/mark-fine-paid/{fine.Id}")">Mark Paid</a>
-                                                }
+                                                <div class="d-flex gap-2 flex-wrap">
+                                                    @if (canManagePayments && fine.Status == FineStatus.Unpaid)
+                                                    {
+                                                        <a class="btn btn-sm btn-success" href="@($"/mark-fine-paid/{fine.Id}")">Mark Paid</a>
+                                                    }
+                                                    @if (canManageStokvel && fine.Status == FineStatus.Unpaid)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => ShowVoidFineConfirmation(fine.Id)">Void</button>
+                                                    }
+                                                </div>
                                             </td>
                                         </tr>
                                     }
@@ -813,6 +825,16 @@ else
         ModalType="warning"
         OnConfirm="@ConfirmGovernanceStatusUpdateAsync"
         OnCancel="@CancelGovernanceStatusUpdate" />
+
+    <ConfirmationModal
+        IsVisible="@showVoidFineConfirmation"
+        Title="Void Fine"
+        Message="Are you sure you want to void this fine? This cannot be undone."
+        ConfirmButtonText="Void Fine"
+        CancelButtonText="Cancel"
+        ModalType="danger"
+        OnConfirm="@ConfirmVoidFineAsync"
+        OnCancel="@CancelVoidFine" />
 }
 
 <style>
@@ -1031,6 +1053,8 @@ else
     private int waitingPeriodMonths;
     private bool isLoading = true;
     private bool showGovernanceStatusConfirmation;
+    private bool showVoidFineConfirmation;
+    private Guid? fineIdPendingVoid;
     private MemberGovernanceStatus selectedGovernanceStatus = MemberGovernanceStatus.Active;
     private string? governanceStatusReason;
     private string? successMessage;
@@ -1041,6 +1065,7 @@ else
     private bool isOwnMemberProfile;
     private bool canViewFines;
     private bool canViewFinancials;
+    private bool canViewProfile;
     private bool IsClaimsAvailable => stokvel is not null &&
         (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableClaims);
     private bool IsDependentsAvailable => stokvel is not null &&
@@ -1060,6 +1085,7 @@ else
         isOwnMemberProfile = false;
         canViewFines = false;
         canViewFinancials = false;
+        canViewProfile = false;
         successMessage = null;
         warningMessage = null;
         memberWarnings = [];
@@ -1082,6 +1108,7 @@ else
                 isOwnMemberProfile = await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
                 canViewFinancials = await MemberAccessService.CanViewFinancialsAsync(userId, stokvel.Id);
                 canViewFines = canManageStokvel || isOwnMemberProfile;
+                canViewProfile = canManageStokvel || isOwnMemberProfile;
             }
         }
 
@@ -1089,15 +1116,15 @@ else
         maxBeneficiaries = stokvel is null ? 0 : await OperatingRuleService.GetMaxBeneficiariesAsync(stokvel.Id);
         maxDependents = stokvel is null ? 0 : await OperatingRuleService.GetMaxDependentsAsync(stokvel.Id);
         waitingPeriodMonths = stokvel is null ? 0 : await OperatingRuleService.GetWaitingPeriodMonthsAsync(stokvel.Id);
-        dependents = member is null || !IsDependentsAvailable ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
-        activeDependentClaims = member is null || !IsClaimsAvailable ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
+        dependents = member is null || !canViewProfile || !IsDependentsAvailable ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
+        activeDependentClaims = member is null || !canViewProfile || !IsClaimsAvailable ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
         memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
-        funeralClaims = member is null || !IsClaimsAvailable ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
+        funeralClaims = member is null || !canViewProfile || !IsClaimsAvailable ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);
         recentContributionSummaries = member is null || stokvel is null || (!canViewFinancials && !isOwnMemberProfile)
             ? []
             : await ContributionPaymentService.GetRecentContributionsByMemberIdAsync(MemberId);
         memberWarnings = member is null || (!canManageMemberStatus && !isOwnMemberProfile) ? [] : await MemberWarningService.GetWarningsByMemberIdAsync(MemberId);
-        timelineItems = member is null || stokvel is null ? [] : await MemberGovernanceTimelineService.GetTimelineByMemberIdAsync(MemberId, stokvel.Id);
+        timelineItems = member is null || stokvel is null || !canViewProfile ? [] : await MemberGovernanceTimelineService.GetTimelineByMemberIdAsync(MemberId, stokvel.Id);
         visibleTimelineItems = GetVisibleTimelineItems();
 
         if (member is not null)
@@ -1141,6 +1168,54 @@ else
         return string.IsNullOrWhiteSpace(member?.ApplicationUserId)
             ? "secondary"
             : "success";
+    }
+
+    private void ShowVoidFineConfirmation(Guid memberFineId)
+    {
+        successMessage = null;
+        warningMessage = null;
+
+        if (!canManageStokvel)
+        {
+            warningMessage = "You are not authorised to void fines for this stokvel.";
+            return;
+        }
+
+        fineIdPendingVoid = memberFineId;
+        showVoidFineConfirmation = true;
+    }
+
+    private void CancelVoidFine()
+    {
+        fineIdPendingVoid = null;
+        showVoidFineConfirmation = false;
+    }
+
+    private async Task ConfirmVoidFineAsync()
+    {
+        showVoidFineConfirmation = false;
+        successMessage = null;
+        warningMessage = null;
+
+        var memberFineId = fineIdPendingVoid;
+        fineIdPendingVoid = null;
+
+        if (memberFineId is null || !canManageStokvel)
+        {
+            warningMessage = "You are not authorised to void fines for this stokvel.";
+            return;
+        }
+
+        var voidedFine = await FineService.VoidFineAsync(memberFineId.Value);
+
+        if (voidedFine is null)
+        {
+            warningMessage = "Fine could not be voided.";
+            return;
+        }
+
+        memberFines = await FineService.GetMemberFinesAsync(MemberId);
+        successMessage = "Fine voided.";
     }
 
     private void ShowGovernanceStatusConfirmation()
