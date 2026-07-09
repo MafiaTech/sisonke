@@ -101,16 +101,22 @@ else
                 @MetricCard("Expected Contributions", FormatZAR(report.MemberStatement.ExpectedContributions), "blue")
                 @MetricCard("Contributions Paid", FormatZAR(report.MemberStatement.ContributionsPaid), "green")
                 @MetricCard("Fines Outstanding", FormatZAR(report.MemberStatement.FinesOutstanding), "red")
-                @MetricCard("Loans Outstanding", FormatZAR(report.MemberStatement.LoansOutstanding), "gold")
-                @MetricCard("Wallet Available", FormatZAR(report.MemberStatement.WalletAvailableBalance), "green")
-                @MetricCard("Surplus Equity", FormatZAR(report.MemberStatement.WalletSurplusEquity), "blue")
-                @MetricCard("Locked Surplus", FormatZAR(report.MemberStatement.WalletLockedSurplus), "gold")
+                @if (report.FinancialProductsAllowed)
+                {
+                    @MetricCard("Loans Outstanding", FormatZAR(report.MemberStatement.LoansOutstanding), "gold")
+                    @MetricCard("Wallet Available", FormatZAR(report.MemberStatement.WalletAvailableBalance), "green")
+                    @MetricCard("Surplus Equity", FormatZAR(report.MemberStatement.WalletSurplusEquity), "blue")
+                    @MetricCard("Locked Surplus", FormatZAR(report.MemberStatement.WalletLockedSurplus), "gold")
+                }
                 @MetricCard("Payouts Received", FormatZAR(report.MemberStatement.PayoutsReceived), "gray")
             </div>
             @ContributionTable(report.MemberStatement.Contributions, "Statement Contributions")
             @FineTable(report.MemberStatement.Fines, "Statement Fines")
-            @LoanTable(report.MemberStatement.Loans, "Statement Loans")
-            @WalletTable(report.MemberStatement.WalletMovements, "Statement Wallet Movements")
+            @if (report.FinancialProductsAllowed)
+            {
+                @LoanTable(report.MemberStatement.Loans, "Statement Loans")
+                @WalletTable(report.MemberStatement.WalletMovements, "Statement Wallet Movements")
+            }
             @PayoutTable(report.MemberStatement.Payouts, "Statement Payouts")
         </div>
     </section>
@@ -145,53 +151,73 @@ else
             </div>
         </section>
 
-        <section class="sisonke-card mb-4">
-            <div class="sisonke-card-body">
-                <div class="sisonke-card-head"><div><h2>Loans Report</h2><p>Loan status, balances and guarantor position.</p></div></div>
-                <div class="sisonke-grid sisonke-grid-4 mb-3">
-                    @MetricCard("Active", report.Loans.ActiveCount.ToString(), "green")
-                    @MetricCard("Pending", report.Loans.PendingCount.ToString(), "gold")
-                    @MetricCard("Rejected", report.Loans.RejectedCount.ToString(), "red")
-                    @MetricCard("Outstanding", FormatZAR(report.Loans.OutstandingBalances), "gold")
+        @if (report.IsBurialStokvel)
+        {
+            <section class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head"><div><h2>Burial Claims & Covered Lives</h2><p>Burial-only covered lives, claim workflow and payout reporting.</p></div></div>
+                    <div class="sisonke-grid sisonke-grid-4 mb-3">
+                        @MetricCard("Active Covered Lives", report.Burial.CoveredLivesActive.ToString(), "green")
+                        @MetricCard("Pending Claims", (report.Burial.ClaimsSubmitted + report.Burial.ClaimsUnderReview).ToString(), "gold")
+                        @MetricCard("Awaiting Payout", FormatZAR(report.Burial.ApprovedAwaitingPayoutAmount), "blue")
+                        @MetricCard("Paid Claims", FormatZAR(report.Burial.PaidPayoutAmount), "green")
+                    </div>
+                    @CoveredLivesTable(report.Burial.CoveredLives)
+                    @BurialClaimsTable(report.Burial.Claims)
                 </div>
-                @LoanTable(report.Loans.Loans, "Loan Register")
-            </div>
-        </section>
+            </section>
+        }
 
-        <section class="sisonke-card mb-4">
-            <div class="sisonke-card-body">
-                <div class="sisonke-card-head"><div><h2>Wallet / Surplus Report</h2><p>Balances, ledger and reconciliation status.</p></div><span class="@Badge(report.Wallet.ReconciliationStatus)">@report.Wallet.ReconciliationStatus</span></div>
-                <div class="sisonke-grid sisonke-grid-4 mb-3">
-                    @MetricCard("Core Mandatory", FormatZAR(report.Wallet.CoreMandatoryBalance), "blue")
-                    @MetricCard("Surplus Equity", FormatZAR(report.Wallet.SurplusEquityBalance), "green")
-                    @MetricCard("Locked/Frozen", FormatZAR(report.Wallet.LockedSurplusBalance), "gold")
-                    @MetricCard("Available", FormatZAR(report.Wallet.AvailableSurplusBalance), "green")
+        @if (report.FinancialProductsAllowed)
+        {
+            <section class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head"><div><h2>Loans Report</h2><p>Loan status, balances and guarantor position.</p></div></div>
+                    <div class="sisonke-grid sisonke-grid-4 mb-3">
+                        @MetricCard("Active", report.Loans.ActiveCount.ToString(), "green")
+                        @MetricCard("Pending", report.Loans.PendingCount.ToString(), "gold")
+                        @MetricCard("Rejected", report.Loans.RejectedCount.ToString(), "red")
+                        @MetricCard("Outstanding", FormatZAR(report.Loans.OutstandingBalances), "gold")
+                    </div>
+                    @LoanTable(report.Loans.Loans, "Loan Register")
                 </div>
-                @WalletTable(report.Wallet.LedgerEntries, "Wallet Ledger")
-            </div>
-        </section>
+            </section>
 
-        <section class="sisonke-card mb-4">
-            <div class="sisonke-card-body">
-                <div class="sisonke-card-head"><div><h2>Early Payout Report</h2><p>Accelerated payout advances and reserve adjustments.</p></div></div>
-                <div class="sisonke-grid sisonke-grid-4 mb-3">
-                    @MetricCard("Gross Payout", FormatZAR(report.EarlyPayouts.GrossPayoutAmount), "blue")
-                    @MetricCard("Adjusted Paid", FormatZAR(report.EarlyPayouts.AdjustedPayoutAmount), "green")
-                    @MetricCard("Reserve Adjustment", FormatZAR(report.EarlyPayouts.ReserveAdjustmentAmount), "gold")
+            <section class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head"><div><h2>Wallet / Surplus Report</h2><p>Balances, ledger and reconciliation status.</p></div><span class="@Badge(report.Wallet.ReconciliationStatus)">@report.Wallet.ReconciliationStatus</span></div>
+                    <div class="sisonke-grid sisonke-grid-4 mb-3">
+                        @MetricCard("Core Mandatory", FormatZAR(report.Wallet.CoreMandatoryBalance), "blue")
+                        @MetricCard("Surplus Equity", FormatZAR(report.Wallet.SurplusEquityBalance), "green")
+                        @MetricCard("Locked/Frozen", FormatZAR(report.Wallet.LockedSurplusBalance), "gold")
+                        @MetricCard("Available", FormatZAR(report.Wallet.AvailableSurplusBalance), "green")
+                    </div>
+                    @WalletTable(report.Wallet.LedgerEntries, "Wallet Ledger")
                 </div>
-                <div class="table-responsive">
-                    <table class="sisonke-table mb-0">
-                        <thead><tr><th>Member</th><th>Gross</th><th>Adjusted</th><th>Reserve</th><th>Approval</th><th>Workflow</th></tr></thead>
-                        <tbody>
-                            @foreach (var item in report.EarlyPayouts.Requests)
-                            {
-                                <tr><td class="fw-semibold">@item.MemberName</td><td>@FormatZAR(item.GrossAmount)</td><td>@FormatZAR(item.AdjustedPayoutAmount)</td><td>@FormatZAR(item.ReserveAdjustmentAmount)</td><td><span class="@Badge(item.ApprovalStatus)">@item.ApprovalStatus</span></td><td>@item.WorkflowStatus</td></tr>
-                            }
-                        </tbody>
-                    </table>
+            </section>
+
+            <section class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head"><div><h2>Early Payout Report</h2><p>Accelerated payout advances and reserve adjustments.</p></div></div>
+                    <div class="sisonke-grid sisonke-grid-4 mb-3">
+                        @MetricCard("Gross Payout", FormatZAR(report.EarlyPayouts.GrossPayoutAmount), "blue")
+                        @MetricCard("Adjusted Paid", FormatZAR(report.EarlyPayouts.AdjustedPayoutAmount), "green")
+                        @MetricCard("Reserve Adjustment", FormatZAR(report.EarlyPayouts.ReserveAdjustmentAmount), "gold")
+                    </div>
+                    <div class="table-responsive">
+                        <table class="sisonke-table mb-0">
+                            <thead><tr><th>Member</th><th>Gross</th><th>Adjusted</th><th>Reserve</th><th>Approval</th><th>Workflow</th></tr></thead>
+                            <tbody>
+                                @foreach (var item in report.EarlyPayouts.Requests)
+                                {
+                                    <tr><td class="fw-semibold">@item.MemberName</td><td>@FormatZAR(item.GrossAmount)</td><td>@FormatZAR(item.AdjustedPayoutAmount)</td><td>@FormatZAR(item.ReserveAdjustmentAmount)</td><td><span class="@Badge(item.ApprovalStatus)">@item.ApprovalStatus</span></td><td>@item.WorkflowStatus</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        }
 
         <section class="sisonke-card mb-4">
             <div class="sisonke-card-body">
@@ -234,10 +260,13 @@ else
                 <div class="sisonke-grid sisonke-grid-4">
                     @MetricCard("Contributions", FormatZAR(report.GroupFinancialSummary.TotalContributions), "green")
                     @MetricCard("Fines", FormatZAR(report.GroupFinancialSummary.TotalFines), "blue")
-                    @MetricCard("Loans Issued", FormatZAR(report.GroupFinancialSummary.TotalLoansIssued), "gold")
-                    @MetricCard("Loans Outstanding", FormatZAR(report.GroupFinancialSummary.TotalLoansOutstanding), "red")
-                    @MetricCard("Surplus Wallets", FormatZAR(report.GroupFinancialSummary.TotalSurplusWalletBalances), "green")
-                    @MetricCard("Reserve Balance", FormatZAR(report.GroupFinancialSummary.TotalReserveWalletBalance), "blue")
+                    @if (report.FinancialProductsAllowed)
+                    {
+                        @MetricCard("Loans Issued", FormatZAR(report.GroupFinancialSummary.TotalLoansIssued), "gold")
+                        @MetricCard("Loans Outstanding", FormatZAR(report.GroupFinancialSummary.TotalLoansOutstanding), "red")
+                        @MetricCard("Surplus Wallets", FormatZAR(report.GroupFinancialSummary.TotalSurplusWalletBalances), "green")
+                        @MetricCard("Reserve Balance", FormatZAR(report.GroupFinancialSummary.TotalReserveWalletBalance), "blue")
+                    }
                     @MetricCard("Pending Payouts", FormatZAR(report.GroupFinancialSummary.PendingPayouts), "gold")
                     @MetricCard("Available Cash View", FormatZAR(report.GroupFinancialSummary.AvailableGroupCashView), "gray")
                 </div>
@@ -408,6 +437,44 @@ else
         }
     </div>;
 
+    private static RenderFragment CoveredLivesTable(IReadOnlyList<ReportingCoveredLifeLineDto> lines) => @<div>
+        <h3 class="reports-section-title">Covered Lives Report</h3>
+        @if (lines.Count == 0)
+        {
+            <div class="sisonke-alert sisonke-alert-blue">No covered lives are linked for this report.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Covered Life</th><th>Relationship</th><th>Status</th><th>Added</th></tr></thead><tbody>
+                    @foreach (var item in lines)
+                    {
+                        <tr><td class="fw-semibold">@item.MemberName</td><td>@item.FullName</td><td>@Dash(item.Relationship)</td><td><span class="@Badge(item.Status)">@item.Status</span></td><td>@item.CreatedAt.ToString("dd MMM yyyy")</td></tr>
+                    }
+                </tbody></table>
+            </div>
+        }
+    </div>;
+
+    private static RenderFragment BurialClaimsTable(IReadOnlyList<ReportingBurialClaimLineDto> lines) => @<div>
+        <h3 class="reports-section-title">Claims Report</h3>
+        @if (lines.Count == 0)
+        {
+            <div class="sisonke-alert sisonke-alert-blue">No burial claims for this period.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="sisonke-table mb-0"><thead><tr><th>Member</th><th>Deceased</th><th>Type</th><th>Subject</th><th>Amount</th><th>Status</th><th>Created</th><th>Paid</th></tr></thead><tbody>
+                    @foreach (var item in lines)
+                    {
+                        <tr><td class="fw-semibold">@item.MemberName</td><td>@item.DeceasedFullName</td><td>@item.ClaimType</td><td>@item.SubjectType</td><td>@FormatZAR(item.Amount)</td><td><span class="@Badge(item.Status)">@item.Status</span></td><td>@item.CreatedAt.ToString("dd MMM yyyy")</td><td>@(item.PaidAt?.ToString("dd MMM yyyy") ?? "-")</td></tr>
+                    }
+                </tbody></table>
+            </div>
+        }
+    </div>;
+
     private static string FormatZAR(decimal amount) =>
         amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
 
@@ -423,8 +490,8 @@ else
     private static string Badge(string status) => status switch
     {
         "Paid" or "Active" or "Present" or "Balanced" or "FullyRepaid" => "sisonke-badge sisonke-badge-green",
-        "Rejected" or "Absent" or "Overdue" or "Review required" or "Unpaid" => "sisonke-badge sisonke-badge-red",
-        "Pending" or "Submitted" or "PendingApproval" or "DisbursementPending" or "Outstanding" or "Approved" or "Apology" => "sisonke-badge sisonke-badge-gold",
+        "Rejected" or "Absent" or "Overdue" or "Review required" or "Unpaid" or "Removed" => "sisonke-badge sisonke-badge-red",
+        "Pending" or "Submitted" or "PendingApproval" or "DisbursementPending" or "Outstanding" or "Approved" or "Apology" or "UnderReview" or "OnHold" => "sisonke-badge sisonke-badge-gold",
         _ => "sisonke-badge sisonke-badge-gray"
     };
 }

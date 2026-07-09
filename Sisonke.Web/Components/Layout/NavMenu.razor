@@ -5,6 +5,7 @@
 @using Microsoft.EntityFrameworkCore
 @using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
 
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -123,12 +124,15 @@
                         <span>Rotation Order</span>
                     </NavLink>
                 </div>
-                <div class="nav-item px-0">
-                    <NavLink class="sisonke-nav-item" href="@($"/stokvel/{contextStokvel.Id}/wallet")">
-                        <i class="bi bi-wallet2 nav-icon" aria-hidden="true"></i>
-                        <span>Wallet</span>
-                    </NavLink>
-                </div>
+                @if (IsFinancialProductsAllowed)
+                {
+                    <div class="nav-item px-0">
+                        <NavLink class="sisonke-nav-item" href="@($"/stokvel/{contextStokvel.Id}/wallet")">
+                            <i class="bi bi-wallet2 nav-icon" aria-hidden="true"></i>
+                            <span>Wallet</span>
+                        </NavLink>
+                    </div>
+                }
                 <div class="nav-item px-0">
                     <span class="sisonke-nav-item sisonke-nav-item-disabled" aria-disabled="true" title="Coming soon">
                         <i class="bi bi-bank nav-icon" aria-hidden="true"></i>
@@ -136,7 +140,7 @@
                         <span class="sisonke-nav-mini-badge">Soon</span>
                     </span>
                 </div>
-                @if (contextStokvel.EnableLending)
+                @if (contextStokvel.EnableLending && IsFinancialProductsAllowed)
                 {
                     <div class="nav-item px-0">
                         <NavLink class="sisonke-nav-item" href="@($"/stokvel/{contextStokvel.Id}/loans")">
@@ -285,6 +289,9 @@
     private string HomeHref => isAuthenticated ? "/my-workspace" : "/";
     private bool HasContextNavigation => contextMember is not null || contextStokvel is not null;
     private bool CanManageContextStokvel => IsOfficeBearerRole(contextMember?.DefaultRole.ToString());
+    private bool IsFinancialProductsAllowed => contextStokvel is not null &&
+        contextStokvel.Archetype != StokvelArchetype.BurialSociety &&
+        contextStokvel.Type != StokvelType.BurialSociety;
     private string DashboardHref => contextStokvel is not null && CanManageContextStokvel
         ? $"/stokvel-dashboard/{contextStokvel.Id}"
         : contextMember is not null

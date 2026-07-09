@@ -87,13 +87,16 @@ else
         <AlertBanner
             Type="warning"
             Title="Dependent could not be added."
-            Message="The maximum dependent limit may have been reached."
+            Message="@saveFailedMessage"
             Icon="bi bi-exclamation-triangle-fill" />
     }
 
     <div class="form-page">
         <div class="sisonke-card">
             <div class="sisonke-card-body">
+                <div class="sisonke-alert sisonke-alert-blue mb-3">
+                    This member has <strong>@seniorDependentCount of @MaxSeniorDependents</strong> active covered lives aged @SeniorDependentAgeThreshold or older. No more than @MaxSeniorDependents may be added.
+                </div>
                 <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="AddDependentForm">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="alert alert-danger" />
@@ -174,6 +177,9 @@ else
 </style>
 
 @code {
+    private const int SeniorDependentAgeThreshold = Sisonke.Web.Services.MemberService.SeniorDependentAgeThreshold;
+    private const int MaxSeniorDependents = Sisonke.Web.Services.MemberService.MaxSeniorDependents;
+
     private static readonly string[] relationshipOptions =
     [
         "Spouse",
@@ -193,8 +199,10 @@ else
     };
     private bool isLoading = true;
     private bool saveFailed;
+    private string saveFailedMessage = "The maximum dependent limit may have been reached.";
     private bool saveBlockedByOwnership;
     private bool canManageDependents;
+    private int seniorDependentCount;
     private bool IsDependentsAvailable => stokvel is not null &&
         (stokvel.Archetype == StokvelArchetype.BurialSociety || stokvel.EnableDependents);
 
@@ -205,6 +213,7 @@ else
     {
         member = await MemberService.GetMemberByIdAsync(MemberId);
         stokvel = member is null ? null : await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+        seniorDependentCount = member is null ? 0 : await MemberService.GetSeniorDependentCountAsync(MemberId);
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -222,6 +231,7 @@ else
     private async Task HandleValidSubmit()
     {
         saveFailed = false;
+        saveFailedMessage = "The maximum dependent limit may have been reached.";
         saveBlockedByOwnership = false;
 
         if (!IsDependentsAvailable)
@@ -243,6 +253,14 @@ else
         if (!isOfficeBearerNow && !isOwnMemberNow)
         {
             saveBlockedByOwnership = true;
+            return;
+        }
+
+        if (Sisonke.Web.Services.MemberService.IsSeniorDependent(model.DateOfBirth) &&
+            await MemberService.GetSeniorDependentCountAsync(MemberId) >= MaxSeniorDependents)
+        {
+            saveFailed = true;
+            saveFailedMessage = $"This member already has {MaxSeniorDependents} active covered lives aged {SeniorDependentAgeThreshold} or older.";
             return;
         }
 

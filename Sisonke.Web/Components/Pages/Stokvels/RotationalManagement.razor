@@ -80,7 +80,7 @@ else
         </div>
     </section>
 
-    <StokvelSubNav StokvelId="@StokvelId" IsRotational="true" />
+    <StokvelSubNav StokvelId="@StokvelId" IsRotational="true" FinancialProductsAllowed="@FinancialProductsAllowed" />
 
     <!-- ── Alerts ────────────────────────────────────────────────── -->
     @if (successMessage is not null)
@@ -1397,6 +1397,9 @@ else
     public Guid StokvelId { get; set; }
 
     private Stokvel? stokvel;
+    private bool FinancialProductsAllowed => stokvel is not null &&
+        stokvel.Archetype != StokvelArchetype.BurialSociety &&
+        stokvel.Type != StokvelType.BurialSociety;
     private Member? linkedMember;
     private List<RotationalPayoutOrderItem> activeOrder = [];
     private List<RotationalPayoutOrderItem> editableOrder = [];

@@ -10,8 +10,12 @@ public class FuneralClaim
     public Guid TenantId { get; set; }
     public Tenant Tenant { get; set; } = default!;
 
+    public Guid? StokvelId { get; set; }
+
     public Guid MemberId { get; set; }
     public Member Member { get; set; } = default!;
+
+    public ClaimType ClaimType { get; set; } = ClaimType.Funeral;
 
     public FuneralClaimSubjectType SubjectType { get; set; }
 

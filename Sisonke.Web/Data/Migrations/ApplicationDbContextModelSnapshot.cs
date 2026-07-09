@@ -841,6 +841,11 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int>("ClaimType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -906,6 +911,9 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("SubjectType")
                         .HasColumnType("int");
 
@@ -926,6 +934,8 @@ namespace Sisonke.Web.Data.Migrations
                     b.HasIndex("DependentId");
 
                     b.HasIndex("MemberId");
+
+                    b.HasIndex("StokvelId");
 
                     b.HasIndex("TenantId", "Status");
 
@@ -1439,6 +1449,11 @@ namespace Sisonke.Web.Data.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("CoverageStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(2);
 
                     b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("datetime2");

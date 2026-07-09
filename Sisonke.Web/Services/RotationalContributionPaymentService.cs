@@ -243,7 +243,7 @@ public class RotationalContributionPaymentService(
         var surplus = request.PaymentStatus == ContributionPaymentStatus.Waived
             ? 0
             : Math.Max(0, request.PaidAmount - payment.ExpectedAmount - penalty);
-        if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+        if (LoansWalletService.IsFinancialProductsAllowed(stokvel))
         {
             var existingSurplus = await GetContributionOverpaymentBalanceAsync(context, payment.Id);
             var surplusDelta = surplus - existingSurplus;

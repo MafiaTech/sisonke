@@ -55,6 +55,7 @@ else
             <p>@GetClaimReference(claim) · @claim.SubjectType claim for @claim.Member.FullName</p>
             <div class="claim-hero-badges">
                 <span class="@GetClaimStatusBadgeClass(claim.Status)">@claim.Status</span>
+                <span class="sisonke-badge sisonke-badge-blue">@claim.ClaimType</span>
                 <span class="@GetBooleanBadgeClass(claim.IsWaitingPeriodSatisfied)">Waiting period: @(claim.IsWaitingPeriodSatisfied ? "Satisfied" : "Not satisfied")</span>
                 <span class="@GetBooleanBadgeClass(claim.IsMemberStatusEligible)">Member eligibility: @(claim.IsMemberStatusEligible ? "Eligible" : "Not eligible")</span>
             </div>
@@ -67,6 +68,10 @@ else
             <div>
                 <span>Subject</span>
                 <strong>@claim.SubjectType</strong>
+            </div>
+            <div>
+                <span>Benefit Amount</span>
+                <strong>@FormatCurrency(claim.PayoutAmount ?? 0)</strong>
             </div>
             <div>
                 <span>Date of Death</span>
@@ -1267,6 +1272,12 @@ else
             return;
         }
 
+        if (claim is not null && treasurerMember.Id == claim.MemberId)
+        {
+            errorMessage = "You cannot mark your own claim payout as paid.";
+            return;
+        }
+
         var markedPaid = await FuneralClaimService.MarkClaimPayoutPaidAsync(
             ClaimId,
             payoutModel.PayoutAmount,
@@ -1302,7 +1313,7 @@ else
             return;
         }
 
-        var updatedClaim = await FuneralClaimService.SubmitClaimAsync(ClaimId);
+        var updatedClaim = await FuneralClaimService.SubmitClaimAsync(ClaimId, currentUserId);
 
         if (updatedClaim is null)
         {
@@ -1423,6 +1434,12 @@ else
             return;
         }
 
+        if (claim is not null && chairpersonMember.Id == claim.MemberId)
+        {
+            errorMessage = "You cannot approve your own claim.";
+            return;
+        }
+
         var approved = await FuneralClaimService.ApproveClaimAsync(
             ClaimId,
             chairpersonMember.Id,
@@ -1488,6 +1505,12 @@ else
         if (chairpersonMember is null)
         {
             errorMessage = "Chairperson member record could not be resolved.";
+            return;
+        }
+
+        if (claim is not null && chairpersonMember.Id == claim.MemberId)
+        {
+            errorMessage = "You cannot reject your own claim.";
             return;
         }
 

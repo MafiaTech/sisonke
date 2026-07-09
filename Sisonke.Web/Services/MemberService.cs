@@ -10,6 +10,9 @@ public class MemberService(
     OperatingRuleService operatingRuleService,
     StokvelService stokvelService)
 {
+    public const int SeniorDependentAgeThreshold = 75;
+    public const int MaxSeniorDependents = 2;
+
     public async Task<Member?> GetMemberByIdAsync(Guid memberId)
     {
         return await context.Members
@@ -449,9 +452,28 @@ public class MemberService(
         return dependentCount < maxDependents;
     }
 
+    public async Task<int> GetSeniorDependentCountAsync(Guid memberId)
+    {
+        var dependents = await context.MemberDependents
+            .Where(dependent =>
+                dependent.MemberId == memberId &&
+                dependent.IsActive &&
+                !dependent.IsDeceased)
+            .Select(dependent => dependent.DateOfBirth)
+            .ToListAsync();
+
+        return dependents.Count(IsSeniorDependent);
+    }
+
     public async Task<MemberDependent?> AddDependentAsync(Guid memberId, MemberDependent dependent)
     {
         if (!await CanAddDependentAsync(memberId))
+        {
+            return null;
+        }
+
+        if (IsSeniorDependent(dependent.DateOfBirth) &&
+            await GetSeniorDependentCountAsync(memberId) >= MaxSeniorDependents)
         {
             return null;
         }
@@ -475,6 +497,30 @@ public class MemberService(
         await context.SaveChangesAsync();
 
         return dependent;
+    }
+
+    public static bool IsSeniorDependent(DateTime? dateOfBirth)
+    {
+        var age = CalculateAge(dateOfBirth, DateTime.Today);
+        return age is >= SeniorDependentAgeThreshold;
+    }
+
+    public static int? CalculateAge(DateTime? dateOfBirth, DateTime today)
+    {
+        if (dateOfBirth is null)
+        {
+            return null;
+        }
+
+        var date = dateOfBirth.Value.Date;
+        var age = today.Year - date.Year;
+
+        if (date > today.AddYears(-age))
+        {
+            age--;
+        }
+
+        return age;
     }
 
     public async Task<MemberDependent?> GetDependentByIdAsync(Guid dependentId)

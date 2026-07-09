@@ -62,6 +62,8 @@ public class FinanceReportService(
         report.MemberSummary.MemberNumber = member.MemberNumber;
         report.MemberSummary.Email = member.EmailAddress;
         report.MemberSummary.CellphoneNumber = member.CellphoneNumber;
+        report.FinancialProductsAllowed = LoansWalletService.IsFinancialProductsAllowed(stokvel);
+        report.IsBurialStokvel = IsBurialStokvel(stokvel);
 
         var memberIds = report.CanViewGroupReports
             ? await context.Members.AsNoTracking()
@@ -78,14 +80,17 @@ public class FinanceReportService(
         var reportContributions = await GetContributionLinesAsync(stokvel, memberIds, from, to, memberNames);
         var memberFines = await GetFineLinesAsync(stokvel.TenantId, [selected.MemberId], from, to, memberNames);
         var reportFines = await GetFineLinesAsync(stokvel.TenantId, memberIds, from, to, memberNames);
-        var memberLoans = await GetLoanLinesAsync(selected.StokvelId, [selected.MemberId], from, to);
-        var reportLoans = await GetLoanLinesAsync(selected.StokvelId, memberIds, from, to);
-        var memberWallet = await GetWalletReportAsync(selected.StokvelId, [selected.MemberId], from, to, memberNames);
-        var reportWallet = await GetWalletReportAsync(selected.StokvelId, memberIds, from, to, memberNames);
+        var memberLoans = report.FinancialProductsAllowed ? await GetLoanLinesAsync(selected.StokvelId, [selected.MemberId], from, to) : [];
+        var reportLoans = report.FinancialProductsAllowed ? await GetLoanLinesAsync(selected.StokvelId, memberIds, from, to) : [];
+        var memberWallet = report.FinancialProductsAllowed ? await GetWalletReportAsync(selected.StokvelId, [selected.MemberId], from, to, memberNames) : new ReportingWalletReportDto();
+        var reportWallet = report.FinancialProductsAllowed ? await GetWalletReportAsync(selected.StokvelId, memberIds, from, to, memberNames) : new ReportingWalletReportDto();
         var memberPayouts = await GetPayoutLinesAsync(stokvel, [selected.MemberId], from, to, memberNames);
         var reportPayouts = await GetPayoutLinesAsync(stokvel, memberIds, from, to, memberNames);
         var reportEarlyPayouts = GetEarlyPayoutReport(reportLoans);
         var attendance = await GetAttendanceReportAsync(stokvel.TenantId, memberIds, from, to, memberNames);
+        var burial = report.IsBurialStokvel
+            ? await GetBurialReportAsync(stokvel, memberIds, from, to, memberNames)
+            : new ReportingBurialReportDto();
 
         report.MemberStatement = new ReportingMemberStatementDto
         {
@@ -117,6 +122,7 @@ public class FinanceReportService(
             Fines = reportFines
         };
         report.Attendance = attendance;
+        report.Burial = burial;
         report.GroupFinancialSummary = new ReportingGroupFinancialSummaryDto
         {
             TotalContributions = report.Contributions.TotalPaid,
@@ -126,7 +132,7 @@ public class FinanceReportService(
             TotalSurplusWalletBalances = report.Wallet.AvailableSurplusBalance,
             TotalReserveWalletBalance = report.EarlyPayouts.ReserveAdjustmentAmount,
             PendingPayouts = reportPayouts.Where(item => item.Status is not "Paid").Sum(item => item.Amount),
-            AvailableGroupCashView = report.Contributions.TotalPaid + report.Fines.FinesPaid + report.Wallet.AvailableSurplusBalance + report.EarlyPayouts.ReserveAdjustmentAmount - reportPayouts.Where(item => item.Status is not "Paid").Sum(item => item.Amount)
+            AvailableGroupCashView = report.Contributions.TotalPaid + report.Fines.FinesPaid + (report.FinancialProductsAllowed ? report.Wallet.AvailableSurplusBalance + report.EarlyPayouts.ReserveAdjustmentAmount : 0) - reportPayouts.Where(item => item.Status is not "Paid").Sum(item => item.Amount)
         };
 
         if (!report.CanViewGroupReports)
@@ -140,6 +146,9 @@ public class FinanceReportService(
             report.Fines.FinesPaid = memberFines.Sum(item => item.Paid);
             report.Fines.FinesOutstanding = memberFines.Sum(item => item.Outstanding);
             report.Attendance = await GetAttendanceReportAsync(stokvel.TenantId, [selected.MemberId], from, to, memberNames);
+            report.Burial = report.IsBurialStokvel
+                ? await GetBurialReportAsync(stokvel, [selected.MemberId], from, to, memberNames)
+                : new ReportingBurialReportDto();
         }
 
         return report;
@@ -676,6 +685,97 @@ public class FinanceReportService(
             ApologyCount = lines.Count(line => line.AttendanceStatus == AttendanceStatus.Apology.ToString() || line.ApologyStatus is not "-" and not ""),
             Lines = lines
         };
+    }
+
+    private async Task<ReportingBurialReportDto> GetBurialReportAsync(Stokvel stokvel, IReadOnlyCollection<Guid> memberIds, DateTime from, DateTime to, IReadOnlyDictionary<Guid, string> memberNames)
+    {
+        if (memberIds.Count == 0)
+        {
+            return new ReportingBurialReportDto();
+        }
+
+        var dependents = await context.MemberDependents.AsNoTracking()
+            .Where(dependent => memberIds.Contains(dependent.MemberId))
+            .OrderBy(dependent => dependent.FullName)
+            .ToListAsync();
+        var claims = await context.FuneralClaims.AsNoTracking()
+            .Where(claim =>
+                claim.TenantId == stokvel.TenantId &&
+                memberIds.Contains(claim.MemberId) &&
+                (claim.SubmittedAt ?? claim.CreatedAt).Date >= from &&
+                (claim.SubmittedAt ?? claim.CreatedAt).Date <= to)
+            .OrderByDescending(claim => claim.SubmittedAt ?? claim.CreatedAt)
+            .ToListAsync();
+
+        return new ReportingBurialReportDto
+        {
+            CoveredLivesActive = dependents.Count(dependent => GetDependentStatus(dependent) == DependentCoverageStatus.Active.ToString()),
+            CoveredLivesPending = dependents.Count(dependent => GetDependentStatus(dependent) == DependentCoverageStatus.Pending.ToString()),
+            CoveredLivesRejected = dependents.Count(dependent => GetDependentStatus(dependent) == DependentCoverageStatus.Rejected.ToString()),
+            CoveredLivesRemoved = dependents.Count(dependent => GetDependentStatus(dependent) == DependentCoverageStatus.Removed.ToString()),
+            ClaimsSubmitted = claims.Count(claim => claim.Status == FuneralClaimStatus.Submitted),
+            ClaimsUnderReview = claims.Count(claim => claim.Status is FuneralClaimStatus.UnderReview or FuneralClaimStatus.OnHold),
+            ClaimsApprovedAwaitingPayout = claims.Count(claim =>
+                claim.Status == FuneralClaimStatus.Approved &&
+                claim.ChairpersonDecisionAt is not null &&
+                claim.ApprovedAt is not null &&
+                claim.PayoutPaidAt is null),
+            ClaimsPaid = claims.Count(claim => claim.Status == FuneralClaimStatus.Paid),
+            ApprovedAwaitingPayoutAmount = claims
+                .Where(claim =>
+                    claim.Status == FuneralClaimStatus.Approved &&
+                    claim.ChairpersonDecisionAt is not null &&
+                    claim.ApprovedAt is not null &&
+                    claim.PayoutPaidAt is null)
+                .Sum(claim => claim.PayoutAmount ?? 0),
+            PaidPayoutAmount = claims
+                .Where(claim => claim.Status == FuneralClaimStatus.Paid)
+                .Sum(claim => claim.PayoutAmount ?? 0),
+            CoveredLives = dependents
+                .Select(dependent => new ReportingCoveredLifeLineDto
+                {
+                    MemberName = memberNames.GetValueOrDefault(dependent.MemberId, "Member"),
+                    FullName = dependent.FullName,
+                    Relationship = dependent.Relationship,
+                    Status = GetDependentStatus(dependent),
+                    CreatedAt = dependent.CreatedAt
+                })
+                .ToList(),
+            Claims = claims
+                .Select(claim => new ReportingBurialClaimLineDto
+                {
+                    MemberName = memberNames.GetValueOrDefault(claim.MemberId, "Member"),
+                    DeceasedFullName = claim.DeceasedFullName,
+                    ClaimType = claim.ClaimType.ToString(),
+                    SubjectType = claim.SubjectType.ToString(),
+                    Status = claim.Status.ToString(),
+                    Amount = claim.PayoutAmount ?? 0,
+                    CreatedAt = claim.SubmittedAt ?? claim.CreatedAt,
+                    PaidAt = claim.PayoutPaidAt
+                })
+                .ToList()
+        };
+    }
+
+    private static bool IsBurialStokvel(Stokvel stokvel)
+    {
+        return stokvel.Archetype == StokvelArchetype.BurialSociety ||
+            stokvel.Type.ToString().Contains("Burial", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetDependentStatus(MemberDependent dependent)
+    {
+        if (dependent.CoverageStatus != DependentCoverageStatus.Active)
+        {
+            return dependent.CoverageStatus.ToString();
+        }
+
+        if (dependent.IsDeceased || !dependent.IsActive)
+        {
+            return DependentCoverageStatus.Removed.ToString();
+        }
+
+        return DependentCoverageStatus.Active.ToString();
     }
 
     private async Task<List<ContributionArrearsLineDto>> GetMonthlyContributionStatementLinesAsync(Guid tenantId, Guid memberId)

@@ -34,13 +34,13 @@ public sealed class LoansWalletService(
             .Select(x => new Stokvel { Id = x.Id, TenantId = x.TenantId, Name = x.Name, Archetype = x.Archetype, Type = x.Type, EnableLending = x.EnableLending, IsActive = x.IsActive })
             .SingleOrDefaultAsync();
         if (stokvel is null) return null;
+        if (!IsFeatureAllowed(stokvel)) return null;
 
         var member = await context.Members.AsNoTracking()
             .Where(x => x.TenantId == stokvel.TenantId && x.ApplicationUserId == currentUserId)
             .OrderBy(x => x.CreatedAt).FirstOrDefaultAsync();
         if (member is null) return new(stokvel, null, null, [], [], null, [], [], [], [], null, false, false, false, false, false, false, "No linked membership was found.");
 
-        var allowed = IsFeatureAllowed(stokvel);
         var role = member.DefaultRole;
         var canConfigure = IsConfigurationRole(role);
         var canViewAll = IsOfficeBearer(role);
@@ -92,7 +92,7 @@ public sealed class LoansWalletService(
         var futurePayoutCycle = await FindFuturePayoutCycleAsync(context, stokvelId, member.Id);
         var eligibility = await GetEligibilityMessageAsync(context, stokvel, member, config);
         return new(stokvel, member, config, loans, repayments, wallet, transactions, withdrawals, guarantorRequests, eligibleGuarantors, futurePayoutCycle,
-            canConfigure, canViewAll, canApprove, canConfirm, canReviewWithdrawals, canApproveWithdrawals, allowed ? eligibility : "Loans and surplus wallets are not available for Burial Societies.");
+            canConfigure, canViewAll, canApprove, canConfirm, canReviewWithdrawals, canApproveWithdrawals, eligibility);
     }
 
     public async Task<LoanConfigurationResult> SaveConfigurationAsync(
@@ -228,6 +228,7 @@ public sealed class LoansWalletService(
         await using var context = await dbFactory.CreateDbContextAsync();
         var loan = await context.MemberLoans.Include(x => x.Guarantors).FirstOrDefaultAsync(x => x.Id == loanId && x.IsActive);
         if (loan is null) return FinanceOperationResult.Failed("Loan not found.");
+        if (!await IsLoanFeatureAvailableForStokvelAsync(loan.StokvelId)) return FinanceOperationResult.Failed("Loans are not available for Burial Societies.");
         if (await GetRoleAsync(context, loan.StokvelId, currentUserId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can approve loans.");
         var config = await context.StokvelLoanConfigurations.AsNoTracking().Where(x => x.StokvelId == loan.StokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstAsync();
         if (loan.LoanStatus != MemberLoanStatus.PendingApproval) return FinanceOperationResult.Failed("Loan is not awaiting approval.");
@@ -405,6 +406,7 @@ public sealed class LoansWalletService(
         await using var context = await dbFactory.CreateDbContextAsync();
         var loan = await context.MemberLoans.FirstOrDefaultAsync(x => x.Id == loanId && x.IsActive);
         if (loan is null) return FinanceOperationResult.Failed("Loan not found.");
+        if (!await IsLoanFeatureAvailableForStokvelAsync(loan.StokvelId)) return FinanceOperationResult.Failed("Loans are not available for Burial Societies.");
         if (await GetRoleAsync(context, loan.StokvelId, currentUserId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can reject loans.");
         if (loan.LoanStatus != MemberLoanStatus.PendingApproval) return FinanceOperationResult.Failed("Loan is not awaiting approval.");
         loan.LoanStatus = MemberLoanStatus.Rejected; loan.RejectionReason = reason.Trim(); loan.RejectedAt = DateTime.UtcNow;
@@ -420,6 +422,7 @@ public sealed class LoansWalletService(
         await using var context = await dbFactory.CreateDbContextAsync(); await using var tx = await context.Database.BeginTransactionAsync();
         var loan = await context.MemberLoans.Include(x => x.Repayments).FirstOrDefaultAsync(x => x.Id == loanId && x.IsActive);
         if (loan is null) return FinanceOperationResult.Failed("Loan not found.");
+        if (!await IsLoanFeatureAvailableForStokvelAsync(loan.StokvelId)) return FinanceOperationResult.Failed("Loans are not available for Burial Societies.");
         if (await GetRoleAsync(context, loan.StokvelId, currentUserId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can confirm loan disbursement.");
         if (loan.LoanStatus is not (MemberLoanStatus.DisbursementPending or MemberLoanStatus.Approved)) return FinanceOperationResult.Failed("Loan is not awaiting disbursement.");
         var config = await context.StokvelLoanConfigurations.AsNoTracking().Where(x => x.StokvelId == loan.StokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstAsync();
@@ -442,6 +445,7 @@ public sealed class LoansWalletService(
         await using var context = await dbFactory.CreateDbContextAsync(); await using var tx = await context.Database.BeginTransactionAsync();
         var repayment = await context.MemberLoanRepayments.Include(x => x.Loan).FirstOrDefaultAsync(x => x.Id == repaymentId && x.IsActive);
         if (repayment is null) return FinanceOperationResult.Failed("Repayment not found.");
+        if (!await IsLoanFeatureAvailableForStokvelAsync(repayment.StokvelId)) return FinanceOperationResult.Failed("Loans are not available for Burial Societies.");
         if (await GetRoleAsync(context, repayment.StokvelId, currentUserId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can confirm loan repayments.");
         if (repayment.Loan.LoanStatus is not (MemberLoanStatus.Active or MemberLoanStatus.Overdue)) return FinanceOperationResult.Failed("Loan is not active.");
         var config = await context.StokvelLoanConfigurations.AsNoTracking().Where(x => x.StokvelId == repayment.StokvelId && x.IsActive).OrderByDescending(x => x.CreatedAt).FirstAsync();
@@ -514,6 +518,7 @@ public sealed class LoansWalletService(
         await using var context = await dbFactory.CreateDbContextAsync();
         var request = await context.MemberSurplusWithdrawalRequests.FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
         if (request is null) return FinanceOperationResult.Failed("Withdrawal request not found.");
+        if (!await IsLoanFeatureAvailableForStokvelAsync(request.StokvelId)) return FinanceOperationResult.Failed("Surplus withdrawals are not available for Burial Societies.");
         if (await GetRoleAsync(context, request.StokvelId, userId) != SisonkeRole.Secretary) return FinanceOperationResult.Failed("Only the Secretary can review withdrawal requests.");
         if (!IsAwaitingSecretaryReview(request.WithdrawalStatus)) return FinanceOperationResult.Failed("Withdrawal is not awaiting secretary review.");
         var now = DateTime.UtcNow;
@@ -540,6 +545,7 @@ public sealed class LoansWalletService(
         await using var context = await dbFactory.CreateDbContextAsync(); await using var tx = await context.Database.BeginTransactionAsync();
         var request = await context.MemberSurplusWithdrawalRequests.Include(x => x.Wallet).FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
         if (request is null) return FinanceOperationResult.Failed("Withdrawal request not found.");
+        if (!await IsLoanFeatureAvailableForStokvelAsync(request.StokvelId)) return FinanceOperationResult.Failed("Surplus withdrawals are not available for Burial Societies.");
         if (await GetRoleAsync(context, request.StokvelId, userId) != SisonkeRole.Treasurer) return FinanceOperationResult.Failed("Only the Treasurer can confirm withdrawal payment.");
         if (!IsAwaitingTreasurerPayout(request.WithdrawalStatus)) return FinanceOperationResult.Failed("Withdrawal is not approved for payment.");
         if (request.Wallet.AvailableBalance < request.RequestedAmount) return FinanceOperationResult.Failed("The wallet no longer has sufficient balance.");
@@ -556,6 +562,7 @@ public sealed class LoansWalletService(
     public async Task<LoansWalletTaskCounts> GetTaskCountsAsync(Guid stokvelId)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
+        if (!await IsLoanFeatureAvailableForStokvelAsync(context, stokvelId)) return new(0, 0, 0, 0, 0);
         var today = DateTime.UtcNow.Date;
         return new(
             await context.MemberLoans.CountAsync(x => x.StokvelId == stokvelId && x.IsActive && x.LoanStatus == MemberLoanStatus.PendingApproval),
@@ -572,6 +579,7 @@ public sealed class LoansWalletService(
     public async Task<List<MemberSurplusWithdrawalRequest>> GetWithdrawalRequestsAwaitingSecretaryReviewAsync(Guid stokvelId)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
+        if (!await IsLoanFeatureAvailableForStokvelAsync(context, stokvelId)) return [];
         return await context.MemberSurplusWithdrawalRequests.AsNoTracking()
             .Include(x => x.Member)
             .Where(x => x.StokvelId == stokvelId && x.IsActive && SecretaryReviewWithdrawalStatuses.Contains(x.WithdrawalStatus))
@@ -582,6 +590,7 @@ public sealed class LoansWalletService(
     public async Task<StokvelLoanConfiguration?> GetActiveLoanConfigurationAsync(Guid stokvelId)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
+        if (!await IsLoanFeatureAvailableForStokvelAsync(context, stokvelId)) return null;
         return await context.StokvelLoanConfigurations.AsNoTracking()
             .Where(x => x.StokvelId == stokvelId && x.IsActive)
             .OrderByDescending(x => x.CreatedAt)
@@ -591,6 +600,7 @@ public sealed class LoansWalletService(
     public async Task<StokvelWalletSummary> GetWalletSummaryAsync(Guid stokvelId)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
+        if (!await IsLoanFeatureAvailableForStokvelAsync(context, stokvelId)) return new(0, 0, 0, null);
         var totalAvailableBalance = await context.MemberSurplusWallets.AsNoTracking()
             .Where(x => x.StokvelId == stokvelId && x.IsActive)
             .SumAsync(x => x.AvailableBalance);
@@ -608,11 +618,18 @@ public sealed class LoansWalletService(
     public async Task<bool> IsLoanFeatureAvailableForStokvelAsync(Guid stokvelId)
     {
         await using var context = await dbFactory.CreateDbContextAsync();
-        var archetype = await context.Stokvels.AsNoTracking()
+        return await IsLoanFeatureAvailableForStokvelAsync(context, stokvelId);
+    }
+
+    private static async Task<bool> IsLoanFeatureAvailableForStokvelAsync(ApplicationDbContext context, Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels.AsNoTracking()
             .Where(x => x.Id == stokvelId && x.IsActive && !x.IsDeleted)
-            .Select(x => (StokvelArchetype?)x.Archetype)
+            .Select(x => new { x.Archetype, x.Type })
             .FirstOrDefaultAsync();
-        return archetype is not null && archetype != StokvelArchetype.BurialSociety;
+        return stokvel is not null &&
+            stokvel.Archetype != StokvelArchetype.BurialSociety &&
+            stokvel.Type != StokvelType.BurialSociety;
     }
 
     private async Task<FinanceOperationResult> DecideWithdrawalAsync(Guid id, string userId, bool approve, string? reason)
@@ -620,6 +637,7 @@ public sealed class LoansWalletService(
         if (!approve && string.IsNullOrWhiteSpace(reason)) return FinanceOperationResult.Failed("Rejection reason is required.");
         await using var context = await dbFactory.CreateDbContextAsync(); var request = await context.MemberSurplusWithdrawalRequests.Include(x => x.Wallet).FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
         if (request is null) return FinanceOperationResult.Failed("Withdrawal request not found.");
+        if (!await IsLoanFeatureAvailableForStokvelAsync(context, request.StokvelId)) return FinanceOperationResult.Failed("Surplus withdrawals are not available for Burial Societies.");
         if (await GetRoleAsync(context, request.StokvelId, userId) != SisonkeRole.Chairperson) return FinanceOperationResult.Failed("Only the Chairperson can approve or reject withdrawals.");
         if (request.WithdrawalStatus != SurplusWithdrawalStatus.AwaitingChairpersonApproval) return FinanceOperationResult.Failed("Withdrawal is not awaiting chairperson approval.");
         var now = DateTime.UtcNow;
@@ -642,6 +660,7 @@ public sealed class LoansWalletService(
             .Include(x => x.GuarantorMember)
             .FirstOrDefaultAsync(x => x.Id == guarantorId);
         if (request is null) return FinanceOperationResult.Failed("Guarantor request not found.");
+        if (!await IsLoanFeatureAvailableForStokvelAsync(context, request.Loan.StokvelId)) return FinanceOperationResult.Failed("Guarantor lending is not available for Burial Societies.");
         var member = await context.Members.AsNoTracking().FirstOrDefaultAsync(x =>
             x.Id == request.GuarantorMemberId &&
             x.ApplicationUserId == currentUserId &&
@@ -666,7 +685,10 @@ public sealed class LoansWalletService(
         return (stokvel, member, member?.DefaultRole);
     }
     private static async Task<SisonkeRole?> GetRoleAsync(ApplicationDbContext context, Guid stokvelId, string userId) => (await GetAccessAsync(context, stokvelId, userId)).Role;
-    private static bool IsFeatureAllowed(Stokvel stokvel) => stokvel.Archetype != StokvelArchetype.BurialSociety;
+    public static bool IsFinancialProductsAllowed(Stokvel stokvel) =>
+        stokvel.Archetype != StokvelArchetype.BurialSociety &&
+        stokvel.Type != StokvelType.BurialSociety;
+    private static bool IsFeatureAllowed(Stokvel stokvel) => IsFinancialProductsAllowed(stokvel);
     private static bool IsOfficeBearer(SisonkeRole? role) => role is SisonkeRole.Creator or SisonkeRole.StokvelAdmin or SisonkeRole.Chairperson or SisonkeRole.Secretary or SisonkeRole.Treasurer;
     private static bool IsConfigurationRole(SisonkeRole? role) => role is SisonkeRole.Creator or SisonkeRole.StokvelAdmin or SisonkeRole.Treasurer;
     private static bool IsEligibleMember(Member member) => member.Status == MemberStatus.Active && member.GovernanceStatus == MemberGovernanceStatus.Active && !member.IsDeceased && member.SuspendedAt is null && member.ExpelledAt is null;

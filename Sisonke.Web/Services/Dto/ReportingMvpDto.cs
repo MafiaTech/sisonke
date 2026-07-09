@@ -10,6 +10,8 @@ public sealed class ReportingMvpDto
     public DateTime FromDate { get; set; }
     public DateTime ToDate { get; set; }
     public bool CanViewGroupReports { get; set; }
+    public bool FinancialProductsAllowed { get; set; }
+    public bool IsBurialStokvel { get; set; }
     public ReportingMemberSummaryDto? MemberSummary { get; set; }
     public ReportingMemberStatementDto MemberStatement { get; set; } = new();
     public ReportingContributionsReportDto Contributions { get; set; } = new();
@@ -18,6 +20,7 @@ public sealed class ReportingMvpDto
     public ReportingEarlyPayoutReportDto EarlyPayouts { get; set; } = new();
     public ReportingFinesReportDto Fines { get; set; } = new();
     public ReportingAttendanceReportDto Attendance { get; set; } = new();
+    public ReportingBurialReportDto Burial { get; set; } = new();
     public ReportingGroupFinancialSummaryDto GroupFinancialSummary { get; set; } = new();
     public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
 }
@@ -199,6 +202,43 @@ public sealed class ReportingAttendanceLineDto
     public bool IsLate { get; set; }
     public string ApologyStatus { get; set; } = string.Empty;
     public string ApologyType { get; set; } = string.Empty;
+}
+
+public sealed class ReportingBurialReportDto
+{
+    public int CoveredLivesActive { get; set; }
+    public int CoveredLivesPending { get; set; }
+    public int CoveredLivesRejected { get; set; }
+    public int CoveredLivesRemoved { get; set; }
+    public int ClaimsSubmitted { get; set; }
+    public int ClaimsUnderReview { get; set; }
+    public int ClaimsApprovedAwaitingPayout { get; set; }
+    public int ClaimsPaid { get; set; }
+    public decimal ApprovedAwaitingPayoutAmount { get; set; }
+    public decimal PaidPayoutAmount { get; set; }
+    public List<ReportingCoveredLifeLineDto> CoveredLives { get; set; } = [];
+    public List<ReportingBurialClaimLineDto> Claims { get; set; } = [];
+}
+
+public sealed class ReportingCoveredLifeLineDto
+{
+    public string MemberName { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string Relationship { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
+public sealed class ReportingBurialClaimLineDto
+{
+    public string MemberName { get; set; } = string.Empty;
+    public string DeceasedFullName { get; set; } = string.Empty;
+    public string ClaimType { get; set; } = string.Empty;
+    public string SubjectType { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? PaidAt { get; set; }
 }
 
 public sealed class ReportingPayoutLineDto

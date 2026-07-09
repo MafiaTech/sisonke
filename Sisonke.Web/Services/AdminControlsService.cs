@@ -207,10 +207,13 @@ public class AdminControlsService(
             BuildStokvelSection(stokvel),
             BuildContributionSection(stokvel.Id, contributionRule),
             BuildFineSection(stokvel.Id, fineTypes),
-            BuildLoanSection(stokvel.Id, loanConfig),
             BuildOperatingSection(stokvel.Id, operatingRules),
             BuildRotationalSection(stokvel.Id, stokvel, rotationalConfig)
         ];
+        if (LoansWalletService.IsFinancialProductsAllowed(stokvel))
+        {
+            model.Sections.Insert(3, BuildLoanSection(stokvel.Id, loanConfig));
+        }
 
         return model;
     }

@@ -132,6 +132,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<FuneralClaim>()
             .HasIndex(c => c.ClaimReference);
 
+        builder.Entity<FuneralClaim>()
+            .HasIndex(c => c.StokvelId);
+
+        builder.Entity<FuneralClaim>()
+            .Property(c => c.ClaimType)
+            .HasDefaultValue(ClaimType.Funeral);
+
         builder.Entity<TenantSubscription>()
             .HasOne(ts => ts.Tenant)
             .WithMany(t => t.TenantSubscriptions)
@@ -195,6 +202,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(d => d.MemberId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MemberDependent>()
+            .Property(d => d.CoverageStatus)
+            .HasDefaultValue(DependentCoverageStatus.Active);
 
         builder.Entity<FuneralClaim>()
             .HasOne(c => c.Tenant)

@@ -34,12 +34,15 @@
                 <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"rotational/management/{StokvelId}")">
                     <i class="bi bi-arrow-repeat"></i><span>Rotation</span>
                 </NavLink>
-                <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"stokvel/{StokvelId}/loans")">
-                    <i class="bi bi-bank2"></i><span>Loans</span>
-                </NavLink>
-                <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"stokvel/{StokvelId}/wallet")">
-                    <i class="bi bi-wallet2"></i><span>Wallet</span>
-                </NavLink>
+                @if (FinancialProductsAllowed)
+                {
+                    <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"stokvel/{StokvelId}/loans")">
+                        <i class="bi bi-bank2"></i><span>Loans</span>
+                    </NavLink>
+                    <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"stokvel/{StokvelId}/wallet")">
+                        <i class="bi bi-wallet2"></i><span>Wallet</span>
+                    </NavLink>
+                }
                 <NavLink class="sk-subnav-link sk-subnav-link-module" href="@($"rotational-configuration/{StokvelId}")">
                     <i class="bi bi-sliders"></i><span>Rules</span>
                 </NavLink>
@@ -51,4 +54,5 @@
 @code {
     [Parameter, EditorRequired] public Guid StokvelId { get; set; }
     [Parameter] public bool IsRotational { get; set; }
+    [Parameter] public bool FinancialProductsAllowed { get; set; } = true;
 }

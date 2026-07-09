@@ -431,6 +431,7 @@ else
                         <div>
                             <div class="card-section-title mb-1">Dependents / Covered Lives</div>
                             <div class="text-muted small">Dependents captured: @dependents.Count of @maxDependents</div>
+                            <div class="text-muted small">Aged @SeniorDependentAgeThreshold+: @seniorDependentCount of @MaxSeniorDependents</div>
                         </div>
                         @if ((canManageStokvel || isOwnMemberProfile) && maxDependents > 0 && dependents.Count < maxDependents)
                         {
@@ -453,6 +454,15 @@ else
                         <div class="alert alert-info mb-3" role="alert">
                             <i class="bi bi-info-circle me-2"></i>
                             Newly added covered lives are subject to a <strong>@waitingPeriodMonths-month waiting period</strong> before claims can be submitted on their behalf.
+                            <br />
+                            A member may have no more than <strong>@MaxSeniorDependents covered lives aged @SeniorDependentAgeThreshold or older</strong>.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mb-3" role="alert">
+                            <i class="bi bi-info-circle me-2"></i>
+                            A member may have no more than <strong>@MaxSeniorDependents covered lives aged @SeniorDependentAgeThreshold or older</strong>.
                         </div>
                     }
 
@@ -501,7 +511,13 @@ else
                                         <tr>
                                             <td class="fw-500">@dependent.FullName</td>
                                             <td class="text-muted small">@dependent.Relationship</td>
-                                            <td class="text-muted small">@(dependent.DateOfBirth?.ToString("dd MMM yyyy") ?? "—")</td>
+                                            <td class="text-muted small">
+                                                @(dependent.DateOfBirth?.ToString("dd MMM yyyy") ?? "—")
+                                                @if (Sisonke.Web.Services.MemberService.IsSeniorDependent(dependent.DateOfBirth))
+                                                {
+                                                    <span class="sisonke-badge sisonke-badge-gold ms-1">@SeniorDependentAgeThreshold+</span>
+                                                }
+                                            </td>
                                             <td class="text-muted small">@SensitiveDataMasker.MaskIdNumber(dependent.IdNumber)</td>
                                             <td class="text-muted small">@SensitiveDataMasker.MaskPhoneNumber(dependent.CellphoneNumber)</td>
                                             <td>
@@ -1037,6 +1053,9 @@ else
 </style>
 
 @code {
+    private const int SeniorDependentAgeThreshold = Sisonke.Web.Services.MemberService.SeniorDependentAgeThreshold;
+    private const int MaxSeniorDependents = Sisonke.Web.Services.MemberService.MaxSeniorDependents;
+
     private Member? member;
     private List<MemberDependent> dependents = [];
     private List<MemberFine> memberFines = [];
@@ -1050,6 +1069,7 @@ else
     private int maxNextOfKin;
     private int maxBeneficiaries;
     private int maxDependents;
+    private int seniorDependentCount;
     private int waitingPeriodMonths;
     private bool isLoading = true;
     private bool showGovernanceStatusConfirmation;
@@ -1117,6 +1137,7 @@ else
         maxDependents = stokvel is null ? 0 : await OperatingRuleService.GetMaxDependentsAsync(stokvel.Id);
         waitingPeriodMonths = stokvel is null ? 0 : await OperatingRuleService.GetWaitingPeriodMonthsAsync(stokvel.Id);
         dependents = member is null || !canViewProfile || !IsDependentsAvailable ? [] : await MemberService.GetDependentsByMemberIdAsync(MemberId);
+        seniorDependentCount = member is null || !canViewProfile || !IsDependentsAvailable ? 0 : await MemberService.GetSeniorDependentCountAsync(MemberId);
         activeDependentClaims = member is null || !canViewProfile || !IsClaimsAvailable ? new() : await FuneralClaimService.GetActiveDependentClaimsByMemberIdAsync(MemberId);
         memberFines = member is null || !canViewFines ? [] : await FineService.GetMemberFinesAsync(MemberId);
         funeralClaims = member is null || !canViewProfile || !IsClaimsAvailable ? [] : await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId);

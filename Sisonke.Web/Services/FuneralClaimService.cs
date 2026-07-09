@@ -11,6 +11,7 @@ public class FuneralClaimService(
     ApplicationDbContext context,
     OperatingRuleService operatingRuleService,
     StokvelOperatingRulesService stokvelOperatingRulesService,
+    AuditLogService auditLogService,
     IWebHostEnvironment webHostEnvironment)
 {
     private const long MaxClaimDocumentUploadSize = 10 * 1024 * 1024;
@@ -404,7 +405,8 @@ public class FuneralClaimService(
         FuneralClaimSubjectType subjectType,
         Guid? dependentId,
         DateTime? dateOfDeath,
-        string? claimReason)
+        string? claimReason,
+        ClaimType claimType = ClaimType.Funeral)
     {
         var member = await context.Members
             .Include(existingMember => existingMember.Tenant)
@@ -425,6 +427,11 @@ public class FuneralClaimService(
         {
             return null;
         }
+
+        var rules = await stokvelOperatingRulesService.GetOrCreateDefaultRulesAsync(
+            stokvel.Id,
+            stokvel.Type.ToString(),
+            null);
 
         if (subjectType == FuneralClaimSubjectType.Dependent && !IsDependentsAvailable(stokvel))
         {
@@ -458,6 +465,7 @@ public class FuneralClaimService(
             {
                 dependent.IsDeceased = true;
                 dependent.IsActive = false;
+                dependent.CoverageStatus = DependentCoverageStatus.Removed;
                 dependent.DeceasedDate = dateOfDeath;
                 dependent.DeathReportedAt ??= DateTime.UtcNow;
             }
@@ -474,7 +482,9 @@ public class FuneralClaimService(
         {
             Id = Guid.NewGuid(),
             TenantId = member.TenantId,
+            StokvelId = stokvel.Id,
             MemberId = member.Id,
+            ClaimType = claimType,
             SubjectType = subjectType,
             DependentId = claimDependentId,
             DeceasedFullName = deceasedFullName,
@@ -484,18 +494,27 @@ public class FuneralClaimService(
             ClaimReference = await GenerateClaimReferenceAsync(member.TenantId, createdAt),
             IsWaitingPeriodSatisfied = isWaitingPeriodSatisfied,
             IsMemberStatusEligible = isMemberStatusEligible,
+            PayoutAmount = rules.DefaultClaimPayoutAmount > 0 ? rules.DefaultClaimPayoutAmount : null,
             CreatedAt = createdAt
         };
 
         context.FuneralClaims.Add(claim);
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            member.ApplicationUserId,
+            stokvel.Id,
+            "ClaimCreated",
+            nameof(FuneralClaim),
+            claim.Id,
+            $"Created {claim.ClaimType} claim {claim.ClaimReference} for {claim.DeceasedFullName}.");
 
         return claim;
     }
 
-    public async Task<FuneralClaim?> SubmitClaimAsync(Guid claimId)
+    public async Task<FuneralClaim?> SubmitClaimAsync(Guid claimId, string? submittedByUserId = null)
     {
         var claim = await context.FuneralClaims
+            .Include(existingClaim => existingClaim.Member)
             .SingleOrDefaultAsync(existingClaim => existingClaim.Id == claimId);
 
         if (claim is null)
@@ -517,6 +536,7 @@ public class FuneralClaimService(
             {
                 dependent.IsDeceased = true;
                 dependent.IsActive = false;
+                dependent.CoverageStatus = DependentCoverageStatus.Removed;
                 dependent.DeceasedDate = claim.DateOfDeath;
                 dependent.DeathReportedAt ??= DateTime.UtcNow;
             }
@@ -536,6 +556,13 @@ public class FuneralClaimService(
         claim.SubmittedByName ??= "Member";
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            submittedByUserId ?? claim.Member.ApplicationUserId,
+            await GetClaimStokvelIdAsync(claim),
+            "ClaimSubmitted",
+            nameof(FuneralClaim),
+            claim.Id,
+            $"Submitted claim {claim.ClaimReference ?? claim.Id.ToString("N")[..8]} for secretary review.");
 
         return claim;
     }
@@ -610,6 +637,13 @@ public class FuneralClaimService(
             return false;
         }
 
+        if (reviewer.DefaultRole != SisonkeRole.Secretary &&
+            reviewer.DefaultRole != SisonkeRole.Creator &&
+            reviewer.DefaultRole != SisonkeRole.StokvelAdmin)
+        {
+            return false;
+        }
+
         claim.SecretaryRecommendedApproval = recommendApproval;
         claim.SecretaryReviewNotes = secretaryNotes.Trim();
         claim.SecretaryReviewedByName = reviewer.FullName;
@@ -618,6 +652,13 @@ public class FuneralClaimService(
         claim.Status = FuneralClaimStatus.UnderReview;
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            reviewer.ApplicationUserId,
+            await GetClaimStokvelIdAsync(claim),
+            "ClaimSecretaryReviewed",
+            nameof(FuneralClaim),
+            claim.Id,
+            $"Secretary review saved for claim {claim.ClaimReference ?? claim.Id.ToString("N")[..8]}.");
 
         return true;
     }
@@ -681,7 +722,10 @@ public class FuneralClaimService(
             .Where(member => member.Id == approvedByMemberId)
             .FirstOrDefaultAsync();
 
-        if (approver is null || approver.TenantId != claim.TenantId)
+        if (approver is null ||
+            approver.TenantId != claim.TenantId ||
+            approver.Id == claim.MemberId ||
+            !IsChairpersonDecisionRole(approver.DefaultRole))
         {
             return false;
         }
@@ -694,6 +738,13 @@ public class FuneralClaimService(
         claim.ChairpersonDecisionNotes = notes;
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            approver.ApplicationUserId,
+            await GetClaimStokvelIdAsync(claim),
+            "ClaimApproved",
+            nameof(FuneralClaim),
+            claim.Id,
+            $"Chairperson approved claim {claim.ClaimReference ?? claim.Id.ToString("N")[..8]}.");
 
         return true;
     }
@@ -753,7 +804,10 @@ public class FuneralClaimService(
             .Where(member => member.Id == rejectedByMemberId)
             .FirstOrDefaultAsync();
 
-        if (rejector is null || rejector.TenantId != claim.TenantId)
+        if (rejector is null ||
+            rejector.TenantId != claim.TenantId ||
+            rejector.Id == claim.MemberId ||
+            !IsChairpersonDecisionRole(rejector.DefaultRole))
         {
             return false;
         }
@@ -766,6 +820,13 @@ public class FuneralClaimService(
         claim.ChairpersonDecisionNotes = reason.Trim();
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            rejector.ApplicationUserId,
+            await GetClaimStokvelIdAsync(claim),
+            "ClaimRejected",
+            nameof(FuneralClaim),
+            claim.Id,
+            $"Chairperson rejected claim {claim.ClaimReference ?? claim.Id.ToString("N")[..8]}.");
 
         return true;
     }
@@ -842,6 +903,7 @@ public class FuneralClaimService(
 
         if (capturedByMember is null ||
             capturedByMember.TenantId != claim.TenantId ||
+            capturedByMember.Id == claim.MemberId ||
             capturedByMember.DefaultRole != SisonkeRole.Treasurer)
         {
             return false;
@@ -880,6 +942,13 @@ public class FuneralClaimService(
         });
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(
+            capturedByMember.ApplicationUserId,
+            stokvel.Id,
+            "ClaimPaid",
+            nameof(FuneralClaim),
+            claim.Id,
+            $"Treasurer marked claim {claim.ClaimReference ?? claim.Id.ToString("N")[..8]} paid for {payoutAmount:C}.");
 
         return true;
     }
@@ -1059,6 +1128,26 @@ public class FuneralClaimService(
         return claim.SecretaryReviewedAt is not null &&
             claim.ChairpersonDecisionAt is null &&
             claim.Status == FuneralClaimStatus.UnderReview;
+    }
+
+    private static bool IsChairpersonDecisionRole(SisonkeRole role)
+    {
+        return role is SisonkeRole.Chairperson or SisonkeRole.Creator or SisonkeRole.StokvelAdmin;
+    }
+
+    private async Task<Guid?> GetClaimStokvelIdAsync(FuneralClaim claim)
+    {
+        if (claim.StokvelId is not null)
+        {
+            return claim.StokvelId.Value;
+        }
+
+        return await context.Stokvels
+            .Where(stokvel => stokvel.TenantId == claim.TenantId)
+            .OrderBy(stokvel => stokvel.CreatedAt)
+            .ThenBy(stokvel => stokvel.Name)
+            .Select(stokvel => (Guid?)stokvel.Id)
+            .FirstOrDefaultAsync();
     }
 
     private static bool IsClaimsAvailable(Stokvel stokvel)

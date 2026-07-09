@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Data.Entities;
 
@@ -25,6 +26,8 @@ public class MemberDependent
     public string? CellphoneNumber { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    public DependentCoverageStatus CoverageStatus { get; set; } = DependentCoverageStatus.Active;
 
     public bool IsDeceased { get; set; }
 

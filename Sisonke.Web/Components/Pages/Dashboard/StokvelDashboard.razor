@@ -115,7 +115,7 @@ else
         </div>
     </div>
 
-    <StokvelSubNav StokvelId="@StokvelId" IsRotational="@stokvel.EnableRotation" />
+    <StokvelSubNav StokvelId="@StokvelId" IsRotational="@stokvel.EnableRotation" FinancialProductsAllowed="@FinancialProductsAllowed" />
 
     <!-- ── Archetype awareness banner ── -->
     @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
@@ -131,7 +131,7 @@ else
                     <i class="bi bi-arrow-repeat me-1"></i>Rotation Management
                 </a>
             }
-            @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+            @if (FinancialProductsAllowed)
             {
                 <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel/loans-wallet/{StokvelId}")">
                     <i class="bi bi-wallet2 me-1"></i>Loans &amp; Wallet
@@ -195,7 +195,7 @@ else
         </section>
     }
 
-    @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+    @if (FinancialProductsAllowed)
     {
         <section class="sisonke-card mb-4">
             <div class="sisonke-card-body">
@@ -322,7 +322,7 @@ else
                                 <a class="sisonke-btn sisonke-btn-primary executive-task-action" href="@($"/rotational-configuration/{StokvelId}")">Configure</a>
                             </div>
                         }
-                        @if (stokvel.Archetype != StokvelArchetype.BurialSociety && activeLoanConfig is null)
+                        @if (FinancialProductsAllowed && activeLoanConfig is null)
                         {
                             <div class="executive-task-card task-accent-blue">
                                 <div class="detail-mini-label">
@@ -1127,7 +1127,7 @@ else
             </div>
 
             <!-- Wallet & Loans summary -->
-            @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+            @if (FinancialProductsAllowed)
             {
                 <div class="col-12 col-lg-4">
                     <div class="card h-100">
@@ -1377,13 +1377,16 @@ else
     private RotationalTaskState? rotationalTaskState;
     private StokvelLoanConfiguration? activeLoanConfig;
     private StokvelWalletSummary? walletSummary;
+    private bool FinancialProductsAllowed => stokvel is not null &&
+        stokvel.Archetype != StokvelArchetype.BurialSociety &&
+        stokvel.Type != StokvelType.BurialSociety;
     private int SecretaryTaskTotal => pendingApologyCount + claimsToReviewCount + attendanceToCaptureCount + openWarningCount;
     private int TreasurerTaskTotal => outstandingFineCount + approvedClaimsAwaitingPayoutCount +
         (rotationalTaskState?.ApprovedPayout is not null ? 1 : 0) +
         (rotationalTaskState?.HasContributionTask == true ? 1 : 0);
     private int ExecutiveTaskTotal => pendingApologyCount + claimsToReviewCount + claimsAwaitingChairpersonApprovalCount + attendanceToCaptureCount + openWarningCount + TreasurerTaskTotal +
         (rotationalTaskState?.PendingApprovalPayout is not null ? 1 : 0) +
-        (stokvel?.Archetype != StokvelArchetype.BurialSociety && activeLoanConfig is null ? 1 : 0);
+        (FinancialProductsAllowed && activeLoanConfig is null ? 1 : 0);
 
     [Parameter]
     public Guid StokvelId { get; set; }
@@ -1484,7 +1487,7 @@ else
             rotationOrderSummary = await RotationalPayoutOrderService.GetSummaryAsync(StokvelId, linkedMember?.Id);
             rotationalTaskState = await RotationalTaskService.GetTaskStateAsync(StokvelId);
         }
-        if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+        if (FinancialProductsAllowed)
         {
             activeLoanConfig = await LoansWalletService.GetActiveLoanConfigurationAsync(StokvelId);
             walletSummary = await LoansWalletService.GetWalletSummaryAsync(StokvelId);
