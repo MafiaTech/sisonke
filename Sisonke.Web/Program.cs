@@ -346,6 +346,8 @@ builder.Services.AddScoped<FineService>();
 builder.Services.AddScoped<ContributionService>();
 builder.Services.AddScoped<ContributionPaymentService>();
 builder.Services.AddScoped<FinanceReportService>();
+builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<AdminControlsService>();
 builder.Services.AddScoped<QuestionnaireService>();
 builder.Services.AddScoped<OperatingRuleService>();
 builder.Services.AddScoped<ConstitutionService>();

@@ -4,7 +4,7 @@ using Sisonke.Web.Data.Entities;
 
 namespace Sisonke.Web.Services;
 
-public class MeetingApologyService(ApplicationDbContext context)
+public class MeetingApologyService(ApplicationDbContext context, AuditLogService auditLogService)
 {
     public async Task<MeetingApology?> SubmitApologyAsync(Guid meetingId, Guid memberId, string apologyType, string reason)
     {
@@ -51,6 +51,8 @@ public class MeetingApologyService(ApplicationDbContext context)
 
         context.MeetingApologies.Add(apology);
         await context.SaveChangesAsync();
+        var stokvel = await context.Stokvels.AsNoTracking().FirstOrDefaultAsync(existingStokvel => existingStokvel.TenantId == meeting.TenantId);
+        await auditLogService.RecordAsync(member.ApplicationUserId, stokvel?.Id, "ApologySubmitted", "MeetingApology", apology.Id, $"Apology submitted by {member.FullName}.");
 
         return apology;
     }

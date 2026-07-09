@@ -1,0 +1,109 @@
+@page "/admin/production-readiness"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AdminControlsService AdminControlsService
+
+<PageTitle>Production Readiness</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <span class="spinner-border spinner-border-sm me-2"></span>Running safe readiness checks...
+    </div>
+}
+else if (model is null || !model.IsAuthorized)
+{
+    <div class="sisonke-alert sisonke-alert-gold">Only platform administrators can view production readiness checks.</div>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-blue">Platform Admin</span>
+            <h1>Production Readiness</h1>
+            <p>Safe operational checks with configuration values hidden.</p>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <span class="sisonke-badge sisonke-badge-gray">@model.EnvironmentName</span>
+                <span class="sisonke-badge sisonke-badge-blue">Build @model.AppVersion</span>
+            </div>
+        </div>
+    </section>
+
+    <div class="sisonke-grid sisonke-grid-2 mb-4">
+        @foreach (var check in model.Checks)
+        {
+            <section class="sisonke-card">
+                <div class="sisonke-card-body">
+                    <div class="d-flex justify-content-between gap-3">
+                        <div>
+                            <h2>@check.Name</h2>
+                            <p>@check.Detail</p>
+                        </div>
+                        <span class="sisonke-badge @(check.IsHealthy ? "sisonke-badge-green" : "sisonke-badge-gold")">@check.Status</span>
+                    </div>
+                </div>
+            </section>
+        }
+    </div>
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Recent Activity</h2>
+                    <p>Latest audit entries captured by the production readiness MVP.</p>
+                </div>
+            </div>
+
+            @if (model.RecentActivity.Count == 0)
+            {
+                <div class="sisonke-alert sisonke-alert-blue">No activity entries have been recorded yet.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table sisonke-table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Entity</th>
+                                <th>Summary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in model.RecentActivity)
+                            {
+                                <tr>
+                                    <td>@entry.TimestampUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                    <td><span class="sisonke-badge sisonke-badge-blue">@entry.ActionType</span></td>
+                                    <td>@entry.EntityType</td>
+                                    <td>@entry.Summary</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private ProductionReadinessViewModel? model;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        model = await AdminControlsService.GetProductionReadinessAsync(authState.User);
+        isLoading = false;
+    }
+}

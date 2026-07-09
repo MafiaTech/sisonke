@@ -7,7 +7,8 @@ namespace Sisonke.Web.Services;
 
 public sealed class LoansWalletService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
-    ILogger<LoansWalletService> logger)
+    ILogger<LoansWalletService> logger,
+    AuditLogService auditLogService)
 {
     private static readonly MemberLoanStatus[] BlockingLoanStatuses =
         [MemberLoanStatus.Submitted, MemberLoanStatus.PendingApproval, MemberLoanStatus.Approved,
@@ -134,6 +135,7 @@ public sealed class LoansWalletService(
         };
         context.StokvelLoanConfigurations.Add(created);
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(currentUserId, stokvelId, "ConfigurationChanged", "StokvelLoanConfiguration", created.Id, "Loan and wallet configuration updated.");
         return LoanConfigurationResult.Succeeded(created);
     }
 
@@ -173,6 +175,7 @@ public sealed class LoansWalletService(
             ApplyWalletEarlyPayout(context, wallet, walletEarlyPayoutAmount, null, now, currentUserId, "Wallet early payout covered the full request.");
             await context.SaveChangesAsync();
             await tx.CommitAsync();
+            await auditLogService.RecordAsync(currentUserId, stokvelId, "WalletMovement", "MemberSurplusWallet", wallet.Id, $"Wallet early payout processed for {FormatMoney(walletEarlyPayoutAmount)}.");
             return FinanceOperationResult.Succeeded("Wallet early payout processed. No loan balance was created.");
         }
 
@@ -214,6 +217,7 @@ public sealed class LoansWalletService(
 
         await context.SaveChangesAsync();
         await tx.CommitAsync();
+        await auditLogService.RecordAsync(currentUserId, stokvelId, "LoanRequested", "MemberLoan", loan.Id, $"Loan requested for {FormatMoney(netLoanAmount)}.");
         return FinanceOperationResult.Succeeded(walletEarlyPayoutAmount > 0
             ? $"Loan request submitted. Wallet early payout applied: {FormatMoney(walletEarlyPayoutAmount)}. Borrowed amount: {FormatMoney(netLoanAmount)}."
             : "Loan request submitted.");
@@ -240,7 +244,9 @@ public sealed class LoansWalletService(
             if (collateralError is not null) return FinanceOperationResult.Failed(collateralError);
             ActivateLoanAndCreateSchedule(context, loan, now, currentUserId, "Loan activated automatically after Chairperson approval.");
         }
-        await context.SaveChangesAsync(); return FinanceOperationResult.Succeeded();
+        await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(currentUserId, loan.StokvelId, "LoanApproved", "MemberLoan", loan.Id, $"Loan approved for {FormatMoney(approvedAmount)}.");
+        return FinanceOperationResult.Succeeded();
     }
 
     public async Task<FinanceOperationResult> RequestSurplusBackedLoanAsync(
@@ -303,6 +309,7 @@ public sealed class LoansWalletService(
         }
         await context.SaveChangesAsync();
         await tx.CommitAsync();
+        await auditLogService.RecordAsync(currentUserId, stokvelId, "LoanRequested", "MemberLoan", loan.Id, $"Surplus-backed loan requested for {FormatMoney(amount)}.");
         return FinanceOperationResult.Succeeded($"Surplus-backed loan request submitted. Collateral required: {FormatMoney(collateralRequired)}.");
     }
 
@@ -382,6 +389,7 @@ public sealed class LoansWalletService(
         }
         await context.SaveChangesAsync();
         await tx.CommitAsync();
+        await auditLogService.RecordAsync(currentUserId, stokvelId, "EarlyPayoutRequested", "MemberLoan", loan.Id, $"Accelerated payout request submitted. Net payout {FormatMoney(net)}; reserve retained {FormatMoney(discount)}.");
         return FinanceOperationResult.Succeeded($"Accelerated payout request submitted. Net payout: {FormatMoney(net)}. Reserve retained: {FormatMoney(discount)}.");
     }
 
@@ -401,7 +409,9 @@ public sealed class LoansWalletService(
         if (loan.LoanStatus != MemberLoanStatus.PendingApproval) return FinanceOperationResult.Failed("Loan is not awaiting approval.");
         loan.LoanStatus = MemberLoanStatus.Rejected; loan.RejectionReason = reason.Trim(); loan.RejectedAt = DateTime.UtcNow;
         loan.RejectedByChairpersonId = currentUserId; loan.UpdatedAt = DateTime.UtcNow; loan.UpdatedBy = currentUserId;
-        await context.SaveChangesAsync(); return FinanceOperationResult.Succeeded();
+        await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(currentUserId, loan.StokvelId, "LoanRejected", "MemberLoan", loan.Id, "Loan request rejected.");
+        return FinanceOperationResult.Succeeded();
     }
 
     public async Task<FinanceOperationResult> ConfirmDisbursementAsync(Guid loanId, string currentUserId, PaymentMethod? method, string? reference, DateTime? date, string? notes)
@@ -421,7 +431,9 @@ public sealed class LoansWalletService(
         var collateralError = await LockCollateralIfNeededAsync(context, loan, now, currentUserId);
         if (collateralError is not null) return FinanceOperationResult.Failed(collateralError);
         ActivateLoanAndCreateSchedule(context, loan, date.Value, currentUserId, null);
-        await context.SaveChangesAsync(); await tx.CommitAsync(); return FinanceOperationResult.Succeeded();
+        await context.SaveChangesAsync(); await tx.CommitAsync();
+        await auditLogService.RecordAsync(currentUserId, loan.StokvelId, "LoanPaidOut", "MemberLoan", loan.Id, $"Loan disbursement confirmed for {FormatMoney(loan.ApprovedAmount ?? loan.RequestedAmount)}.");
+        return FinanceOperationResult.Succeeded();
     }
 
     public async Task<FinanceOperationResult> ConfirmRepaymentAsync(Guid repaymentId, string currentUserId, decimal paidAmount, DateTime? paymentDate, PaymentMethod? method, string? reference, bool waive, bool applyFine, string? notes)
@@ -450,7 +462,9 @@ public sealed class LoansWalletService(
             await UnlockCollateralIfNeededAsync(context, repayment.Loan, repaid, currentUserId);
         }
         repayment.Loan.UpdatedAt = DateTime.UtcNow; repayment.Loan.UpdatedBy = currentUserId;
-        await context.SaveChangesAsync(); await tx.CommitAsync(); return FinanceOperationResult.Succeeded();
+        await context.SaveChangesAsync(); await tx.CommitAsync();
+        await auditLogService.RecordAsync(currentUserId, repayment.StokvelId, "LoanRepaymentRecorded", "MemberLoanRepayment", repayment.Id, $"Loan repayment recorded for {FormatMoney(paidAmount)}.");
+        return FinanceOperationResult.Succeeded();
     }
 
     public async Task CreditContributionOverpaymentAsync(Guid stokvelId, Guid memberId, Guid paymentId, decimal amount, string currentUserId)
@@ -471,6 +485,7 @@ public sealed class LoansWalletService(
         wallet.UpdatedAt = DateTime.UtcNow; wallet.UpdatedBy = currentUserId;
         context.MemberSurplusWalletTransactions.Add(new() { Id = Guid.NewGuid(), StokvelId = stokvelId, WalletId = wallet.Id, MemberId = memberId, TransactionType = delta > 0 ? WalletTransactionType.Credit : WalletTransactionType.Debit, Amount = Math.Abs(delta), BalanceAfterTransaction = wallet.AvailableBalance, SourceType = WalletTransactionSourceType.ContributionOverpayment, SourceReferenceId = paymentId, Description = delta > 0 ? "Contribution overpayment" : "Contribution overpayment adjustment", CreatedAt = DateTime.UtcNow, CreatedBy = currentUserId });
         await context.SaveChangesAsync(); await tx.CommitAsync();
+        await auditLogService.RecordAsync(currentUserId, stokvelId, "WalletMovement", "MemberSurplusWallet", wallet.Id, $"Contribution overpayment adjusted wallet by {FormatMoney(Math.Abs(delta))}.");
         logger.LogInformation("Surplus wallet adjusted from contribution payment {PaymentId}", paymentId);
     }
 
@@ -489,7 +504,9 @@ public sealed class LoansWalletService(
         var now = DateTime.UtcNow; var request = new MemberSurplusWithdrawalRequest { Id = Guid.NewGuid(), StokvelId = stokvelId, MemberId = access.Member.Id, WalletId = wallet.Id, RequestedAmount = amount, RequestReason = reason.Trim(), RequestReasonNotes = Trim(reasonNotes), WithdrawalStatus = SurplusWithdrawalStatus.PendingSecretaryReview, RequestedAt = now, RequestedBy = currentUserId, IsActive = true, CreatedAt = now, CreatedBy = currentUserId };
         context.MemberSurplusWithdrawalRequests.Add(request);
         context.MemberSurplusWalletTransactions.Add(new() { Id = Guid.NewGuid(), StokvelId = stokvelId, WalletId = wallet.Id, MemberId = wallet.MemberId, TransactionType = WalletTransactionType.WithdrawalRequested, Amount = amount, BalanceAfterTransaction = wallet.AvailableBalance, SourceType = WalletTransactionSourceType.Withdrawal, SourceReferenceId = request.Id, Description = "Withdrawal requested", CreatedAt = now, CreatedBy = currentUserId });
-        await context.SaveChangesAsync(); return FinanceOperationResult.Succeeded();
+        await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(currentUserId, stokvelId, "EarlyPayoutRequested", "MemberSurplusWithdrawalRequest", request.Id, $"Surplus withdrawal requested for {FormatMoney(amount)}.");
+        return FinanceOperationResult.Succeeded();
     }
 
     public async Task<FinanceOperationResult> ReviewWithdrawalAsSecretaryAsync(Guid id, string userId, bool recommendApproval, string? notes)
@@ -508,6 +525,7 @@ public sealed class LoansWalletService(
         request.UpdatedAt = now;
         request.UpdatedBy = userId;
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(userId, request.StokvelId, "EarlyPayoutReviewed", "MemberSurplusWithdrawalRequest", request.Id, "Secretary reviewed surplus withdrawal request.");
         return FinanceOperationResult.Succeeded(recommendApproval
             ? "Withdrawal reviewed and recommended for approval."
             : "Withdrawal reviewed and recommended for rejection.");
@@ -530,7 +548,9 @@ public sealed class LoansWalletService(
         request.Wallet.SurplusEquityBalance = Math.Max(0, request.Wallet.SurplusEquityBalance - request.RequestedAmount);
         request.WithdrawalStatus = SurplusWithdrawalStatus.Paid; request.PaidAt = paidAt; request.PaidByTreasurerId = userId; request.PaymentMethod = method; request.PaymentReference = reference.Trim(); request.PaymentNotes = Trim(notes); request.Notes = Trim(notes); request.UpdatedAt = DateTime.UtcNow; request.UpdatedBy = userId;
         context.MemberSurplusWalletTransactions.Add(new() { Id = Guid.NewGuid(), StokvelId = request.StokvelId, WalletId = request.WalletId, MemberId = request.MemberId, TransactionType = WalletTransactionType.WithdrawalPaid, Amount = request.RequestedAmount, BalanceAfterTransaction = request.Wallet.AvailableBalance, SourceType = WalletTransactionSourceType.Withdrawal, SourceReferenceId = request.Id, Description = "Withdrawal paid", CreatedAt = DateTime.UtcNow, CreatedBy = userId });
-        await context.SaveChangesAsync(); await tx.CommitAsync(); return FinanceOperationResult.Succeeded();
+        await context.SaveChangesAsync(); await tx.CommitAsync();
+        await auditLogService.RecordAsync(userId, request.StokvelId, "EarlyPayoutPaid", "MemberSurplusWithdrawalRequest", request.Id, $"Surplus withdrawal paid for {FormatMoney(request.RequestedAmount)}.");
+        return FinanceOperationResult.Succeeded();
     }
 
     public async Task<LoansWalletTaskCounts> GetTaskCountsAsync(Guid stokvelId)
@@ -608,7 +628,9 @@ public sealed class LoansWalletService(
         request.ChairpersonNotes = Trim(reason);
         if (approve) { if (request.Wallet.AvailableBalance < request.RequestedAmount) return FinanceOperationResult.Failed("Wallet balance is insufficient."); if (request.RequestedAmount > GetAvailableSurplusEquity(request.Wallet)) return FinanceOperationResult.Failed("This withdrawal would use surplus equity locked as loan collateral."); request.WithdrawalStatus = SurplusWithdrawalStatus.AwaitingTreasurerPayout; request.ApprovedAt = now; request.ApprovedByChairpersonId = userId; }
         else { request.WithdrawalStatus = SurplusWithdrawalStatus.Rejected; request.RejectedAt = now; request.RejectedByChairpersonId = userId; request.RejectionReason = reason!.Trim(); context.MemberSurplusWalletTransactions.Add(new() { Id = Guid.NewGuid(), StokvelId = request.StokvelId, WalletId = request.WalletId, MemberId = request.MemberId, TransactionType = WalletTransactionType.WithdrawalRejected, Amount = request.RequestedAmount, BalanceAfterTransaction = request.Wallet.AvailableBalance, SourceType = WalletTransactionSourceType.Withdrawal, SourceReferenceId = request.Id, Description = "Withdrawal rejected", CreatedAt = now, CreatedBy = userId }); }
-        request.UpdatedAt = now; request.UpdatedBy = userId; await context.SaveChangesAsync(); return FinanceOperationResult.Succeeded();
+        request.UpdatedAt = now; request.UpdatedBy = userId; await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(userId, request.StokvelId, approve ? "EarlyPayoutApproved" : "EarlyPayoutRejected", "MemberSurplusWithdrawalRequest", request.Id, approve ? "Chairperson approved surplus withdrawal request." : "Chairperson rejected surplus withdrawal request.");
+        return FinanceOperationResult.Succeeded();
     }
 
     private async Task<FinanceOperationResult> RespondToGuarantorRequestAsync(Guid guarantorId, string currentUserId, bool accept, string? notes, string? reason)

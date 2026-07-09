@@ -27,6 +27,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<ContributionPaymentAudit> ContributionPaymentAudits => Set<ContributionPaymentAudit>();
     public DbSet<ClaimPayoutAudit> ClaimPayoutAudits => Set<ClaimPayoutAudit>();
+    public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<MeetingAgendaItem> MeetingAgendaItems => Set<MeetingAgendaItem>();
     public DbSet<MeetingAttendance> MeetingAttendances => Set<MeetingAttendance>();
@@ -338,6 +339,30 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(a => a.CapturedByMemberId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<AuditLogEntry>()
+            .Property(a => a.ActionType)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Entity<AuditLogEntry>()
+            .Property(a => a.EntityType)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Entity<AuditLogEntry>()
+            .Property(a => a.Summary)
+            .HasMaxLength(1000)
+            .IsRequired();
+
+        builder.Entity<AuditLogEntry>()
+            .HasIndex(a => a.TimestampUtc);
+
+        builder.Entity<AuditLogEntry>()
+            .HasIndex(a => new { a.StokvelId, a.TimestampUtc });
+
+        builder.Entity<AuditLogEntry>()
+            .HasIndex(a => new { a.UserId, a.TimestampUtc });
 
         builder.Entity<Meeting>()
             .HasOne(m => m.Tenant)

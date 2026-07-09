@@ -1,0 +1,161 @@
+@page "/stokvel/{StokvelId:guid}/admin/roles"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AdminControlsService AdminControlsService
+
+<PageTitle>Role Management</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <span class="spinner-border spinner-border-sm me-2"></span>Loading role assignments...
+    </div>
+}
+else if (model is null || !model.IsAuthorized)
+{
+    <div class="sisonke-alert sisonke-alert-gold">@(model?.DenialReason ?? "You are not authorized to view this page.")</div>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-blue">Admin Controls</span>
+            <h1>Role Management</h1>
+            <p>View and safely update stokvel role assignments for @model.StokvelName.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel/{StokvelId}/configuration-review")">Configuration Review</a>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="@messageCss">@message</div>
+    }
+
+    <section class="sisonke-card mb-4">
+        <div class="sisonke-card-body">
+            <div class="sisonke-card-head">
+                <div>
+                    <h2>Members</h2>
+                    <p>Only linked chairpersons, stokvel admins, creators, and platform admins can change these assignments.</p>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table sisonke-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Member</th>
+                            <th>Email</th>
+                            <th>Current role</th>
+                            <th>New role</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in model.Members)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@row.FullName</strong>
+                                    @if (row.IsCurrentUser)
+                                    {
+                                        <span class="sisonke-badge sisonke-badge-gray ms-2">You</span>
+                                    }
+                                </td>
+                                <td>@(string.IsNullOrWhiteSpace(row.EmailAddress) ? "Not captured" : row.EmailAddress)</td>
+                                <td><span class="sisonke-badge sisonke-badge-blue">@row.Role</span></td>
+                                <td>
+                                    <select class="form-select" value="@GetSelectedRole(row.MemberId)" @onchange="eventArgs => ChangeSelectedRole(row.MemberId, eventArgs.Value?.ToString())" disabled="@row.IsCurrentUser">
+                                        @foreach (var role in assignableRoles)
+                                        {
+                                            <option value="@role">@role</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td class="text-end">
+                                    <button class="sisonke-btn sisonke-btn-primary" type="button" @onclick="() => SaveRoleAsync(row.MemberId)" disabled="@(row.IsCurrentUser || isSaving)">
+                                        Save
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public Guid StokvelId { get; set; }
+
+    private RoleManagementViewModel? model;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? message;
+    private bool messageIsSuccess;
+    private SisonkeRole[] assignableRoles = [];
+    private readonly Dictionary<Guid, SisonkeRole> selectedRoles = [];
+    private string messageCss => messageIsSuccess ? "sisonke-alert sisonke-alert-green" : "sisonke-alert sisonke-alert-gold";
+
+    protected override async Task OnInitializedAsync()
+    {
+        assignableRoles = AdminControlsService.GetAssignableStokvelRoles().ToArray();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        model = await AdminControlsService.GetRoleManagementAsync(StokvelId, authState.User);
+        selectedRoles.Clear();
+
+        foreach (var row in model.Members)
+        {
+            selectedRoles[row.MemberId] = assignableRoles.Contains(row.Role) ? row.Role : SisonkeRole.Member;
+        }
+
+        isLoading = false;
+    }
+
+    private SisonkeRole GetSelectedRole(Guid memberId) =>
+        selectedRoles.TryGetValue(memberId, out var role) ? role : SisonkeRole.Member;
+
+    private void ChangeSelectedRole(Guid memberId, string? value)
+    {
+        if (Enum.TryParse<SisonkeRole>(value, out var role))
+        {
+            selectedRoles[memberId] = role;
+        }
+    }
+
+    private async Task SaveRoleAsync(Guid memberId)
+    {
+        if (!selectedRoles.TryGetValue(memberId, out var role))
+        {
+            return;
+        }
+
+        isSaving = true;
+        message = null;
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var result = await AdminControlsService.UpdateMemberRoleAsync(StokvelId, memberId, role, authState.User);
+        messageIsSuccess = result.Succeeded;
+        message = result.Message;
+        await LoadAsync();
+        isSaving = false;
+    }
+}

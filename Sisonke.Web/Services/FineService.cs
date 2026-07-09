@@ -5,7 +5,7 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class FineService(ApplicationDbContext context)
+public class FineService(ApplicationDbContext context, AuditLogService auditLogService)
 {
     public async Task<List<FineType>> GetFineTypesByStokvelIdAsync(Guid stokvelId)
     {
@@ -123,6 +123,8 @@ public class FineService(ApplicationDbContext context)
 
         context.MemberFines.Add(memberFine);
         await context.SaveChangesAsync();
+        var stokvel = await context.Stokvels.AsNoTracking().FirstOrDefaultAsync(existingStokvel => existingStokvel.TenantId == member.TenantId);
+        await auditLogService.RecordAsync(null, stokvel?.Id, "FineCreated", "MemberFine", memberFine.Id, $"Fine issued to {member.FullName} for R {amount:N2}.");
 
         return memberFine;
     }
@@ -141,6 +143,8 @@ public class FineService(ApplicationDbContext context)
         memberFine.PaidDate = DateTime.Today;
 
         await context.SaveChangesAsync();
+        var stokvel = await context.Stokvels.AsNoTracking().FirstOrDefaultAsync(existingStokvel => existingStokvel.TenantId == memberFine.TenantId);
+        await auditLogService.RecordAsync(null, stokvel?.Id, "FinePaid", "MemberFine", memberFine.Id, $"Fine marked paid for R {memberFine.Amount:N2}.");
 
         return memberFine;
     }
@@ -158,6 +162,8 @@ public class FineService(ApplicationDbContext context)
         memberFine.Status = FineStatus.Cancelled;
 
         await context.SaveChangesAsync();
+        var stokvel = await context.Stokvels.AsNoTracking().FirstOrDefaultAsync(existingStokvel => existingStokvel.TenantId == memberFine.TenantId);
+        await auditLogService.RecordAsync(null, stokvel?.Id, "FineWaived", "MemberFine", memberFine.Id, $"Fine cancelled for R {memberFine.Amount:N2}.");
 
         return memberFine;
     }

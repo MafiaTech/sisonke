@@ -6,7 +6,7 @@ using Sisonke.Web.Services.Dto;
 
 namespace Sisonke.Web.Services;
 
-public class ContributionPaymentService(ApplicationDbContext context, MemberAccessService memberAccessService)
+public class ContributionPaymentService(ApplicationDbContext context, MemberAccessService memberAccessService, AuditLogService auditLogService)
 {
     public async Task<List<MemberContribution>> EnsureMonthlyContributionRecordsAsync(
         Guid stokvelId,
@@ -690,6 +690,7 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         });
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(capturedByUserId, stokvel.Id, "ContributionPaymentCaptured", "MemberContribution", memberContribution.Id, $"Contribution payment captured for R {amountPaid:N2}.");
 
         return memberContribution;
     }

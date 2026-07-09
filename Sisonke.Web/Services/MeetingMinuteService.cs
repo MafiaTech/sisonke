@@ -9,7 +9,7 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration, AuditLogService auditLogService)
 {
     private const string StatusDraft = "Draft";
     private const string StatusSubmitted = "Submitted";
@@ -101,6 +101,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
 
         context.MeetingMinutes.Add(minutes);
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(null, stokvel.Id, "MeetingMinutesCreated", "MeetingMinute", minutes.Id, $"Draft minutes created for {meeting.Title ?? meeting.Purpose}.");
 
         return minutes;
     }
@@ -128,6 +129,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
         minutes.UpdatedAt = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(null, minutes.StokvelId, "MeetingMinutesSubmitted", "MeetingMinute", minutes.Id, "Meeting minutes submitted for approval.");
 
         return true;
     }
@@ -164,6 +166,7 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
         minutes.UpdatedAt = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(null, minutes.StokvelId, "MeetingMinutesApproved", "MeetingMinute", minutes.Id, "Meeting minutes approved.");
 
         return true;
     }

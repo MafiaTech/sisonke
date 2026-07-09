@@ -1,0 +1,97 @@
+@page "/stokvel/{StokvelId:guid}/configuration-review"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Dto
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AdminControlsService AdminControlsService
+
+<PageTitle>Configuration Review</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <span class="spinner-border spinner-border-sm me-2"></span>Loading configuration...
+    </div>
+}
+else if (model is null || !model.IsLinkedMember)
+{
+    <div class="sisonke-alert sisonke-alert-gold">@(model?.DenialReason ?? "You are not linked to this stokvel.")</div>
+}
+else
+{
+    <section class="sisonke-hero-card mb-4">
+        <div>
+            <span class="sisonke-badge sisonke-badge-blue">Production Readiness</span>
+            <h1>Configuration Review</h1>
+            <p>Important setup values for @model.StokvelName in one place.</p>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <span class="sisonke-badge sisonke-badge-gray">Read-only review</span>
+                <span class="sisonke-badge @(model.CanManage ? "sisonke-badge-green" : "sisonke-badge-gold")">
+                    @(model.CanManage ? "Existing config pages available" : "View only")
+                </span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
+            @if (model.CanManage)
+            {
+                <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel/{StokvelId}/admin/roles")">Role Management</a>
+            }
+        </div>
+    </section>
+
+    <div class="sisonke-grid sisonke-grid-2">
+        @foreach (var section in model.Sections)
+        {
+            <section class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head">
+                        <div>
+                            <h2>@section.Title</h2>
+                            <p>@(section.Values.Any(value => value.NeedsAttention) ? "Review highlighted values before production use." : "Configured values found.")</p>
+                        </div>
+                        @if (model.CanManage && !string.IsNullOrWhiteSpace(section.EditHref))
+                        {
+                            <a class="sisonke-btn sisonke-btn-outline" href="@section.EditHref">Open</a>
+                        }
+                    </div>
+
+                    <div class="list-group list-group-flush">
+                        @foreach (var value in section.Values)
+                        {
+                            <div class="list-group-item px-0 d-flex justify-content-between gap-3">
+                                <span>@value.Label</span>
+                                <span class="text-end">
+                                    <strong>@value.Value</strong>
+                                    @if (value.NeedsAttention)
+                                    {
+                                        <span class="sisonke-badge sisonke-badge-gold ms-2">Review</span>
+                                    }
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid StokvelId { get; set; }
+
+    private ConfigurationReviewViewModel? model;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        model = await AdminControlsService.GetConfigurationReviewAsync(StokvelId, authState.User);
+        isLoading = false;
+    }
+}
