@@ -6,8 +6,7 @@ using Sisonke.Web.Services.Notifications.Channels;
 namespace Sisonke.Web.Services.Notifications;
 
 public sealed class NotificationDispatchService(
-    IDbContextFactory<ApplicationDbContext> dbFactory,
-    IEnumerable<INotificationChannelSender> senders,
+    IServiceScopeFactory scopeFactory,
     NotificationOptions options,
     ILogger<NotificationDispatchService> logger) : BackgroundService
 {
@@ -33,6 +32,10 @@ public sealed class NotificationDispatchService(
 
     public async Task DispatchPendingAsync(CancellationToken ct)
     {
+        using var scope = scopeFactory.CreateScope();
+        var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+        var senders = scope.ServiceProvider.GetServices<INotificationChannelSender>();
+
         await using var context = await dbFactory.CreateDbContextAsync(ct);
 
         var pending = await context.NotificationMessages

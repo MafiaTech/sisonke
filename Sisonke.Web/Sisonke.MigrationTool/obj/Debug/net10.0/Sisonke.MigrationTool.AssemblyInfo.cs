@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Sisonke.MigrationTool")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+54cc5b6ea25441b6093b20740364d151b6270307")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5180afc0a106edf9cd7d3272071b9ffea07624a7")]
 [assembly: System.Reflection.AssemblyProductAttribute("Sisonke.MigrationTool")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Sisonke.MigrationTool")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

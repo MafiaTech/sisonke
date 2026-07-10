@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
@@ -8,7 +9,8 @@ namespace Sisonke.Web.Services;
 public class MemberService(
     ApplicationDbContext context,
     OperatingRuleService operatingRuleService,
-    StokvelService stokvelService)
+    StokvelService stokvelService,
+    ILogger<MemberService> logger)
 {
     public const int SeniorDependentAgeThreshold = 75;
     public const int MaxSeniorDependents = 2;
@@ -395,10 +397,131 @@ public class MemberService(
 
     public async Task<List<MemberDependent>> GetDependentsByMemberIdAsync(Guid memberId)
     {
-        return await context.MemberDependents
-            .Where(dependent => dependent.MemberId == memberId)
-            .OrderBy(dependent => dependent.FullName)
-            .ToListAsync();
+        try
+        {
+            return await context.MemberDependents
+                .Where(dependent => dependent.MemberId == memberId)
+                .OrderBy(dependent => dependent.FullName)
+                .ToListAsync();
+        }
+        catch (InvalidCastException ex)
+        {
+            logger.LogError(ex, "Failed to materialize dependents for member {MemberId}. Falling back to defensive dependent loader.", memberId);
+            return await GetDependentsByMemberIdDefensivelyAsync(memberId);
+        }
+    }
+
+    private async Task<List<MemberDependent>> GetDependentsByMemberIdDefensivelyAsync(Guid memberId)
+    {
+        var dependents = new List<MemberDependent>();
+        var connection = context.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT Id, MemberId, FullName, Relationship, DateOfBirth, IdNumber, CellphoneNumber,
+                       IsActive, CoverageStatus, IsDeceased, DeceasedDate, DeathReportedAt, CreatedAt
+                FROM dbo.MemberDependents
+                WHERE MemberId = @memberId
+                ORDER BY FullName
+                """;
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@memberId";
+            parameter.DbType = DbType.Guid;
+            parameter.Value = memberId;
+            command.Parameters.Add(parameter);
+
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                try
+                {
+                    dependents.Add(new MemberDependent
+                    {
+                        Id = reader.GetGuid(0),
+                        MemberId = reader.GetGuid(1),
+                        FullName = ReadString(reader, 2) ?? string.Empty,
+                        Relationship = ReadString(reader, 3) ?? string.Empty,
+                        DateOfBirth = ReadNullableDateTime(reader, 4),
+                        IdNumber = ReadString(reader, 5),
+                        CellphoneNumber = ReadString(reader, 6),
+                        IsActive = ReadBoolean(reader, 7),
+                        CoverageStatus = ReadCoverageStatus(reader.GetValue(8)),
+                        IsDeceased = ReadBoolean(reader, 9),
+                        DeceasedDate = ReadNullableDateTime(reader, 10),
+                        DeathReportedAt = ReadNullableDateTime(reader, 11),
+                        CreatedAt = ReadNullableDateTime(reader, 12) ?? DateTime.UtcNow
+                    });
+                }
+                catch (Exception rowEx) when (rowEx is InvalidCastException or FormatException or ArgumentException)
+                {
+                    logger.LogWarning(rowEx, "Skipped one malformed dependent row for member {MemberId}.", memberId);
+                }
+            }
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+
+        return dependents;
+    }
+
+    private static string? ReadString(IDataRecord reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : Convert.ToString(reader.GetValue(ordinal));
+
+    private static DateTime? ReadNullableDateTime(IDataRecord reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : Convert.ToDateTime(reader.GetValue(ordinal));
+
+    private static bool ReadBoolean(IDataRecord reader, int ordinal)
+    {
+        if (reader.IsDBNull(ordinal))
+        {
+            return false;
+        }
+
+        var value = reader.GetValue(ordinal);
+        return value switch
+        {
+            bool boolean => boolean,
+            int number => number != 0,
+            string text => bool.TryParse(text, out var parsed) ? parsed : text == "1",
+            _ => Convert.ToBoolean(value)
+        };
+    }
+
+    private static DependentCoverageStatus ReadCoverageStatus(object value)
+    {
+        if (value is null or DBNull)
+        {
+            return DependentCoverageStatus.Active;
+        }
+
+        if (value is int intValue && Enum.IsDefined(typeof(DependentCoverageStatus), intValue))
+        {
+            return (DependentCoverageStatus)intValue;
+        }
+
+        var text = Convert.ToString(value)?.Trim();
+        if (int.TryParse(text, out var parsedNumber) &&
+            Enum.IsDefined(typeof(DependentCoverageStatus), parsedNumber))
+        {
+            return (DependentCoverageStatus)parsedNumber;
+        }
+
+        return Enum.TryParse<DependentCoverageStatus>(text, ignoreCase: true, out var parsedStatus)
+            ? parsedStatus
+            : DependentCoverageStatus.Active;
     }
 
     public async Task<int> GetActiveDependentCountByStokvelIdAsync(Guid stokvelId)

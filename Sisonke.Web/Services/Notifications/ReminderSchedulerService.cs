@@ -4,8 +4,7 @@ using Sisonke.Web.Data;
 namespace Sisonke.Web.Services.Notifications;
 
 public sealed class ReminderSchedulerService(
-    IDbContextFactory<ApplicationDbContext> dbFactory,
-    IReminderSource reminderSource,
+    IServiceScopeFactory scopeFactory,
     NotificationOptions options,
     ILogger<ReminderSchedulerService> logger) : BackgroundService
 {
@@ -17,6 +16,10 @@ public sealed class ReminderSchedulerService(
         {
             try
             {
+                using var scope = scopeFactory.CreateScope();
+                var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+                var reminderSource = scope.ServiceProvider.GetRequiredService<IReminderSource>();
+
                 await using var context = await dbFactory.CreateDbContextAsync(stoppingToken);
                 await reminderSource.EnqueuePaymentRemindersAsync(context, stoppingToken);
                 await reminderSource.EnqueueMeetingRemindersAsync(context, stoppingToken);
