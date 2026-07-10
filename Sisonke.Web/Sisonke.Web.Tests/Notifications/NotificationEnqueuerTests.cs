@@ -16,11 +16,12 @@ public class NotificationEnqueuerTests
     [InlineData(NotificationType.ChairpersonRejected)]
     [InlineData(NotificationType.PaymentReminder)]
     [InlineData(NotificationType.MeetingReminder)]
+    [InlineData(NotificationType.MinutesPublished)]
     public async Task Enqueue_CreatesEmailRow_WithExpectedDedupeKey(NotificationType type)
     {
         using var db = new SqliteTestDatabase();
         await using var context = db.CreateContext();
-        var member = TestData.CreateMember(context);
+        var member = TestData.CreateMember(context, webPushEnabled: false);
         await context.SaveChangesAsync();
 
         var enqueuer = new NotificationEnqueuer();
@@ -42,7 +43,7 @@ public class NotificationEnqueuerTests
     {
         using var db = new SqliteTestDatabase();
         await using var context = db.CreateContext();
-        var member = TestData.CreateMember(context);
+        var member = TestData.CreateMember(context, webPushEnabled: false);
         await context.SaveChangesAsync();
 
         var enqueuer = new NotificationEnqueuer();
@@ -86,11 +87,29 @@ public class NotificationEnqueuerTests
     }
 
     [Fact]
-    public async Task Enqueue_MemberWithEmailDisabled_EnqueuesNothing()
+    public async Task Enqueue_MemberWithEmailDisabled_DoesNotEnqueueEmailRow()
     {
         using var db = new SqliteTestDatabase();
         await using var context = db.CreateContext();
-        var member = TestData.CreateMember(context, emailEnabled: false);
+        var member = TestData.CreateMember(context, emailEnabled: false, webPushEnabled: true);
+        await context.SaveChangesAsync();
+
+        var enqueuer = new NotificationEnqueuer();
+        await enqueuer.EnqueueAsync(
+            context, NotificationType.TaskAssigned, member.Id, stokvelId: null, EntityType, EntityId,
+            subject: "Subject", body: "Body");
+        await context.SaveChangesAsync();
+
+        var messages = await context.NotificationMessages.ToListAsync();
+        Assert.DoesNotContain(messages, message => message.Channel == NotificationChannel.Email);
+    }
+
+    [Fact]
+    public async Task Enqueue_MemberWithBothChannelsDisabled_EnqueuesNothing()
+    {
+        using var db = new SqliteTestDatabase();
+        await using var context = db.CreateContext();
+        var member = TestData.CreateMember(context, emailEnabled: false, webPushEnabled: false);
         await context.SaveChangesAsync();
 
         var enqueuer = new NotificationEnqueuer();
@@ -100,5 +119,26 @@ public class NotificationEnqueuerTests
         await context.SaveChangesAsync();
 
         Assert.Equal(0, await context.NotificationMessages.CountAsync());
+    }
+
+    [Fact]
+    public async Task Enqueue_MemberWithBothChannelsEnabled_EnqueuesOneRowPerChannel()
+    {
+        using var db = new SqliteTestDatabase();
+        await using var context = db.CreateContext();
+        var member = TestData.CreateMember(context, emailEnabled: true, webPushEnabled: true);
+        await context.SaveChangesAsync();
+
+        var enqueuer = new NotificationEnqueuer();
+        await enqueuer.EnqueueAsync(
+            context, NotificationType.TaskAssigned, member.Id, stokvelId: null, EntityType, EntityId,
+            subject: "Subject", body: "Body");
+        await context.SaveChangesAsync();
+
+        var messages = await context.NotificationMessages.ToListAsync();
+        Assert.Equal(2, messages.Count);
+        Assert.Contains(messages, message => message.Channel == NotificationChannel.Email);
+        Assert.Contains(messages, message => message.Channel == NotificationChannel.WebPush);
+        Assert.Equal(2, messages.Select(message => message.DedupeKey).Distinct().Count());
     }
 }

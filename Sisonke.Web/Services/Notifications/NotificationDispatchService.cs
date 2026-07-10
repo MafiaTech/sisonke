@@ -62,6 +62,11 @@ public sealed class NotificationDispatchService(
                 message.Status = NotificationStatus.Cancelled;
                 message.LastError = ex.Message;
             }
+            catch (PushSubscriptionGoneException ex)
+            {
+                message.Status = NotificationStatus.Cancelled;
+                message.LastError = ex.Message;
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 message.AttemptCount++;

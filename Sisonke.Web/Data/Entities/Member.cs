@@ -29,6 +29,8 @@ public class Member
 
     public bool EmailEnabled { get; set; } = true;
 
+    public bool WebPushEnabled { get; set; } = true;
+
     [MaxLength(30)]
     public string? IdNumber { get; set; }
 

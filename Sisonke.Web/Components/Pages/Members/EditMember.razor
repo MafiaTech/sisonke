@@ -133,6 +133,26 @@ else
 
             <div class="sisonke-card mb-4">
                 <div class="sisonke-card-body">
+                    <p class="form-section-title">Notification Preferences</p>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="email-enabled" class="form-check-input" @bind-Value="editMember.EmailEnabled" />
+                                <label class="form-check-label fw-semibold" for="email-enabled">Email notifications</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="webpush-enabled" class="form-check-input" @bind-Value="editMember.WebPushEnabled" />
+                                <label class="form-check-label fw-semibold" for="webpush-enabled">Browser push notifications</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sisonke-card mb-4">
+                <div class="sisonke-card-body">
                     <p class="form-section-title">Cooling Period</p>
                     <div class="row g-3">
                         <div class="col-12">

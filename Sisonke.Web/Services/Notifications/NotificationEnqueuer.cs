@@ -25,12 +25,39 @@ public sealed class NotificationEnqueuer
         var recipient = await context.Members
             .SingleOrDefaultAsync(member => member.Id == recipientMemberId, ct);
 
-        if (recipient is null || !recipient.EmailEnabled)
+        if (recipient is null)
         {
             return;
         }
 
-        var dedupeKey = BuildDedupeKey(type, NotificationChannel.Email, entityType, entityId, recipientMemberId);
+        if (recipient.EmailEnabled)
+        {
+            await EnqueueForChannelAsync(
+                context, type, NotificationChannel.Email, recipientMemberId, stokvelId,
+                entityType, entityId, subject, body, ct);
+        }
+
+        if (recipient.WebPushEnabled)
+        {
+            await EnqueueForChannelAsync(
+                context, type, NotificationChannel.WebPush, recipientMemberId, stokvelId,
+                entityType, entityId, subject, body, ct);
+        }
+    }
+
+    private static async Task EnqueueForChannelAsync(
+        ApplicationDbContext context,
+        NotificationType type,
+        NotificationChannel channel,
+        Guid recipientMemberId,
+        Guid? stokvelId,
+        string entityType,
+        Guid entityId,
+        string subject,
+        string body,
+        CancellationToken ct)
+    {
+        var dedupeKey = BuildDedupeKey(type, channel, entityType, entityId, recipientMemberId);
 
         var alreadyEnqueued = await context.NotificationMessages
             .AnyAsync(message => message.DedupeKey == dedupeKey, ct);
@@ -58,7 +85,7 @@ public sealed class NotificationEnqueuer
             RecipientMemberId = recipientMemberId,
             EntityType = entityType,
             EntityId = entityId,
-            Channel = NotificationChannel.Email,
+            Channel = channel,
             Type = type,
             DedupeKey = dedupeKey,
             Subject = subject,
@@ -82,6 +109,11 @@ public sealed class NotificationEnqueuer
         ApplicationDbContext context, Guid recipientMemberId, Guid? stokvelId,
         string entityType, Guid entityId, string subject, string body, CancellationToken ct = default) =>
         EnqueueAsync(context, NotificationType.ChairpersonRejected, recipientMemberId, stokvelId, entityType, entityId, subject, body, ct);
+
+    public Task EnqueueMinutesPublishedAsync(
+        ApplicationDbContext context, Guid recipientMemberId, Guid? stokvelId,
+        string entityType, Guid entityId, string subject, string body, CancellationToken ct = default) =>
+        EnqueueAsync(context, NotificationType.MinutesPublished, recipientMemberId, stokvelId, entityType, entityId, subject, body, ct);
 
     public static string BuildDedupeKey(
         NotificationType type, NotificationChannel channel, string entityType, Guid entityId, Guid recipientMemberId) =>

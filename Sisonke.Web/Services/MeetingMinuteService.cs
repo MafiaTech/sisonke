@@ -6,10 +6,16 @@ using Microsoft.Extensions.Configuration;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
+using Sisonke.Web.Services.Notifications;
 
 namespace Sisonke.Web.Services;
 
-public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration, AuditLogService auditLogService)
+public class MeetingMinuteService(
+    ApplicationDbContext context,
+    IHttpClientFactory httpClientFactory,
+    IConfiguration configuration,
+    AuditLogService auditLogService,
+    NotificationEnqueuer notificationEnqueuer)
 {
     private const string StatusDraft = "Draft";
     private const string StatusSubmitted = "Submitted";
@@ -208,6 +214,24 @@ public class MeetingMinuteService(ApplicationDbContext context, IHttpClientFacto
         minutes.ApprovedAt = now;
         minutes.UpdatedByMemberId = approvedByMemberId;
         minutes.UpdatedAt = now;
+
+        var stokvelTenantId = await context.Stokvels
+            .Where(stokvel => stokvel.Id == minutes.StokvelId)
+            .Select(stokvel => stokvel.TenantId)
+            .SingleOrDefaultAsync();
+
+        var visibleMembers = await context.Members
+            .Where(member => member.TenantId == stokvelTenantId && member.Status == MemberStatus.Active)
+            .ToListAsync();
+
+        foreach (var member in visibleMembers)
+        {
+            await notificationEnqueuer.EnqueueMinutesPublishedAsync(
+                context, member.Id, minutes.StokvelId,
+                nameof(Meeting), minutes.MeetingId,
+                $"Minutes published — {minutes.Title}",
+                $"The minutes for {minutes.Title} have been approved and published. View them here: /meeting-minutes/{minutes.MeetingId}");
+        }
 
         await context.SaveChangesAsync();
 

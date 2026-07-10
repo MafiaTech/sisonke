@@ -77,6 +77,25 @@ public class NotificationDispatchServiceTests
         Assert.Equal(0, message.AttemptCount);
     }
 
+    [Fact]
+    public async Task DispatchPending_PushSubscriptionGone_MarksMessageCancelled()
+    {
+        using var db = new SqliteTestDatabase();
+        var messageId = await SeedPendingMessageAsync(db, NotificationChannel.WebPush);
+
+        var sender = new FakeChannelSender(
+            NotificationChannel.WebPush,
+            _ => throw new PushSubscriptionGoneException("No live push subscriptions left."));
+        var dispatcher = CreateDispatcher(db, [sender], new NotificationOptions());
+
+        await dispatcher.DispatchPendingAsync(CancellationToken.None);
+
+        await using var context = db.CreateContext();
+        var message = await context.NotificationMessages.SingleAsync(m => m.Id == messageId);
+        Assert.Equal(NotificationStatus.Cancelled, message.Status);
+        Assert.Equal(0, message.AttemptCount);
+    }
+
     private static async Task<Guid> SeedPendingMessageAsync(SqliteTestDatabase db, NotificationChannel channel)
     {
         await using var context = db.CreateContext();
@@ -111,13 +130,5 @@ public class NotificationDispatchServiceTests
         public NotificationChannel Channel { get; } = channel;
 
         public Task SendAsync(NotificationMessage message, CancellationToken ct) => behavior(message);
-    }
-
-    private sealed class TestDbContextFactory(SqliteTestDatabase db) : IDbContextFactory<ApplicationDbContext>
-    {
-        public ApplicationDbContext CreateDbContext() => db.CreateContext();
-
-        public Task<ApplicationDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(db.CreateContext());
     }
 }

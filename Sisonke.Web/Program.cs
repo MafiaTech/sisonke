@@ -14,6 +14,7 @@ using System.Security.Claims;
 using Sisonke.Web.Components;
 using Sisonke.Web.Components.Account;
 using Sisonke.Web.Data;
+using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Seed;
 using Sisonke.Web.Helpers;
 using Sisonke.Web.Services;
@@ -35,6 +36,7 @@ var featureFlags = builder.Configuration.GetSection("Features").Get<FeatureFlags
 var acsEmailOptions = builder.Configuration.GetSection("AcsEmail").Get<AcsEmailOptions>() ?? new AcsEmailOptions();
 var whatsAppOptions = builder.Configuration.GetSection("WhatsApp").Get<WhatsAppOptions>() ?? new WhatsAppOptions();
 var notificationOptions = builder.Configuration.GetSection("Notifications").Get<NotificationOptions>() ?? new NotificationOptions();
+var webPushOptions = builder.Configuration.GetSection("WebPush").Get<WebPushOptions>() ?? new WebPushOptions();
 builder.Services.AddSingleton(authSettings);
 builder.Services.AddSingleton(appSettings);
 builder.Services.AddSingleton(emailSettings);
@@ -42,6 +44,7 @@ builder.Services.AddSingleton(featureFlags);
 builder.Services.AddSingleton(acsEmailOptions);
 builder.Services.AddSingleton(whatsAppOptions);
 builder.Services.AddSingleton(notificationOptions);
+builder.Services.AddSingleton(webPushOptions);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -385,6 +388,7 @@ builder.Services.AddScoped<DashboardQueryService>();
 builder.Services.AddScoped<NotificationEnqueuer>();
 builder.Services.AddScoped<INotificationChannelSender, AcsEmailSender>();
 builder.Services.AddScoped<INotificationChannelSender, WhatsAppChannelSender>();
+builder.Services.AddScoped<INotificationChannelSender, WebPushSender>();
 builder.Services.AddScoped<IReminderSource, SisonkeReminderSource>();
 builder.Services.AddHostedService<NotificationDispatchService>();
 builder.Services.AddHostedService<ReminderSchedulerService>();
@@ -606,6 +610,11 @@ app.MapPost("/Account/RegisterSubmit", RegistrationSubmitEndpoint.HandleAsync)
     .DisableAntiforgery()
     .WithName("RegisterSubmit");
 
+app.MapPost("/api/push-subscriptions", PushSubscriptionEndpoint.HandleAsync)
+    .RequireAuthorization()
+    .DisableAntiforgery()
+    .WithName("RegisterPushSubscription");
+
 app.MapGet("/Auth/Login", (
     HttpContext context,
     [FromQuery] string? returnUrl) =>
@@ -751,6 +760,58 @@ static async Task SeedAdminUserAsync(IServiceProvider serviceProvider, IConfigur
         }
     }
 }
+
+internal static class PushSubscriptionEndpoint
+{
+    public static async Task<IResult> HandleAsync(
+        [FromBody] PushSubscriptionRequest request,
+        ClaimsPrincipal user,
+        UserManager<ApplicationUser> userManager,
+        ApplicationDbContext context,
+        CancellationToken ct)
+    {
+        var userId = userManager.GetUserId(user);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Endpoint) ||
+            string.IsNullOrWhiteSpace(request.P256dh) ||
+            string.IsNullOrWhiteSpace(request.Auth))
+        {
+            return Results.BadRequest();
+        }
+
+        var existing = await context.PushSubscriptions
+            .SingleOrDefaultAsync(subscription => subscription.Endpoint == request.Endpoint, ct);
+
+        if (existing is not null)
+        {
+            existing.UserId = userId;
+            existing.P256dh = request.P256dh;
+            existing.Auth = request.Auth;
+        }
+        else
+        {
+            context.PushSubscriptions.Add(new PushSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Endpoint = request.Endpoint,
+                P256dh = request.P256dh,
+                Auth = request.Auth,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        await context.SaveChangesAsync(ct);
+
+        return Results.NoContent();
+    }
+}
+
+internal sealed record PushSubscriptionRequest(string Endpoint, string P256dh, string Auth);
 
 internal static class RegistrationSubmitEndpoint
 {

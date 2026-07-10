@@ -20,6 +20,8 @@
 @inject ContributionPaymentService ContributionPaymentService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
+@inject IJSRuntime JSRuntime
+@inject Sisonke.Web.Services.Notifications.WebPushOptions WebPushOptions
 
 <PageTitle>Member Profile</PageTitle>
 
@@ -279,6 +281,26 @@ else
                 </div>
             </div>
         </div>
+
+        @if (isOwnMemberProfile)
+        {
+        <!-- Notifications -->
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body p-4">
+                    <div class="card-section-title">Notifications</div>
+                    <p class="text-muted small">Enable browser push notifications on this device to get alerts even when Sisonke isn't open.</p>
+                    <button class="btn btn-sm btn-primary" type="button" @onclick="EnableBrowserNotificationsAsync" disabled="@isEnablingBrowserNotifications">
+                        <i class="bi bi-bell me-1"></i>Enable Browser Notifications
+                    </button>
+                    @if (!string.IsNullOrWhiteSpace(browserNotificationStatus))
+                    {
+                        <p class="text-muted small mt-2 mb-0">@browserNotificationStatus</p>
+                    }
+                </div>
+            </div>
+        </div>
+        }
 
         <!-- Membership details -->
         <div class="col-12 col-lg-6">
@@ -1083,6 +1105,8 @@ else
     private bool canManagePayments;
     private bool canManageMemberStatus;
     private bool isOwnMemberProfile;
+    private bool isEnablingBrowserNotifications;
+    private string? browserNotificationStatus;
     private bool canViewFines;
     private bool canViewFinancials;
     private bool canViewProfile;
@@ -1155,6 +1179,35 @@ else
         }
 
         isLoading = false;
+    }
+
+    private async Task EnableBrowserNotificationsAsync()
+    {
+        isEnablingBrowserNotifications = true;
+        browserNotificationStatus = null;
+
+        try
+        {
+            await using var module = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "/js/push-notifications.js");
+            var result = await module.InvokeAsync<string>("subscribe", WebPushOptions.PublicKey);
+
+            browserNotificationStatus = result switch
+            {
+                "subscribed" => "Browser notifications are enabled on this device.",
+                "denied" => "Notification permission was denied in the browser.",
+                "unsupported" => "This browser does not support push notifications.",
+                _ => "Could not enable browser notifications. Please try again."
+            };
+        }
+        catch
+        {
+            browserNotificationStatus = "Could not enable browser notifications. Please try again.";
+        }
+        finally
+        {
+            isEnablingBrowserNotifications = false;
+        }
     }
 
     private static string GetInitials(string fullName)

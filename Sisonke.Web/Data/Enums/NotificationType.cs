@@ -6,5 +6,6 @@ public enum NotificationType
     ChairpersonApproved = 2,
     ChairpersonRejected = 3,
     PaymentReminder = 4,
-    MeetingReminder = 5
+    MeetingReminder = 5,
+    MinutesPublished = 6
 }

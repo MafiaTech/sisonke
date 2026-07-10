@@ -29,6 +29,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ClaimPayoutAudit> ClaimPayoutAudits => Set<ClaimPayoutAudit>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<NotificationMessage> NotificationMessages => Set<NotificationMessage>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<MeetingAgendaItem> MeetingAgendaItems => Set<MeetingAgendaItem>();
     public DbSet<MeetingAttendance> MeetingAttendances => Set<MeetingAttendance>();
@@ -166,6 +167,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<Member>()
             .Property(m => m.EmailEnabled)
+            .HasDefaultValue(true);
+
+        builder.Entity<Member>()
+            .Property(m => m.WebPushEnabled)
             .HasDefaultValue(true);
 
         builder.Entity<MemberWarning>()
@@ -406,6 +411,23 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<NotificationMessage>()
             .HasIndex(n => new { n.Status, n.CreatedAt });
+
+        builder.Entity<PushSubscription>()
+            .Property(p => p.UserId)
+            .HasMaxLength(450)
+            .IsRequired();
+
+        builder.Entity<PushSubscription>()
+            .Property(p => p.Endpoint)
+            .HasMaxLength(500)
+            .IsRequired();
+
+        builder.Entity<PushSubscription>()
+            .HasIndex(p => p.Endpoint)
+            .IsUnique();
+
+        builder.Entity<PushSubscription>()
+            .HasIndex(p => p.UserId);
 
         builder.Entity<Meeting>()
             .HasOne(m => m.Tenant)

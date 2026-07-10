@@ -5,7 +5,11 @@ namespace Sisonke.Web.Tests.TestSupport;
 
 public static class TestData
 {
-    public static Member CreateMember(ApplicationDbContext context, bool emailEnabled = true)
+    public static Member CreateMember(
+        ApplicationDbContext context,
+        bool emailEnabled = true,
+        bool webPushEnabled = true,
+        string? applicationUserId = null)
     {
         var tenant = new Tenant
         {
@@ -19,11 +23,13 @@ public static class TestData
         {
             Id = Guid.NewGuid(),
             TenantId = tenant.Id,
+            ApplicationUserId = applicationUserId,
             MemberNumber = "M001",
             FullName = "Test Member",
             CellphoneNumber = "0821234567",
             EmailAddress = "member@example.com",
             EmailEnabled = emailEnabled,
+            WebPushEnabled = webPushEnabled,
             JoiningDate = DateTime.UtcNow
         };
         context.Members.Add(member);

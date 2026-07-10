@@ -21,7 +21,8 @@
     <link rel="icon" href="favicon.ico" sizes="48x48" />
     <link rel="alternate icon" type="image/png" href="icon-192.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-    <meta name="theme-color" content="#062F66" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#0A2A5A" />
     <HeadOutlet />
 </head>
 
@@ -30,6 +31,13 @@
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["Components/Account/Shared/PasskeySubmit.razor.js"]" type="module"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => { });
+            });
+        }
+    </script>
 </body>
 
 </html>
