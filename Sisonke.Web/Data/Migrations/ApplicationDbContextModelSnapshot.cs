@@ -1327,6 +1327,11 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<bool>("EmailEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<DateTime?>("ExpelledAt")
                         .HasColumnType("datetime2");
 
@@ -1447,13 +1452,13 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<int>("CoverageStatus")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(2);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("datetime2");
@@ -2228,6 +2233,76 @@ namespace Sisonke.Web.Data.Migrations
                     b.ToTable("NextOfKinRecords");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.NotificationMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("RecipientMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DedupeKey")
+                        .IsUnique();
+
+                    b.HasIndex("RecipientMemberId");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("NotificationMessages");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Payment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2723,19 +2798,19 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<DateTime?>("SecretaryReviewedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SecretaryReviewedByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<bool?>("SecretaryRecommendedApproval")
                         .HasColumnType("bit");
 
                     b.Property<string>("SecretaryReviewNotes")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("SecretaryReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SecretaryReviewedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<Guid>("StokvelId")
                         .HasColumnType("uniqueidentifier");
@@ -4283,6 +4358,17 @@ namespace Sisonke.Web.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Member");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.NotificationMessage", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "RecipientMember")
+                        .WithMany()
+                        .HasForeignKey("RecipientMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RecipientMember");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Payment", b =>

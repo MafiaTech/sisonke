@@ -22,9 +22,12 @@
   <ItemGroup>
     <Compile Remove="Sisonke.MigrationTool\**\*.cs" />
     <Content Remove="Sisonke.MigrationTool\**" />
+    <Compile Remove="Sisonke.Web.Tests\**\*.cs" />
+    <Content Remove="Sisonke.Web.Tests\**" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Communication.Email" Version="1.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.8" />

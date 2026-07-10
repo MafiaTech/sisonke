@@ -27,6 +27,8 @@ public class Member
     [MaxLength(150)]
     public string? EmailAddress { get; set; }
 
+    public bool EmailEnabled { get; set; } = true;
+
     [MaxLength(30)]
     public string? IdNumber { get; set; }
 

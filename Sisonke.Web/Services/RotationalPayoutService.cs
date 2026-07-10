@@ -2,13 +2,15 @@ using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
+using Sisonke.Web.Services.Notifications;
 
 namespace Sisonke.Web.Services;
 
 public sealed class RotationalPayoutService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     ILogger<RotationalPayoutService> logger,
-    AuditLogService auditLogService)
+    AuditLogService auditLogService,
+    NotificationEnqueuer notificationEnqueuer)
 {
     public async Task<RotationalPayout?> GetCurrentPayoutAsync(Guid stokvelId)
     {
@@ -78,6 +80,11 @@ public sealed class RotationalPayoutService(
             .FirstOrDefaultAsync(payout => payout.CycleId == cycleId && payout.IsActive);
         if (existing is not null) return PayoutOperationResult.Succeeded(existing);
 
+        var stokvelTenantId = await context.Stokvels
+            .Where(stokvel => stokvel.Id == cycle.StokvelId)
+            .Select(stokvel => stokvel.TenantId)
+            .SingleOrDefaultAsync();
+
         var now = DateTime.UtcNow;
         var payout = new RotationalPayout
         {
@@ -96,6 +103,21 @@ public sealed class RotationalPayoutService(
         context.RotationalPayouts.Add(payout);
         cycle.Status = RotationalCycleStatus.PayoutPending;
         cycle.UpdatedAt = now; cycle.UpdatedBy = currentUserId;
+
+        var secretaries = await context.Members
+            .Where(member => member.TenantId == stokvelTenantId &&
+                member.DefaultRole == SisonkeRole.Secretary &&
+                member.Status == MemberStatus.Active)
+            .ToListAsync();
+        foreach (var secretary in secretaries)
+        {
+            await notificationEnqueuer.EnqueueTaskAssignedAsync(
+                context, secretary.Id, cycle.StokvelId,
+                nameof(RotationalPayout), payout.Id,
+                "A payout is awaiting your review",
+                $"A rotational payout for {cycle.CycleName} is awaiting Secretary review.");
+        }
+
         await context.SaveChangesAsync();
         await auditLogService.RecordAsync(
             currentUserId,
@@ -261,6 +283,24 @@ public sealed class RotationalPayoutService(
 
         payout.UpdatedAt = now;
         payout.UpdatedBy = currentUserId;
+
+        if (decision == RotationalPayoutDecision.Approve)
+        {
+            await notificationEnqueuer.EnqueueChairpersonApprovedAsync(
+                context, payout.PayoutMemberId, payout.StokvelId,
+                nameof(RotationalPayout), payout.Id,
+                "Your payout was approved",
+                $"Your rotational payout of {payout.PayoutAmount:C} has been approved by the Chairperson.");
+        }
+        else if (decision == RotationalPayoutDecision.Reject)
+        {
+            await notificationEnqueuer.EnqueueChairpersonRejectedAsync(
+                context, payout.PayoutMemberId, payout.StokvelId,
+                nameof(RotationalPayout), payout.Id,
+                "Your payout was rejected",
+                $"Your rotational payout of {payout.PayoutAmount:C} was rejected by the Chairperson.{(trimmedNotes is null ? string.Empty : $" Reason: {trimmedNotes}")}");
+        }
+
         await context.SaveChangesAsync();
         await auditLogService.RecordAsync(
             currentUserId,

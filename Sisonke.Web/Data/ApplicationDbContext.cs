@@ -28,6 +28,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ContributionPaymentAudit> ContributionPaymentAudits => Set<ContributionPaymentAudit>();
     public DbSet<ClaimPayoutAudit> ClaimPayoutAudits => Set<ClaimPayoutAudit>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
+    public DbSet<NotificationMessage> NotificationMessages => Set<NotificationMessage>();
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<MeetingAgendaItem> MeetingAgendaItems => Set<MeetingAgendaItem>();
     public DbSet<MeetingAttendance> MeetingAttendances => Set<MeetingAttendance>();
@@ -162,6 +163,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<Member>()
             .HasIndex(m => m.ApplicationUserId);
+
+        builder.Entity<Member>()
+            .Property(m => m.EmailEnabled)
+            .HasDefaultValue(true);
 
         builder.Entity<MemberWarning>()
             .HasOne(w => w.Member)
@@ -374,6 +379,33 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<AuditLogEntry>()
             .HasIndex(a => new { a.UserId, a.TimestampUtc });
+
+        builder.Entity<NotificationMessage>()
+            .HasOne(n => n.RecipientMember)
+            .WithMany()
+            .HasForeignKey(n => n.RecipientMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<NotificationMessage>()
+            .Property(n => n.EntityType)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Entity<NotificationMessage>()
+            .Property(n => n.DedupeKey)
+            .HasMaxLength(200)
+            .IsRequired();
+
+        builder.Entity<NotificationMessage>()
+            .Property(n => n.Body)
+            .IsRequired();
+
+        builder.Entity<NotificationMessage>()
+            .HasIndex(n => n.DedupeKey)
+            .IsUnique();
+
+        builder.Entity<NotificationMessage>()
+            .HasIndex(n => new { n.Status, n.CreatedAt });
 
         builder.Entity<Meeting>()
             .HasOne(m => m.Tenant)

@@ -17,6 +17,8 @@ using Sisonke.Web.Data;
 using Sisonke.Web.Data.Seed;
 using Sisonke.Web.Helpers;
 using Sisonke.Web.Services;
+using Sisonke.Web.Services.Notifications;
+using Sisonke.Web.Services.Notifications.Channels;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,10 +32,16 @@ authSettings.SessionTimeoutMinutes = builder.Configuration.GetValue("Auth:Sessio
 var appSettings = builder.Configuration.GetSection("App").Get<AppSettings>() ?? new AppSettings();
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings();
 var featureFlags = builder.Configuration.GetSection("Features").Get<FeatureFlags>() ?? new FeatureFlags();
+var acsEmailOptions = builder.Configuration.GetSection("AcsEmail").Get<AcsEmailOptions>() ?? new AcsEmailOptions();
+var whatsAppOptions = builder.Configuration.GetSection("WhatsApp").Get<WhatsAppOptions>() ?? new WhatsAppOptions();
+var notificationOptions = builder.Configuration.GetSection("Notifications").Get<NotificationOptions>() ?? new NotificationOptions();
 builder.Services.AddSingleton(authSettings);
 builder.Services.AddSingleton(appSettings);
 builder.Services.AddSingleton(emailSettings);
 builder.Services.AddSingleton(featureFlags);
+builder.Services.AddSingleton(acsEmailOptions);
+builder.Services.AddSingleton(whatsAppOptions);
+builder.Services.AddSingleton(notificationOptions);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -374,6 +382,12 @@ builder.Services.AddScoped<RotationalTaskService>();
 builder.Services.AddScoped<StokvelBankingDetailsService>();
 builder.Services.AddScoped<LoansWalletService>();
 builder.Services.AddScoped<DashboardQueryService>();
+builder.Services.AddScoped<NotificationEnqueuer>();
+builder.Services.AddScoped<INotificationChannelSender, AcsEmailSender>();
+builder.Services.AddScoped<INotificationChannelSender, WhatsAppChannelSender>();
+builder.Services.AddScoped<IReminderSource, SisonkeReminderSource>();
+builder.Services.AddHostedService<NotificationDispatchService>();
+builder.Services.AddHostedService<ReminderSchedulerService>();
 builder.Services.AddHttpClient();
 
 var app = builder.Build();

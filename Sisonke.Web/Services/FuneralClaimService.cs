@@ -4,6 +4,7 @@ using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
 using Sisonke.Web.Services.Dto;
+using Sisonke.Web.Services.Notifications;
 
 namespace Sisonke.Web.Services;
 
@@ -12,7 +13,8 @@ public class FuneralClaimService(
     OperatingRuleService operatingRuleService,
     StokvelOperatingRulesService stokvelOperatingRulesService,
     AuditLogService auditLogService,
-    IWebHostEnvironment webHostEnvironment)
+    IWebHostEnvironment webHostEnvironment,
+    NotificationEnqueuer notificationEnqueuer)
 {
     private const long MaxClaimDocumentUploadSize = 10 * 1024 * 1024;
     private static readonly string[] AllowedClaimDocumentExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"];
@@ -555,10 +557,25 @@ public class FuneralClaimService(
         claim.SubmittedAt = DateTime.UtcNow;
         claim.SubmittedByName ??= "Member";
 
+        var claimStokvelId = await GetClaimStokvelIdAsync(claim);
+        var secretaries = await context.Members
+            .Where(member => member.TenantId == claim.TenantId &&
+                member.DefaultRole == SisonkeRole.Secretary &&
+                member.Status == MemberStatus.Active)
+            .ToListAsync();
+        foreach (var secretary in secretaries)
+        {
+            await notificationEnqueuer.EnqueueTaskAssignedAsync(
+                context, secretary.Id, claimStokvelId,
+                nameof(FuneralClaim), claim.Id,
+                "A claim is awaiting your review",
+                $"Claim {claim.ClaimReference ?? claim.Id.ToString("N")[..8]} has been submitted and is awaiting Secretary review.");
+        }
+
         await context.SaveChangesAsync();
         await auditLogService.RecordAsync(
             submittedByUserId ?? claim.Member.ApplicationUserId,
-            await GetClaimStokvelIdAsync(claim),
+            claimStokvelId,
             "ClaimSubmitted",
             nameof(FuneralClaim),
             claim.Id,
@@ -737,10 +754,17 @@ public class FuneralClaimService(
         claim.ChairpersonDecisionByName = approver.FullName;
         claim.ChairpersonDecisionNotes = notes;
 
+        var claimStokvelId = await GetClaimStokvelIdAsync(claim);
+        await notificationEnqueuer.EnqueueChairpersonApprovedAsync(
+            context, claim.MemberId, claimStokvelId,
+            nameof(FuneralClaim), claim.Id,
+            "Your claim was approved",
+            $"Your claim {claim.ClaimReference ?? claim.Id.ToString("N")[..8]} has been approved by the Chairperson.");
+
         await context.SaveChangesAsync();
         await auditLogService.RecordAsync(
             approver.ApplicationUserId,
-            await GetClaimStokvelIdAsync(claim),
+            claimStokvelId,
             "ClaimApproved",
             nameof(FuneralClaim),
             claim.Id,
@@ -819,10 +843,17 @@ public class FuneralClaimService(
         claim.ChairpersonDecisionByName = rejector.FullName;
         claim.ChairpersonDecisionNotes = reason.Trim();
 
+        var claimStokvelId = await GetClaimStokvelIdAsync(claim);
+        await notificationEnqueuer.EnqueueChairpersonRejectedAsync(
+            context, claim.MemberId, claimStokvelId,
+            nameof(FuneralClaim), claim.Id,
+            "Your claim was rejected",
+            $"Your claim {claim.ClaimReference ?? claim.Id.ToString("N")[..8]} was rejected by the Chairperson. Reason: {reason.Trim()}");
+
         await context.SaveChangesAsync();
         await auditLogService.RecordAsync(
             rejector.ApplicationUserId,
-            await GetClaimStokvelIdAsync(claim),
+            claimStokvelId,
             "ClaimRejected",
             nameof(FuneralClaim),
             claim.Id,
