@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
+using Sisonke.Web.Services.Billing;
 
 namespace Sisonke.Web.Services.Entitlements;
 
@@ -336,7 +337,7 @@ public sealed class EntitlementService(
     private static EvaluatedAccess EvaluateAccess(OrganisationSubscription subscription, DateTime now)
     {
         var hasPaymentMethod = subscription.PaymentMethods.Any(method =>
-            method.RemovedAt == null && method.IsDefault && method.MandateStatus == MandateStatus.Active);
+            method.RemovedAt == null && method.IsDefault && SubscriptionPaymentReadiness.IsReady(method));
         var hasExplicitActiveTrial = subscription.Status == SubscriptionStatus.Trialing &&
             subscription.TrialOptedIn &&
             subscription.TrialStartedAt is { } trialStart &&

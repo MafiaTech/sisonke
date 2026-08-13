@@ -3,8 +3,13 @@
 @attribute [Authorize]
 
 @using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@using Sisonke.Web.Services
 @using Sisonke.Web.Services.Billing
+@inject ISubscriptionPaymentSetupService PaymentSetupService
 @inject SubscriptionService SubscriptionService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
 <PageTitle>Confirming Payment Method...</PageTitle>
@@ -17,12 +22,8 @@
 </div>
 
 @code {
-    @* Single shared return page for every Paystack hosted-authorisation redirect: onboarding
-       (Phase 5 §A), legacy migration (§C, which re-enters the same onboarding wizard at Step 2),
-       and card updates from the customer billing page (§D). Paystack appends its own "reference"
-       (and sometimes "trxref") query param to whatever callback URL we supplied — the "intent",
-       "stokvelId" and "redirect" params below are ours, added when BeginCardAuthorisationAsync /
-       UpdatePaymentMethodAsync was called. *@
+    @* New payment-method setup uses a protected, user-bound State value. StokvelId/Intent remain
+       temporarily for the existing onboarding flow and are independently membership-checked. *@
 
     [SupplyParameterFromQuery]
     public Guid? StokvelId { get; set; }
@@ -34,6 +35,9 @@
     public string? TrxRef { get; set; }
 
     [SupplyParameterFromQuery]
+    public string? State { get; set; }
+
+    [SupplyParameterFromQuery]
     public string? Intent { get; set; }
 
     [SupplyParameterFromQuery]
@@ -42,17 +46,35 @@
     protected override async Task OnInitializedAsync()
     {
         var reference = Reference ?? TrxRef;
-        var redirectTarget = string.IsNullOrWhiteSpace(Redirect) ? "/subscription" : Redirect;
+        var redirectTarget = string.IsNullOrWhiteSpace(Redirect) || !Redirect.StartsWith('/') || Redirect.StartsWith("//")
+            ? "/subscription"
+            : Redirect;
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var actorUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-        if (StokvelId is null || string.IsNullOrWhiteSpace(reference))
+        if (string.IsNullOrWhiteSpace(reference) || string.IsNullOrWhiteSpace(actorUserId))
         {
             NavigationManager.NavigateTo(redirectTarget, replace: true);
             return;
         }
 
-        var result = string.Equals(Intent, "payment-method-update", StringComparison.OrdinalIgnoreCase)
-            ? await SubscriptionService.CompletePaymentMethodUpdateAsync(StokvelId.Value, reference)
-            : await SubscriptionService.CompleteCardAuthorisationAsync(StokvelId.Value, reference);
+        PaymentSetupCompletionResult result;
+        if (!string.IsNullOrWhiteSpace(State))
+        {
+            result = await PaymentSetupService.CompleteAsync(State, reference, actorUserId);
+            redirectTarget = result.RedirectPath ?? redirectTarget;
+        }
+        else if (StokvelId is { } stokvelId && await MemberAccessService.IsOfficeBearerAsync(actorUserId, stokvelId))
+        {
+            var legacyResult = string.Equals(Intent, "payment-method-update", StringComparison.OrdinalIgnoreCase)
+                ? await SubscriptionService.CompletePaymentMethodUpdateAsync(stokvelId, reference)
+                : await SubscriptionService.CompleteCardAuthorisationAsync(stokvelId, reference);
+            result = new(legacyResult.Success, redirectTarget, legacyResult.Message);
+        }
+        else
+        {
+            result = PaymentSetupCompletionResult.Failed("Payment setup could not be correlated to an authorized stokvel.");
+        }
 
         if (result.Success)
         {

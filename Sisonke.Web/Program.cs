@@ -23,6 +23,7 @@ using Sisonke.Web.Services;
 using Sisonke.Web.Services.Billing;
 using Sisonke.Web.Services.Billing.Jobs;
 using Sisonke.Web.Services.Billing.Paystack;
+using Sisonke.Web.Services.Billing.Netcash;
 using Sisonke.Web.Services.Entitlements;
 using Sisonke.Web.Services.Jobs;
 using Sisonke.Web.Services.Notifications;
@@ -46,6 +47,8 @@ var notificationOptions = builder.Configuration.GetSection("Notifications").Get<
 var webPushOptions = builder.Configuration.GetSection("WebPush").Get<WebPushOptions>() ?? new WebPushOptions();
 var entitlementOptions = builder.Configuration.GetSection("Entitlements").Get<EntitlementOptions>() ?? new EntitlementOptions();
 var paystackOptions = builder.Configuration.GetSection("Paystack").Get<PaystackOptions>() ?? new PaystackOptions();
+var subscriptionPaymentOptions = builder.Configuration.GetSection("SubscriptionPayments").Get<SubscriptionPaymentOptions>() ?? new SubscriptionPaymentOptions();
+var netcashOptions = builder.Configuration.GetSection("Netcash").Get<NetcashOptions>() ?? new NetcashOptions();
 var invoicingOptions = builder.Configuration.GetSection("Invoicing").Get<InvoicingOptions>() ?? new InvoicingOptions();
 
 // Fail loudly outside Development if the webhook secret is missing — a missing secret would
@@ -68,6 +71,8 @@ builder.Services.AddSingleton(notificationOptions);
 builder.Services.AddSingleton(webPushOptions);
 builder.Services.AddSingleton(entitlementOptions);
 builder.Services.AddSingleton(paystackOptions);
+builder.Services.AddSingleton(subscriptionPaymentOptions);
+builder.Services.AddSingleton(netcashOptions);
 builder.Services.AddSingleton(invoicingOptions);
 
 // Add services to the container.
@@ -446,6 +451,11 @@ builder.Services.AddHttpClient<PaystackBillingProvider>(client =>
         .Or<TaskCanceledException>() // timeouts
         .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
 builder.Services.AddScoped<IBillingProvider>(sp => sp.GetRequiredService<PaystackBillingProvider>());
+builder.Services.AddScoped<ISubscriptionPaymentProvider, PaystackPaymentSetupProvider>();
+builder.Services.AddScoped<ISubscriptionPaymentProvider, NetcashPaymentSetupProvider>();
+builder.Services.AddScoped<ISubscriptionPaymentProviderResolver, SubscriptionPaymentProviderResolver>();
+builder.Services.AddSingleton<IPaymentSetupStateProtector, PaymentSetupStateProtector>();
+builder.Services.AddScoped<ISubscriptionPaymentSetupService, SubscriptionPaymentSetupService>();
 
 builder.Services.AddScoped<IInvoiceNumberGenerator, InvoiceNumberGenerator>();
 builder.Services.AddSingleton<IInvoicePdfRenderer, QuestPdfInvoiceRenderer>();

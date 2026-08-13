@@ -27,6 +27,10 @@ public sealed class FakeBillingProvider : IBillingProvider
         string customerCode, string email, long amountMinorUnits, string callbackUrl, CancellationToken ct = default) =>
         Task.FromResult(new CardAuthorisationStart("https://checkout.paystack.com/fake", "ref-1", "access-1"));
 
+    public Task<CardAuthorisationStart> StartCardAuthorisationAsync(
+        string customerCode, string email, long amountMinorUnits, string callbackUrl, string reference, CancellationToken ct = default) =>
+        Task.FromResult(new CardAuthorisationStart("https://checkout.paystack.com/fake", reference, "access-1"));
+
     public Task<VerifiedAuthorisation> VerifyAuthorisationAsync(string reference, CancellationToken ct = default) =>
         Task.FromResult(VerificationToReturn);
 

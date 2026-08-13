@@ -50,12 +50,15 @@ public sealed class PaystackBillingProvider(HttpClient httpClient, ILogger<Payst
 
     public async Task<CardAuthorisationStart> StartCardAuthorisationAsync(
         string customerCode, string email, long amountMinorUnits, string callbackUrl, CancellationToken ct = default)
+        => await StartCardAuthorisationAsync(
+            customerCode, email, amountMinorUnits, callbackUrl, $"sisonke-auth-{Guid.NewGuid():N}", ct);
+
+    public async Task<CardAuthorisationStart> StartCardAuthorisationAsync(
+        string customerCode, string email, long amountMinorUnits, string callbackUrl, string reference, CancellationToken ct = default)
     {
         // Client-generated reference makes this call idempotent under Polly retry — a retried
         // POST after a timeout carries the same reference, so Paystack rejects a duplicate
         // rather than initializing (and, downstream, charging) twice.
-        var reference = $"sisonke-auth-{Guid.NewGuid():N}";
-
         var request = new PaystackInitializeTransactionRequest
         {
             Email = email,

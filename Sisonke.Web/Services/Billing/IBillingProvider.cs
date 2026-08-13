@@ -15,6 +15,10 @@ public interface IBillingProvider
     Task<CardAuthorisationStart> StartCardAuthorisationAsync(
         string customerCode, string email, long amountMinorUnits, string callbackUrl, CancellationToken ct = default);
 
+    /// <summary>Starts hosted card authorisation with a caller-owned correlation reference.</summary>
+    Task<CardAuthorisationStart> StartCardAuthorisationAsync(
+        string customerCode, string email, long amountMinorUnits, string callbackUrl, string reference, CancellationToken ct = default);
+
     Task<VerifiedAuthorisation> VerifyAuthorisationAsync(string reference, CancellationToken ct = default);
 
     /// <summary>Refunds a real charge made purely to capture a reusable authorisation (see PaystackOptions.CardVerificationAmountMinorUnits).</summary>

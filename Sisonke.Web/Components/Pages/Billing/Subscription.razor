@@ -17,6 +17,7 @@
 @inject StokvelService StokvelService
 @inject IEntitlementService EntitlementService
 @inject SubscriptionService SubscriptionService
+@inject ISubscriptionPaymentSetupService PaymentSetupService
 @inject PlanCatalogueService PlanCatalogueService
 @inject InvoiceDownloadTokenService InvoiceDownloadTokenService
 @inject IServiceScopeFactory ScopeFactory
@@ -95,7 +96,7 @@ else
                 @if (managementLink is not null)
                 {
                     <a class="sisonke-btn sisonke-btn-outline mt-3" href="@managementLink" target="_blank" rel="noopener">
-                        <i class="bi bi-box-arrow-up-right me-2"></i>Manage on Paystack
+                        <i class="bi bi-box-arrow-up-right me-2"></i>Manage payment method
                     </a>
                 }
             </div>
@@ -107,21 +108,44 @@ else
             <div class="sisonke-card mb-3">
                 <div class="sisonke-card-body">
                     <div class="sisonke-card-head mb-3"><h2>Payment Method</h2></div>
-                    @if (defaultPaymentMethod is not null)
+                    @if (paymentSetup?.PaymentReady == true)
                     {
                         <p class="mb-2">
-                            <i class="bi bi-credit-card-2-front me-2"></i>
-                            @defaultPaymentMethod.CardBrand &bull;&bull;&bull;&bull; @defaultPaymentMethod.Last4
-                            (expires @defaultPaymentMethod.ExpiryMonth/@defaultPaymentMethod.ExpiryYear)
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Ready for paid billing through @paymentSetup.ProviderDisplayName
                         </p>
+                        <div class="text-muted small mb-2">
+                            @paymentSetup.PaymentMethodType
+                            @if (!string.IsNullOrWhiteSpace(paymentSetup.MaskedDisplay))
+                            {
+                                <span>&mdash; @paymentSetup.MaskedDisplay</span>
+                            }
+                            @if (paymentSetup.MandateStatus != MandateStatus.None)
+                            {
+                                <span>&mdash; mandate @paymentSetup.MandateStatus</span>
+                            }
+                        </div>
                     }
                     else
                     {
-                        <p class="text-muted mb-2">No payment method on file.</p>
+                        <p class="text-muted mb-2">Payment setup is not complete.</p>
                     }
-                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="UpdatePaymentMethodAsync" disabled="@isBusy">
-                        <i class="bi bi-arrow-repeat me-2"></i>Update card
-                    </button>
+                    @if (snapshot.IsTrial)
+                    {
+                        <p class="text-muted small">Complete setup before the trial ends. You will not be charged during the trial.</p>
+                    }
+                    @if (paymentSetup?.ProviderAvailable == true)
+                    {
+                        <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="UpdatePaymentMethodAsync" disabled="@isBusy">
+                            <i class="bi bi-credit-card me-2"></i>@(paymentSetup.PaymentReady ? "Update payment method" : "Set up payment method")
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="sisonke-alert sisonke-alert-gold mb-0">
+                            <i class="bi bi-info-circle me-2"></i>@(paymentSetup?.UnavailableMessage ?? "Payment setup is unavailable in this environment.")
+                        </div>
+                    }
                 </div>
             </div>
 
@@ -273,7 +297,7 @@ else
     private string? pendingPlanChangeName;
     private DateTime? pendingPlanChangeEffectiveAt;
     private string? managementLink;
-    private SubscriptionPaymentMethod? defaultPaymentMethod;
+    private PaymentSetupViewModel? paymentSetup;
     private string? subscriptionBillingEmail;
     private string? subscriptionCardholderName;
     private List<SubscriptionInvoice> invoices = [];
@@ -340,6 +364,7 @@ else
     {
         isOfficeBearer = await MemberAccessService.IsOfficeBearerAsync(currentUserId!, selectedStokvelId);
         snapshot = await EntitlementService.GetSnapshotAsync(selectedStokvelId);
+        paymentSetup = await PaymentSetupService.GetStatusAsync(selectedStokvelId, currentUserId!);
         managementLink = await SubscriptionService.GetManagementLinkAsync(selectedStokvelId);
 
         await using var scope = ScopeFactory.CreateAsyncScope();
@@ -364,12 +389,6 @@ else
 
         if (subscription is not null)
         {
-            defaultPaymentMethod = await db.SubscriptionPaymentMethods
-                .AsNoTracking()
-                .Where(m => m.OrganisationSubscriptionId == subscription.Id && m.IsDefault && m.RemovedAt == null)
-                .OrderByDescending(m => m.AuthorisedAt)
-                .FirstOrDefaultAsync();
-
             invoices = await db.SubscriptionInvoices
                 .AsNoTracking()
                 .Where(i => i.OrganisationSubscriptionId == subscription.Id)
@@ -384,7 +403,6 @@ else
         }
         else
         {
-            defaultPaymentMethod = null;
             invoices = [];
             payments = [];
         }
@@ -393,22 +411,22 @@ else
     private async Task UpdatePaymentMethodAsync()
     {
         isBusy = true;
-        var callbackUrl = NavigationManager.ToAbsoluteUri(
-            $"/billing/payment-callback?intent=payment-method-update&stokvelId={selectedStokvelId}&redirect={Uri.EscapeDataString("/subscription")}").ToString();
+        var callbackUrl = NavigationManager.ToAbsoluteUri("/billing/payment-callback").ToString();
 
-        var result = await SubscriptionService.UpdatePaymentMethodAsync(
-            selectedStokvelId, subscriptionBillingEmail ?? string.Empty, subscriptionCardholderName ?? "Cardholder", null, callbackUrl);
+        var result = await PaymentSetupService.StartAsync(
+            selectedStokvelId, currentUserId!, subscriptionBillingEmail ?? string.Empty,
+            subscriptionCardholderName ?? "Cardholder", null, callbackUrl, "/subscription");
 
         isBusy = false;
 
-        if (!result.Success || string.IsNullOrWhiteSpace(result.AuthorisationUrl))
+        if (!result.Success || string.IsNullOrWhiteSpace(result.SetupUrl))
         {
             actionSucceeded = false;
             actionMessage = result.Message ?? "Could not start card update. Please try again.";
             return;
         }
 
-        NavigationManager.NavigateTo(result.AuthorisationUrl, forceLoad: true);
+        NavigationManager.NavigateTo(result.SetupUrl, forceLoad: true);
     }
 
     private async Task SelectOrChangePlanAsync(string planCode)
