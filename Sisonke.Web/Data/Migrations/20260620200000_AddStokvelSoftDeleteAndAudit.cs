@@ -1,11 +1,15 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Sisonke.Web.Data;
 
 #nullable disable
 
 namespace Sisonke.Web.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260620200000_AddStokvelSoftDeleteAndAudit")]
     public partial class AddStokvelSoftDeleteAndAudit : Migration
     {
         /// <inheritdoc />

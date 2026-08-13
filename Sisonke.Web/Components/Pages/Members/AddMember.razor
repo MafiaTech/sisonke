@@ -1,12 +1,15 @@
 @page "/add-member/{StokvelId:guid}"
 @rendermode InteractiveServer
 
+@using Sisonke.Web.Data
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Entitlements
 
 @inject MemberService MemberService
 @inject StokvelService StokvelService
+@inject IEntitlementService EntitlementService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Register Member</PageTitle>
@@ -263,7 +266,7 @@ else
 
 @code {
     private Stokvel? stokvel;
-    private TenantSubscription? activeSubscription;
+    private EntitlementSnapshot? entitlementSnapshot;
     private Member newMember = new()
     {
         JoiningDate = DateTime.Today,
@@ -285,7 +288,7 @@ else
 
         if (stokvel is not null)
         {
-            activeSubscription = await StokvelService.GetActiveSubscriptionByStokvelIdAsync(StokvelId);
+            entitlementSnapshot = await EntitlementService.GetSnapshotAsync(StokvelId);
             currentMemberCount = await MemberService.GetMemberCountByStokvelIdAsync(StokvelId);
             canAddMember = await StokvelService.CanAddMemberAsync(StokvelId);
             memberLimitMessage = await StokvelService.GetMemberLimitMessageAsync(StokvelId);
@@ -314,12 +317,12 @@ else
 
     private string GetSubscriptionPackageText()
     {
-        return activeSubscription?.SubscriptionPlan.Name ?? "Subscription package unavailable";
+        return entitlementSnapshot?.PlanName ?? "Subscription package unavailable";
     }
 
     private string GetMemberCountText()
     {
-        var maxMembers = activeSubscription?.SubscriptionPlan.MaxMembers;
+        var maxMembers = entitlementSnapshot?.Features.GetValueOrDefault(FeatureCodes.MaxMembers)?.LimitValue;
 
         return maxMembers is null
             ? $"{currentMemberCount} members captured"

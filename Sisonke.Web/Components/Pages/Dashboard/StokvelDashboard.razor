@@ -118,7 +118,7 @@ else
     <StokvelSubNav StokvelId="@StokvelId" IsRotational="@stokvel.EnableRotation" FinancialProductsAllowed="@FinancialProductsAllowed" />
 
     <!-- ── Archetype awareness banner ── -->
-    @if (stokvel.Archetype != StokvelArchetype.BurialSociety)
+    @if (!BurialFeaturesAllowed)
     {
         <div class="sisonke-alert sisonke-alert-blue mb-3 d-flex align-items-center gap-3 flex-wrap">
             <div>
@@ -280,7 +280,7 @@ else
                             <p class="text-muted small mb-3">Submitted meeting apologies awaiting attendance review.</p>
                             <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Apologies</a>
                         </div>
-                        @if (stokvel.EnableClaims)
+                        @if (ClaimsAllowed)
                         {
                             <div class="executive-task-card task-accent-gold">
                                 <div class="detail-mini-label">Claims to Review</div>
@@ -395,7 +395,7 @@ else
                         </div>
                     }
                     <div class="executive-task-grid">
-                        @if (stokvel.EnableClaims)
+                        @if (ClaimsAllowed)
                         {
                             <div class="executive-task-card task-accent-green">
                                 <div class="detail-mini-label">Claims Awaiting Approval</div>
@@ -471,7 +471,7 @@ else
                             <p class="text-muted small mb-3">Submitted meeting apologies awaiting attendance review.</p>
                             <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/secretary-tasks/{StokvelId}")">Review Apologies</a>
                         </div>
-                        @if (stokvel.EnableClaims)
+                        @if (ClaimsAllowed)
                         {
                             <div class="executive-task-card task-accent-gold">
                                 <div class="detail-mini-label">Claims to Review</div>
@@ -533,7 +533,7 @@ else
                             }
                             <a class="sisonke-btn sisonke-btn-outline executive-task-action" href="@($"/contribution-capture/{StokvelId}")">Capture Contributions</a>
                         </div>
-                        @if (stokvel.EnableClaims)
+                        @if (ClaimsAllowed)
                         {
                             <div class="executive-task-card task-accent-gold">
                                 <div class="detail-mini-label">Approved Claims Awaiting Payout</div>
@@ -1356,6 +1356,7 @@ else
     private ContributionMonthSummaryDto monthlyContributionSummary = new();
     private List<ContributionMonthlyTrendDto> contributionTrends = [];
     private decimal totalContributionOutstanding;
+    private readonly System.Threading.SemaphoreSlim dashboardLoadLock = new(1, 1);
     private bool isLoading = true;
     private bool canManageDashboard;
     private bool canViewSecretaryTasks;
@@ -1377,6 +1378,10 @@ else
     private RotationalTaskState? rotationalTaskState;
     private StokvelLoanConfiguration? activeLoanConfig;
     private StokvelWalletSummary? walletSummary;
+    private bool BurialFeaturesAllowed => stokvel is not null &&
+        (stokvel.Archetype == StokvelArchetype.BurialSociety ||
+            stokvel.Type == StokvelType.BurialSociety);
+    private bool ClaimsAllowed => BurialFeaturesAllowed && stokvel?.EnableClaims == true;
     private bool FinancialProductsAllowed => stokvel is not null &&
         stokvel.Archetype != StokvelArchetype.BurialSociety &&
         stokvel.Type != StokvelType.BurialSociety;
@@ -1392,6 +1397,19 @@ else
     public Guid StokvelId { get; set; }
 
     protected override async Task OnParametersSetAsync()
+    {
+        await dashboardLoadLock.WaitAsync();
+        try
+        {
+            await LoadDashboardAsync();
+        }
+        finally
+        {
+            dashboardLoadLock.Release();
+        }
+    }
+
+    private async Task LoadDashboardAsync()
     {
         var loadStopwatch = System.Diagnostics.Stopwatch.StartNew();
         isLoading = true;
@@ -1472,7 +1490,10 @@ else
         constitutionStatus = await ConstitutionService.GetConstitutionStatusAsync(StokvelId);
         memberCount = await MemberService.GetMemberCountByStokvelIdAsync(StokvelId);
         activeMemberCount = await MemberService.GetActiveMemberCountByStokvelIdAsync(StokvelId);
-        activeDependentCount = await MemberService.GetActiveDependentCountByStokvelIdAsync(StokvelId);
+        if (BurialFeaturesAllowed)
+        {
+            activeDependentCount = await MemberService.GetActiveDependentCountByStokvelIdAsync(StokvelId);
+        }
         expectedMonthlyContributions = await ContributionService.GetExpectedMonthlyContributionsByStokvelIdAsync(StokvelId);
         monthlyContributionSummary = await ContributionPaymentService.GetMonthlyContributionSummaryAsync(
             StokvelId,
@@ -1496,10 +1517,13 @@ else
         recentMeetingCount = await MeetingService.GetRecentMeetingCountByStokvelIdAsync(StokvelId);
         nextMeeting = await MeetingService.GetNextUpcomingMeetingAsync(StokvelId);
         pendingApologyCount = await MeetingApologyService.GetPendingApologyCountByStokvelIdAsync(StokvelId);
-        openClaimCount = await FuneralClaimService.GetOpenClaimCountByStokvelIdAsync(StokvelId);
-        claimsToReviewCount = await FuneralClaimService.GetClaimsRequiringSecretaryReviewCountByStokvelIdAsync(StokvelId);
-        claimsAwaitingChairpersonApprovalCount = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalCountByStokvelIdAsync(StokvelId);
-        approvedClaimsAwaitingPayoutCount = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutCountByStokvelIdAsync(StokvelId);
+        if (ClaimsAllowed)
+        {
+            openClaimCount = await FuneralClaimService.GetOpenClaimCountByStokvelIdAsync(StokvelId);
+            claimsToReviewCount = await FuneralClaimService.GetClaimsRequiringSecretaryReviewCountByStokvelIdAsync(StokvelId);
+            claimsAwaitingChairpersonApprovalCount = await FuneralClaimService.GetClaimsRequiringChairpersonApprovalCountByStokvelIdAsync(StokvelId);
+            approvedClaimsAwaitingPayoutCount = await FuneralClaimService.GetApprovedClaimsAwaitingPayoutCountByStokvelIdAsync(StokvelId);
+        }
         attendanceToCaptureCount = await MeetingService.GetMeetingsNeedingAttendanceCountByStokvelIdAsync(StokvelId);
         openWarningCount = (await MemberWarningService.GetOpenWarningsByStokvelIdAsync(StokvelId)).Count;
         var voteMotions = await VotingService.GetVotesByStokvelIdAsync(StokvelId);

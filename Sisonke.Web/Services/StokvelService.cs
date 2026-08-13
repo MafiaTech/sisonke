@@ -2,12 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
+using Sisonke.Web.Services.Entitlements;
 
 namespace Sisonke.Web.Services;
 
 public class StokvelService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
-    StokvelArchetypeConfigurationService archetypeConfigurationService)
+    StokvelArchetypeConfigurationService archetypeConfigurationService,
+    IEntitlementService entitlementService)
 {
     public async Task<Stokvel?> RegisterStokvelAsync(
         string name,
@@ -17,10 +19,10 @@ public class StokvelService(
         string? townOrArea,
         DateTime? establishedDate,
         int? expectedMemberCount,
-        Guid subscriptionPlanId,
         string? description,
         StokvelBankingDetails? bankingDetails = null,
-        string? currentUserId = null)
+        string? currentUserId = null,
+        StokvelRegistrationType? registrationType = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -28,17 +30,6 @@ public class StokvelService(
         }
 
         await using var context = await dbFactory.CreateDbContextAsync();
-
-        var plan = await context.SubscriptionPlans
-            .SingleOrDefaultAsync(subscriptionPlan =>
-                subscriptionPlan.Id == subscriptionPlanId &&
-                subscriptionPlan.IsActive &&
-                subscriptionPlan.Name != "Pilot");
-
-        if (plan is null)
-        {
-            return null;
-        }
 
         if (HasBankingDetails(bankingDetails) && !IsValidBankingDetails(bankingDetails!))
         {
@@ -66,6 +57,7 @@ public class StokvelService(
             Code = stokvelCode,
             Type = type,
             Archetype = archetype,
+            RegistrationType = registrationType,
             Province = province,
             TownOrArea = townOrArea,
             EstablishedDate = establishedDate,
@@ -79,17 +71,11 @@ public class StokvelService(
 
         archetypeConfigurationService.ApplyDefaults(stokvel, archetype);
 
-        context.TenantSubscriptions.Add(new TenantSubscription
-        {
-            TenantId = tenant.Id,
-            Tenant = tenant,
-            SubscriptionPlanId = plan.Id,
-            SubscriptionPlan = plan,
-            Status = SubscriptionStatus.Active,
-            StartDate = createdAt,
-            IsTrial = true
-        });
-
+        // No TenantSubscription/legacy plan is created here — subscription lifecycle (plan
+        // selection, card authorisation, trial) is owned entirely by SubscriptionService against
+        // OrganisationSubscription (Phase 5: the onboarding wizard calls SelectPlanAsync right
+        // after this method returns, so the stokvel is never left with a fake "Active" legacy
+        // subscription that IEntitlementService can't see).
         context.Stokvels.Add(stokvel);
 
         if (HasBankingDetails(bankingDetails))
@@ -355,66 +341,33 @@ public class StokvelService(
         return await GetLatestActiveSubscriptionByTenantIdAsync(context, stokvel.TenantId);
     }
 
+    // Authoritative check delegates to IEntitlementService (Phase 2) — this method only reads
+    // the current decision for UI display (e.g. disabling the "Add member" button); it does not
+    // itself guarantee no race, so it must never be the only gate on an actual write. See
+    // MemberService.AddMemberAsync for the write-path check, which holds IStokvelOperationLock
+    // across the check and the insert.
     public async Task<bool> CanAddMemberAsync(Guid stokvelId)
     {
-        await using var context = await dbFactory.CreateDbContextAsync();
-
-        var stokvel = await GetStokvelByIdForLookupAsync(context, stokvelId);
-
-        if (stokvel is null)
-        {
-            return false;
-        }
-
-        var subscription = await GetLatestActiveSubscriptionByTenantIdAsync(context, stokvel.TenantId);
-
-        if (subscription?.SubscriptionPlan is null)
-        {
-            return false;
-        }
-
-        if (subscription.SubscriptionPlan.MaxMembers is null)
-        {
-            return true;
-        }
-
-        var activeMemberCount = await context.Members
-            .CountAsync(member =>
-                member.TenantId == stokvel.TenantId &&
-                member.Status == MemberStatus.Active);
-
-        return activeMemberCount < subscription.SubscriptionPlan.MaxMembers;
+        var decision = await entitlementService.AuthorizeAsync(stokvelId, FeatureCodes.MaxMembers, requestedUsage: 1);
+        return decision.Allowed;
     }
 
     public async Task<string> GetMemberLimitMessageAsync(Guid stokvelId)
     {
-        await using var context = await dbFactory.CreateDbContextAsync();
+        // requestedUsage: 0 — this reports the *current* state, not "would one more fit".
+        var decision = await entitlementService.AuthorizeAsync(stokvelId, FeatureCodes.MaxMembers, requestedUsage: 0);
 
-        var stokvel = await GetStokvelByIdForLookupAsync(context, stokvelId);
-
-        if (stokvel is null)
+        if (!decision.Allowed)
         {
-            return "Subscription package could not be found.";
+            return decision.Message;
         }
 
-        var subscription = await GetLatestActiveSubscriptionByTenantIdAsync(context, stokvel.TenantId);
-
-        if (subscription?.SubscriptionPlan is null)
+        if (decision.Limit is null)
         {
-            return "Subscription package could not be found.";
+            return "Unlimited members allowed on this plan.";
         }
 
-        var activeMemberCount = await context.Members
-            .CountAsync(member =>
-                member.TenantId == stokvel.TenantId &&
-                member.Status == MemberStatus.Active);
-
-        if (subscription.SubscriptionPlan.MaxMembers is null)
-        {
-            return "Unlimited members allowed on this package.";
-        }
-
-        return $"{activeMemberCount} of {subscription.SubscriptionPlan.MaxMembers} members captured on the {subscription.SubscriptionPlan.Name} package.";
+        return $"{decision.CurrentUsage} of {decision.Limit} members captured on the {decision.PlanName} plan.";
     }
 
     private static async Task<Stokvel?> GetStokvelByIdForLookupAsync(ApplicationDbContext context, Guid stokvelId)

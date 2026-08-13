@@ -1,10 +1,15 @@
 @page "/edit-beneficiary/{BeneficiaryId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
 
 @inject MemberService MemberService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
 <PageTitle>Edit Beneficiary</PageTitle>
@@ -22,13 +27,17 @@ else if (editBeneficiary is null)
 {
     <AlertBanner Type="danger" Title="Beneficiary record not found." Message="" Icon="bi bi-x-circle-fill" />
 }
+else if (!canEditBeneficiary)
+{
+    <AlertBanner Type="danger" Title="Access denied." Message="You do not have access to edit this beneficiary." Icon="bi bi-shield-exclamation" />
+}
 else
 {
     <PageHeader
         Title="Edit Beneficiary"
         Subtitle="@editBeneficiary.Member.FullName"
-        BackText="Back to Member Profile"
-        BackHref="@($"/member-profile/{editBeneficiary.MemberId}")" />
+        BackText="Back"
+        BackHref="@BackHref" />
 
     @if (saveFailed)
     {
@@ -84,7 +93,7 @@ else
                 <button class="btn btn-primary" type="submit">
                     <i class="bi bi-floppy me-2"></i>Save Changes
                 </button>
-                <a class="btn btn-outline-secondary" href="@($"/member-profile/{editBeneficiary.MemberId}")">Cancel</a>
+                <a class="btn btn-outline-secondary" href="@BackHref">Cancel</a>
             </div>
         </div>
     </EditForm>
@@ -108,19 +117,35 @@ else
     private Beneficiary? editBeneficiary;
     private bool isLoading = true;
     private bool saveFailed;
+    private bool canEditBeneficiary;
 
     [Parameter]
     public Guid BeneficiaryId { get; set; }
 
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string BackHref =>
+        IsSafeLocalReturnUrl(ReturnUrl)
+            ? ReturnUrl!
+            : editBeneficiary is null
+                ? "/my-memberships"
+                : $"/member-profile/{editBeneficiary.MemberId}";
+
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
         editBeneficiary = await MemberService.GetBeneficiaryByIdAsync(BeneficiaryId);
+        canEditBeneficiary = editBeneficiary is not null &&
+            !string.IsNullOrWhiteSpace(userId) &&
+            await MemberAccessService.CanViewMemberProfileAsync(userId, editBeneficiary.MemberId);
         isLoading = false;
     }
 
     private async Task HandleValidSubmit()
     {
-        if (editBeneficiary is null)
+        if (editBeneficiary is null || !canEditBeneficiary)
         {
             return;
         }
@@ -135,6 +160,14 @@ else
             return;
         }
 
-        NavigationManager.NavigateTo($"/member-profile/{editBeneficiary.MemberId}");
+        NavigationManager.NavigateTo(BackHref);
+    }
+
+    private static bool IsSafeLocalReturnUrl(string? returnUrl)
+    {
+        return !string.IsNullOrWhiteSpace(returnUrl) &&
+            returnUrl.StartsWith('/') &&
+            !returnUrl.StartsWith("//") &&
+            !returnUrl.Contains("://", StringComparison.Ordinal);
     }
 }

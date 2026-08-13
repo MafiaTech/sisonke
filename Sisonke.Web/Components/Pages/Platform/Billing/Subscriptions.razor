@@ -1,0 +1,153 @@
+@page "/platform-admin/subscriptions"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "PlatformAdmin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Enums
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Subscriptions — Platform Admin</PageTitle>
+
+<div class="sisonke-role-platform-admin">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Subscriptions</h1>
+            <p class="page-subtitle">Every organisation's billing state.</p>
+        </div>
+        <a class="sisonke-btn sisonke-btn-outline" href="/platform-admin"><i class="bi bi-arrow-left me-2"></i>Back</a>
+    </div>
+
+    <div class="sisonke-card mb-3">
+        <div class="sisonke-card-body">
+            <div class="row g-2">
+                <div class="col-12 col-md-4">
+                    <input class="form-control" placeholder="Search organisation..." @bind="searchText" @bind:event="oninput" />
+                </div>
+                <div class="col-6 col-md-3">
+                    <select class="form-select" @bind="statusFilter">
+                        <option value="">All statuses</option>
+                        @foreach (var status in Enum.GetValues<SubscriptionStatus>())
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <select class="form-select" @bind="planFilter">
+                        <option value="">All plans</option>
+                        @foreach (var planName in planNames)
+                        {
+                            <option value="@planName">@planName</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>
+            Loading subscriptions...
+        </div>
+    }
+    else
+    {
+        <div class="sisonke-card">
+            <div class="sisonke-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Organisation</th><th>Plan</th><th>Status</th><th>Trial End</th>
+                                <th>Next Billing</th><th>MRR</th><th>Dunning Day</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in FilteredRows)
+                            {
+                                <tr class="admin-clickable-row" @onclick="@(() => NavigationManager.NavigateTo($"/platform-admin/subscriptions/{row.Id}"))">
+                                    <td>@row.StokvelName</td>
+                                    <td>@(row.PlanName ?? "—")</td>
+                                    <td><span class="@StatusBadgeClass(row.Status)">@row.Status</span></td>
+                                    <td>@(row.TrialEndsAt?.ToString("d MMM yyyy") ?? "—")</td>
+                                    <td>@(row.NextBillingAt?.ToString("d MMM yyyy") ?? "—")</td>
+                                    <td>@(row.MonthlyPrice is { } price ? FormatCurrency(price) : "—")</td>
+                                    <td>@(row.DunningDay?.ToString() ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <p class="text-muted small mt-2">@FilteredRows.Count() of @rows.Count subscriptions</p>
+    }
+</div>
+
+<style>
+    .admin-clickable-row { cursor: pointer; }
+    .admin-clickable-row:hover { background: var(--sk-green-50); }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private List<SubscriptionRow> rows = [];
+    private List<string> planNames = [];
+    private string searchText = string.Empty;
+    private string statusFilter = string.Empty;
+    private string planFilter = string.Empty;
+
+    private IEnumerable<SubscriptionRow> FilteredRows => rows.Where(r =>
+        (string.IsNullOrWhiteSpace(searchText) || r.StokvelName.Contains(searchText, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(statusFilter) || r.Status.ToString() == statusFilter) &&
+        (string.IsNullOrWhiteSpace(planFilter) || r.PlanName == planFilter));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        rows = await context.OrganisationSubscriptions
+            .AsNoTracking()
+            .Include(s => s.Stokvel)
+            .Include(s => s.SubscriptionPlan)
+            .Select(s => new SubscriptionRow(
+                s.Id,
+                s.Stokvel.Name,
+                s.SubscriptionPlan != null ? s.SubscriptionPlan.Name : null,
+                s.Status,
+                s.TrialEndsAt,
+                s.NextBillingAt,
+                s.SubscriptionPlan != null && !s.SubscriptionPlan.IsCustomPricing ? s.SubscriptionPlan.MonthlyPrice : (decimal?)null,
+                s.DunningStartedAt))
+            .OrderBy(r => r.StokvelName)
+            .ToListAsync();
+
+        planNames = rows.Where(r => r.PlanName is not null).Select(r => r.PlanName!).Distinct().OrderBy(n => n).ToList();
+        isLoading = false;
+    }
+
+    private static string FormatCurrency(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static string StatusBadgeClass(SubscriptionStatus status) => status switch
+    {
+        SubscriptionStatus.Active => "sisonke-badge sisonke-badge-green",
+        SubscriptionStatus.Trialing => "sisonke-badge sisonke-badge-blue",
+        SubscriptionStatus.PastDue => "sisonke-badge sisonke-badge-gold",
+        SubscriptionStatus.Restricted or SubscriptionStatus.Suspended => "sisonke-badge sisonke-badge-gray",
+        SubscriptionStatus.Cancelled or SubscriptionStatus.Expired => "sisonke-badge sisonke-badge-gray",
+        _ => "sisonke-badge sisonke-badge-gray"
+    };
+
+    private sealed record SubscriptionRow(
+        Guid Id, string StokvelName, string? PlanName, SubscriptionStatus Status,
+        DateTime? TrialEndsAt, DateTime? NextBillingAt, decimal? MonthlyPrice, DateTime? DunningStartedAt)
+    {
+        public int? DunningDay => DunningStartedAt is null ? null : (int)(DateTime.UtcNow.Date - DunningStartedAt.Value.Date).TotalDays;
+    }
+}

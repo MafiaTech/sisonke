@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Enums;
+using Sisonke.Web.Services.Entitlements;
 using Sisonke.Web.Services.Notifications.Channels;
 
 namespace Sisonke.Web.Services.Notifications;
@@ -54,6 +55,25 @@ public sealed class NotificationDispatchService(
                 continue;
             }
 
+            // Entitlement guard: paid channels (WhatsApp) must not send for a stokvel whose plan
+            // doesn't include them, or whose subscription is Restricted/Suspended. Skip and log —
+            // never throw, so one gated stokvel can't stall the whole batch.
+            if (message.Channel == NotificationChannel.WhatsApp && message.StokvelId is { } stokvelId)
+            {
+                var entitlementService = scope.ServiceProvider.GetRequiredService<IEntitlementService>();
+                var hasWhatsApp = await entitlementService.HasFeatureAsync(stokvelId, FeatureCodes.WhatsAppNotifications, ct);
+                if (!hasWhatsApp)
+                {
+                    logger.LogInformation(
+                        "Skipping WhatsApp notification {NotificationId} for stokvel {StokvelId}: not entitled.",
+                        message.Id, stokvelId);
+                    message.Status = NotificationStatus.Cancelled;
+                    message.LastError = "WhatsApp notifications are not available on this stokvel's current plan/status.";
+                    await context.SaveChangesAsync(ct);
+                    continue;
+                }
+            }
+
             try
             {
                 await sender.SendAsync(message, ct);
@@ -69,6 +89,13 @@ public sealed class NotificationDispatchService(
             {
                 message.Status = NotificationStatus.Cancelled;
                 message.LastError = ex.Message;
+            }
+            catch (EmailChannelConfigurationException ex)
+            {
+                message.Status = NotificationStatus.Failed;
+                message.LastAttemptAt = DateTime.UtcNow;
+                message.LastError = ex.Message;
+                logger.LogWarning("Email notification {NotificationId} failed due to missing email configuration: {Error}", message.Id, ex.Message);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

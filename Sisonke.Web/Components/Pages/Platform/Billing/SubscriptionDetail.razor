@@ -1,0 +1,419 @@
+@page "/platform-admin/subscriptions/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "PlatformAdmin")]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services.Billing
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AdminBillingService AdminBillingService
+@inject InvoiceDownloadTokenService InvoiceDownloadTokenService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Subscription Detail — Platform Admin</PageTitle>
+
+<div class="sisonke-role-platform-admin">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>@(subscription?.Stokvel.Name ?? "Subscription")</h1>
+            <p class="page-subtitle">Full billing history, events and manual actions — the support-and-dispute view.</p>
+        </div>
+        <a class="sisonke-btn sisonke-btn-outline" href="/platform-admin/subscriptions"><i class="bi bi-arrow-left me-2"></i>Back</a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>
+            Loading...
+        </div>
+    }
+    else if (subscription is null)
+    {
+        <AlertBanner Type="danger" Title="Subscription not found." Message="" Icon="bi bi-x-circle-fill" />
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(actionResultMessage))
+        {
+            <AlertBanner Type="@(actionSucceeded ? "info" : "danger")" Title="@actionResultMessage" Message="" Icon="@(actionSucceeded ? "bi bi-check-circle-fill" : "bi bi-x-circle-fill")" />
+        }
+
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="row g-3">
+                    <div class="col-6 col-md-3"><div class="detail-mini-label">Plan</div><div class="fw-700">@(subscription.SubscriptionPlan?.Name ?? "—")</div></div>
+                    <div class="col-6 col-md-3"><div class="detail-mini-label">Status</div><div class="fw-700">@subscription.Status</div></div>
+                    <div class="col-6 col-md-3"><div class="detail-mini-label">Trial ends</div><div class="fw-700">@(subscription.TrialEndsAt?.ToString("d MMM yyyy") ?? "—")</div></div>
+                    <div class="col-6 col-md-3"><div class="detail-mini-label">Next billing</div><div class="fw-700">@(subscription.NextBillingAt?.ToString("d MMM yyyy") ?? "—")</div></div>
+                    <div class="col-6 col-md-3"><div class="detail-mini-label">Dunning started</div><div class="fw-700">@(subscription.DunningStartedAt?.ToString("d MMM yyyy") ?? "—")</div></div>
+                    <div class="col-6 col-md-3"><div class="detail-mini-label">Terms accepted</div><div class="fw-700">@(subscription.TermsAcceptedAt?.ToString("d MMM yyyy") ?? "—") (v@(subscription.TermsVersion ?? "—"))</div></div>
+                    <div class="col-6 col-md-3"><div class="detail-mini-label">Accepted from IP</div><div class="fw-700">@(subscription.TermsAcceptedIpAddress ?? "—")</div></div>
+                    <div class="col-6 col-md-3"><div class="detail-mini-label">Provider subscription code</div><div class="fw-700">@(subscription.ProviderSubscriptionCode ?? "—")</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Manual actions ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>Manual Actions</h2></div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small">Action</label>
+                        <select class="form-select" @bind="selectedAction">
+                            <option value="ExtendTrial">Extend trial</option>
+                            <option value="ApplyPromotionalTrial">Apply promotional trial</option>
+                            <option value="RetryCharge">Retry charge</option>
+                            <option value="MoveToEnterprise">Move to Enterprise (custom pricing)</option>
+                            <option value="Reinstate">Reinstate suspended subscription</option>
+                        </select>
+                    </div>
+                    @if (selectedAction == "ExtendTrial")
+                    {
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small">Additional days</label>
+                            <input type="number" class="form-control" min="1" @bind="extendDays" />
+                        </div>
+                    }
+                    @if (selectedAction == "ApplyPromotionalTrial")
+                    {
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small">Promo code</label>
+                            <input class="form-control" @bind="promoCode" />
+                        </div>
+                    }
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small">Reason <span class="text-danger">*</span></label>
+                        <input class="form-control" placeholder="Required — written to the audit trail" @bind="reason" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <button type="button" class="sisonke-btn sisonke-btn-primary w-100" disabled="@isBusy" @onclick="ExecuteActionAsync">
+                            @if (isBusy) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            Execute
+                        </button>
+                    </div>
+                </div>
+                <p class="text-muted small mt-2 mb-0">Every action requires a reason and is written to the subscription's event timeline below. No action sets or reveals card data.</p>
+            </div>
+        </div>
+
+        <!-- ── Invoices ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>Invoices</h2></div>
+                @if (invoices.Count == 0)
+                {
+                    <p class="text-muted mb-0">No invoices.</p>
+                }
+                else
+                {
+                    <table class="table mb-0">
+                        <thead><tr><th>Number</th><th>Issued</th><th>Total</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var invoice in invoices)
+                            {
+                                <tr>
+                                    <td>@invoice.InvoiceNumber</td>
+                                    <td>@(invoice.IssuedAt?.ToString("d MMM yyyy") ?? "—")</td>
+                                    <td>@FormatCurrency(invoice.Total)</td>
+                                    <td>@invoice.Status</td>
+                                    <td class="d-flex gap-2">
+                                        <a href="@BuildDocumentLink("invoice", invoice.Id)" target="_blank">Download</a>
+                                        @if (invoice.Status is not (SubscriptionInvoiceStatus.Paid or SubscriptionInvoiceStatus.Waived))
+                                        {
+                                            <button type="button" class="btn btn-sm btn-link p-0" @onclick="@(() => waivingInvoiceId = invoice.Id)">Waive</button>
+                                        }
+                                    </td>
+                                </tr>
+                                @if (waivingInvoiceId == invoice.Id)
+                                {
+                                    <tr>
+                                        <td colspan="5">
+                                            <div class="d-flex gap-2 align-items-center">
+                                                <input class="form-control form-control-sm" placeholder="Reason for waiving (required)" @bind="waiveReason" style="max-width:320px" />
+                                                <button type="button" class="sisonke-btn sisonke-btn-primary btn-sm" @onclick="@(() => WaiveInvoiceAsync(invoice.Id))">Confirm waive</button>
+                                                <button type="button" class="sisonke-btn sisonke-btn-outline btn-sm" @onclick="@(() => waivingInvoiceId = null)">Cancel</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <!-- ── Payments ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>Payments</h2></div>
+                @if (payments.Count == 0)
+                {
+                    <p class="text-muted mb-0">No payment attempts.</p>
+                }
+                else
+                {
+                    <table class="table mb-0">
+                        <thead><tr><th>Date</th><th>Amount</th><th>Status</th><th>Attempt</th><th>Failure</th></tr></thead>
+                        <tbody>
+                            @foreach (var payment in payments)
+                            {
+                                <tr>
+                                    <td>@payment.CreatedAt.ToString("d MMM yyyy HH:mm")</td>
+                                    <td>@FormatCurrency(payment.Amount)</td>
+                                    <td>@payment.Status</td>
+                                    <td>@payment.AttemptNumber</td>
+                                    <td>@(payment.FailureMessage ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <!-- ── Webhook events (best-effort match — no direct FK) ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3">
+                    <h2>Webhook Events</h2>
+                    <p class="text-muted small mb-0">Best-effort match by provider code in the raw payload — BillingWebhookEvent has no direct subscription FK.</p>
+                </div>
+                @if (webhookEvents.Count == 0)
+                {
+                    <p class="text-muted mb-0">No matched webhook events.</p>
+                }
+                else
+                {
+                    <table class="table mb-0">
+                        <thead><tr><th>Received</th><th>Event Type</th><th>Signature Valid</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var webhookEvent in webhookEvents)
+                            {
+                                <tr>
+                                    <td>@webhookEvent.ReceivedAt.ToString("d MMM yyyy HH:mm")</td>
+                                    <td>@webhookEvent.EventType</td>
+                                    <td>@(webhookEvent.SignatureValid ? "Yes" : "No")</td>
+                                    <td>@webhookEvent.ProcessingStatus</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <!-- ── Notifications sent ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>Notifications Sent</h2></div>
+                @if (notifications.Count == 0)
+                {
+                    <p class="text-muted mb-0">No notifications sent yet.</p>
+                }
+                else
+                {
+                    <table class="table mb-0">
+                        <thead><tr><th>Sent</th><th>Type</th><th>Channel</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var notification in notifications)
+                            {
+                                <tr>
+                                    <td>@(notification.SentAt?.ToString("d MMM yyyy HH:mm") ?? notification.CreatedAt.ToString("d MMM yyyy HH:mm"))</td>
+                                    <td>@notification.Type</td>
+                                    <td>@notification.Channel</td>
+                                    <td>@notification.Status</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <!-- ── Event timeline ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>Event Timeline</h2></div>
+                @if (events.Count == 0)
+                {
+                    <p class="text-muted mb-0">No events recorded.</p>
+                }
+                else
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var evt in events)
+                        {
+                            <li class="admin-timeline-item">
+                                <div class="d-flex justify-content-between">
+                                    <strong>@evt.EventType</strong>
+                                    <span class="text-muted small">@evt.OccurredAt.ToString("d MMM yyyy HH:mm")</span>
+                                </div>
+                                @if (evt.FromStatus is not null || evt.ToStatus is not null)
+                                {
+                                    <div class="text-muted small">@evt.FromStatus &rarr; @evt.ToStatus</div>
+                                }
+                                <div class="small">@evt.Notes</div>
+                                <div class="text-muted small">By: @(evt.ActorUserId ?? "System")</div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .admin-timeline-item { border-left: 2px solid var(--sk-border); padding: .5rem 0 .5rem 1rem; margin-bottom: .5rem; }
+</style>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private bool isLoading = true;
+    private OrganisationSubscription? subscription;
+    private List<SubscriptionInvoice> invoices = [];
+    private List<SubscriptionPayment> payments = [];
+    private List<BillingWebhookEvent> webhookEvents = [];
+    private List<NotificationMessage> notifications = [];
+    private List<SubscriptionEvent> events = [];
+
+    private string selectedAction = "ExtendTrial";
+    private string reason = string.Empty;
+    private int extendDays = 7;
+    private string promoCode = "LAUNCH60";
+    private bool isBusy;
+    private string? actionResultMessage;
+    private bool actionSucceeded;
+    private Guid? waivingInvoiceId;
+    private string waiveReason = string.Empty;
+    private string? actorUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        actorUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        subscription = await context.OrganisationSubscriptions
+            .Include(s => s.Stokvel)
+            .Include(s => s.SubscriptionPlan)
+            .FirstOrDefaultAsync(s => s.Id == Id);
+
+        if (subscription is not null)
+        {
+            invoices = await context.SubscriptionInvoices
+                .Where(i => i.OrganisationSubscriptionId == subscription.Id)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+
+            payments = await context.SubscriptionPayments
+                .Where(p => p.OrganisationSubscriptionId == subscription.Id)
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
+
+            events = await context.SubscriptionEvents
+                .Where(e => e.OrganisationSubscriptionId == subscription.Id)
+                .OrderByDescending(e => e.OccurredAt)
+                .ToListAsync();
+
+            notifications = await context.NotificationMessages
+                .Where(n => n.StokvelId == subscription.StokvelId && n.DedupeKey.StartsWith("OrgSub:"))
+                .OrderByDescending(n => n.CreatedAt)
+                .ToListAsync();
+
+            var providerCodes = new[] { subscription.ProviderSubscriptionCode, subscription.ProviderCustomerCode }
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .ToList();
+
+            webhookEvents = providerCodes.Count == 0
+                ? []
+                : await context.BillingWebhookEvents
+                    .Where(e => providerCodes.Any(code => e.RawPayload.Contains(code!)))
+                    .OrderByDescending(e => e.ReceivedAt)
+                    .ToListAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task ExecuteActionAsync()
+    {
+        if (subscription is null || string.IsNullOrWhiteSpace(actorUserId))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            actionSucceeded = false;
+            actionResultMessage = "A reason is required.";
+            return;
+        }
+
+        isBusy = true;
+        var result = selectedAction switch
+        {
+            "ExtendTrial" => await AdminBillingService.ExtendTrialAsync(subscription.StokvelId, extendDays, reason, actorUserId),
+            "ApplyPromotionalTrial" => await AdminBillingService.ApplyPromotionalTrialAsync(subscription.StokvelId, promoCode, reason, actorUserId),
+            "RetryCharge" => await AdminBillingService.RetryChargeAsync(subscription.StokvelId, reason, actorUserId),
+            "MoveToEnterprise" => await AdminBillingService.MoveToEnterpriseAsync(subscription.StokvelId, reason, actorUserId),
+            "Reinstate" => await AdminBillingService.ReinstateAsync(subscription.StokvelId, reason, actorUserId),
+            _ => SubscriptionActionResult.Failed("Unknown action.")
+        };
+
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionResultMessage = result.Message ?? (result.Success ? "Action completed." : "Action failed.");
+        reason = string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task WaiveInvoiceAsync(Guid invoiceId)
+    {
+        if (string.IsNullOrWhiteSpace(actorUserId))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(waiveReason))
+        {
+            actionSucceeded = false;
+            actionResultMessage = "A reason is required to waive an invoice.";
+            return;
+        }
+
+        isBusy = true;
+        var result = await AdminBillingService.WaiveInvoiceAsync(invoiceId, waiveReason, actorUserId);
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionResultMessage = result.Message ?? (result.Success ? "Invoice waived." : "Could not waive invoice.");
+        waivingInvoiceId = null;
+        waiveReason = string.Empty;
+        await LoadAsync();
+    }
+
+    private string BuildDocumentLink(string documentType, Guid documentId)
+    {
+        var token = InvoiceDownloadTokenService.CreateToken(documentType, documentId);
+        return $"/api/billing/documents/{documentType}/{documentId}?token={Uri.EscapeDataString(token)}";
+    }
+
+    private static string FormatCurrency(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+}

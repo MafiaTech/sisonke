@@ -9,7 +9,7 @@ namespace Sisonke.Web.Services.Notifications;
 /// Adds NotificationMessage rows to the caller's own DbContext. Never calls SaveChangesAsync
 /// itself, so the enqueued row commits atomically with the caller's business-action write.
 /// </summary>
-public sealed class NotificationEnqueuer
+public sealed class NotificationEnqueuer(NotificationEmailTemplateRenderer emailTemplateRenderer)
 {
     public async Task EnqueueAsync(
         ApplicationDbContext context,
@@ -45,7 +45,7 @@ public sealed class NotificationEnqueuer
         }
     }
 
-    private static async Task EnqueueForChannelAsync(
+    private async Task EnqueueForChannelAsync(
         ApplicationDbContext context,
         NotificationType type,
         NotificationChannel channel,
@@ -78,6 +78,10 @@ public sealed class NotificationEnqueuer
             return;
         }
 
+        var notificationBody = channel == NotificationChannel.Email
+            ? emailTemplateRenderer.Render(type, stokvelId, entityType, entityId, subject, body)
+            : body;
+
         context.NotificationMessages.Add(new NotificationMessage
         {
             Id = Guid.NewGuid(),
@@ -89,7 +93,7 @@ public sealed class NotificationEnqueuer
             Type = type,
             DedupeKey = dedupeKey,
             Subject = subject,
-            Body = body,
+            Body = notificationBody,
             Status = NotificationStatus.Pending,
             CreatedAt = DateTime.UtcNow
         });

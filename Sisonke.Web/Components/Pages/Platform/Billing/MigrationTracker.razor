@@ -1,0 +1,122 @@
+@page "/platform-admin/migration-tracker"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "PlatformAdmin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services.Entitlements
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject EntitlementOptions EntitlementOptions
+
+<PageTitle>Migration Tracker — Platform Admin</PageTitle>
+
+<div class="sisonke-role-platform-admin">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Legacy Migration Tracker</h1>
+            <p class="page-subtitle">Organisations moving from legacy access to a paid plan.</p>
+        </div>
+        <a class="sisonke-btn sisonke-btn-outline" href="/platform-admin"><i class="bi bi-arrow-left me-2"></i>Back</a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>
+            Loading migration data...
+        </div>
+    }
+    else
+    {
+        <div class="sisonke-alert @(daysToCutover is null or > 30 ? "sisonke-alert-blue" : "sisonke-alert-gold") mb-3">
+            <i class="bi bi-calendar-event me-2"></i>
+            @if (daysToCutover is null)
+            {
+                <span>No cutover date configured — legacy organisations retain grace access indefinitely.</span>
+            }
+            else
+            {
+                <span><strong>@daysToCutover</strong> day(s) until the legacy access cutover (@EntitlementOptions.LegacyGraceCutoverUtc.ToString("d MMMM yyyy")).</span>
+            }
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3"><div class="sisonke-stat-card"><div class="sisonke-stat-label">Total Organisations</div><div class="sisonke-stat-value">@totalOrganisations</div></div></div>
+            <div class="col-6 col-md-3"><div class="sisonke-stat-card"><div class="sisonke-stat-label">Prompted</div><div class="sisonke-stat-value">@promptedCount</div></div></div>
+            <div class="col-6 col-md-3"><div class="sisonke-stat-card"><div class="sisonke-stat-label">Opted In</div><div class="sisonke-stat-value">@optedInCount</div></div></div>
+            <div class="col-6 col-md-3"><div class="sisonke-stat-card"><div class="sisonke-stat-label">Still Outstanding</div><div class="sisonke-stat-value">@outstandingRows.Count</div></div></div>
+        </div>
+        <p class="text-muted small mb-3">
+            "Opted in" counts every organisation whose subscription has moved past LegacyUnsubscribed — since every
+            organisation's subscription (new or pre-existing) starts there, this reflects who has completed plan
+            selection + card authorisation, not only pre-existing customers.
+        </p>
+
+        <div class="sisonke-card">
+            <div class="sisonke-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead><tr><th>Organisation</th><th>Created</th><th>Prompted</th></tr></thead>
+                        <tbody>
+                            @foreach (var row in outstandingRows)
+                            {
+                                <tr>
+                                    <td>@row.Name</td>
+                                    <td>@row.CreatedAt.ToString("d MMM yyyy")</td>
+                                    <td>@(row.Prompted ? "Yes" : "No")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private int totalOrganisations;
+    private int promptedCount;
+    private int optedInCount;
+    private int? daysToCutover;
+    private List<OutstandingRow> outstandingRows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        totalOrganisations = await context.Stokvels.CountAsync(s => s.IsActive && !s.IsDeleted);
+
+        var promptedStokvelIds = await context.SubscriptionEvents
+            .Where(e => e.EventType == SubscriptionEventType.LegacyMigrationReminderSent)
+            .Select(e => e.OrganisationSubscription.StokvelId)
+            .Distinct()
+            .ToListAsync();
+        promptedCount = promptedStokvelIds.Count;
+
+        var outstanding = await context.OrganisationSubscriptions
+            .AsNoTracking()
+            .Include(s => s.Stokvel)
+            .Where(s => s.Status == SubscriptionStatus.LegacyUnsubscribed)
+            .ToListAsync();
+
+        outstandingRows = outstanding
+            .Select(s => new OutstandingRow(s.Stokvel.Name, s.Stokvel.CreatedAt, promptedStokvelIds.Contains(s.StokvelId)))
+            .OrderBy(r => r.CreatedAt)
+            .ToList();
+
+        optedInCount = totalOrganisations - outstandingRows.Count;
+
+        if (EntitlementOptions.LegacyGraceCutoverUtc != DateTime.MaxValue)
+        {
+            daysToCutover = Math.Max(0, (int)(EntitlementOptions.LegacyGraceCutoverUtc.Date - DateTime.UtcNow.Date).TotalDays);
+        }
+
+        isLoading = false;
+    }
+
+    private sealed record OutstandingRow(string Name, DateTime CreatedAt, bool Prompted);
+}

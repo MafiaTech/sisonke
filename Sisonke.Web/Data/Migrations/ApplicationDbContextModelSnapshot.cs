@@ -372,6 +372,56 @@ namespace Sisonke.Web.Data.Migrations
                     b.ToTable("Beneficiaries");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.BillingWebhookEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ProcessingStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProviderEventId")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("SignatureValid")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderEventId")
+                        .IsUnique();
+
+                    b.ToTable("BillingWebhookEvents");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.ClaimPayoutAudit", b =>
                 {
                     b.Property<Guid>("Id")
@@ -778,6 +828,50 @@ namespace Sisonke.Web.Data.Migrations
                     b.ToTable("CyclePayouts");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.FeatureDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int>("DataType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DefaultValue")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("FeatureDefinitions");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.FineType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -979,6 +1073,39 @@ namespace Sisonke.Web.Data.Migrations
                     b.HasIndex("FuneralClaimId");
 
                     b.ToTable("FuneralClaimDocuments");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.InvoiceNumberCounter", b =>
+                {
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NextNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Year");
+
+                    b.ToTable("InvoiceNumberCounters");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.JobExecutionLock", b =>
+                {
+                    b.Property<string>("JobName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("LockExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("LockToken")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("LockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("JobName");
+
+                    b.ToTable("JobExecutionLocks");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Meeting", b =>
@@ -1502,6 +1629,47 @@ namespace Sisonke.Web.Data.Migrations
                     b.HasIndex("MemberId");
 
                     b.ToTable("MemberDependents");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("StoredFilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId", "UploadedAt");
+
+                    b.ToTable("MemberDocuments");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberFine", b =>
@@ -2308,6 +2476,130 @@ namespace Sisonke.Web.Data.Migrations
                     b.ToTable("NotificationMessages");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.OrganisationSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BillingAddress")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<string>("BillingEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CardholderName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CurrentPeriodEndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CurrentPeriodStartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DunningStartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("GracePeriodEndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastSuccessfulPaymentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("NextBillingAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PendingPlanChangeEffectiveAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("PendingPlanChangePlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Provider")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProviderCustomerCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ProviderEmailToken")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ProviderPlanCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ProviderSubscriptionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StokvelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SubscriptionPlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("SuspendedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("TermsAcceptedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TermsAcceptedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("TermsAcceptedIpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<string>("TermsVersion")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("TrialEndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("TrialStartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PendingPlanChangePlanId");
+
+                    b.HasIndex("StokvelId")
+                        .IsUnique()
+                        .HasFilter("[Status] IN (0, 1, 2, 3, 6, 7, 8)");
+
+                    b.HasIndex("SubscriptionPlanId");
+
+                    b.ToTable("OrganisationSubscriptions");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Payment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2353,6 +2645,86 @@ namespace Sisonke.Web.Data.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.PlanFeature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ConfigurationJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("FeatureDefinitionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("LimitValue")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SubscriptionPlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeatureDefinitionId");
+
+                    b.HasIndex("SubscriptionPlanId", "FeatureDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("PlanFeatures");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.PromotionalTrial", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AppliesToPlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("MaxRedemptions")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RedemptionCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TrialDays")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ValidFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppliesToPlanId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("PromotionalTrials");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.PushSubscription", b =>
@@ -3156,6 +3528,9 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("RegistrationType")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("SetupCompletedAt")
                         .HasColumnType("datetime2");
 
@@ -3583,20 +3958,321 @@ namespace Sisonke.Web.Data.Migrations
                     b.ToTable("StokvelReserveTransactions");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("FromStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("OrganisationSubscriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ToStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationSubscriptionId", "OccurredAt");
+
+                    b.ToTable("SubscriptionEvents");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTime?>("DueAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("IssuedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("OrganisationSubscriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProviderInvoiceCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("VatAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceNumber")
+                        .IsUnique();
+
+                    b.HasIndex("OrganisationSubscriptionId");
+
+                    b.ToTable("SubscriptionInvoices");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionInvoiceLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("FeatureCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SubscriptionInvoiceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubscriptionInvoiceId");
+
+                    b.ToTable("SubscriptionInvoiceLines");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("OrganisationSubscriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProviderReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("SubscriptionInvoiceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationSubscriptionId");
+
+                    b.HasIndex("ProviderReference")
+                        .IsUnique();
+
+                    b.HasIndex("SubscriptionInvoiceId");
+
+                    b.ToTable("SubscriptionPayments");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionPaymentMethod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AuthorisedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Bank")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CardBrand")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("CardholderName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ExpiryMonth")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ExpiryYear")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsReusable")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Last4")
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
+
+                    b.Property<Guid>("OrganisationSubscriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProviderAuthorizationCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("RemovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationSubscriptionId");
+
+                    b.ToTable("SubscriptionPaymentMethods");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionPlan", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<decimal>("AnnualPrice")
+                    b.Property<decimal?>("AnnualPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsCustomPricing")
+                        .HasColumnType("bit");
+
                     b.Property<int?>("MaxMembers")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaximumAdministrators")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaximumMembers")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaximumSchemes")
                         .HasColumnType("int");
 
                     b.Property<int>("MinMembers")
@@ -3611,9 +4287,60 @@ namespace Sisonke.Web.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("ProviderPlanCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("StorageLimitMb")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("[Code] IS NOT NULL");
+
                     b.ToTable("SubscriptionPlans");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FeatureCode")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<DateTime>("LastCalculatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("LimitValue")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OrganisationSubscriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UsedValue")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationSubscriptionId", "FeatureCode", "PeriodStart")
+                        .IsUnique();
+
+                    b.ToTable("SubscriptionUsages");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Tenant", b =>
@@ -3683,6 +4410,29 @@ namespace Sisonke.Web.Data.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("TenantSubscriptions");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.TrialReminderSent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Bucket")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OrganisationSubscriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationSubscriptionId", "Bucket")
+                        .IsUnique();
+
+                    b.ToTable("TrialReminderSents");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.VoteMotion", b =>
@@ -4210,6 +4960,17 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("Member");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberDocument", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.MemberFine", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.FineType", "FineType")
@@ -4415,6 +5176,31 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("RecipientMember");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.OrganisationSubscription", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.SubscriptionPlan", "PendingPlanChangePlan")
+                        .WithMany()
+                        .HasForeignKey("PendingPlanChangePlanId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sisonke.Web.Data.Entities.Stokvel", "Stokvel")
+                        .WithMany()
+                        .HasForeignKey("StokvelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.SubscriptionPlan", "SubscriptionPlan")
+                        .WithMany("OrganisationSubscriptions")
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("PendingPlanChangePlan");
+
+                    b.Navigation("Stokvel");
+
+                    b.Navigation("SubscriptionPlan");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.Payment", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.MemberContribution", "MemberContribution")
@@ -4440,6 +5226,35 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("MemberContribution");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.PlanFeature", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.FeatureDefinition", "FeatureDefinition")
+                        .WithMany("PlanFeatures")
+                        .HasForeignKey("FeatureDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.SubscriptionPlan", "SubscriptionPlan")
+                        .WithMany("PlanFeatures")
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FeatureDefinition");
+
+                    b.Navigation("SubscriptionPlan");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.PromotionalTrial", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.SubscriptionPlan", "AppliesToPlan")
+                        .WithMany()
+                        .HasForeignKey("AppliesToPlanId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AppliesToPlan");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.QuestionnaireOption", b =>
@@ -4689,6 +5504,79 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("Stokvel");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionEvent", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.OrganisationSubscription", "OrganisationSubscription")
+                        .WithMany("Events")
+                        .HasForeignKey("OrganisationSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrganisationSubscription");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionInvoice", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.OrganisationSubscription", "OrganisationSubscription")
+                        .WithMany("Invoices")
+                        .HasForeignKey("OrganisationSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrganisationSubscription");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionInvoiceLine", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.SubscriptionInvoice", "SubscriptionInvoice")
+                        .WithMany("Lines")
+                        .HasForeignKey("SubscriptionInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SubscriptionInvoice");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionPayment", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.OrganisationSubscription", "OrganisationSubscription")
+                        .WithMany("Payments")
+                        .HasForeignKey("OrganisationSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sisonke.Web.Data.Entities.SubscriptionInvoice", "SubscriptionInvoice")
+                        .WithMany("Payments")
+                        .HasForeignKey("SubscriptionInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("OrganisationSubscription");
+
+                    b.Navigation("SubscriptionInvoice");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionPaymentMethod", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.OrganisationSubscription", "OrganisationSubscription")
+                        .WithMany("PaymentMethods")
+                        .HasForeignKey("OrganisationSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrganisationSubscription");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionUsage", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.OrganisationSubscription", "OrganisationSubscription")
+                        .WithMany("UsageRecords")
+                        .HasForeignKey("OrganisationSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrganisationSubscription");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.TenantSubscription", b =>
                 {
                     b.HasOne("Sisonke.Web.Data.Entities.SubscriptionPlan", "SubscriptionPlan")
@@ -4706,6 +5594,17 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("SubscriptionPlan");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.TrialReminderSent", b =>
+                {
+                    b.HasOne("Sisonke.Web.Data.Entities.OrganisationSubscription", "OrganisationSubscription")
+                        .WithMany()
+                        .HasForeignKey("OrganisationSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrganisationSubscription");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.VoteMotion", b =>
@@ -4744,6 +5643,11 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("VoteMotion");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.FeatureDefinition", b =>
+                {
+                    b.Navigation("PlanFeatures");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.FuneralClaim", b =>
                 {
                     b.Navigation("Documents");
@@ -4773,6 +5677,19 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("Repayments");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.OrganisationSubscription", b =>
+                {
+                    b.Navigation("Events");
+
+                    b.Navigation("Invoices");
+
+                    b.Navigation("PaymentMethods");
+
+                    b.Navigation("Payments");
+
+                    b.Navigation("UsageRecords");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.QuestionnaireQuestion", b =>
                 {
                     b.Navigation("Options");
@@ -4790,8 +5707,19 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("CyclePayouts");
                 });
 
+            modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionInvoice", b =>
+                {
+                    b.Navigation("Lines");
+
+                    b.Navigation("Payments");
+                });
+
             modelBuilder.Entity("Sisonke.Web.Data.Entities.SubscriptionPlan", b =>
                 {
+                    b.Navigation("OrganisationSubscriptions");
+
+                    b.Navigation("PlanFeatures");
+
                     b.Navigation("TenantSubscriptions");
                 });
 

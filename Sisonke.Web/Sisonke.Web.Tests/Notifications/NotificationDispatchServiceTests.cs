@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
@@ -121,8 +122,18 @@ public class NotificationDispatchServiceTests
     }
 
     private static NotificationDispatchService CreateDispatcher(
-        SqliteTestDatabase db, IEnumerable<INotificationChannelSender> senders, NotificationOptions options) =>
-        new(new TestDbContextFactory(db), senders, options, NullLogger<NotificationDispatchService>.Instance);
+        SqliteTestDatabase db, IEnumerable<INotificationChannelSender> senders, NotificationOptions options)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(new TestDbContextFactory(db));
+        foreach (var sender in senders)
+        {
+            services.AddSingleton<INotificationChannelSender>(sender);
+        }
+
+        var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+        return new NotificationDispatchService(scopeFactory, options, NullLogger<NotificationDispatchService>.Instance);
+    }
 
     private sealed class FakeChannelSender(NotificationChannel channel, Func<NotificationMessage, Task> behavior)
         : INotificationChannelSender

@@ -1,0 +1,238 @@
+@page "/platform-admin/revenue"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "PlatformAdmin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Enums
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Revenue — Platform Admin</PageTitle>
+
+<div class="sisonke-role-platform-admin viz-root">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Revenue</h1>
+            <p class="page-subtitle">MRR, ARR, conversion and churn across the subscription base.</p>
+        </div>
+        <a class="sisonke-btn sisonke-btn-outline" href="/platform-admin"><i class="bi bi-arrow-left me-2"></i>Back</a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>
+            Loading revenue data...
+        </div>
+    }
+    else
+    {
+        <!-- ── Stat tiles ── -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3"><div class="viz-stat-tile"><div class="viz-stat-label">MRR</div><div class="viz-stat-value">@FormatCurrency(mrr)</div></div></div>
+            <div class="col-6 col-md-3"><div class="viz-stat-tile"><div class="viz-stat-label">ARR</div><div class="viz-stat-value">@FormatCurrency(mrr * 12)</div></div></div>
+            <div class="col-6 col-md-3"><div class="viz-stat-tile"><div class="viz-stat-label">Trial → Paid</div><div class="viz-stat-value">@conversionRate.ToString("P0")</div></div></div>
+            <div class="col-6 col-md-3"><div class="viz-stat-tile"><div class="viz-stat-label">Churn</div><div class="viz-stat-value">@churnRate.ToString("P0")</div></div></div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3"><div class="viz-stat-tile viz-stat-good"><div class="viz-stat-label">Active</div><div class="viz-stat-value">@activeCount</div></div></div>
+            <div class="col-6 col-md-3"><div class="viz-stat-tile viz-stat-info"><div class="viz-stat-label">Trialing</div><div class="viz-stat-value">@trialingCount</div></div></div>
+            <div class="col-6 col-md-3"><div class="viz-stat-tile viz-stat-warning"><div class="viz-stat-label">Past Due</div><div class="viz-stat-value">@pastDueCount</div></div></div>
+            <div class="col-6 col-md-3"><div class="viz-stat-tile viz-stat-critical"><div class="viz-stat-label">Failed-payment rate</div><div class="viz-stat-value">@failedPaymentRate.ToString("P0")</div></div></div>
+        </div>
+
+        <!-- ── Revenue by month ── -->
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>Revenue by Month</h2></div>
+                @if (revenueByMonth.Count == 0)
+                {
+                    <p class="text-muted mb-0">No successful payments yet.</p>
+                }
+                else
+                {
+                    <div class="viz-bar-chart">
+                        @foreach (var point in revenueByMonth)
+                        {
+                            <div class="viz-bar-row" title="@point.Label: @FormatCurrency(point.Amount)">
+                                <span class="viz-bar-axis-label">@point.Label</span>
+                                <div class="viz-bar-track">
+                                    <div class="viz-bar-fill viz-bar-fill-sequential" style="width:@(BarWidthPercent(point.Amount, maxMonthlyRevenue))%"></div>
+                                </div>
+                                <span class="viz-bar-value">@FormatCurrency(point.Amount)</span>
+                            </div>
+                        }
+                    </div>
+                    <table class="visually-hidden-focusable table table-sm mt-3 viz-table-view">
+                        <caption>Revenue by month (table view)</caption>
+                        <thead><tr><th>Month</th><th>Revenue</th></tr></thead>
+                        <tbody>
+                            @foreach (var point in revenueByMonth)
+                            {
+                                <tr><td>@point.Label</td><td>@FormatCurrency(point.Amount)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <!-- ── MRR by plan ── -->
+        <div class="sisonke-card mb-4">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>MRR by Plan</h2></div>
+                @if (mrrByPlan.Count == 0)
+                {
+                    <p class="text-muted mb-0">No billing subscriptions yet.</p>
+                }
+                else
+                {
+                    <div class="viz-bar-chart">
+                        @for (var i = 0; i < mrrByPlan.Count; i++)
+                        {
+                            var point = mrrByPlan[i];
+                            var colorIndex = i;
+                            <div class="viz-bar-row" title="@point.Label: @FormatCurrency(point.Amount)">
+                                <span class="viz-bar-axis-label">@point.Label</span>
+                                <div class="viz-bar-track">
+                                    <div class="viz-bar-fill" style="width:@(BarWidthPercent(point.Amount, maxPlanMrr))%;background:var(--series-@((colorIndex % 8) + 1))"></div>
+                                </div>
+                                <span class="viz-bar-value">@FormatCurrency(point.Amount)</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .viz-root {
+        color-scheme: light;
+        --surface-1: #fcfcfb;
+        --text-primary: #0b0b0b;
+        --text-secondary: #52514e;
+        --text-muted: #898781;
+        --gridline: #e1e0d9;
+        --series-1: #2a78d6;
+        --series-2: #eb6834;
+        --series-3: #1baf7a;
+        --series-4: #eda100;
+        --series-5: #e87ba4;
+        --series-6: #008300;
+        --series-7: #4a3aa7;
+        --series-8: #e34948;
+        --status-good: #0ca30c;
+        --status-warning: #fab219;
+        --status-critical: #d03b3b;
+        --status-info: #2a78d6;
+    }
+
+    .viz-stat-tile {
+        background: var(--surface-1);
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius);
+        padding: 1rem 1.25rem;
+        border-top: 3px solid var(--sk-border);
+    }
+    .viz-stat-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 600; }
+    .viz-stat-value { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .viz-stat-good { border-top-color: var(--status-good); }
+    .viz-stat-warning { border-top-color: var(--status-warning); }
+    .viz-stat-critical { border-top-color: var(--status-critical); }
+    .viz-stat-info { border-top-color: var(--status-info); }
+
+    .viz-bar-chart { display: flex; flex-direction: column; gap: .6rem; }
+    .viz-bar-row { display: grid; grid-template-columns: 6rem 1fr 6rem; align-items: center; gap: .75rem; }
+    .viz-bar-axis-label { font-size: .8rem; color: var(--text-secondary); }
+    .viz-bar-track { background: var(--gridline); border-radius: 4px; height: 1.5rem; overflow: hidden; }
+    .viz-bar-fill { height: 100%; border-radius: 4px; min-width: 2px; }
+    .viz-bar-fill-sequential { background: var(--series-1); }
+    .viz-bar-value { font-size: .8rem; font-weight: 600; color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+    .viz-table-view { font-size: .8rem; }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private decimal mrr;
+    private double conversionRate;
+    private double churnRate;
+    private double failedPaymentRate;
+    private int activeCount;
+    private int trialingCount;
+    private int pastDueCount;
+    private List<ChartPoint> revenueByMonth = [];
+    private List<ChartPoint> mrrByPlan = [];
+    private decimal maxMonthlyRevenue;
+    private decimal maxPlanMrr;
+
+    private static readonly SubscriptionStatus[] PayingStatuses = [SubscriptionStatus.Active, SubscriptionStatus.PastDue, SubscriptionStatus.Restricted];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        var subscriptions = await context.OrganisationSubscriptions
+            .AsNoTracking()
+            .Include(s => s.SubscriptionPlan)
+            .ToListAsync();
+
+        activeCount = subscriptions.Count(s => s.Status == SubscriptionStatus.Active);
+        trialingCount = subscriptions.Count(s => s.Status == SubscriptionStatus.Trialing);
+        pastDueCount = subscriptions.Count(s => s.Status == SubscriptionStatus.PastDue);
+        var cancelledCount = subscriptions.Count(s => s.Status == SubscriptionStatus.Cancelled);
+
+        var paying = subscriptions.Where(s => PayingStatuses.Contains(s.Status) && s.SubscriptionPlan is { IsCustomPricing: false }).ToList();
+        mrr = paying.Sum(s => s.SubscriptionPlan!.MonthlyPrice);
+
+        mrrByPlan = paying
+            .GroupBy(s => s.SubscriptionPlan!.Name)
+            .Select(g => new ChartPoint(g.Key, g.Sum(s => s.SubscriptionPlan!.MonthlyPrice)))
+            .OrderByDescending(p => p.Amount)
+            .ToList();
+        maxPlanMrr = mrrByPlan.Count > 0 ? mrrByPlan.Max(p => p.Amount) : 0;
+
+        var everActiveOrCancelled = subscriptions.Count(s => s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Cancelled);
+        churnRate = everActiveOrCancelled == 0 ? 0 : (double)cancelledCount / everActiveOrCancelled;
+
+        var trialStartedSubscriptionIds = await context.SubscriptionEvents
+            .Where(e => e.EventType == SubscriptionEventType.TrialStarted)
+            .Select(e => e.OrganisationSubscriptionId)
+            .Distinct()
+            .ToListAsync();
+        var activatedSubscriptionIds = await context.SubscriptionEvents
+            .Where(e => e.EventType == SubscriptionEventType.Activated)
+            .Select(e => e.OrganisationSubscriptionId)
+            .Distinct()
+            .ToListAsync();
+        conversionRate = trialStartedSubscriptionIds.Count == 0
+            ? 0
+            : (double)activatedSubscriptionIds.Intersect(trialStartedSubscriptionIds).Count() / trialStartedSubscriptionIds.Count;
+
+        var payments = await context.SubscriptionPayments.AsNoTracking().ToListAsync();
+        var completedAttempts = payments.Count(p => p.Status is SubscriptionPaymentStatus.Succeeded or SubscriptionPaymentStatus.Failed);
+        failedPaymentRate = completedAttempts == 0 ? 0 : (double)payments.Count(p => p.Status == SubscriptionPaymentStatus.Failed) / completedAttempts;
+
+        var since = DateTime.UtcNow.Date.AddMonths(-5);
+        revenueByMonth = payments
+            .Where(p => p.Status == SubscriptionPaymentStatus.Succeeded && p.PaidAt >= since)
+            .GroupBy(p => new DateTime(p.PaidAt!.Value.Year, p.PaidAt.Value.Month, 1))
+            .Select(g => new ChartPoint(g.Key.ToString("MMM yyyy"), g.Sum(p => p.Amount)))
+            .OrderBy(p => DateTime.ParseExact(p.Label, "MMM yyyy", System.Globalization.CultureInfo.InvariantCulture))
+            .ToList();
+        maxMonthlyRevenue = revenueByMonth.Count > 0 ? revenueByMonth.Max(p => p.Amount) : 0;
+
+        isLoading = false;
+    }
+
+    private static double BarWidthPercent(decimal value, decimal max) =>
+        max <= 0 ? 0 : Math.Max(2, (double)(value / max) * 100);
+
+    private static string FormatCurrency(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private sealed record ChartPoint(string Label, decimal Amount);
+}

@@ -1,19 +1,25 @@
 using System.Data;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.EntityFrameworkCore;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
+using Sisonke.Web.Services.Entitlements;
 
 namespace Sisonke.Web.Services;
 
 public class MemberService(
     ApplicationDbContext context,
     OperatingRuleService operatingRuleService,
-    StokvelService stokvelService,
-    ILogger<MemberService> logger)
+    IWebHostEnvironment webHostEnvironment,
+    ILogger<MemberService> logger,
+    IEntitlementService entitlementService,
+    IStokvelOperationLock operationLock)
 {
     public const int SeniorDependentAgeThreshold = 75;
     public const int MaxSeniorDependents = 2;
+    private const long MaxMemberDocumentUploadSize = 10 * 1024 * 1024;
+    private static readonly string[] AllowedMemberDocumentExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"];
 
     public async Task<Member?> GetMemberByIdAsync(Guid memberId)
     {
@@ -76,7 +82,13 @@ public class MemberService(
 
     public async Task<Member?> AddMemberAsync(Guid stokvelId, Member member)
     {
-        if (!await stokvelService.CanAddMemberAsync(stokvelId))
+        // Holds the per-stokvel lock across the entitlement check AND the insert/save, so two
+        // concurrent AddMemberAsync calls at the limit can't both be authorized before either
+        // persists (AuthorizeAsync alone reads live usage but does not serialize callers).
+        await using var guard = await operationLock.AcquireAsync(stokvelId, FeatureCodes.MaxMembers);
+
+        var decision = await entitlementService.AuthorizeAsync(stokvelId, FeatureCodes.MaxMembers, requestedUsage: 1);
+        if (!decision.Allowed)
         {
             return null;
         }
@@ -393,6 +405,70 @@ public class MemberService(
         await context.SaveChangesAsync();
 
         return beneficiary;
+    }
+
+    public async Task<List<MemberDocument>> GetMemberDocumentsAsync(Guid memberId)
+    {
+        return await context.MemberDocuments
+            .Where(document => document.MemberId == memberId)
+            .OrderByDescending(document => document.UploadedAt)
+            .ToListAsync();
+    }
+
+    public async Task<MemberDocument?> UploadMemberDocumentAsync(
+        Guid memberId,
+        string documentType,
+        IBrowserFile file)
+    {
+        var member = await context.Members
+            .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
+
+        if (member is null || file is null || string.IsNullOrWhiteSpace(documentType))
+        {
+            return null;
+        }
+
+        var originalFileName = Path.GetFileName(file.Name);
+        var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
+
+        if (!AllowedMemberDocumentExtensions.Contains(extension) || file.Size > MaxMemberDocumentUploadSize)
+        {
+            return null;
+        }
+
+        var tenantFolderName = member.TenantId.ToString("D");
+        var memberFolderName = member.Id.ToString("D");
+        var webRootPath = webHostEnvironment.WebRootPath
+            ?? Path.Combine(webHostEnvironment.ContentRootPath, "wwwroot");
+        var uploadFolder = Path.Combine(webRootPath, "uploads", "member-documents", tenantFolderName, memberFolderName);
+
+        Directory.CreateDirectory(uploadFolder);
+
+        var storedFileName = $"{Guid.NewGuid()}_{GetSafeFileName(originalFileName)}";
+        var storedFilePath = Path.Combine(uploadFolder, storedFileName);
+
+        await using (var fileStream = File.Create(storedFilePath))
+        await using (var uploadStream = file.OpenReadStream(maxAllowedSize: MaxMemberDocumentUploadSize))
+        {
+            await uploadStream.CopyToAsync(fileStream);
+        }
+
+        var document = new MemberDocument
+        {
+            Id = Guid.NewGuid(),
+            MemberId = member.Id,
+            DocumentType = documentType.Trim(),
+            OriginalFileName = file.Name,
+            StoredFilePath = $"/uploads/member-documents/{tenantFolderName}/{memberFolderName}/{storedFileName}",
+            ContentType = file.ContentType,
+            FileSizeBytes = file.Size,
+            UploadedAt = DateTime.UtcNow
+        };
+
+        context.MemberDocuments.Add(document);
+        await context.SaveChangesAsync();
+
+        return document;
     }
 
     public async Task<List<MemberDependent>> GetDependentsByMemberIdAsync(Guid memberId)
@@ -764,6 +840,18 @@ public class MemberService(
         return string.IsNullOrWhiteSpace(idNumber)
             ? string.Empty
             : idNumber.Trim().Replace(" ", string.Empty).Replace("-", string.Empty);
+    }
+
+    private static string GetSafeFileName(string fileName)
+    {
+        var safeFileName = Path.GetFileName(fileName);
+
+        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
+        {
+            safeFileName = safeFileName.Replace(invalidCharacter, '_');
+        }
+
+        return safeFileName;
     }
 
     private static bool IsOfficeBearerRole(SisonkeRole role)

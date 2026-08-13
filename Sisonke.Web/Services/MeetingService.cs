@@ -168,7 +168,6 @@ public class MeetingService(ApplicationDbContext context)
     public async Task<bool> DeleteMeetingAsync(Guid meetingId)
     {
         var meeting = await context.Meetings
-            .Include(existingMeeting => existingMeeting.AgendaItems)
             .SingleOrDefaultAsync(existingMeeting => existingMeeting.Id == meetingId);
 
         if (meeting is null)
@@ -176,8 +175,49 @@ public class MeetingService(ApplicationDbContext context)
             return false;
         }
 
+        var agendaItemIds = await context.MeetingAgendaItems
+            .Where(agendaItem => agendaItem.MeetingId == meetingId)
+            .Select(agendaItem => agendaItem.Id)
+            .ToListAsync();
+
+        var meetingMinutes = await context.MeetingMinutes
+            .Where(minutes => minutes.MeetingId == meetingId)
+            .ToListAsync();
+
+        var linkedVoteMotionsQuery = context.VoteMotions
+            .Where(vote => vote.MeetingId == meetingId);
+
+        if (agendaItemIds.Count > 0)
+        {
+            linkedVoteMotionsQuery = linkedVoteMotionsQuery
+                .Union(context.VoteMotions.Where(vote =>
+                    vote.AgendaItemId.HasValue &&
+                    agendaItemIds.Contains(vote.AgendaItemId.Value)));
+        }
+
+        var linkedVoteMotions = await linkedVoteMotionsQuery.ToListAsync();
+        var linkedWarnings = await context.MemberWarnings
+            .Where(warning => warning.MeetingId == meetingId)
+            .ToListAsync();
+
+        await using var transaction = await context.Database.BeginTransactionAsync();
+
+        context.MeetingMinutes.RemoveRange(meetingMinutes);
+
+        foreach (var voteMotion in linkedVoteMotions)
+        {
+            voteMotion.MeetingId = null;
+            voteMotion.AgendaItemId = null;
+        }
+
+        foreach (var warning in linkedWarnings)
+        {
+            warning.MeetingId = null;
+        }
+
         context.Meetings.Remove(meeting);
         await context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return true;
     }

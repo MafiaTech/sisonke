@@ -25,9 +25,19 @@ public sealed class AcsEmailSender(
                 $"Notification {message.Id} recipient {message.RecipientMemberId} has no email address on file.");
         }
 
+        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            throw new EmailChannelConfigurationException("Email:ConnectionString is not configured.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.FromAddress))
+        {
+            throw new EmailChannelConfigurationException("Email:FromAddress is not configured.");
+        }
+
         var emailClient = new EmailClient(options.ConnectionString);
         var emailMessage = new EmailMessage(
-            senderAddress: options.SenderAddress,
+            senderAddress: options.FromAddress,
             content: new EmailContent(message.Subject ?? string.Empty) { Html = message.Body },
             recipients: new EmailRecipients([new EmailAddress(recipient.EmailAddress)]));
 
@@ -36,3 +46,5 @@ public sealed class AcsEmailSender(
         await emailClient.SendAsync(WaitUntil.Started, emailMessage, ct);
     }
 }
+
+public sealed class EmailChannelConfigurationException(string message) : Exception(message);

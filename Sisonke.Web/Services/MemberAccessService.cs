@@ -204,6 +204,30 @@ public class MemberAccessService(ApplicationDbContext context)
         return member is not null && IsOfficeBearerRole(member.DefaultRole.ToString());
     }
 
+    /// <summary>
+    /// Every active office bearer for the stokvel — the recipient set for subscription billing
+    /// notifications (never ordinary members). Reuses the same role check as IsOfficeBearerAsync
+    /// rather than a separate/looser list.
+    /// </summary>
+    public async Task<List<Member>> GetOfficeBearersAsync(Guid stokvelId)
+    {
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        var members = await context.Members
+            .Where(member => member.TenantId == stokvel.TenantId && member.Status == MemberStatus.Active)
+            .ToListAsync();
+
+        return members.Where(member => IsOfficeBearerRole(member.DefaultRole.ToString())).ToList();
+    }
+
     public async Task<bool> IsOrdinaryMemberAsync(string userId, Guid stokvelId)
     {
         var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
@@ -632,31 +656,23 @@ public class MemberAccessService(ApplicationDbContext context)
             return DashboardAccess.Denied;
 
         var linkedMember = await GetLinkedMemberForUserAsync(userId, stokvelId);
-        var canManage = await CanViewFullDashboardAsync(userId, stokvelId);
+        var role = linkedMember?.DefaultRole.ToString();
+        var canManage = linkedMember is not null && IsOfficeBearerRole(role);
 
         if (!canManage)
             return new DashboardAccess(false, linkedMember, false, false, false, false, false, false, false, false);
 
-        var canViewSecretaryTasks = await CanViewSecretaryTasksAsync(userId, stokvelId);
-        var canViewChairpersonTasks = await CanViewChairpersonTasksAsync(userId, stokvelId);
-        var canManageMeetings = await CanManageMeetingsAsync(userId, stokvelId);
-        var canReviewClaims = await CanReviewClaimsAsync(userId, stokvelId);
-        var canManageAttendance = await CanManageAttendanceAsync(userId, stokvelId);
-        var canViewTreasurerTasks = await CanViewTreasurerTasksAsync(userId, stokvelId);
-        var canManagePayments = await CanManagePaymentsAsync(userId, stokvelId);
-        var canViewFinancials = await CanViewFinancialsAsync(userId, stokvelId);
-
         return new DashboardAccess(
             CanManageDashboard: true,
             LinkedMember: linkedMember,
-            CanViewSecretaryTasks: canViewSecretaryTasks,
-            CanViewChairpersonTasks: canViewChairpersonTasks,
-            CanManageMeetings: canManageMeetings,
-            CanReviewClaims: canReviewClaims,
-            CanManageAttendance: canManageAttendance,
-            CanViewTreasurerTasks: canViewTreasurerTasks,
-            CanManagePayments: canManagePayments,
-            CanViewFinancials: canViewFinancials
+            CanViewSecretaryTasks: CanViewSecretaryTasksRole(role),
+            CanViewChairpersonTasks: CanViewChairpersonTasksRole(role),
+            CanManageMeetings: CanManageMeetingsRole(role),
+            CanReviewClaims: CanReviewClaimsRole(role),
+            CanManageAttendance: CanManageMeetingsRole(role),
+            CanViewTreasurerTasks: CanViewTreasurerTasksRole(role),
+            CanManagePayments: CanManagePaymentsRole(role),
+            CanViewFinancials: CanViewFinancialsRole(role)
         );
     }
 }

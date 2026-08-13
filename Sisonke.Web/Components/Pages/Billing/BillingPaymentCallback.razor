@@ -1,0 +1,68 @@
+@page "/billing/payment-callback"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using Sisonke.Web.Services.Billing
+@inject SubscriptionService SubscriptionService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Confirming Payment Method...</PageTitle>
+
+<div class="loading-state">
+    <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    Confirming your payment method...
+</div>
+
+@code {
+    @* Single shared return page for every Paystack hosted-authorisation redirect: onboarding
+       (Phase 5 §A), legacy migration (§C, which re-enters the same onboarding wizard at Step 2),
+       and card updates from the customer billing page (§D). Paystack appends its own "reference"
+       (and sometimes "trxref") query param to whatever callback URL we supplied — the "intent",
+       "stokvelId" and "redirect" params below are ours, added when BeginCardAuthorisationAsync /
+       UpdatePaymentMethodAsync was called. *@
+
+    [SupplyParameterFromQuery]
+    public Guid? StokvelId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Reference { get; set; }
+
+    [SupplyParameterFromQuery(Name = "trxref")]
+    public string? TrxRef { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Intent { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Redirect { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var reference = Reference ?? TrxRef;
+        var redirectTarget = string.IsNullOrWhiteSpace(Redirect) ? "/subscription" : Redirect;
+
+        if (StokvelId is null || string.IsNullOrWhiteSpace(reference))
+        {
+            NavigationManager.NavigateTo(redirectTarget, replace: true);
+            return;
+        }
+
+        var result = string.Equals(Intent, "payment-method-update", StringComparison.OrdinalIgnoreCase)
+            ? await SubscriptionService.CompletePaymentMethodUpdateAsync(StokvelId.Value, reference)
+            : await SubscriptionService.CompleteCardAuthorisationAsync(StokvelId.Value, reference);
+
+        if (result.Success)
+        {
+            NavigationManager.NavigateTo(redirectTarget, replace: true);
+            return;
+        }
+
+        var separator = redirectTarget.Contains('?') ? "&" : "?";
+        NavigationManager.NavigateTo(
+            $"{redirectTarget}{separator}step=3&error={Uri.EscapeDataString(result.Message ?? "Card authorisation failed.")}",
+            replace: true);
+    }
+}

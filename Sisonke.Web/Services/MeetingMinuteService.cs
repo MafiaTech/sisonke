@@ -258,6 +258,26 @@ public class MeetingMinuteService(
         return true;
     }
 
+    public async Task<bool> DeleteDraftMinutesAsync(Guid meetingMinuteId, Guid deletedByMemberId)
+    {
+        var minutes = await context.MeetingMinutes
+            .Where(existingMinutes => existingMinutes.Id == meetingMinuteId)
+            .FirstOrDefaultAsync();
+
+        if (minutes is null || minutes.Status is not (StatusDraft or StatusRejected))
+        {
+            return false;
+        }
+
+        var stokvelId = minutes.StokvelId;
+        var meetingId = minutes.MeetingId;
+        context.MeetingMinutes.Remove(minutes);
+        await context.SaveChangesAsync();
+        await auditLogService.RecordAsync(null, stokvelId, "MeetingMinutesDeleted", "MeetingMinute", meetingMinuteId, $"Draft minutes deleted for meeting {meetingId} by member {deletedByMemberId}.");
+
+        return true;
+    }
+
     private static string BuildAttendanceSummary(List<MeetingAttendance> attendanceRecords, int apologiesCount)
     {
         if (attendanceRecords.Count == 0 && apologiesCount == 0)

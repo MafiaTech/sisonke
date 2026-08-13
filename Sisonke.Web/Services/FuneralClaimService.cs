@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
 using Sisonke.Web.Data.Enums;
@@ -14,7 +15,8 @@ public class FuneralClaimService(
     StokvelOperatingRulesService stokvelOperatingRulesService,
     AuditLogService auditLogService,
     IWebHostEnvironment webHostEnvironment,
-    NotificationEnqueuer notificationEnqueuer)
+    NotificationEnqueuer notificationEnqueuer,
+    ILogger<FuneralClaimService> logger)
 {
     private const long MaxClaimDocumentUploadSize = 10 * 1024 * 1024;
     private static readonly string[] AllowedClaimDocumentExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"];
@@ -64,12 +66,20 @@ public class FuneralClaimService(
 
     public async Task<List<FuneralClaim>> GetClaimsByMemberIdAsync(Guid memberId)
     {
-        return await context.FuneralClaims
-            .Include(claim => claim.Dependent)
-            .Include(claim => claim.Documents)
-            .Where(claim => claim.MemberId == memberId)
-            .OrderByDescending(claim => claim.CreatedAt)
-            .ToListAsync();
+        try
+        {
+            return await context.FuneralClaims
+                .Include(claim => claim.Dependent)
+                .Include(claim => claim.Documents)
+                .Where(claim => claim.MemberId == memberId)
+                .OrderByDescending(claim => claim.CreatedAt)
+                .ToListAsync();
+        }
+        catch (InvalidCastException ex)
+        {
+            logger.LogError(ex, "Failed to materialize funeral claims for member {MemberId}. Falling back to defensive claim loader.", memberId);
+            return await GetClaimsByMemberIdDefensivelyAsync(memberId, activeDependentClaimsOnly: false);
+        }
     }
 
     public async Task<List<FuneralClaim>> GetClaimsRequiringSecretaryReviewByStokvelIdAsync(Guid stokvelId)
@@ -257,19 +267,255 @@ public class FuneralClaimService(
 
     public async Task<Dictionary<Guid, FuneralClaim>> GetActiveDependentClaimsByMemberIdAsync(Guid memberId)
     {
-        var claims = await context.FuneralClaims
-            .Include(claim => claim.Documents)
-            .Where(claim =>
-                claim.MemberId == memberId &&
-                claim.DependentId != null &&
-                claim.Status != FuneralClaimStatus.Rejected &&
-                claim.Status != FuneralClaimStatus.Cancelled)
-            .OrderByDescending(claim => claim.CreatedAt)
-            .ToListAsync();
+        List<FuneralClaim> claims;
+
+        try
+        {
+            claims = await context.FuneralClaims
+                .Include(claim => claim.Documents)
+                .Where(claim =>
+                    claim.MemberId == memberId &&
+                    claim.DependentId != null &&
+                    claim.Status != FuneralClaimStatus.Rejected &&
+                    claim.Status != FuneralClaimStatus.Cancelled)
+                .OrderByDescending(claim => claim.CreatedAt)
+                .ToListAsync();
+        }
+        catch (InvalidCastException ex)
+        {
+            logger.LogError(ex, "Failed to materialize active dependent funeral claims for member {MemberId}. Falling back to defensive claim loader.", memberId);
+            claims = await GetClaimsByMemberIdDefensivelyAsync(memberId, activeDependentClaimsOnly: true);
+        }
 
         return claims
             .GroupBy(claim => claim.DependentId!.Value)
             .ToDictionary(group => group.Key, group => group.First());
+    }
+
+    private async Task<List<FuneralClaim>> GetClaimsByMemberIdDefensivelyAsync(Guid memberId, bool activeDependentClaimsOnly)
+    {
+        var claims = new List<FuneralClaim>();
+        var connection = context.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"""
+                SELECT Id, TenantId, StokvelId, MemberId, ClaimType, SubjectType, DependentId,
+                       DeceasedFullName, DateOfDeath, Status, ClaimReference, ClaimReason, ReviewNotes,
+                       IsWaitingPeriodSatisfied, IsMemberStatusEligible, CreatedAt, SubmittedAt,
+                       SubmittedByName, SecretaryReviewedAt, SecretaryReviewedByName,
+                       SecretaryRecommendedApproval, SecretaryReviewNotes, ChairpersonDecisionAt,
+                       ChairpersonDecisionByName, ChairpersonDecisionNotes, ApprovedAt, RejectedAt,
+                       PayoutAmount, PayoutPaidAt, PayoutReference, PayoutNotes, PayoutCapturedByMemberId
+                FROM dbo.FuneralClaims
+                WHERE MemberId = @memberId
+                  {GetActiveDependentClaimSqlFilter(activeDependentClaimsOnly)}
+                ORDER BY CreatedAt DESC
+                """;
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@memberId";
+            parameter.DbType = DbType.Guid;
+            parameter.Value = memberId;
+            command.Parameters.Add(parameter);
+
+            // The reader must be fully disposed before LoadClaimDocumentsDefensivelyAsync opens a
+            // second command on this same connection — otherwise SQL Server (without MARS) throws
+            // "There is already an open DataReader associated with this Connection".
+            await using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    try
+                    {
+                        claims.Add(new FuneralClaim
+                        {
+                            Id = reader.GetGuid(0),
+                            TenantId = reader.GetGuid(1),
+                            StokvelId = ReadNullableGuid(reader, 2),
+                            MemberId = reader.GetGuid(3),
+                            ClaimType = ReadEnum(reader.GetValue(4), ClaimType.Funeral),
+                            SubjectType = ReadEnum(reader.GetValue(5), FuneralClaimSubjectType.Member),
+                            DependentId = ReadNullableGuid(reader, 6),
+                            DeceasedFullName = ReadString(reader, 7) ?? string.Empty,
+                            DateOfDeath = ReadNullableDateTime(reader, 8),
+                            Status = ReadEnum(reader.GetValue(9), FuneralClaimStatus.Draft),
+                            ClaimReference = ReadString(reader, 10),
+                            ClaimReason = ReadString(reader, 11),
+                            ReviewNotes = ReadString(reader, 12),
+                            IsWaitingPeriodSatisfied = ReadBoolean(reader, 13),
+                            IsMemberStatusEligible = ReadBoolean(reader, 14),
+                            CreatedAt = ReadNullableDateTime(reader, 15) ?? DateTime.UtcNow,
+                            SubmittedAt = ReadNullableDateTime(reader, 16),
+                            SubmittedByName = ReadString(reader, 17),
+                            SecretaryReviewedAt = ReadNullableDateTime(reader, 18),
+                            SecretaryReviewedByName = ReadString(reader, 19),
+                            SecretaryRecommendedApproval = ReadNullableBoolean(reader, 20),
+                            SecretaryReviewNotes = ReadString(reader, 21),
+                            ChairpersonDecisionAt = ReadNullableDateTime(reader, 22),
+                            ChairpersonDecisionByName = ReadString(reader, 23),
+                            ChairpersonDecisionNotes = ReadString(reader, 24),
+                            ApprovedAt = ReadNullableDateTime(reader, 25),
+                            RejectedAt = ReadNullableDateTime(reader, 26),
+                            PayoutAmount = ReadNullableDecimal(reader, 27),
+                            PayoutPaidAt = ReadNullableDateTime(reader, 28),
+                            PayoutReference = ReadString(reader, 29),
+                            PayoutNotes = ReadString(reader, 30),
+                            PayoutCapturedByMemberId = ReadNullableGuid(reader, 31)
+                        });
+                    }
+                    catch (Exception rowEx) when (rowEx is InvalidCastException or FormatException or ArgumentException)
+                    {
+                        logger.LogWarning(rowEx, "Skipped one malformed funeral claim row for member {MemberId}.", memberId);
+                    }
+                }
+            }
+
+            await LoadClaimDocumentsDefensivelyAsync(memberId, claims, activeDependentClaimsOnly);
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+
+        return claims;
+    }
+
+    private async Task LoadClaimDocumentsDefensivelyAsync(Guid memberId, List<FuneralClaim> claims, bool activeDependentClaimsOnly)
+    {
+        if (claims.Count == 0)
+        {
+            return;
+        }
+
+        await using var command = context.Database.GetDbConnection().CreateCommand();
+        command.CommandText = $"""
+            SELECT d.Id, d.FuneralClaimId, d.DocumentType, d.OriginalFileName, d.StoredFilePath,
+                   d.ContentType, d.FileSizeBytes, d.UploadedAt
+            FROM dbo.FuneralClaimDocuments d
+            INNER JOIN dbo.FuneralClaims c ON c.Id = d.FuneralClaimId
+            WHERE c.MemberId = @memberId
+              {GetActiveDependentClaimSqlFilter(activeDependentClaimsOnly, "c.")}
+            """;
+
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "@memberId";
+        parameter.DbType = DbType.Guid;
+        parameter.Value = memberId;
+        command.Parameters.Add(parameter);
+
+        var claimsById = claims.ToDictionary(claim => claim.Id);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            try
+            {
+                var claimId = reader.GetGuid(1);
+                if (!claimsById.TryGetValue(claimId, out var claim))
+                {
+                    continue;
+                }
+
+                claim.Documents.Add(new FuneralClaimDocument
+                {
+                    Id = reader.GetGuid(0),
+                    FuneralClaimId = claimId,
+                    DocumentType = ReadEnum(reader.GetValue(2), ClaimDocumentType.Other),
+                    OriginalFileName = ReadString(reader, 3) ?? string.Empty,
+                    StoredFilePath = ReadString(reader, 4) ?? string.Empty,
+                    ContentType = ReadString(reader, 5),
+                    FileSizeBytes = Convert.ToInt64(reader.GetValue(6)),
+                    UploadedAt = ReadNullableDateTime(reader, 7) ?? DateTime.UtcNow
+                });
+            }
+            catch (Exception rowEx) when (rowEx is InvalidCastException or FormatException or ArgumentException)
+            {
+                logger.LogWarning(rowEx, "Skipped one malformed funeral claim document row for member {MemberId}.", memberId);
+            }
+        }
+    }
+
+    private static string GetActiveDependentClaimSqlFilter(bool activeDependentClaimsOnly, string prefix = "") =>
+        activeDependentClaimsOnly
+            ? $"""
+              AND {prefix}DependentId IS NOT NULL
+              AND UPPER(LTRIM(RTRIM(CONVERT(nvarchar(100), {prefix}Status)))) NOT IN (N'6', N'8', N'REJECTED', N'CANCELLED')
+              """
+            : string.Empty;
+
+    private static string? ReadString(IDataRecord reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : Convert.ToString(reader.GetValue(ordinal));
+
+    private static DateTime? ReadNullableDateTime(IDataRecord reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : Convert.ToDateTime(reader.GetValue(ordinal));
+
+    private static Guid? ReadNullableGuid(IDataRecord reader, int ordinal)
+    {
+        if (reader.IsDBNull(ordinal))
+        {
+            return null;
+        }
+
+        var value = reader.GetValue(ordinal);
+        return value is Guid guid ? guid : Guid.Parse(Convert.ToString(value) ?? string.Empty);
+    }
+
+    private static bool ReadBoolean(IDataRecord reader, int ordinal)
+    {
+        if (reader.IsDBNull(ordinal))
+        {
+            return false;
+        }
+
+        var value = reader.GetValue(ordinal);
+        return value switch
+        {
+            bool boolean => boolean,
+            int number => number != 0,
+            string text => bool.TryParse(text, out var parsed) ? parsed : text == "1",
+            _ => Convert.ToBoolean(value)
+        };
+    }
+
+    private static bool? ReadNullableBoolean(IDataRecord reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : ReadBoolean(reader, ordinal);
+
+    private static decimal? ReadNullableDecimal(IDataRecord reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : Convert.ToDecimal(reader.GetValue(ordinal));
+
+    private static TEnum ReadEnum<TEnum>(object value, TEnum fallback)
+        where TEnum : struct, Enum
+    {
+        if (value is null or DBNull)
+        {
+            return fallback;
+        }
+
+        if (value is int intValue && Enum.IsDefined(typeof(TEnum), intValue))
+        {
+            return (TEnum)Enum.ToObject(typeof(TEnum), intValue);
+        }
+
+        var text = Convert.ToString(value)?.Trim();
+        if (int.TryParse(text, out var parsedNumber) && Enum.IsDefined(typeof(TEnum), parsedNumber))
+        {
+            return (TEnum)Enum.ToObject(typeof(TEnum), parsedNumber);
+        }
+
+        return Enum.TryParse<TEnum>(text, ignoreCase: true, out var parsedStatus)
+            ? parsedStatus
+            : fallback;
     }
 
     public async Task<bool> HasDeathCertificateAsync(Guid claimId)

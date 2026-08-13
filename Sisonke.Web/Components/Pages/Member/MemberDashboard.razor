@@ -378,7 +378,7 @@ else
                 </div>
             </div>
 
-            <!-- Card: Documents (stub) -->
+            <!-- Card: Documents -->
             <div class="sm-card sm-fade-up">
                 <div class="sm-card-head">
                     <h2 class="sm-card-title">
@@ -387,11 +387,59 @@ else
                     </h2>
                 </div>
                 <div class="sm-card-body">
-                    <!-- TODO: wire to IDocumentService.GetMemberDocumentsAsync(memberId) -->
-                    <div class="sm-empty">
-                        <span class="sm-empty-icon">📁</span>
-                        <p class="sm-empty-text">Document management is coming soon.</p>
+                    @if (!string.IsNullOrWhiteSpace(documentFeedback))
+                    {
+                        <div class="sm-error-state" style="margin-bottom:12px;">@documentFeedback</div>
+                    }
+
+                    <div class="sm-form-group">
+                        <label class="sm-form-label" for="member-document-type">Document type</label>
+                        <select id="member-document-type" class="sm-form-control" @bind="selectedDocumentType">
+                            @foreach (var option in documentTypeOptions)
+                            {
+                                <option value="@option">@option</option>
+                            }
+                        </select>
                     </div>
+                    <div class="sm-form-group">
+                        <label class="sm-form-label" for="member-document">Upload document</label>
+                        <InputFile id="member-document" class="sm-form-control" OnChange="@OnDocumentSelected" />
+                    </div>
+                    <button class="sm-btn-primary" type="button" @onclick="UploadMemberDocumentAsync" disabled="@(selectedDocument is null || isUploadingDocument)">
+                        @if (isUploadingDocument)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                            <span>Uploading...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-upload"></i>
+                            <span>Upload</span>
+                        }
+                    </button>
+
+                    @if (memberDocuments.Count == 0)
+                    {
+                        <div class="sm-empty" style="margin-top:18px;">
+                            <span class="sm-empty-icon">📁</span>
+                            <p class="sm-empty-text">No documents uploaded yet.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="display:flex;flex-direction:column;gap:10px;margin-top:18px;">
+                            @foreach (var document in memberDocuments)
+                            {
+                                <div class="sm-profile-detail-row">
+                                    <span class="sm-profile-detail-label">@document.DocumentType</span>
+                                    <span class="sm-profile-detail-value">
+                                        <a class="sm-btn-link" href="@document.StoredFilePath" target="_blank" rel="noopener noreferrer">@document.OriginalFileName</a>
+                                        <span style="color:var(--sm-muted);margin-left:8px;font-size:12px;">@document.UploadedAt.ToString("dd MMM yyyy")</span>
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -480,6 +528,11 @@ else
     private Dictionary<Guid, AttendanceStatus?> myAttendanceByMeeting = new();
     private ConstitutionDocument? constitution;
     private string constitutionStatus = "Not Created";
+    private List<MemberDocument> memberDocuments = [];
+    private IBrowserFile? selectedDocument;
+    private string selectedDocumentType = "Proof of Payment";
+    private string? documentFeedback;
+    private bool isUploadingDocument;
 
     private bool showApologyModal;
     private Guid selectedMeetingId;
@@ -488,6 +541,16 @@ else
     private bool apologySubmitting;
     private string? apologyFeedback;
     private string? toastMessage;
+
+    private static readonly string[] documentTypeOptions =
+    [
+        "Proof of Payment",
+        "ID Copy",
+        "Bank Confirmation",
+        "Address Proof",
+        "Membership Form",
+        "Other"
+    ];
 
     private decimal OutstandingFines =>
         fines.Where(f => f.Status == FineStatus.Unpaid).Sum(f => f.Amount);
@@ -526,6 +589,8 @@ else
             return;
         }
 
+        memberDocuments = await MemberService.GetMemberDocumentsAsync(MemberId);
+
         stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
 
         if (stokvel is not null)
@@ -554,6 +619,53 @@ else
         }
 
         isLoading = false;
+    }
+
+    private void OnDocumentSelected(InputFileChangeEventArgs args)
+    {
+        selectedDocument = args.File;
+        documentFeedback = null;
+    }
+
+    private async Task UploadMemberDocumentAsync()
+    {
+        if (selectedDocument is null)
+        {
+            documentFeedback = "Choose a document to upload.";
+            return;
+        }
+
+        isUploadingDocument = true;
+        documentFeedback = null;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrWhiteSpace(userId) ||
+                !await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId))
+            {
+                documentFeedback = "You do not have access to upload documents for this profile.";
+                return;
+            }
+
+            var uploaded = await MemberService.UploadMemberDocumentAsync(MemberId, selectedDocumentType, selectedDocument);
+
+            if (uploaded is null)
+            {
+                documentFeedback = "Document could not be uploaded. Use PDF, image, Word documents, up to 10 MB.";
+                return;
+            }
+
+            selectedDocument = null;
+            memberDocuments = await MemberService.GetMemberDocumentsAsync(MemberId);
+            ShowToast("Document uploaded.");
+        }
+        finally
+        {
+            isUploadingDocument = false;
+        }
     }
 
     private void OpenApologyModal(Guid meetingId, string meetingTitle)

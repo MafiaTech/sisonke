@@ -150,8 +150,14 @@ else
                 </div>
                 @if (canManageMinutes || IsApprovedOrPublished(meetingMinutes.Status))
                 {
-                    <div class="mt-3">
+                    <div class="d-flex flex-wrap gap-2 mt-3">
                         <a class="sisonke-btn sisonke-btn-outline" href="@($"/meeting-minutes/{MeetingId}")">@GetMinutesActionLabel(meetingMinutes.Status)</a>
+                        @if (CanDeleteMinutes)
+                        {
+                            <button type="button" class="sisonke-btn sisonke-btn-outline" style="color:var(--sk-danger)" @onclick="ShowDeleteMinutesConfirmation">
+                                <i class="bi bi-trash me-1"></i>Delete Minutes
+                            </button>
+                        }
                     </div>
                 }
             }
@@ -382,6 +388,16 @@ else
         ModalType="danger"
         OnConfirm="ConfirmDeleteMeetingAsync"
         OnCancel="CancelDeleteMeeting" />
+
+    <ConfirmationModal
+        IsVisible="@showDeleteMinutesConfirmation"
+        Title="Delete Minutes"
+        Message="Are you sure you want to delete these draft minutes? This will not delete the meeting or agenda items."
+        ConfirmButtonText="Delete Minutes"
+        CancelButtonText="Cancel"
+        ModalType="danger"
+        OnConfirm="ConfirmDeleteMinutesAsync"
+        OnCancel="CancelDeleteMinutes" />
 }
 
 <style>
@@ -430,7 +446,12 @@ else
     private bool showDeleteAgendaItemConfirmation;
     private Guid? selectedAgendaItemId;
     private bool showDeleteMeetingConfirmation;
+    private bool showDeleteMinutesConfirmation;
     private Guid? meetingStokvelId;
+    private bool CanDeleteMinutes =>
+        canManageMinutes &&
+        meetingMinutes?.Status is "Draft" or "Rejected" &&
+        linkedMember is not null;
 
     [Parameter]
     public Guid MeetingId { get; set; }
@@ -698,6 +719,45 @@ else
         }
 
         errorMessage = "Meeting could not be deleted.";
+    }
+
+    private void ShowDeleteMinutesConfirmation()
+    {
+        if (!CanDeleteMinutes)
+        {
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+        showDeleteMinutesConfirmation = true;
+    }
+
+    private void CancelDeleteMinutes()
+    {
+        showDeleteMinutesConfirmation = false;
+    }
+
+    private async Task ConfirmDeleteMinutesAsync()
+    {
+        if (!CanDeleteMinutes || meetingMinutes is null || linkedMember is null)
+        {
+            errorMessage = "Only authorised office bearers can delete draft minutes.";
+            showDeleteMinutesConfirmation = false;
+            return;
+        }
+
+        var deleted = await MeetingMinuteService.DeleteDraftMinutesAsync(meetingMinutes.Id, linkedMember.Id);
+        showDeleteMinutesConfirmation = false;
+
+        if (deleted)
+        {
+            await LoadMeetingAsync();
+            successMessage = "Draft minutes deleted.";
+            return;
+        }
+
+        errorMessage = "Only draft or rejected minutes can be deleted.";
     }
 
     private static string DisplayOrDash(string? value)

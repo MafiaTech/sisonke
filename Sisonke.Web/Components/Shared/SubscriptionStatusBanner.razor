@@ -1,0 +1,85 @@
+@* Subscription status banner driven by EntitlementSnapshot (Phase 2/4). Dismissible except while
+   Restricted/Suspended — those need to stay visible since they explain why actions are blocked. *@
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services.Entitlements
+@inject IEntitlementService EntitlementService
+
+@if (!isDismissed && snapshot is not null)
+{
+    switch (snapshot.Status)
+    {
+        case SubscriptionStatus.LegacyUnsubscribed:
+            <div class="alert alert-info d-flex justify-content-between align-items-center gap-3" role="alert">
+                <span><i class="bi bi-info-circle-fill me-2"></i>Sisonke is moving to paid plans. Choose a plan to start your 60-day free trial.</span>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <a class="btn btn-sm btn-primary" href="/subscription">Choose a plan</a>
+                    <button type="button" class="btn-close" aria-label="Dismiss" @onclick="Dismiss"></button>
+                </div>
+            </div>
+            break;
+
+        case SubscriptionStatus.Trialing:
+            <div class="alert alert-light border d-flex justify-content-between align-items-center gap-3" role="alert">
+                <span>
+                    <i class="bi bi-clock-history me-2"></i>
+                    @DaysRemaining(snapshot.TrialEndsAt) day(s) left in your @snapshot.PlanName trial.
+                    First billing date: @snapshot.NextBillingAt?.ToString("d MMMM yyyy").
+                </span>
+                <button type="button" class="btn-close flex-shrink-0" aria-label="Dismiss" @onclick="Dismiss"></button>
+            </div>
+            break;
+
+        case SubscriptionStatus.PastDue:
+            <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3" role="alert">
+                <span><i class="bi bi-exclamation-triangle-fill me-2"></i>Your last payment failed. Update your card to avoid losing access.</span>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <a class="btn btn-sm btn-outline-dark" href="/subscription">Update card</a>
+                    <button type="button" class="btn-close" aria-label="Dismiss" @onclick="Dismiss"></button>
+                </div>
+            </div>
+            break;
+
+        case SubscriptionStatus.Restricted:
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-lock-fill me-2"></i><strong>This account is restricted pending payment.</strong>
+                <div class="mt-1">Blocked: adding members, creating claims, starting loans, creating meetings, sending bulk notifications, processing payouts, new financial transactions.</div>
+                <div>Still works: viewing records, exporting reports, invoices, billing and support.</div>
+                <a class="btn btn-sm btn-dark mt-2" href="/subscription">Update card to restore access</a>
+            </div>
+            break;
+
+        case SubscriptionStatus.Suspended:
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-lock-fill me-2"></i><strong>This account is suspended.</strong> Read-only access only.
+                <div class="mt-1">Your data is retained and can be exported at any time — nothing is deleted.</div>
+                <a class="btn btn-sm btn-dark mt-2" href="/subscription">Update card to restore access</a>
+            </div>
+            break;
+    }
+}
+
+@code {
+    private EntitlementSnapshot? snapshot;
+    private bool isDismissed;
+
+    [Parameter, EditorRequired]
+    public Guid StokvelId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        snapshot = await EntitlementService.GetSnapshotAsync(StokvelId);
+    }
+
+    private void Dismiss()
+    {
+        if (snapshot?.Status is SubscriptionStatus.Restricted or SubscriptionStatus.Suspended)
+        {
+            return; // Not dismissible in these states.
+        }
+
+        isDismissed = true;
+    }
+
+    private static int DaysRemaining(DateTime? trialEndsAt) =>
+        trialEndsAt is null ? 0 : Math.Max(0, (trialEndsAt.Value.Date - DateTime.UtcNow.Date).Days);
+}

@@ -21,6 +21,9 @@ public class Stokvel
 
     public StokvelArchetype Archetype { get; set; } = StokvelArchetype.BurialSociety;
 
+    /// <summary>The stokvel's legal registration status (Phase 5 onboarding Step 1). Null for stokvels created before this field existed.</summary>
+    public StokvelRegistrationType? RegistrationType { get; set; }
+
     public bool EnableClaims { get; set; } = true;
 
     public bool EnableDependents { get; set; } = true;

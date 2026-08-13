@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Data.Sqlite;
+using Polly;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -15,9 +16,15 @@ using Sisonke.Web.Components;
 using Sisonke.Web.Components.Account;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Entities;
+using Sisonke.Web.Data.Enums;
 using Sisonke.Web.Data.Seed;
 using Sisonke.Web.Helpers;
 using Sisonke.Web.Services;
+using Sisonke.Web.Services.Billing;
+using Sisonke.Web.Services.Billing.Jobs;
+using Sisonke.Web.Services.Billing.Paystack;
+using Sisonke.Web.Services.Entitlements;
+using Sisonke.Web.Services.Jobs;
 using Sisonke.Web.Services.Notifications;
 using Sisonke.Web.Services.Notifications.Channels;
 
@@ -33,10 +40,24 @@ authSettings.SessionTimeoutMinutes = builder.Configuration.GetValue("Auth:Sessio
 var appSettings = builder.Configuration.GetSection("App").Get<AppSettings>() ?? new AppSettings();
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings();
 var featureFlags = builder.Configuration.GetSection("Features").Get<FeatureFlags>() ?? new FeatureFlags();
-var acsEmailOptions = builder.Configuration.GetSection("AcsEmail").Get<AcsEmailOptions>() ?? new AcsEmailOptions();
+var acsEmailOptions = builder.Configuration.GetSection("Email").Get<AcsEmailOptions>() ?? new AcsEmailOptions();
 var whatsAppOptions = builder.Configuration.GetSection("WhatsApp").Get<WhatsAppOptions>() ?? new WhatsAppOptions();
 var notificationOptions = builder.Configuration.GetSection("Notifications").Get<NotificationOptions>() ?? new NotificationOptions();
 var webPushOptions = builder.Configuration.GetSection("WebPush").Get<WebPushOptions>() ?? new WebPushOptions();
+var entitlementOptions = builder.Configuration.GetSection("Entitlements").Get<EntitlementOptions>() ?? new EntitlementOptions();
+var paystackOptions = builder.Configuration.GetSection("Paystack").Get<PaystackOptions>() ?? new PaystackOptions();
+var invoicingOptions = builder.Configuration.GetSection("Invoicing").Get<InvoicingOptions>() ?? new InvoicingOptions();
+
+// Fail loudly outside Development if the webhook secret is missing — a missing secret would
+// otherwise mean every webhook silently fails signature verification (401) with no obvious cause.
+if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(paystackOptions.WebhookSecret))
+{
+    throw new InvalidOperationException(
+        "Paystack:WebhookSecret is not configured. Set it via Azure App Service configuration or Key Vault " +
+        "(Paystack__WebhookSecret) — never in appsettings.json. The app will not start without it outside Development.");
+}
+
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(authSettings);
 builder.Services.AddSingleton(appSettings);
 builder.Services.AddSingleton(emailSettings);
@@ -45,6 +66,9 @@ builder.Services.AddSingleton(acsEmailOptions);
 builder.Services.AddSingleton(whatsAppOptions);
 builder.Services.AddSingleton(notificationOptions);
 builder.Services.AddSingleton(webPushOptions);
+builder.Services.AddSingleton(entitlementOptions);
+builder.Services.AddSingleton(paystackOptions);
+builder.Services.AddSingleton(invoicingOptions);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -385,6 +409,7 @@ builder.Services.AddScoped<RotationalTaskService>();
 builder.Services.AddScoped<StokvelBankingDetailsService>();
 builder.Services.AddScoped<LoansWalletService>();
 builder.Services.AddScoped<DashboardQueryService>();
+builder.Services.AddScoped<NotificationEmailTemplateRenderer>();
 builder.Services.AddScoped<NotificationEnqueuer>();
 builder.Services.AddScoped<INotificationChannelSender, AcsEmailSender>();
 builder.Services.AddScoped<INotificationChannelSender, WhatsAppChannelSender>();
@@ -393,6 +418,56 @@ builder.Services.AddScoped<IReminderSource, SisonkeReminderSource>();
 builder.Services.AddHostedService<NotificationDispatchService>();
 builder.Services.AddHostedService<ReminderSchedulerService>();
 builder.Services.AddHttpClient();
+
+// ── Subscription entitlements (Phase 2) ────────────────────────────────────
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IEntitlementUsageProvider, EntitlementUsageProvider>();
+builder.Services.AddScoped<IEntitlementService, EntitlementService>();
+builder.Services.AddSingleton<IStokvelOperationLock, StokvelOperationLock>();
+builder.Services.AddHostedService<EntitlementUsageRollupService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IDistributedJobLock, DistributedJobLock>();
+
+// ── Paystack billing integration (Phase 3) ─────────────────────────────────
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
+builder.Services.AddHttpClient<PaystackBillingProvider>(client =>
+    {
+        client.BaseAddress = new Uri(paystackOptions.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(30);
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", paystackOptions.SecretKey);
+    })
+    // Default IHttpClientFactory logging can emit request headers (including the bearer secret
+    // key) at Trace level — removed in favour of PaystackBillingProvider's own path-only logging.
+    .RemoveAllLoggers()
+    .AddPolicyHandler(Polly.Extensions.Http.HttpPolicyExtensions
+        .HandleTransientHttpError() // 5xx and network failures
+        .Or<TaskCanceledException>() // timeouts
+        .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
+builder.Services.AddScoped<IBillingProvider>(sp => sp.GetRequiredService<PaystackBillingProvider>());
+
+builder.Services.AddScoped<IInvoiceNumberGenerator, InvoiceNumberGenerator>();
+builder.Services.AddSingleton<IInvoicePdfRenderer, QuestPdfInvoiceRenderer>();
+builder.Services.AddScoped<BillingDocumentStorage>();
+builder.Services.AddSingleton<InvoiceDownloadTokenService>();
+builder.Services.AddScoped<ISubscriptionStateMachine, SubscriptionStateMachine>();
+builder.Services.AddScoped<SubscriptionNotificationService>();
+builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddScoped<BillingWebhookProcessor>();
+builder.Services.AddHostedService<BillingWebhookProcessingService>();
+
+// ── Onboarding, pricing, billing page, admin dashboards (Phase 5) ─────────
+builder.Services.AddScoped<PlanCatalogueService>();
+builder.Services.AddScoped<AdminBillingService>();
+
+// ── Trial lifecycle, notifications, dunning (Phase 4) ──────────────────────
+builder.Services.AddScoped<TrialReminderJob>();
+builder.Services.AddScoped<TrialExpiryJob>();
+builder.Services.AddScoped<DunningJob>();
+builder.Services.AddScoped<RenewalJob>();
+builder.Services.AddScoped<LegacyMigrationReminderJob>();
+builder.Services.AddHostedService<SubscriptionJobsHostedService>();
 
 var app = builder.Build();
 
@@ -459,6 +534,39 @@ using (var scope = app.Services.CreateScope())
         {
             startupLogger.LogWarning(ex, "[Startup] Could not check for pending migrations. Continuing startup.");
         }
+    }
+
+    // Billing catalogue (plans, feature definitions, plan/feature rows, LAUNCH60 trial) and the
+    // LegacyUnsubscribed backfill are reference data the app needs to function, not demo data —
+    // unlike SeedData:Enabled below, this runs unconditionally in every environment on every
+    // startup. Both steps are upsert-by-natural-key and never touch an existing
+    // OrganisationSubscription row.
+    try
+    {
+        startupLogger.LogInformation("[Startup] Ensuring subscription billing catalogue...");
+        await BillingCatalogueSeed.EnsureBillingCatalogueAsync(context, startupLogger);
+        await BillingCatalogueSeed.EnsureLegacyOrganisationSubscriptionsAsync(context, startupLogger);
+        startupLogger.LogInformation("[Startup] Subscription billing catalogue check complete.");
+    }
+    catch (Exception ex)
+    {
+        startupLogger.LogError(ex, "[Startup] Subscription billing catalogue seed failed.");
+        throw;
+    }
+
+    // Reporting stored procedures (Database/Scripts/StoredProcedures) — soft-fail, not throw:
+    // DashboardQueryService already tolerates a missing/failing stored procedure by falling back
+    // to an equivalent LINQ query, so a deployment problem here should degrade performance, not
+    // take the app down.
+    try
+    {
+        startupLogger.LogInformation("[Startup] Ensuring reporting stored procedures...");
+        await DatabaseScriptDeployer.EnsureStoredProceduresAsync(context, startupLogger);
+        startupLogger.LogInformation("[Startup] Reporting stored procedures check complete.");
+    }
+    catch (Exception ex)
+    {
+        startupLogger.LogWarning(ex, "[Startup] Reporting stored procedure deployment failed — dashboards will fall back to LINQ queries.");
     }
 
     if (builder.Configuration.GetValue("AdminSeed:Enabled", false))
@@ -562,7 +670,7 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseExceptionHandler("/error", createScopeForErrors: true);
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
@@ -615,6 +723,31 @@ app.MapPost("/api/push-subscriptions", PushSubscriptionEndpoint.HandleAsync)
     .DisableAntiforgery()
     .WithName("RegisterPushSubscription");
 
+// Minimal API surface for the entitlement engine's endpoint enforcement layer (Phase 2) — proves
+// the same IEntitlementService.AuthorizeAsync decision used by MemberService.AddMemberAsync
+// (the application-service check) also blocks a direct API call with HTTP 402, not just the
+// Blazor UI. MemberService performs its own authoritative check regardless of this filter.
+app.MapPost("/api/stokvels/{stokvelId:guid}/members", MemberCreationEndpoint.HandleAsync)
+    .RequireAuthorization()
+    .RequireFeature(FeatureCodes.MaxMembers)
+    .DisableAntiforgery()
+    .WithName("CreateMemberViaApi");
+
+// Anonymous — Paystack cannot authenticate as a Sisonke user. Security is the HMAC-SHA512
+// signature check inside the handler, not ASP.NET Core authorization.
+app.MapPost("/api/billing/webhooks/paystack", PaystackWebhookEndpoint.HandleAsync)
+    .AllowAnonymous()
+    .DisableAntiforgery()
+    .WithName("PaystackWebhook");
+
+// Invoice/receipt PDF download (Phase 5). The signed token (InvoiceDownloadTokenService, 24h
+// TTL) proves the link was legitimately issued for this exact document; RequireAuthorization +
+// the in-handler CanViewStokvelAsync check are the second, independent layer — a leaked link
+// alone is not enough without also being signed in as a member of the owning stokvel.
+app.MapGet("/api/billing/documents/{documentType}/{documentId:guid}", BillingDocumentDownloadEndpoint.HandleAsync)
+    .RequireAuthorization()
+    .WithName("DownloadBillingDocument");
+
 app.MapGet("/Auth/Login", (
     HttpContext context,
     [FromQuery] string? returnUrl) =>
@@ -647,7 +780,8 @@ app.MapGet("/Account/Login", (
 app.MapAdditionalIdentityEndpoints();
 
 Console.WriteLine($"[Sisonke] Environment: {builder.Environment.EnvironmentName} | DB provider: {(isSqlite ? "SQLite" : "SQL Server")} | DB server: {dbDiagServer} | DB name: {dbDiagName} | Connection: {MaskConnectionString(connectionString)}");
-Console.WriteLine($"[Sisonke] SMTP configured: {!string.IsNullOrWhiteSpace(emailSettings.SmtpHost)} | RequireConfirmedAccount: {authSettings.RequireConfirmedAccount} | SessionTimeout: {authSettings.SessionTimeoutMinutes}m | PublicBaseUrl: {appSettings.PublicBaseUrl ?? "(NavigationManager)"}");
+Console.WriteLine($"[Sisonke] SMTP configured: {!string.IsNullOrWhiteSpace(emailSettings.SmtpHost)} | RequireConfirmedAccount: {authSettings.RequireConfirmedAccount} | SessionTimeout: {authSettings.SessionTimeoutMinutes}m | BaseUrl configured: {!string.IsNullOrWhiteSpace(appSettings.BaseUrl)} | PublicBaseUrl: {appSettings.PublicBaseUrl ?? "(NavigationManager)"}");
+Console.WriteLine($"[Sisonke] ACS email configured: {!string.IsNullOrWhiteSpace(acsEmailOptions.ConnectionString)} | Email from address configured: {!string.IsNullOrWhiteSpace(acsEmailOptions.FromAddress)} | Email from name configured: {!string.IsNullOrWhiteSpace(acsEmailOptions.FromName)}");
 
 
 app.Run();
@@ -812,6 +946,195 @@ internal static class PushSubscriptionEndpoint
 }
 
 internal sealed record PushSubscriptionRequest(string Endpoint, string P256dh, string Auth);
+
+internal static class MemberCreationEndpoint
+{
+    public static async Task<IResult> HandleAsync(
+        Guid stokvelId,
+        [FromBody] CreateMemberRequest request,
+        MemberService memberService,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.FullName) || string.IsNullOrWhiteSpace(request.CellphoneNumber))
+        {
+            return Results.BadRequest(new ProblemDetails
+            {
+                Title = "Invalid request",
+                Detail = "FullName and CellphoneNumber are required.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var member = new Member
+        {
+            FullName = request.FullName.Trim(),
+            CellphoneNumber = request.CellphoneNumber.Trim(),
+            Status = MemberStatus.Active,
+            DefaultRole = SisonkeRole.Member,
+            JoiningDate = DateTime.Today
+        };
+
+        // MemberService.AddMemberAsync performs its own authoritative entitlement check —
+        // RequireFeature above is the API-layer check, not a substitute for it.
+        var created = await memberService.AddMemberAsync(stokvelId, member);
+
+        if (created is null)
+        {
+            return Results.Conflict(new ProblemDetails
+            {
+                Title = "Could not add member",
+                Detail = "The stokvel was not found, or its member limit has been reached.",
+                Status = StatusCodes.Status409Conflict
+            });
+        }
+
+        return Results.Created($"/api/stokvels/{stokvelId}/members/{created.Id}", new { created.Id, created.FullName });
+    }
+}
+
+internal sealed record CreateMemberRequest(string FullName, string CellphoneNumber);
+
+internal static class PaystackWebhookEndpoint
+{
+    public static async Task<IResult> HandleAsync(
+        HttpContext httpContext,
+        ApplicationDbContext context,
+        PaystackOptions options,
+        ILoggerFactory loggerFactory,
+        CancellationToken ct)
+    {
+        var logger = loggerFactory.CreateLogger("PaystackWebhook");
+
+        string rawBody;
+        using (var reader = new StreamReader(httpContext.Request.Body))
+        {
+            rawBody = await reader.ReadToEndAsync(ct);
+        }
+
+        var signatureHeader = httpContext.Request.Headers["x-paystack-signature"].FirstOrDefault();
+        var isSignatureValid = PaystackWebhookSignatureVerifier.IsValid(rawBody, signatureHeader, options.WebhookSecret);
+
+        var payload = PaystackWebhookPayload.TryParse(rawBody);
+        var eventType = payload?.EventType ?? "unknown";
+        var providerEventId = payload?.ResolveProviderEventId(rawBody) ?? $"unparsed:{Guid.NewGuid()}";
+
+        if (!isSignatureValid)
+        {
+            logger.LogWarning("Paystack webhook signature invalid for event {EventType}.", eventType);
+
+            context.BillingWebhookEvents.Add(new BillingWebhookEvent
+            {
+                Id = Guid.NewGuid(),
+                Provider = SubscriptionProvider.Paystack,
+                ProviderEventId = providerEventId,
+                EventType = eventType,
+                RawPayload = rawBody,
+                SignatureValid = false,
+                ProcessingStatus = WebhookProcessingStatus.Failed,
+                ErrorMessage = "Invalid signature.",
+                ProcessedAt = DateTime.UtcNow,
+                ReceivedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync(ct);
+
+            return Results.Unauthorized();
+        }
+
+        var alreadyReceived = await context.BillingWebhookEvents
+            .AnyAsync(e => e.ProviderEventId == providerEventId, ct);
+
+        if (!alreadyReceived)
+        {
+            context.BillingWebhookEvents.Add(new BillingWebhookEvent
+            {
+                Id = Guid.NewGuid(),
+                Provider = SubscriptionProvider.Paystack,
+                ProviderEventId = providerEventId,
+                EventType = eventType,
+                RawPayload = rawBody,
+                SignatureValid = true,
+                ProcessingStatus = WebhookProcessingStatus.Received,
+                ReceivedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync(ct);
+        }
+
+        // Always 200 fast, whether newly recorded or a replay — BillingWebhookProcessingService
+        // does the actual work asynchronously. Paystack retries hourly on non-2xx.
+        return Results.Ok();
+    }
+}
+
+internal static class BillingDocumentDownloadEndpoint
+{
+    public static async Task<IResult> HandleAsync(
+        string documentType,
+        Guid documentId,
+        [FromQuery] string? token,
+        ClaimsPrincipal user,
+        UserManager<ApplicationUser> userManager,
+        ApplicationDbContext context,
+        InvoiceDownloadTokenService tokenService,
+        IInvoicePdfRenderer pdfRenderer,
+        MemberAccessService memberAccessService,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(token) || !tokenService.TryValidate(token, documentType, documentId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var userId = userManager.GetUserId(user);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        if (string.Equals(documentType, "invoice", StringComparison.OrdinalIgnoreCase))
+        {
+            var invoice = await context.SubscriptionInvoices
+                .Include(i => i.Lines)
+                .Include(i => i.OrganisationSubscription).ThenInclude(s => s.Stokvel)
+                .SingleOrDefaultAsync(i => i.Id == documentId, ct);
+
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (!await memberAccessService.CanViewStokvelAsync(userId, invoice.OrganisationSubscription.StokvelId))
+            {
+                return Results.Forbid();
+            }
+
+            var pdf = pdfRenderer.RenderInvoice(invoice, [.. invoice.Lines.OrderBy(l => l.SortOrder)], invoice.OrganisationSubscription.Stokvel);
+            return Results.File(pdf, "application/pdf", $"{invoice.InvoiceNumber}.pdf");
+        }
+
+        if (string.Equals(documentType, "receipt", StringComparison.OrdinalIgnoreCase))
+        {
+            var payment = await context.SubscriptionPayments
+                .Include(p => p.SubscriptionInvoice)
+                .Include(p => p.OrganisationSubscription).ThenInclude(s => s.Stokvel)
+                .SingleOrDefaultAsync(p => p.Id == documentId, ct);
+
+            if (payment is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (!await memberAccessService.CanViewStokvelAsync(userId, payment.OrganisationSubscription.StokvelId))
+            {
+                return Results.Forbid();
+            }
+
+            var pdf = pdfRenderer.RenderReceipt(payment, payment.SubscriptionInvoice, payment.OrganisationSubscription.Stokvel);
+            return Results.File(pdf, "application/pdf", $"receipt-{payment.ProviderReference}.pdf");
+        }
+
+        return Results.BadRequest();
+    }
+}
 
 internal static class RegistrationSubmitEndpoint
 {

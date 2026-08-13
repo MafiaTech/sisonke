@@ -1,0 +1,421 @@
+@page "/subscription"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Billing
+@using Sisonke.Web.Services.Entitlements
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject StokvelService StokvelService
+@inject IEntitlementService EntitlementService
+@inject SubscriptionService SubscriptionService
+@inject PlanCatalogueService PlanCatalogueService
+@inject InvoiceDownloadTokenService InvoiceDownloadTokenService
+@inject IServiceScopeFactory ScopeFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Billing &amp; Subscription</PageTitle>
+
+@* No FeatureGate wraps this page — billing/subscription access must always remain reachable in
+   Restricted and Suspended (Phase 5 brief §D), matching FeatureCodes.AlwaysAllowed. *@
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading billing details...
+    </div>
+}
+else if (stokvelOptions.Count == 0)
+{
+    <AlertBanner Type="info" Title="No stokvels found." Message="Register a stokvel to manage its subscription." Icon="bi bi-info-circle-fill" />
+}
+else
+{
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Billing &amp; Subscription</h1>
+            <p class="page-subtitle">Manage your plan, payment method and invoices.</p>
+        </div>
+        @if (stokvelOptions.Count > 1)
+        {
+            <select class="form-select" style="max-width:280px" value="@selectedStokvelId" @onchange="OnStokvelChangedAsync">
+                @foreach (var option in stokvelOptions)
+                {
+                    <option value="@option.Id">@option.Name</option>
+                }
+            </select>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(actionMessage))
+    {
+        <AlertBanner Type="@(actionSucceeded ? "info" : "danger")" Title="@actionMessage" Message="" Icon="@(actionSucceeded ? "bi bi-check-circle-fill" : "bi bi-x-circle-fill")" />
+    }
+
+    <SubscriptionStatusBanner StokvelId="@selectedStokvelId" />
+
+    @if (snapshot is not null)
+    {
+        <!-- ── Plan / status overview ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Plan</div>
+                        <div class="fw-700">@(snapshot.PlanName ?? "No plan")</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Status</div>
+                        <div class="fw-700">@snapshot.Status</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">@(snapshot.Status == SubscriptionStatus.Trialing ? "Trial ends" : "Next billing date")</div>
+                        <div class="fw-700">@((snapshot.Status == SubscriptionStatus.Trialing ? snapshot.TrialEndsAt : snapshot.NextBillingAt)?.ToString("d MMMM yyyy") ?? "—")</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Amount</div>
+                        <div class="fw-700">@(currentPlan is { IsCustomPricing: false } ? FormatCurrency(currentPlan.MonthlyPrice) + "/mo" : (currentPlan?.IsCustomPricing == true ? "Custom" : "—"))</div>
+                    </div>
+                </div>
+                @if (managementLink is not null)
+                {
+                    <a class="sisonke-btn sisonke-btn-outline mt-3" href="@managementLink" target="_blank" rel="noopener">
+                        <i class="bi bi-box-arrow-up-right me-2"></i>Manage on Paystack
+                    </a>
+                }
+            </div>
+        </div>
+
+        @if (isOfficeBearer)
+        {
+            <!-- ── Payment method ── -->
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head mb-3"><h2>Payment Method</h2></div>
+                    @if (defaultPaymentMethod is not null)
+                    {
+                        <p class="mb-2">
+                            <i class="bi bi-credit-card-2-front me-2"></i>
+                            @defaultPaymentMethod.CardBrand &bull;&bull;&bull;&bull; @defaultPaymentMethod.Last4
+                            (expires @defaultPaymentMethod.ExpiryMonth/@defaultPaymentMethod.ExpiryYear)
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-2">No payment method on file.</p>
+                    }
+                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="UpdatePaymentMethodAsync" disabled="@isBusy">
+                        <i class="bi bi-arrow-repeat me-2"></i>Update card
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Upgrade / downgrade ── -->
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head mb-3">
+                        <h2>Change Plan</h2>
+                    </div>
+                    @if (pendingPlanChangeName is not null)
+                    {
+                        <div class="sisonke-alert sisonke-alert-gold mb-3">
+                            <i class="bi bi-clock-history me-2"></i>
+                            Downgrade to <strong>@pendingPlanChangeName</strong> is scheduled for @pendingPlanChangeEffectiveAt?.ToString("d MMMM yyyy").
+                        </div>
+                    }
+                    <p class="text-muted small mb-3">Upgrades take effect immediately. Downgrades take effect at the end of your current billing period — no refund is issued for the current period.</p>
+                    <div class="row g-3">
+                        @foreach (var entry in catalogueEntries)
+                        {
+                            var plan = entry.Plan;
+                            var isCurrent = plan.Code == currentPlan?.Code;
+                            <div class="col-12 col-md-6 col-lg-3">
+                                <div class="plan-card @(isCurrent ? "plan-selected" : "") h-100">
+                                    <div class="card-body p-3 d-flex flex-column">
+                                        <h3 class="h6 fw-700 mb-1">@plan.Name</h3>
+                                        <div class="plan-price mb-2" style="font-size:1.15rem">
+                                            @(plan.IsCustomPricing ? "Custom" : FormatCurrency(plan.MonthlyPrice) + "/mo")
+                                        </div>
+                                        @if (isCurrent)
+                                        {
+                                            <span class="sisonke-badge sisonke-badge-green mt-auto">Current plan</span>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="sisonke-btn sisonke-btn-outline mt-auto" disabled="@isBusy" @onclick="@(() => ChangePlanAsync(plan.Code!))">
+                                                Switch to @plan.Name
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- ── Invoices & receipts ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>Invoices &amp; Receipts</h2></div>
+                @if (invoices.Count == 0 && payments.Count == 0)
+                {
+                    <p class="text-muted mb-0">No invoices or receipts yet.</p>
+                }
+                else
+                {
+                    <table class="table mb-0">
+                        <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var invoice in invoices)
+                            {
+                                <tr>
+                                    <td>@invoice.IssuedAt?.ToString("d MMM yyyy")</td>
+                                    <td>Invoice @invoice.InvoiceNumber</td>
+                                    <td>@FormatCurrency(invoice.Total)</td>
+                                    <td>@invoice.Status</td>
+                                    <td><a href="@BuildDocumentLink("invoice", invoice.Id)" target="_blank">Download</a></td>
+                                </tr>
+                            }
+                            @foreach (var payment in payments.Where(p => p.Status == SubscriptionPaymentStatus.Succeeded))
+                            {
+                                <tr>
+                                    <td>@payment.PaidAt?.ToString("d MMM yyyy")</td>
+                                    <td>Receipt</td>
+                                    <td>@FormatCurrency(payment.Amount)</td>
+                                    <td>Paid</td>
+                                    <td><a href="@BuildDocumentLink("receipt", payment.Id)" target="_blank">Download</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        @if (isOfficeBearer)
+        {
+            <!-- ── Cancellation ── -->
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head mb-3"><h2>Cancel Subscription</h2></div>
+                    @if (!showCancelConfirm)
+                    {
+                        <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="@(() => showCancelConfirm = true)">
+                            Cancel subscription
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="sisonke-alert sisonke-alert-gold mb-3">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Your access will continue until <strong>@accessUntilDate?.ToString("d MMMM yyyy")</strong>, then end.
+                            Your data is retained and can be exported at any time — nothing is deleted.
+                        </div>
+                        <textarea class="form-control mb-2" rows="2" placeholder="Reason for cancelling (optional)" @bind="cancelReason"></textarea>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="@(() => showCancelConfirm = false)">Keep subscription</button>
+                            <button type="button" class="sisonke-btn sisonke-btn-primary" disabled="@isBusy" @onclick="ConfirmCancelAsync">Confirm cancellation</button>
+                        </div>
+                    }
+                    <p class="text-muted small mt-3 mb-0">
+                        Need your data before leaving? <a href="mailto:support@sisonke.co.za?subject=Data export request">Request a data export</a> from support.
+                    </p>
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? currentUserId;
+    private List<(Guid Id, string Name)> stokvelOptions = [];
+    private Guid selectedStokvelId;
+    private bool isOfficeBearer;
+
+    private EntitlementSnapshot? snapshot;
+    private SubscriptionPlan? currentPlan;
+    private string? pendingPlanChangeName;
+    private DateTime? pendingPlanChangeEffectiveAt;
+    private string? managementLink;
+    private SubscriptionPaymentMethod? defaultPaymentMethod;
+    private string? subscriptionBillingEmail;
+    private string? subscriptionCardholderName;
+    private List<SubscriptionInvoice> invoices = [];
+    private List<SubscriptionPayment> payments = [];
+    private List<PlanCatalogueEntry> catalogueEntries = [];
+
+    private bool showCancelConfirm;
+    private string? cancelReason;
+    private DateTime? accessUntilDate;
+
+    private string? actionMessage;
+    private bool actionSucceeded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var memberships = await MemberAccessService.GetLinkedMembershipsForUserAsync(currentUserId);
+        var seenTenants = new HashSet<Guid>();
+        foreach (var member in memberships)
+        {
+            if (!seenTenants.Add(member.TenantId))
+            {
+                continue;
+            }
+            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+            if (stokvel is not null)
+            {
+                stokvelOptions.Add((stokvel.Id, stokvel.Name));
+            }
+        }
+
+        catalogueEntries = (await PlanCatalogueService.GetPublicPlansAsync()).ToList();
+
+        if (stokvelOptions.Count > 0)
+        {
+            selectedStokvelId = stokvelOptions[0].Id;
+            await LoadStokvelBillingDataAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task OnStokvelChangedAsync(ChangeEventArgs args)
+    {
+        if (Guid.TryParse(args.Value?.ToString(), out var stokvelId))
+        {
+            selectedStokvelId = stokvelId;
+            actionMessage = null;
+            showCancelConfirm = false;
+            await LoadStokvelBillingDataAsync();
+        }
+    }
+
+    private async Task LoadStokvelBillingDataAsync()
+    {
+        isOfficeBearer = await MemberAccessService.IsOfficeBearerAsync(currentUserId!, selectedStokvelId);
+        snapshot = await EntitlementService.GetSnapshotAsync(selectedStokvelId);
+        managementLink = await SubscriptionService.GetManagementLinkAsync(selectedStokvelId);
+
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var subscription = await db.OrganisationSubscriptions
+            .AsNoTracking()
+            .Include(s => s.SubscriptionPlan)
+            .Include(s => s.PendingPlanChangePlan)
+            .Where(s => s.StokvelId == selectedStokvelId)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        currentPlan = subscription?.SubscriptionPlan;
+        pendingPlanChangeName = subscription?.PendingPlanChangePlan?.Name;
+        pendingPlanChangeEffectiveAt = subscription?.PendingPlanChangeEffectiveAt;
+        accessUntilDate = subscription?.CurrentPeriodEndsAt ?? subscription?.TrialEndsAt ?? DateTime.UtcNow;
+
+        var currentUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId);
+        subscriptionBillingEmail = subscription?.BillingEmail ?? currentUser?.Email;
+        subscriptionCardholderName = subscription?.CardholderName ?? currentUser?.FullName ?? "Cardholder";
+
+        if (subscription is not null)
+        {
+            defaultPaymentMethod = await db.SubscriptionPaymentMethods
+                .AsNoTracking()
+                .Where(m => m.OrganisationSubscriptionId == subscription.Id && m.IsDefault && m.RemovedAt == null)
+                .OrderByDescending(m => m.AuthorisedAt)
+                .FirstOrDefaultAsync();
+
+            invoices = await db.SubscriptionInvoices
+                .AsNoTracking()
+                .Where(i => i.OrganisationSubscriptionId == subscription.Id)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+
+            payments = await db.SubscriptionPayments
+                .AsNoTracking()
+                .Where(p => p.OrganisationSubscriptionId == subscription.Id)
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
+        }
+        else
+        {
+            defaultPaymentMethod = null;
+            invoices = [];
+            payments = [];
+        }
+    }
+
+    private async Task UpdatePaymentMethodAsync()
+    {
+        isBusy = true;
+        var callbackUrl = NavigationManager.ToAbsoluteUri(
+            $"/billing/payment-callback?intent=payment-method-update&stokvelId={selectedStokvelId}&redirect={Uri.EscapeDataString("/subscription")}").ToString();
+
+        var result = await SubscriptionService.UpdatePaymentMethodAsync(
+            selectedStokvelId, subscriptionBillingEmail ?? string.Empty, subscriptionCardholderName ?? "Cardholder", null, callbackUrl);
+
+        isBusy = false;
+
+        if (!result.Success || string.IsNullOrWhiteSpace(result.AuthorisationUrl))
+        {
+            actionSucceeded = false;
+            actionMessage = result.Message ?? "Could not start card update. Please try again.";
+            return;
+        }
+
+        NavigationManager.NavigateTo(result.AuthorisationUrl, forceLoad: true);
+    }
+
+    private async Task ChangePlanAsync(string planCode)
+    {
+        isBusy = true;
+        var result = await SubscriptionService.ChangePlanAsync(selectedStokvelId, planCode, currentUserId!);
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message ?? (result.Success ? "Plan changed." : "Could not change plan.");
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private async Task ConfirmCancelAsync()
+    {
+        isBusy = true;
+        var result = await SubscriptionService.CancelAsync(selectedStokvelId, atPeriodEnd: true, cancelReason, currentUserId!);
+        isBusy = false;
+        showCancelConfirm = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message ?? (result.Success ? "Subscription cancelled." : "Could not cancel subscription.");
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private string BuildDocumentLink(string documentType, Guid documentId)
+    {
+        var token = InvoiceDownloadTokenService.CreateToken(documentType, documentId);
+        return $"/api/billing/documents/{documentType}/{documentId}?token={Uri.EscapeDataString(token)}";
+    }
+
+    private static string FormatCurrency(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+}

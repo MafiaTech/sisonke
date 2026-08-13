@@ -3,6 +3,10 @@
 @attribute [Authorize(Roles = "PlatformAdmin")]
 
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Enums
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <PageTitle>Platform Administration</PageTitle>
 
@@ -51,16 +55,31 @@
             <div class="sisonke-grid sisonke-grid-3">
                 @foreach (var card in actionCards)
                 {
-                    <article class="sisonke-quick-action platform-action-card">
-                        <div class="sisonke-card-icon">
-                            <i class="bi @card.Icon"></i>
-                        </div>
-                        <div>
-                            <h3>@card.Title</h3>
-                            <p>@card.Description</p>
-                            <span class="sisonke-badge sisonke-badge-gray">Coming Soon</span>
-                        </div>
-                    </article>
+                    @if (card.Href is null)
+                    {
+                        <article class="sisonke-quick-action platform-action-card">
+                            <div class="sisonke-card-icon">
+                                <i class="bi @card.Icon"></i>
+                            </div>
+                            <div>
+                                <h3>@card.Title</h3>
+                                <p>@card.Description</p>
+                                <span class="sisonke-badge sisonke-badge-gray">Coming Soon</span>
+                            </div>
+                        </article>
+                    }
+                    else
+                    {
+                        <a class="sisonke-quick-action platform-action-card" href="@card.Href" style="text-decoration:none">
+                            <div class="sisonke-card-icon">
+                                <i class="bi @card.Icon"></i>
+                            </div>
+                            <div>
+                                <h3>@card.Title</h3>
+                                <p>@card.Description</p>
+                            </div>
+                        </a>
+                    }
                 }
             </div>
         </div>
@@ -115,15 +134,30 @@
         new("Total Users", "Coming Soon", "bi-people", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
         new("Total Members", "Coming Soon", "bi-person-vcard", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
         new("Open Claims", "Coming Soon", "bi-file-earmark-medical", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
-        new("Active Subscriptions", "Coming Soon", "bi-credit-card", "sisonke-badge sisonke-badge-gray", "Metrics pending"),
         new("Support Tickets", "Coming Soon", "bi-life-preserver", "sisonke-badge sisonke-badge-gray", "Coming soon")
     ];
+
+    private int activeSubscriptionCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var context = await DbFactory.CreateDbContextAsync();
+        activeSubscriptionCount = await context.OrganisationSubscriptions.CountAsync(s =>
+            s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Trialing ||
+            s.Status == SubscriptionStatus.PastDue || s.Status == SubscriptionStatus.Restricted);
+
+        statCards.Insert(4, new StatCardModel(
+            "Active Subscriptions", activeSubscriptionCount.ToString(), "bi-credit-card",
+            "sisonke-badge sisonke-badge-green", "Live"));
+    }
 
     private readonly List<ActionCardModel> actionCards =
     [
         new("Stokvel Registry", "Browse and manage registered stokvel records.", "bi-building"),
         new("User Management", "Review platform user accounts and access state.", "bi-person-gear"),
-        new("Subscription Management", "Manage plans, subscriptions and billing state.", "bi-credit-card-2-front"),
+        new("Subscription Management", "Manage plans, subscriptions and billing state.", "bi-credit-card-2-front", "/platform-admin/subscriptions"),
+        new("Revenue", "MRR, ARR, conversion and churn across the subscription base.", "bi-graph-up-arrow", "/platform-admin/revenue"),
+        new("Migration Tracker", "Track legacy organisations moving to a paid plan.", "bi-arrow-left-right", "/platform-admin/migration-tracker"),
         new("Audit Logs", "Track platform administration and sensitive changes.", "bi-list-check"),
         new("Platform Settings", "Configure platform-wide operational settings.", "bi-sliders"),
         new("Support Queue", "Review escalated support requests.", "bi-headset")
@@ -131,5 +165,5 @@
 
     private sealed record StatCardModel(string Title, string Value, string Icon, string BadgeClass, string BadgeText);
 
-    private sealed record ActionCardModel(string Title, string Description, string Icon);
+    private sealed record ActionCardModel(string Title, string Description, string Icon, string? Href = null);
 }
