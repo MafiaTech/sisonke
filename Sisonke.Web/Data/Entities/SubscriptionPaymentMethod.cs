@@ -4,7 +4,8 @@ using Sisonke.Web.Data.Enums;
 namespace Sisonke.Web.Data.Entities;
 
 /// <summary>
-/// Provider token/mandate metadata returned after hosted authorisation. Sisonke never stores card
+/// Provider token/mandate metadata for fees owed directly to Sisonke for its SaaS subscription.
+/// It must not be reused as a stokvel treasury/member payment method. Sisonke never stores card
 /// numbers, CVVs, full bank credentials or online-banking credentials. The legacy Paystack
 /// ProviderAuthorizationCode remains supported; new provider-neutral references are additive.
 /// </summary>

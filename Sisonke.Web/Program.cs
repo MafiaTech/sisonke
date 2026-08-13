@@ -456,6 +456,8 @@ builder.Services.AddScoped<ISubscriptionPaymentProvider, NetcashPaymentSetupProv
 builder.Services.AddScoped<ISubscriptionPaymentProviderResolver, SubscriptionPaymentProviderResolver>();
 builder.Services.AddSingleton<IPaymentSetupStateProtector, PaymentSetupStateProtector>();
 builder.Services.AddScoped<ISubscriptionPaymentSetupService, SubscriptionPaymentSetupService>();
+builder.Services.AddScoped<INetcashClient, NetcashClient>();
+builder.Services.AddScoped<INetcashMandateService, NetcashMandateService>();
 
 builder.Services.AddScoped<IInvoiceNumberGenerator, InvoiceNumberGenerator>();
 builder.Services.AddSingleton<IInvoicePdfRenderer, QuestPdfInvoiceRenderer>();

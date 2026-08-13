@@ -3,7 +3,12 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services.Billing;
 
-/// <summary>Provider-neutral hosted payment-method setup boundary. It never accepts raw payment credentials.</summary>
+/// <summary>
+/// Provider-neutral setup boundary exclusively for fees owed to Sisonke for its SaaS subscription.
+/// It must never be used for contributions, loans, member payments, benefits, payouts, wallets or
+/// any other stokvel funds. It never accepts raw payment credentials or a client-selected amount.
+/// See docs/subscription-payment-boundary.md.
+/// </summary>
 public interface ISubscriptionPaymentProvider
 {
     SubscriptionProvider Provider { get; }

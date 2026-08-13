@@ -17,6 +17,13 @@ public static class BillingTermsVersion
     /// <summary>Placeholder version pending South African commercial/legal review.</summary>
     public const string CurrentTrialAndRecurringBillingConsentVersion = "2026-08-04-v1";
 
+    /// <summary>
+    /// Versioned product-purpose wording, pending final legal copy review. Keep this specific to
+    /// Sisonke's own SaaS fees; it must never authorize movement of stokvel/member funds.
+    /// </summary>
+    public const string SubscriptionMandatePurposeStatement =
+        "This authorization is only for Sisonke platform subscription fees.";
+
     /// <summary>Backward-compatible alias used by the current onboarding flow.</summary>
     public const string Current = CurrentTrialAndRecurringBillingConsentVersion;
 }

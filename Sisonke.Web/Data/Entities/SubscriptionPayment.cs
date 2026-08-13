@@ -3,6 +3,11 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Data.Entities;
 
+/// <summary>
+/// A payment attempt for fees owed directly to Sisonke for the Sisonke SaaS subscription.
+/// This is not a stokvel/member-money ledger and must not represent contributions, loan
+/// repayments, benefits, payouts, wallet movements or transfers.
+/// </summary>
 public class SubscriptionPayment
 {
     public Guid Id { get; set; }

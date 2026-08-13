@@ -1,8 +1,9 @@
 namespace Sisonke.Web.Services.Billing;
 
 /// <summary>
-/// Provider-agnostic billing gateway abstraction. SubscriptionService and everything else in
-/// this application depends only on this interface and the plain records below — no Paystack
+/// Provider-agnostic gateway used only by Sisonke's own SaaS subscription billing. It is not a
+/// general money-movement API and must never process stokvel/member funds. SubscriptionService
+/// and the subscription jobs depend only on this interface and the plain records below — no Paystack
 /// request/response shape, field name or type may appear outside Services/Billing/Paystack (see
 /// the PaystackTypesStayInPaystackFolder architecture test).
 /// </summary>

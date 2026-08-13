@@ -2,6 +2,10 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services.Billing;
 
+/// <summary>
+/// Sisonke SaaS subscription payment-method setup. SubscriptionId is mandatory; there is
+/// deliberately no amount, beneficiary, payout or operational-ledger identifier on this contract.
+/// </summary>
 public sealed record PaymentSetupRequest(
     Guid StokvelId,
     Guid SubscriptionId,
