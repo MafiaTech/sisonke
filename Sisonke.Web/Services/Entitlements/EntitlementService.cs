@@ -12,8 +12,11 @@ public sealed class EntitlementService(
     IEntitlementUsageProvider usageProvider,
     IMemoryCache cache,
     EntitlementOptions options,
-    ILogger<EntitlementService> logger) : IEntitlementService
+    ILogger<EntitlementService> logger,
+    TimeProvider? timeProvider = null) : IEntitlementService
 {
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+
     public async Task<bool> HasFeatureAsync(Guid stokvelId, string featureCode, CancellationToken ct = default)
     {
         // requestedUsage: 0 — a pure existence check must not itself push a numeric feature over its cap.
@@ -34,13 +37,24 @@ public sealed class EntitlementService(
     {
         var cacheKey = BuildCacheKey(stokvelId);
 
-        if (cache.TryGetValue(cacheKey, out EntitlementSnapshot? cached) && cached is not null)
+        if (cache.TryGetValue(cacheKey, out EntitlementSnapshot? cached) && cached is not null &&
+            !(cached.IsTrial && cached.TrialEndsAt is { } cachedTrialEnd && clock.GetUtcNow().UtcDateTime >= cachedTrialEnd))
         {
             return cached;
         }
 
         var snapshot = await BuildSnapshotAsync(stokvelId, ct);
-        cache.Set(cacheKey, snapshot, TimeSpan.FromMinutes(Math.Max(1, options.CacheTtlMinutes)));
+        var cacheDuration = TimeSpan.FromMinutes(Math.Max(1, options.CacheTtlMinutes));
+        if (snapshot.IsTrial && snapshot.TrialEndsAt is { } trialEnd)
+        {
+            var untilExpiry = trialEnd - clock.GetUtcNow().UtcDateTime;
+            if (untilExpiry > TimeSpan.Zero && untilExpiry < cacheDuration)
+            {
+                cacheDuration = untilExpiry;
+            }
+        }
+
+        cache.Set(cacheKey, snapshot, cacheDuration);
         return snapshot;
     }
 
@@ -68,6 +82,26 @@ public sealed class EntitlementService(
             return AllowedDecision(featureCode, subscription.SubscriptionPlan, currentUsage: 0);
         }
 
+        var access = EvaluateAccess(subscription, clock.GetUtcNow().UtcDateTime);
+        if (!access.CanUsePaidFeatures)
+        {
+            var reason = access.State switch
+            {
+                SubscriptionAccessState.TrialExpired => EntitlementDenialReason.TrialExpired,
+                SubscriptionAccessState.Suspended => EntitlementDenialReason.SubscriptionSuspended,
+                _ => EntitlementDenialReason.SubscriptionRestricted
+            };
+            var message = access.State switch
+            {
+                SubscriptionAccessState.TrialExpired => "Your trial has expired. Set up payment to continue using plan features.",
+                SubscriptionAccessState.PaymentSetupRequired => "Start your trial or add a payment method to unlock plan features.",
+                SubscriptionAccessState.Suspended => "This account is suspended. Contact support to reactivate your subscription.",
+                SubscriptionAccessState.Cancelled => "This subscription has been cancelled. Resubscribe to continue.",
+                _ => "This account does not currently have access to paid features."
+            };
+            return DeniedDecision(featureCode, subscription.SubscriptionPlan, reason, message);
+        }
+
         switch (subscription.Status)
         {
             case SubscriptionStatus.Suspended:
@@ -78,18 +112,11 @@ public sealed class EntitlementService(
                 return DeniedDecision(featureCode, subscription.SubscriptionPlan, EntitlementDenialReason.SubscriptionRestricted,
                     "This account is restricted pending payment. Update your payment details to resume full access.");
 
-            case SubscriptionStatus.PendingPaymentMethod when FeatureCodes.WriteBlocked.Contains(featureCode):
+            case SubscriptionStatus.PastDue
+                when access.State == SubscriptionAccessState.PastDue && FeatureCodes.WriteBlocked.Contains(featureCode):
                 return DeniedDecision(featureCode, subscription.SubscriptionPlan, EntitlementDenialReason.SubscriptionRestricted,
-                    "Add a payment method to activate your subscription and unlock this feature.");
+                    "The seven-day payment grace period has ended. Update payment details to resume transactional features.");
 
-            case SubscriptionStatus.Expired when FeatureCodes.WriteBlocked.Contains(featureCode):
-                return DeniedDecision(featureCode, subscription.SubscriptionPlan, EntitlementDenialReason.TrialExpired,
-                    "Your trial has expired. Choose a plan to continue.");
-
-            case SubscriptionStatus.Cancelled
-                when !IsWithinCurrentPeriod(subscription) && FeatureCodes.WriteBlocked.Contains(featureCode):
-                return DeniedDecision(featureCode, subscription.SubscriptionPlan, EntitlementDenialReason.SubscriptionRestricted,
-                    "This subscription has been cancelled. Resubscribe to continue.");
         }
 
         // Trialing / Active / PastDue / Cancelled-but-in-period / Restricted-or-PendingPaymentMethod-or-
@@ -105,7 +132,7 @@ public sealed class EntitlementService(
             return AllowedDecision(featureCode, null, currentUsage: 0);
         }
 
-        if (DateTime.UtcNow >= options.LegacyGraceCutoverUtc)
+        if (clock.GetUtcNow().UtcDateTime >= options.LegacyGraceCutoverUtc)
         {
             return DeniedDecision(featureCode, null, EntitlementDenialReason.NoSubscription,
                 "This organisation does not have an active subscription. Choose a plan to continue.");
@@ -231,9 +258,19 @@ public sealed class EntitlementService(
 
         if (subscription is null || subscription.Status == SubscriptionStatus.LegacyUnsubscribed)
         {
-            effectivePlan = DateTime.UtcNow < options.LegacyGraceCutoverUtc
+            effectivePlan = clock.GetUtcNow().UtcDateTime < options.LegacyGraceCutoverUtc
                 ? await context.SubscriptionPlans.SingleOrDefaultAsync(p => p.Code == options.LegacyEquivalentPlanCode, ct)
                 : null;
+        }
+
+        var now = clock.GetUtcNow().UtcDateTime;
+        var access = subscription is null || subscription.Status == SubscriptionStatus.LegacyUnsubscribed
+            ? new EvaluatedAccess(SubscriptionAccessState.Legacy, false, false, false, false)
+            : EvaluateAccess(subscription, now);
+
+        if (!access.CanUsePaidFeatures && subscription?.Status != SubscriptionStatus.LegacyUnsubscribed)
+        {
+            effectivePlan = subscription?.SubscriptionPlan;
         }
 
         var features = new Dictionary<string, FeatureValue>();
@@ -250,7 +287,7 @@ public sealed class EntitlementService(
                 features[planFeature.FeatureDefinition.Code] = new FeatureValue(
                     planFeature.FeatureDefinition.Code,
                     planFeature.FeatureDefinition.DataType,
-                    planFeature.IsEnabled,
+                    planFeature.IsEnabled && access.CanUsePaidFeatures,
                     planFeature.LimitValue,
                     ExtractEnumValue(planFeature.ConfigurationJson));
             }
@@ -261,7 +298,14 @@ public sealed class EntitlementService(
             effectivePlan?.Code,
             effectivePlan?.Name,
             status,
+            access.State,
+            access.IsTrial,
+            subscription?.TrialStartedAt,
             subscription?.TrialEndsAt,
+            CalculateTrialDaysRemaining(subscription?.TrialEndsAt, now),
+            access.IsExpired,
+            access.CanUsePaidFeatures,
+            access.PaymentSetupRequired,
             subscription?.NextBillingAt,
             features);
     }
@@ -271,6 +315,7 @@ public sealed class EntitlementService(
     {
         var subscriptions = await context.OrganisationSubscriptions
             .Include(s => s.SubscriptionPlan)
+            .Include(s => s.PaymentMethods)
             .Where(s => s.StokvelId == stokvelId)
             .ToListAsync(ct);
 
@@ -288,8 +333,56 @@ public sealed class EntitlementService(
             ?? subscriptions.OrderByDescending(s => s.CreatedAt).First();
     }
 
-    private static bool IsWithinCurrentPeriod(OrganisationSubscription subscription) =>
-        subscription.CurrentPeriodEndsAt is { } periodEnd && periodEnd > DateTime.UtcNow;
+    private static EvaluatedAccess EvaluateAccess(OrganisationSubscription subscription, DateTime now)
+    {
+        var hasPaymentMethod = subscription.PaymentMethods.Any(method =>
+            method.RemovedAt == null && method.IsDefault && method.MandateStatus == MandateStatus.Active);
+        var hasExplicitActiveTrial = subscription.Status == SubscriptionStatus.Trialing &&
+            subscription.TrialOptedIn &&
+            subscription.TrialStartedAt is { } trialStart &&
+            subscription.TrialEndsAt is { } trialEnd &&
+            trialStart <= now && now < trialEnd;
+
+        if (subscription.Status == SubscriptionStatus.Trialing)
+        {
+            return hasExplicitActiveTrial
+                ? new(SubscriptionAccessState.TrialActive, true, true, false, !hasPaymentMethod)
+                : new(SubscriptionAccessState.TrialExpired, false, false, true, !hasPaymentMethod);
+        }
+
+        return subscription.Status switch
+        {
+            SubscriptionStatus.Active => new(SubscriptionAccessState.Active, false, true, false, false),
+            SubscriptionStatus.PastDue when subscription.GracePeriodEndsAt is { } graceEnd && now < graceEnd
+                => new(SubscriptionAccessState.GracePeriod, false, true, false, false),
+            SubscriptionStatus.PastDue => new(SubscriptionAccessState.PastDue, false, true, false, false),
+            SubscriptionStatus.Restricted => new(SubscriptionAccessState.Restricted, false, true, false, false),
+            SubscriptionStatus.Suspended => new(SubscriptionAccessState.Suspended, false, false, true, false),
+            SubscriptionStatus.Cancelled when subscription.CurrentPeriodEndsAt is { } periodEnd && now < periodEnd
+                => new(SubscriptionAccessState.Cancelled, false, true, false, false),
+            SubscriptionStatus.Cancelled => new(SubscriptionAccessState.Cancelled, false, false, true, false),
+            SubscriptionStatus.Expired => new(SubscriptionAccessState.Expired, false, false, true, !hasPaymentMethod),
+            SubscriptionStatus.PendingPaymentMethod => new(SubscriptionAccessState.PaymentSetupRequired, false, false, true, !hasPaymentMethod),
+            _ => new(SubscriptionAccessState.Legacy, false, false, false, false)
+        };
+    }
+
+    private static int CalculateTrialDaysRemaining(DateTime? trialEndsAt, DateTime now)
+    {
+        if (trialEndsAt is null || now >= trialEndsAt.Value)
+        {
+            return 0;
+        }
+
+        return (int)Math.Ceiling((trialEndsAt.Value - now).TotalDays);
+    }
+
+    private sealed record EvaluatedAccess(
+        SubscriptionAccessState State,
+        bool IsTrial,
+        bool CanUsePaidFeatures,
+        bool IsExpired,
+        bool PaymentSetupRequired);
 
     private static string? ExtractEnumValue(string? configurationJson)
     {

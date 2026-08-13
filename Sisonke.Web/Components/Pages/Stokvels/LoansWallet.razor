@@ -9,14 +9,25 @@
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Entitlements
 @inject LoansWalletService Service
+@inject MemberAccessService MemberAccessService
+@inject IEntitlementService EntitlementService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
 
 <PageTitle>Loans &amp; Wallet</PageTitle>
 
 @if (isLoading)
 {
     <div class="loading-state"><span class="spinner-border spinner-border-sm me-2"></span>Loading loans and surplus wallet…</div>
+}
+else if (entitlementDenial is not null)
+{
+    <div class="sisonke-alert sisonke-alert-gold">
+        <strong>Plan upgrade required.</strong> @entitlementDenial.Message
+        <a class="sisonke-btn sisonke-btn-primary ms-2" href="/subscription">View plans</a>
+    </div>
 }
 else if (state is null)
 {
@@ -600,6 +611,7 @@ else
     private decimal EarlyPayoutNet => Math.Max(0, EarlyPayoutGross - EarlyPayoutDiscount);
     private MemberLoan? MyActiveLoan => state?.Loans.FirstOrDefault(x => x.MemberId == state.CurrentMember?.Id && x.LoanStatus is MemberLoanStatus.Active or MemberLoanStatus.Overdue);
     private decimal EstimatedMonthly => loanMonths <= 0 || NetLoanAmount <= 0 ? 0 : Math.Round(NetLoanAmount / loanMonths, 2);
+    private EntitlementDecision? entitlementDenial;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -610,6 +622,24 @@ else
         success = null;
         var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUserId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        if (!await MemberAccessService.CanViewStokvelAsync(currentUserId, StokvelId))
+        {
+            state = null;
+            isLoading = false;
+            return;
+        }
+
+        var featureCode = new Uri(NavigationManager.Uri).AbsolutePath.EndsWith("/wallet", StringComparison.OrdinalIgnoreCase)
+            ? Sisonke.Web.Data.FeatureCodes.SurplusWallet
+            : Sisonke.Web.Data.FeatureCodes.LoansAndWithdrawals;
+        var entitlement = await EntitlementService.AuthorizeAsync(StokvelId, featureCode, requestedUsage: 0);
+        entitlementDenial = entitlement.Allowed ? null : entitlement;
+        if (entitlementDenial is not null)
+        {
+            state = null;
+            isLoading = false;
+            return;
+        }
         await ReloadAsync();
         isLoading = false;
     }

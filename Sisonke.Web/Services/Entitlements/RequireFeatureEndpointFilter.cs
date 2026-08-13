@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Sisonke.Web.Services;
 
 namespace Sisonke.Web.Services.Entitlements;
 
@@ -24,6 +26,18 @@ public sealed class RequireFeatureEndpointFilter(string featureCode, int request
                 Detail = "This endpoint requires a stokvelId route value to evaluate entitlements.",
                 Status = StatusCodes.Status400BadRequest
             });
+        }
+
+        var userId = context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var memberAccessService = context.HttpContext.RequestServices.GetRequiredService<MemberAccessService>();
+        if (!await memberAccessService.CanViewStokvelAsync(userId, stokvelId.Value))
+        {
+            return Results.Forbid();
         }
 
         var entitlementService = context.HttpContext.RequestServices.GetRequiredService<IEntitlementService>();

@@ -18,14 +18,23 @@
             </div>
             break;
 
-        case SubscriptionStatus.Trialing:
+        case SubscriptionStatus.Trialing when snapshot.AccessState == SubscriptionAccessState.TrialActive:
             <div class="alert alert-light border d-flex justify-content-between align-items-center gap-3" role="alert">
                 <span>
                     <i class="bi bi-clock-history me-2"></i>
-                    @DaysRemaining(snapshot.TrialEndsAt) day(s) left in your @snapshot.PlanName trial.
+                    @snapshot.TrialDaysRemaining day(s) left in your @snapshot.PlanName trial.
                     First billing date: @snapshot.NextBillingAt?.ToString("d MMMM yyyy").
                 </span>
                 <button type="button" class="btn-close flex-shrink-0" aria-label="Dismiss" @onclick="Dismiss"></button>
+            </div>
+            break;
+
+        case SubscriptionStatus.PendingPaymentMethod when snapshot.AccessState == SubscriptionAccessState.TrialExpired:
+        case SubscriptionStatus.Trialing when snapshot.AccessState == SubscriptionAccessState.TrialExpired:
+        case SubscriptionStatus.Expired:
+            <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3" role="alert">
+                <span><i class="bi bi-clock-fill me-2"></i>Your trial has expired. Set up payment to restore plan features.</span>
+                <a class="btn btn-sm btn-primary" href="/subscription">Manage subscription</a>
             </div>
             break;
 
@@ -80,6 +89,4 @@
         isDismissed = true;
     }
 
-    private static int DaysRemaining(DateTime? trialEndsAt) =>
-        trialEndsAt is null ? 0 : Math.Max(0, (trialEndsAt.Value.Date - DateTime.UtcNow.Date).Days);
 }

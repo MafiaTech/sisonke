@@ -14,7 +14,7 @@ public sealed class SubscriptionServiceTestHarness : IDisposable
     public EntitlementTestHarness Entitlements { get; }
     public FakeBillingProvider BillingProvider { get; } = new();
     public PaystackOptions PaystackOptions { get; } = new();
-    public FakeTimeProvider TimeProvider { get; } = new(DateTimeOffset.UtcNow);
+    public FakeTimeProvider TimeProvider { get; }
     public IDistributedJobLock JobLock { get; }
     public ISubscriptionStateMachine StateMachine { get; }
     public SubscriptionNotificationService NotificationService { get; }
@@ -22,7 +22,8 @@ public sealed class SubscriptionServiceTestHarness : IDisposable
 
     public SubscriptionServiceTestHarness()
     {
-        Entitlements = new EntitlementTestHarness();
+        TimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        Entitlements = new EntitlementTestHarness(timeProvider: TimeProvider);
 
         var memberAccessService = new MemberAccessService(Entitlements.CreateContext());
         var notificationEnqueuer = new NotificationEnqueuer(

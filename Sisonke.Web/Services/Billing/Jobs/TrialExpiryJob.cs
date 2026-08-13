@@ -52,6 +52,17 @@ public sealed class TrialExpiryJob(
                 continue;
             }
 
+            // Phase 2 explicit trials are provider-neutral and must never cause collection.
+            // Only the legacy Paystack onboarding path sets Provider=Paystack; preserve that
+            // existing path while leaving provider setup/collection for a later phase.
+            if (subscription.Provider != SubscriptionProvider.Paystack)
+            {
+                logger.LogInformation(
+                    "Subscription {SubscriptionId} is a provider-neutral trial; expiry is enforced by entitlements without collection.",
+                    subscription.Id);
+                continue;
+            }
+
             if (!string.IsNullOrEmpty(subscription.ProviderSubscriptionCode))
             {
                 // Paystack has an active subscription on record — trust its automatic first
@@ -91,7 +102,7 @@ public sealed class TrialExpiryJob(
             else
             {
                 subscription.DunningStartedAt ??= now;
-                subscription.GracePeriodEndsAt = now.AddDays(14);
+                subscription.GracePeriodEndsAt = now.AddDays(7);
                 await context.SaveChangesAsync(ct);
                 await stateMachine.TransitionAsync(
                     context, subscription, SubscriptionStatus.PastDue,

@@ -29,6 +29,8 @@ public sealed class SubscriptionService(
     TimeProvider timeProvider,
     ILogger<SubscriptionService> logger)
 {
+    public const int IntroductoryTrialDays = 60;
+
     private static readonly (string Code, string Description)[] NumericFeatures =
     [
         (FeatureCodes.MaxMembers, "active members"),
@@ -94,9 +96,9 @@ public sealed class SubscriptionService(
             return CardAuthorisationResult.Failed("Select a plan before authorising a card.");
         }
 
-        if (subscription.Status != SubscriptionStatus.PendingPaymentMethod)
+        if (subscription.Status is not (SubscriptionStatus.PendingPaymentMethod or SubscriptionStatus.Trialing))
         {
-            return CardAuthorisationResult.Failed("This organisation is not currently awaiting a payment method.");
+            return CardAuthorisationResult.Failed("This organisation cannot set up a payment method in its current subscription state.");
         }
 
         try
@@ -119,6 +121,76 @@ public sealed class SubscriptionService(
             logger.LogError(ex, "Failed to start card authorisation for stokvel {StokvelId}.", stokvelId);
             return CardAuthorisationResult.Failed(DescribeProviderFailure(ex));
         }
+    }
+
+    /// <summary>
+    /// Explicitly activates the one introductory trial available to a stokvel. This path performs
+    /// no provider call: payment setup may happen during the trial, before paid billing begins.
+    /// Repeating a successful activation is idempotent and never moves either trial boundary.
+    /// </summary>
+    public async Task<SubscriptionActionResult> ActivateTrialAsync(
+        Guid stokvelId,
+        string acceptedTermsVersion,
+        string actorUserId,
+        string? actorIpAddress = null,
+        CancellationToken ct = default)
+    {
+        if (!await memberAccessService.IsOfficeBearerAsync(actorUserId, stokvelId))
+        {
+            return SubscriptionActionResult.Failed("Only an office bearer can start the free trial.");
+        }
+
+        if (string.IsNullOrWhiteSpace(acceptedTermsVersion))
+        {
+            return SubscriptionActionResult.Failed("Accept the current trial and billing terms before starting the trial.");
+        }
+
+        await using var context = await dbFactory.CreateDbContextAsync(ct);
+        var subscription = await GetLiveSubscriptionAsync(context, stokvelId, ct);
+        if (subscription?.SubscriptionPlan is null)
+        {
+            return SubscriptionActionResult.Failed("Select a subscription plan before starting the trial.");
+        }
+
+        if (subscription.TrialOptedIn)
+        {
+            return SubscriptionActionResult.Succeeded("The free trial has already been activated; its end date is unchanged.");
+        }
+
+        var priorTrialExists = await context.OrganisationSubscriptions
+            .AnyAsync(s => s.StokvelId == stokvelId && s.Id != subscription.Id && s.TrialOptedIn, ct);
+        if (priorTrialExists)
+        {
+            return SubscriptionActionResult.Failed("This stokvel has already used its introductory trial.");
+        }
+
+        if (subscription.Status != SubscriptionStatus.PendingPaymentMethod)
+        {
+            return SubscriptionActionResult.Failed("Select a plan before starting the free trial.");
+        }
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var trialEnds = now.AddDays(IntroductoryTrialDays);
+        subscription.TrialOptedIn = true;
+        subscription.TrialStartedAt = now;
+        subscription.TrialEndsAt = trialEnds;
+        subscription.NextBillingAt = trialEnds;
+        subscription.TermsAcceptedAt = now;
+        subscription.TermsAcceptedByUserId = actorUserId;
+        subscription.TermsVersion = acceptedTermsVersion.Trim();
+        subscription.TermsAcceptedIpAddress = actorIpAddress;
+
+        AddAuditEvent(context, subscription, SubscriptionEventType.TermsAccepted, actorUserId,
+            $"Accepted trial and billing terms version {subscription.TermsVersion}.", now);
+        await context.SaveChangesAsync(ct);
+
+        await stateMachine.TransitionAsync(
+            context, subscription, SubscriptionStatus.Trialing,
+            SubscriptionEventType.TrialStarted, actorUserId,
+            $"Explicit 60-day trial activated; ends {trialEnds:yyyy-MM-dd} UTC.", ct);
+
+        await notificationService.SendTrialStartedAsync(context, subscription, subscription.SubscriptionPlan, ct);
+        return SubscriptionActionResult.Succeeded($"Your 60-day free trial is active until {trialEnds:d MMMM yyyy}.");
     }
 
     public async Task<SubscriptionActionResult> CompleteCardAuthorisationAsync(Guid stokvelId, string reference, CancellationToken ct = default)
@@ -157,7 +229,9 @@ public sealed class SubscriptionService(
 
         var plan = subscription.SubscriptionPlan;
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var trialEnds = now.AddDays(paystackOptions.TrialDays);
+        var trialEnds = subscription.TrialOptedIn && subscription.TrialEndsAt is { } existingTrialEnd
+            ? existingTrialEnd
+            : now.AddDays(IntroductoryTrialDays);
 
         ProviderSubscriptionResult subscriptionResult;
         try
@@ -188,19 +262,30 @@ public sealed class SubscriptionService(
         subscription.ProviderEmailToken = subscriptionResult.EmailToken;
         subscription.ProviderPlanCode = plan.ProviderPlanCode;
         subscription.Provider = SubscriptionProvider.Paystack;
-        subscription.TrialStartedAt = now;
-        subscription.TrialEndsAt = trialEnds;
-        subscription.TrialOptedIn = true;
+        var trialWasAlreadyActive = subscription.TrialOptedIn;
+        if (!trialWasAlreadyActive)
+        {
+            subscription.TrialStartedAt = now;
+            subscription.TrialEndsAt = trialEnds;
+            subscription.TrialOptedIn = true;
+        }
         subscription.NextBillingAt = trialEnds;
 
         AddAuditEvent(context, subscription, SubscriptionEventType.PaymentMethodAuthorised, null, "Card authorised.", now);
         await context.SaveChangesAsync(ct);
 
-        await stateMachine.TransitionAsync(
-            context, subscription, SubscriptionStatus.Trialing,
-            SubscriptionEventType.TrialStarted, null, $"Trial started, ends {trialEnds:yyyy-MM-dd}.", ct);
+        if (!trialWasAlreadyActive)
+        {
+            await stateMachine.TransitionAsync(
+                context, subscription, SubscriptionStatus.Trialing,
+                SubscriptionEventType.TrialStarted, null, $"Trial started, ends {trialEnds:yyyy-MM-dd}.", ct);
 
-        await notificationService.SendTrialStartedAsync(context, subscription, plan, ct);
+            await notificationService.SendTrialStartedAsync(context, subscription, plan, ct);
+        }
+        else
+        {
+            await entitlementService.InvalidateAsync(stokvelId, ct);
+        }
 
         return SubscriptionActionResult.Succeeded();
     }

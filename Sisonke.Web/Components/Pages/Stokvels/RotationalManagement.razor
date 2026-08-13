@@ -9,6 +9,7 @@
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Entitlements
 
 @inject StokvelService StokvelService
 @inject MemberAccessService MemberAccessService
@@ -19,6 +20,7 @@
 @inject RotationalPayoutService PayoutService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
+@inject IEntitlementService EntitlementService
 
 <PageTitle>Rotation Management</PageTitle>
 
@@ -48,6 +50,11 @@ else if (accessDenied)
     <a class="sisonke-btn sisonke-btn-outline mt-3" href="/my-workspace">
         <i class="bi bi-arrow-left me-2"></i>Back to Workspace
     </a>
+}
+else if (entitlementDenial is not null)
+{
+    <AlertBanner Type="warning" Title="Plan upgrade required." Message="@entitlementDenial.Message" Icon="bi bi-lock-fill" />
+    <a class="sisonke-btn sisonke-btn-primary mt-3" href="/subscription">View plans</a>
 }
 else if (!stokvel.EnableRotation)
 {
@@ -1452,6 +1459,7 @@ else
     private RotationalStokvelConfiguration? activeConfig;
     private bool isLoading = true;
     private bool accessDenied;
+    private EntitlementDecision? entitlementDenial;
     private bool isSaving;
     private bool isEditing;
     private bool isGeneratingPreview;
@@ -1570,9 +1578,27 @@ else
         linkedMember = null;
         canManage = false;
         accessDenied = false;
+        entitlementDenial = null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(currentUserId) || !await MemberAccessService.CanViewStokvelAsync(currentUserId, StokvelId))
+        {
+            accessDenied = true;
+            isLoading = false;
+            return;
+        }
+
+        var entitlement = await EntitlementService.AuthorizeAsync(
+            StokvelId, Sisonke.Web.Data.FeatureCodes.RotationalStokvel, requestedUsage: 0);
+        entitlementDenial = entitlement.Allowed ? null : entitlement;
+        if (entitlementDenial is not null)
+        {
+            stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
+            isLoading = false;
+            return;
+        }
 
         var summary = await RotationOrderService.GetRotationalManagementSummaryAsync(StokvelId, currentUserId);
         stokvel = summary?.Stokvel;

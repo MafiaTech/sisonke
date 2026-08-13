@@ -14,6 +14,25 @@ public enum EntitlementDenialReason
 }
 
 /// <summary>
+/// Evaluated access state. This is deliberately not persisted: it combines the persisted
+/// subscription status with time-dependent trial/period boundaries and payment setup state.
+/// </summary>
+public enum SubscriptionAccessState
+{
+    Legacy = 0,
+    PaymentSetupRequired = 1,
+    TrialActive = 2,
+    TrialExpired = 3,
+    Active = 4,
+    GracePeriod = 5,
+    PastDue = 6,
+    Restricted = 7,
+    Suspended = 8,
+    Cancelled = 9,
+    Expired = 10
+}
+
+/// <summary>
 /// The single result type every enforcement surface (application service, API endpoint filter,
 /// UI helper, background job guard) reads to decide whether an operation may proceed. Never
 /// construct one by hand outside EntitlementService — always come from AuthorizeAsync/HasFeatureAsync.
@@ -46,6 +65,13 @@ public sealed record EntitlementSnapshot(
     string? PlanCode,
     string? PlanName,
     SubscriptionStatus Status,
+    SubscriptionAccessState AccessState,
+    bool IsTrial,
+    DateTime? TrialStartedAt,
     DateTime? TrialEndsAt,
+    int TrialDaysRemaining,
+    bool IsExpired,
+    bool CanUsePaidFeatures,
+    bool PaymentSetupRequired,
     DateTime? NextBillingAt,
     IReadOnlyDictionary<string, FeatureValue> Features);

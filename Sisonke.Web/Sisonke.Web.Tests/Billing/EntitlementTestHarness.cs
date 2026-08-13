@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Sisonke.Web.Data;
 using Sisonke.Web.Data.Seed;
 using Sisonke.Web.Services.Entitlements;
@@ -17,16 +18,18 @@ public sealed class EntitlementTestHarness : IDisposable
     public EntitlementUsageProvider UsageProvider { get; }
     public IStokvelOperationLock OperationLock { get; } = new StokvelOperationLock();
     public EntitlementService Sut { get; }
+    public FakeTimeProvider TimeProvider { get; }
 
-    public EntitlementTestHarness(EntitlementOptions? options = null)
+    public EntitlementTestHarness(EntitlementOptions? options = null, FakeTimeProvider? timeProvider = null)
     {
         var db = new SqliteTestDatabase();
         _db = db;
         DbFactory = new TestDbContextFactory(db);
         Options = options ?? new EntitlementOptions();
+        TimeProvider = timeProvider ?? new FakeTimeProvider(DateTimeOffset.UtcNow);
         UsageProvider = new EntitlementUsageProvider(DbFactory);
         var cache = new MemoryCache(new MemoryCacheOptions());
-        Sut = new EntitlementService(DbFactory, UsageProvider, cache, Options, NullLogger<EntitlementService>.Instance);
+        Sut = new EntitlementService(DbFactory, UsageProvider, cache, Options, NullLogger<EntitlementService>.Instance, TimeProvider);
     }
 
     /// <summary>
@@ -39,9 +42,10 @@ public sealed class EntitlementTestHarness : IDisposable
         _db = db;
         DbFactory = new TestDbContextFactory(db);
         Options = options ?? new EntitlementOptions();
+        TimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
         UsageProvider = new EntitlementUsageProvider(DbFactory);
         var cache = new MemoryCache(new MemoryCacheOptions());
-        Sut = new EntitlementService(DbFactory, UsageProvider, cache, Options, NullLogger<EntitlementService>.Instance);
+        Sut = new EntitlementService(DbFactory, UsageProvider, cache, Options, NullLogger<EntitlementService>.Instance, TimeProvider);
     }
 
     public async Task SeedCatalogueAsync()

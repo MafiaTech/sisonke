@@ -289,7 +289,7 @@ public sealed class BillingWebhookProcessor(
         }
 
         subscription.DunningStartedAt ??= now; // day 0 of dunning — DunningJob takes it from here
-        subscription.GracePeriodEndsAt = now.AddDays(14);
+        subscription.GracePeriodEndsAt = now.AddDays(7);
 
         context.SubscriptionPayments.Add(new SubscriptionPayment
         {

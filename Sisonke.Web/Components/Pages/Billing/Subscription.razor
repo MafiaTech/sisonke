@@ -77,17 +77,21 @@ else
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="detail-mini-label">Status</div>
-                        <div class="fw-700">@snapshot.Status</div>
+                        <div class="fw-700">@snapshot.AccessState</div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="detail-mini-label">@(snapshot.Status == SubscriptionStatus.Trialing ? "Trial ends" : "Next billing date")</div>
-                        <div class="fw-700">@((snapshot.Status == SubscriptionStatus.Trialing ? snapshot.TrialEndsAt : snapshot.NextBillingAt)?.ToString("d MMMM yyyy") ?? "—")</div>
+                        <div class="detail-mini-label">@(snapshot.IsTrial ? "Trial ends" : "Next billing date")</div>
+                        <div class="fw-700">@((snapshot.IsTrial ? snapshot.TrialEndsAt : snapshot.NextBillingAt)?.ToString("d MMMM yyyy") ?? "—")</div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="detail-mini-label">Amount</div>
                         <div class="fw-700">@(currentPlan is { IsCustomPricing: false } ? FormatCurrency(currentPlan.MonthlyPrice) + "/mo" : (currentPlan?.IsCustomPricing == true ? "Custom" : "—"))</div>
                     </div>
                 </div>
+                @if (snapshot.IsTrial)
+                {
+                    <div class="text-muted small mt-2">@snapshot.TrialDaysRemaining day(s) remaining. @(snapshot.PaymentSetupRequired ? "Set up a payment method before the trial ends to prepare for paid billing." : "Payment setup is complete.")</div>
+                }
                 @if (managementLink is not null)
                 {
                     <a class="sisonke-btn sisonke-btn-outline mt-3" href="@managementLink" target="_blank" rel="noopener">
@@ -121,6 +125,23 @@ else
                 </div>
             </div>
 
+            @if (snapshot.Status == SubscriptionStatus.PendingPaymentMethod && currentPlan is not null && !snapshot.IsTrial)
+            {
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-2"><h2>Start your 60-day free trial</h2></div>
+                        <p class="text-muted">Your selected @currentPlan.Name plan features become available immediately. Repeating this action will not extend the trial.</p>
+                        <div class="form-check mb-3">
+                            <input id="trialTerms" class="form-check-input" type="checkbox" @bind="trialTermsAccepted" />
+                            <label class="form-check-label" for="trialTerms">I accept trial and billing terms version @BillingTermsVersion.Current.</label>
+                        </div>
+                        <button type="button" class="sisonke-btn sisonke-btn-primary" disabled="@(isBusy || !trialTermsAccepted)" @onclick="ActivateTrialAsync">
+                            Start free trial
+                        </button>
+                    </div>
+                </div>
+            }
+
             <!-- ── Upgrade / downgrade ── -->
             <div class="sisonke-card mb-3">
                 <div class="sisonke-card-body">
@@ -153,8 +174,8 @@ else
                                         }
                                         else
                                         {
-                                            <button type="button" class="sisonke-btn sisonke-btn-outline mt-auto" disabled="@isBusy" @onclick="@(() => ChangePlanAsync(plan.Code!))">
-                                                Switch to @plan.Name
+                                            <button type="button" class="sisonke-btn sisonke-btn-outline mt-auto" disabled="@isBusy" @onclick="@(() => SelectOrChangePlanAsync(plan.Code!))">
+                                                @(snapshot.Status is SubscriptionStatus.LegacyUnsubscribed or SubscriptionStatus.PendingPaymentMethod ? "Select" : "Switch to") @plan.Name
                                             </button>
                                         }
                                     </div>
@@ -265,6 +286,7 @@ else
 
     private string? actionMessage;
     private bool actionSucceeded;
+    private bool trialTermsAccepted;
 
     protected override async Task OnInitializedAsync()
     {
@@ -389,13 +411,26 @@ else
         NavigationManager.NavigateTo(result.AuthorisationUrl, forceLoad: true);
     }
 
-    private async Task ChangePlanAsync(string planCode)
+    private async Task SelectOrChangePlanAsync(string planCode)
     {
         isBusy = true;
-        var result = await SubscriptionService.ChangePlanAsync(selectedStokvelId, planCode, currentUserId!);
+        var result = snapshot?.Status is SubscriptionStatus.LegacyUnsubscribed or SubscriptionStatus.PendingPaymentMethod
+            ? await SubscriptionService.SelectPlanAsync(selectedStokvelId, planCode, BillingTermsVersion.Current, currentUserId!)
+            : await SubscriptionService.ChangePlanAsync(selectedStokvelId, planCode, currentUserId!);
         isBusy = false;
         actionSucceeded = result.Success;
         actionMessage = result.Message ?? (result.Success ? "Plan changed." : "Could not change plan.");
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private async Task ActivateTrialAsync()
+    {
+        isBusy = true;
+        var result = await SubscriptionService.ActivateTrialAsync(
+            selectedStokvelId, BillingTermsVersion.Current, currentUserId!);
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message ?? (result.Success ? "Trial started." : "Could not start trial.");
         await LoadStokvelBillingDataAsync();
     }
 

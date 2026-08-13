@@ -11,6 +11,7 @@
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Entitlements
 
 @inject FuneralClaimService FuneralClaimService
 @inject StokvelOperatingRulesService StokvelOperatingRulesService
@@ -18,6 +19,7 @@
 @inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
 @inject IServiceScopeFactory ScopeFactory
+@inject IEntitlementService EntitlementService
 
 <PageTitle>Create Funeral Claim</PageTitle>
 
@@ -322,8 +324,14 @@ else
             return false;
         }
 
-        return await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id) ||
+        var isAuthorized = await MemberAccessService.CanManageStokvelAsync(userId, stokvel.Id) ||
             await MemberAccessService.CanViewOwnMemberProfileAsync(userId, MemberId);
+        if (!isAuthorized)
+        {
+            return false;
+        }
+
+        return await EntitlementService.HasFeatureAsync(stokvel.Id, FeatureCodes.ClaimsBasic);
     }
 
     private async Task HandleValidSubmit()

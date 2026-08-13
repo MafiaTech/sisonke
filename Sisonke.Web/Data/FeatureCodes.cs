@@ -25,6 +25,10 @@ public static class FeatureCodes
     public const string Voting = "VOTING";
     public const string AttendanceWarnings = "ATTENDANCE_WARNINGS";
     public const string AiMeetingMinutes = "AI_MEETING_MINUTES";
+    /// <summary>
+    /// Configuring stages, approvers, role sequence, thresholds or approval rules. Executing an
+    /// already-configured approval workflow is governed by the relevant module feature instead.
+    /// </summary>
     public const string ConfigurableApprovalWorkflows = "CONFIGURABLE_APPROVAL_WORKFLOWS";
 
     // Finance
@@ -36,7 +40,10 @@ public static class FeatureCodes
     public const string SurplusWallet = "SURPLUS_WALLET";
 
     // Claims
+    /// <summary>Own-claim viewing, creation/submission, status and basic document handling.</summary>
     public const string ClaimsBasic = "CLAIMS_BASIC";
+
+    /// <summary>Secretary review, chairperson decision, treasurer payout and claim workflow administration.</summary>
     public const string ClaimsFullWorkflow = "CLAIMS_FULL_WORKFLOW";
 
     // Notifications
@@ -116,6 +123,8 @@ public static class FeatureCodes
     {
         MaxMembers,
         ClaimsBasic,
+        ClaimsFullWorkflow,
+        ConfigurableApprovalWorkflows,
         LoansAndWithdrawals,
         Meetings,
         OpSendBulkNotification,
