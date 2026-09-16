@@ -12,7 +12,7 @@ public sealed class PaystackPaymentSetupProvider(
 {
     public SubscriptionProvider Provider => SubscriptionProvider.Paystack;
     public string DisplayName => "Paystack";
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(options.SecretKey) &&
+    public bool IsConfigured => options.IsEnabled && !string.IsNullOrWhiteSpace(options.SecretKey) &&
         (!subscriptionPaymentOptions.TestMode || options.SecretKey.StartsWith("sk_test_", StringComparison.Ordinal));
     public string UnavailableMessage => subscriptionPaymentOptions.TestMode &&
         !string.IsNullOrWhiteSpace(options.SecretKey) &&

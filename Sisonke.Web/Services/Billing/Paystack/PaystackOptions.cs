@@ -8,6 +8,15 @@ namespace Sisonke.Web.Services.Billing.Paystack;
 /// </summary>
 public class PaystackOptions
 {
+    /// <summary>
+    /// Explicit provider switch (Paystack__Enabled). When omitted, existing credentials
+    /// retain legacy enablement; an unconfigured installation leaves Paystack disabled.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    public bool IsEnabled => Enabled ??
+        (!string.IsNullOrWhiteSpace(SecretKey) || !string.IsNullOrWhiteSpace(PublicKey));
+
     public string BaseUrl { get; set; } = "https://api.paystack.co";
 
     public string PublicKey { get; set; } = string.Empty;

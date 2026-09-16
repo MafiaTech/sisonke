@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Data.Sqlite;
-using Polly;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -50,15 +49,6 @@ var paystackOptions = builder.Configuration.GetSection("Paystack").Get<PaystackO
 var subscriptionPaymentOptions = builder.Configuration.GetSection("SubscriptionPayments").Get<SubscriptionPaymentOptions>() ?? new SubscriptionPaymentOptions();
 var netcashOptions = builder.Configuration.GetSection("Netcash").Get<NetcashOptions>() ?? new NetcashOptions();
 var invoicingOptions = builder.Configuration.GetSection("Invoicing").Get<InvoicingOptions>() ?? new InvoicingOptions();
-
-// Paystack signs webhook bodies with the integration secret key (HMAC-SHA512); it does not issue
-// a separate webhook signing secret. Fail loudly outside Development if that key is absent.
-if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(paystackOptions.SecretKey))
-{
-    throw new InvalidOperationException(
-        "Paystack:SecretKey is not configured. Set it via Azure App Service configuration or Key Vault " +
-        "(Paystack__SecretKey) — never in appsettings.json. The app will not start without it outside Development.");
-}
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(authSettings);
@@ -439,22 +429,7 @@ builder.Services.AddScoped<IDistributedJobLock, DistributedJobLock>();
 // ── Paystack billing integration (Phase 3) ─────────────────────────────────
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
-builder.Services.AddHttpClient<PaystackBillingProvider>(client =>
-    {
-        client.BaseAddress = new Uri(paystackOptions.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(30);
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", paystackOptions.SecretKey);
-    })
-    // Default IHttpClientFactory logging can emit request headers (including the bearer secret
-    // key) at Trace level — removed in favour of PaystackBillingProvider's own path-only logging.
-    .RemoveAllLoggers()
-    .AddPolicyHandler(Polly.Extensions.Http.HttpPolicyExtensions
-        .HandleTransientHttpError() // 5xx and network failures
-        .Or<TaskCanceledException>() // timeouts
-        .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
-builder.Services.AddScoped<IBillingProvider>(sp => sp.GetRequiredService<PaystackBillingProvider>());
-builder.Services.AddScoped<ISubscriptionPaymentProvider, PaystackPaymentSetupProvider>();
+builder.Services.AddPaystackBilling(paystackOptions);
 builder.Services.AddScoped<ISubscriptionPaymentProvider, NetcashPaymentSetupProvider>();
 builder.Services.AddScoped<ISubscriptionPaymentProviderResolver, SubscriptionPaymentProviderResolver>();
 builder.Services.AddSingleton<IPaymentSetupStateProtector, PaymentSetupStateProtector>();
@@ -1021,6 +996,8 @@ internal static class PaystackWebhookEndpoint
         ILoggerFactory loggerFactory,
         CancellationToken ct)
     {
+        if (!options.IsEnabled) return Results.NotFound();
+
         var logger = loggerFactory.CreateLogger("PaystackWebhook");
 
         string rawBody;
