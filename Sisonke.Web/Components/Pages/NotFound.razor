@@ -1,4 +1,4 @@
-@page "/{*Path}"
+@page "/not-found"
 @layout MainLayout
 @using Microsoft.AspNetCore.Components
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
@@ -20,7 +20,3 @@
     </section>
 </div>
 
-@code {
-    [Parameter]
-    public string? Path { get; set; }
-}

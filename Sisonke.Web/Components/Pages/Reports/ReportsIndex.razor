@@ -8,9 +8,11 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Services
 @using Sisonke.Web.Services.Dto
+@using Sisonke.Web.Services.Entitlements
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject FinanceReportService FinanceReportService
+@inject IEntitlementService EntitlementService
 
 <PageTitle>Reports</PageTitle>
 
@@ -27,6 +29,13 @@ else if (string.IsNullOrWhiteSpace(currentUserId))
 else if (report.LinkedStokvels.Count == 0)
 {
     <div class="sisonke-alert sisonke-alert-blue">No linked stokvel memberships were found for your account.</div>
+}
+else if (entitlementDenial is not null)
+{
+    <div class="sisonke-alert sisonke-alert-gold">
+        <strong>Reports are unavailable.</strong> @entitlementDenial.Message
+        <a class="sisonke-btn sisonke-btn-primary ms-2" href="/subscription">View plans</a>
+    </div>
 }
 else
 {
@@ -308,6 +317,7 @@ else
     private DateTime fromDate = DateTime.Today.AddMonths(-6);
     private DateTime toDate = DateTime.Today;
     private ReportingMvpDto report = new();
+    private EntitlementDecision? entitlementDenial;
 
     [Parameter]
     public Guid? InitialStokvelId { get; set; }
@@ -330,6 +340,13 @@ else
         isRefreshing = true;
         var selectedStokvelId = Guid.TryParse(selectedStokvelIdValue, out var parsed) ? parsed : InitialStokvelId;
         report = await FinanceReportService.GetReportingMvpAsync(currentUserId, selectedStokvelId, fromDate, toDate);
+        entitlementDenial = null;
+        if (report.SelectedStokvelId is { } reportStokvelId)
+        {
+            var entitlement = await EntitlementService.AuthorizeAsync(
+                reportStokvelId, Sisonke.Web.Data.FeatureCodes.StandardReporting, requestedUsage: 0);
+            entitlementDenial = entitlement.Allowed ? null : entitlement;
+        }
         selectedStokvelIdValue = report.SelectedStokvelId?.ToString() ?? string.Empty;
         fromDate = report.FromDate;
         toDate = report.ToDate;

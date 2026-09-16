@@ -9,12 +9,14 @@
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Entitlements
 
 @inject StokvelService StokvelService
 @inject MemberAccessService MemberAccessService
 @inject RotationalConfigurationService RotationalConfigurationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
+@inject IEntitlementService EntitlementService
 
 <PageTitle>Rotational Configuration</PageTitle>
 
@@ -404,12 +406,27 @@ else
         isLoading = true;
         saveSuccess = false;
         isEditing = false;
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+        if (!await MemberAccessService.CanViewStokvelAsync(userId, StokvelId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var entitlement = await EntitlementService.AuthorizeAsync(
+            StokvelId, Sisonke.Web.Data.FeatureCodes.RotationalStokvel, requestedUsage: 0);
+        if (!entitlement.Allowed)
+        {
+            NavigationManager.NavigateTo("/subscription");
+            isLoading = false;
+            return;
+        }
+
         stokvel = await StokvelService.GetStokvelByIdAsync(StokvelId);
 
         if (stokvel is not null)
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
             canEdit = await MemberAccessService.IsOfficeBearerAsync(userId, StokvelId);
             activeConfig = await RotationalConfigurationService.GetActiveConfigurationAsync(StokvelId);
         }

@@ -1,0 +1,645 @@
+@page "/subscription"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Billing
+@using Sisonke.Web.Services.Billing.Netcash
+@using Sisonke.Web.Services.Entitlements
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject StokvelService StokvelService
+@inject IEntitlementService EntitlementService
+@inject SubscriptionService SubscriptionService
+@inject ISubscriptionPaymentSetupService PaymentSetupService
+@inject INetcashMandateService NetcashMandateService
+@inject PlanCatalogueService PlanCatalogueService
+@inject InvoiceDownloadTokenService InvoiceDownloadTokenService
+@inject IServiceScopeFactory ScopeFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Billing &amp; Subscription</PageTitle>
+
+@* No FeatureGate wraps this page — billing/subscription access must always remain reachable in
+   Restricted and Suspended (Phase 5 brief §D), matching FeatureCodes.AlwaysAllowed. *@
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading billing details...
+    </div>
+}
+else if (stokvelOptions.Count == 0)
+{
+    <AlertBanner Type="info" Title="No stokvels found." Message="Register a stokvel to manage its subscription." Icon="bi bi-info-circle-fill" />
+}
+else
+{
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Billing &amp; Subscription</h1>
+            <p class="page-subtitle">Manage your plan, payment method and invoices.</p>
+        </div>
+        @if (stokvelOptions.Count > 1)
+        {
+            <select class="form-select" style="max-width:280px" value="@selectedStokvelId" @onchange="OnStokvelChangedAsync">
+                @foreach (var option in stokvelOptions)
+                {
+                    <option value="@option.Id">@option.Name</option>
+                }
+            </select>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(actionMessage))
+    {
+        <AlertBanner Type="@(actionSucceeded ? "info" : "danger")" Title="@actionMessage" Message="" Icon="@(actionSucceeded ? "bi bi-check-circle-fill" : "bi bi-x-circle-fill")" />
+    }
+
+    <SubscriptionStatusBanner StokvelId="@selectedStokvelId" />
+
+    @if (snapshot is not null)
+    {
+        <!-- ── Plan / status overview ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Plan</div>
+                        <div class="fw-700">@(snapshot.PlanName ?? "No plan")</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Status</div>
+                        <div class="fw-700">@snapshot.AccessState</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">@(snapshot.IsTrial ? "Trial ends" : "Next billing date")</div>
+                        <div class="fw-700">@((snapshot.IsTrial ? snapshot.TrialEndsAt : snapshot.NextBillingAt)?.ToString("d MMMM yyyy") ?? "—")</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="detail-mini-label">Amount</div>
+                        <div class="fw-700">@(currentPlan is { IsCustomPricing: false } ? FormatCurrency(currentPlan.MonthlyPrice) + "/mo" : (currentPlan?.IsCustomPricing == true ? "Custom" : "—"))</div>
+                    </div>
+                </div>
+                @if (snapshot.IsTrial)
+                {
+                    <div class="text-muted small mt-2">@snapshot.TrialDaysRemaining day(s) remaining. @(snapshot.PaymentSetupRequired ? "Set up a payment method before the trial ends to prepare for paid billing." : "Payment setup is complete.")</div>
+                }
+                @if (managementLink is not null)
+                {
+                    <a class="sisonke-btn sisonke-btn-outline mt-3" href="@managementLink" target="_blank" rel="noopener">
+                        <i class="bi bi-box-arrow-up-right me-2"></i>Manage payment method
+                    </a>
+                }
+            </div>
+        </div>
+
+        @if (isOfficeBearer)
+        {
+            <!-- ── Payment method ── -->
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head mb-3"><h2>Payment Method</h2></div>
+                    @if (paymentSetup?.PaymentReady == true)
+                    {
+                        <p class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Ready for paid billing through @paymentSetup.ProviderDisplayName
+                        </p>
+                        <div class="text-muted small mb-2">
+                            @paymentSetup.PaymentMethodType
+                            @if (!string.IsNullOrWhiteSpace(paymentSetup.MaskedDisplay))
+                            {
+                                <span>&mdash; @paymentSetup.MaskedDisplay</span>
+                            }
+                            @if (paymentSetup.Provider == SubscriptionProvider.Netcash && paymentSetup.MandateStatus != MandateStatus.None)
+                            {
+                                <span>&mdash; mandate @paymentSetup.MandateStatus</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-2">Payment setup is not complete.</p>
+                    }
+                    @if (snapshot.IsTrial)
+                    {
+                        <div class="sisonke-alert sisonke-alert-gold small">
+                            <strong>NO CHARGE DURING THE FREE TRIAL.</strong>
+                            No monthly subscription fee is collected. Paystack processes a R1 card-verification
+                            transaction to obtain a reusable authorization and Sisonke immediately requests its refund.
+                        </div>
+                    }
+                    @if (paymentSetup?.ProviderAvailable == true && paymentSetup.Provider != SubscriptionProvider.Netcash)
+                    {
+                        <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="UpdatePaymentMethodAsync" disabled="@isBusy">
+                            <i class="bi bi-credit-card me-2"></i>@(paymentSetup.PaymentReady ? "Update payment method" : "Set up payment method")
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="sisonke-alert sisonke-alert-gold mb-0">
+                            <i class="bi bi-info-circle me-2"></i>@(paymentSetup?.UnavailableMessage ?? "Payment setup is unavailable in this environment.")
+                        </div>
+                    }
+
+                    <hr class="my-4" />
+                    <h3 class="h6 fw-700">Netcash Debit Order / DebiCheck</h3>
+                    @if (!NetcashMandateService.IsConfigured)
+                    {
+                        <div class="sisonke-alert sisonke-alert-gold mb-0">
+                            <i class="bi bi-info-circle me-2"></i>@NetcashMandateService.AvailabilityMessage
+                        </div>
+                    }
+                    else if (paymentSetup?.Provider == SubscriptionProvider.Netcash && paymentSetup.MandateStatus == MandateStatus.Active)
+                    {
+                        <p class="text-success small">The DebiCheck mandate is accepted and ready for paid billing after the trial.</p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="sisonke-btn sisonke-btn-outline" disabled="@isBusy" @onclick="RefreshNetcashMandateAsync">Check status</button>
+                            <button type="button" class="sisonke-btn sisonke-btn-outline" disabled="@isBusy" @onclick="CancelNetcashMandateAsync">Cancel mandate</button>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">To replace this mandate, cancel it first, confirm revocation, then set up the replacement.</p>
+                    }
+                    else
+                    {
+                        @if (paymentSetup?.Provider == SubscriptionProvider.Netcash && paymentSetup.MandateStatus == MandateStatus.Pending)
+                        {
+                            <p class="text-muted small">The mandate is awaiting bank authentication or cancellation confirmation.</p>
+                            <button type="button" class="sisonke-btn sisonke-btn-outline me-2" disabled="@isBusy" @onclick="RefreshNetcashMandateAsync">Check status</button>
+                        }
+                        @if (!showNetcashSetup)
+                        {
+                            <button type="button" class="sisonke-btn sisonke-btn-outline" disabled="@isBusy" @onclick="ShowNetcashSetup">
+                                Set up DebiCheck mandate
+                            </button>
+                        }
+                    }
+
+                    @if (showNetcashSetup && NetcashMandateService.IsConfigured)
+                    {
+                        <div class="mt-3">
+                            <div class="sisonke-alert sisonke-alert-gold">
+                                <strong>NO CHARGE DURING THE FREE TRIAL.</strong> This submits a mandate for bank authentication only.
+                                @BillingTermsVersion.SubscriptionMandatePurposeStatement
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="netcashHolder">Account holder name</label>
+                                    <input id="netcashHolder" class="form-control" maxlength="50" autocomplete="name" @bind="netcashAccountHolderName" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="netcashBankName">Name registered on bank account</label>
+                                    <input id="netcashBankName" class="form-control" maxlength="30" autocomplete="off" @bind="netcashBankAccountName" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="netcashIdentification">SA ID or passport number</label>
+                                    <input id="netcashIdentification" class="form-control" type="password" maxlength="20" autocomplete="off" @bind="netcashDebtorIdentification" />
+                                    <div class="form-check mt-1">
+                                        <input id="netcashIsId" class="form-check-input" type="checkbox" @bind="netcashIsSouthAfricanId" />
+                                        <label class="form-check-label" for="netcashIsId">This is a South African ID number</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="netcashAccountType">Account type</label>
+                                    <select id="netcashAccountType" class="form-select" @bind="netcashBankAccountType">
+                                        <option value="@NetcashBankAccountType.Current">Current</option>
+                                        <option value="@NetcashBankAccountType.Savings">Savings</option>
+                                        <option value="@NetcashBankAccountType.Transmission">Transmission</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="netcashBranch">Branch code</label>
+                                    <input id="netcashBranch" class="form-control" inputmode="numeric" maxlength="6" autocomplete="off" @bind="netcashBranchCode" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="netcashAccount">Bank account number</label>
+                                    <input id="netcashAccount" class="form-control" type="password" inputmode="numeric" maxlength="16" autocomplete="off" @bind="netcashBankAccountNumber" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="netcashMobile">Mobile number</label>
+                                    <input id="netcashMobile" class="form-control" inputmode="tel" maxlength="20" autocomplete="tel" @bind="netcashMobileNumber" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="netcashEmail">Email address</label>
+                                    <input id="netcashEmail" class="form-control" type="email" maxlength="256" autocomplete="email" @bind="netcashEmailAddress" />
+                                </div>
+                            </div>
+                            <div class="form-check my-3">
+                                <input id="netcashConsent" class="form-check-input" type="checkbox" @bind="netcashConsentAccepted" />
+                                <label class="form-check-label" for="netcashConsent">
+                                    I authorise a DebiCheck mandate for Sisonke platform subscription fees only and accept billing terms version @BillingTermsVersion.Current.
+                                </label>
+                            </div>
+                            <p class="text-muted small">Legal wording is a versioned placeholder pending final South African legal review.</p>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="sisonke-btn sisonke-btn-primary" disabled="@(isBusy || !netcashConsentAccepted)" @onclick="SubmitNetcashMandateAsync">Submit for bank authentication</button>
+                                <button type="button" class="sisonke-btn sisonke-btn-outline" disabled="@isBusy" @onclick="HideNetcashSetup">Cancel</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (snapshot.Status == SubscriptionStatus.PendingPaymentMethod && currentPlan is not null && !snapshot.IsTrial)
+            {
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-2"><h2>Start your 60-day free trial</h2></div>
+                        <p class="text-muted">Your selected @currentPlan.Name plan features become available immediately. Repeating this action will not extend the trial.</p>
+                        <div class="form-check mb-3">
+                            <input id="trialTerms" class="form-check-input" type="checkbox" @bind="trialTermsAccepted" />
+                            <label class="form-check-label" for="trialTerms">I accept trial and billing terms version @BillingTermsVersion.Current.</label>
+                        </div>
+                        <button type="button" class="sisonke-btn sisonke-btn-primary" disabled="@(isBusy || !trialTermsAccepted)" @onclick="ActivateTrialAsync">
+                            Start free trial
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <!-- ── Upgrade / downgrade ── -->
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head mb-3">
+                        <h2>Change Plan</h2>
+                    </div>
+                    @if (pendingPlanChangeName is not null)
+                    {
+                        <div class="sisonke-alert sisonke-alert-gold mb-3">
+                            <i class="bi bi-clock-history me-2"></i>
+                            Downgrade to <strong>@pendingPlanChangeName</strong> is scheduled for @pendingPlanChangeEffectiveAt?.ToString("d MMMM yyyy").
+                        </div>
+                    }
+                    <p class="text-muted small mb-3">Upgrades take effect immediately. Downgrades take effect at the end of your current billing period — no refund is issued for the current period.</p>
+                    <div class="row g-3">
+                        @foreach (var entry in catalogueEntries)
+                        {
+                            var plan = entry.Plan;
+                            var isCurrent = plan.Code == currentPlan?.Code;
+                            <div class="col-12 col-md-6 col-lg-3">
+                                <div class="plan-card @(isCurrent ? "plan-selected" : "") h-100">
+                                    <div class="card-body p-3 d-flex flex-column">
+                                        <h3 class="h6 fw-700 mb-1">@plan.Name</h3>
+                                        <div class="plan-price mb-2" style="font-size:1.15rem">
+                                            @(plan.IsCustomPricing ? "Custom" : FormatCurrency(plan.MonthlyPrice) + "/mo")
+                                        </div>
+                                        @if (isCurrent)
+                                        {
+                                            <span class="sisonke-badge sisonke-badge-green mt-auto">Current plan</span>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="sisonke-btn sisonke-btn-outline mt-auto" disabled="@isBusy" @onclick="@(() => SelectOrChangePlanAsync(plan.Code!))">
+                                                @(snapshot.Status is SubscriptionStatus.LegacyUnsubscribed or SubscriptionStatus.PendingPaymentMethod ? "Select" : "Switch to") @plan.Name
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- ── Invoices & receipts ── -->
+        <div class="sisonke-card mb-3">
+            <div class="sisonke-card-body">
+                <div class="sisonke-card-head mb-3"><h2>Invoices &amp; Receipts</h2></div>
+                @if (invoices.Count == 0 && payments.Count == 0)
+                {
+                    <p class="text-muted mb-0">No invoices or receipts yet.</p>
+                }
+                else
+                {
+                    <table class="table mb-0">
+                        <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var invoice in invoices)
+                            {
+                                <tr>
+                                    <td>@invoice.IssuedAt?.ToString("d MMM yyyy")</td>
+                                    <td>Invoice @invoice.InvoiceNumber</td>
+                                    <td>@FormatCurrency(invoice.Total)</td>
+                                    <td>@invoice.Status</td>
+                                    <td><a href="@BuildDocumentLink("invoice", invoice.Id)" target="_blank">Download</a></td>
+                                </tr>
+                            }
+                            @foreach (var payment in payments.Where(p => p.Status == SubscriptionPaymentStatus.Succeeded))
+                            {
+                                <tr>
+                                    <td>@payment.PaidAt?.ToString("d MMM yyyy")</td>
+                                    <td>Receipt</td>
+                                    <td>@FormatCurrency(payment.Amount)</td>
+                                    <td>Paid</td>
+                                    <td><a href="@BuildDocumentLink("receipt", payment.Id)" target="_blank">Download</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        @if (isOfficeBearer)
+        {
+            <!-- ── Cancellation ── -->
+            <div class="sisonke-card mb-3">
+                <div class="sisonke-card-body">
+                    <div class="sisonke-card-head mb-3"><h2>Cancel Subscription</h2></div>
+                    @if (!showCancelConfirm)
+                    {
+                        <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="@(() => showCancelConfirm = true)">
+                            Cancel subscription
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="sisonke-alert sisonke-alert-gold mb-3">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Your access will continue until <strong>@accessUntilDate?.ToString("d MMMM yyyy")</strong>, then end.
+                            Your data is retained and can be exported at any time — nothing is deleted.
+                        </div>
+                        <textarea class="form-control mb-2" rows="2" placeholder="Reason for cancelling (optional)" @bind="cancelReason"></textarea>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="@(() => showCancelConfirm = false)">Keep subscription</button>
+                            <button type="button" class="sisonke-btn sisonke-btn-primary" disabled="@isBusy" @onclick="ConfirmCancelAsync">Confirm cancellation</button>
+                        </div>
+                    }
+                    <p class="text-muted small mt-3 mb-0">
+                        Need your data before leaving? <a href="mailto:support@sisonke.co.za?subject=Data export request">Request a data export</a> from support.
+                    </p>
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? currentUserId;
+    private List<(Guid Id, string Name)> stokvelOptions = [];
+    private Guid selectedStokvelId;
+    private bool isOfficeBearer;
+
+    private EntitlementSnapshot? snapshot;
+    private SubscriptionPlan? currentPlan;
+    private string? pendingPlanChangeName;
+    private DateTime? pendingPlanChangeEffectiveAt;
+    private string? managementLink;
+    private PaymentSetupViewModel? paymentSetup;
+    private string? subscriptionBillingEmail;
+    private string? subscriptionCardholderName;
+    private List<SubscriptionInvoice> invoices = [];
+    private List<SubscriptionPayment> payments = [];
+    private List<PlanCatalogueEntry> catalogueEntries = [];
+
+    private bool showCancelConfirm;
+    private string? cancelReason;
+    private DateTime? accessUntilDate;
+
+    private string? actionMessage;
+    private bool actionSucceeded;
+    private bool trialTermsAccepted;
+    private bool showNetcashSetup;
+    private string netcashAccountHolderName = string.Empty;
+    private string netcashBankAccountName = string.Empty;
+    private bool netcashIsSouthAfricanId = true;
+    private string netcashDebtorIdentification = string.Empty;
+    private NetcashBankAccountType netcashBankAccountType = NetcashBankAccountType.Current;
+    private string netcashBranchCode = string.Empty;
+    private string netcashBankAccountNumber = string.Empty;
+    private string netcashMobileNumber = string.Empty;
+    private string netcashEmailAddress = string.Empty;
+    private bool netcashConsentAccepted;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            isLoading = false;
+            return;
+        }
+
+        var memberships = await MemberAccessService.GetLinkedMembershipsForUserAsync(currentUserId);
+        var seenTenants = new HashSet<Guid>();
+        foreach (var member in memberships)
+        {
+            if (!seenTenants.Add(member.TenantId))
+            {
+                continue;
+            }
+            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+            if (stokvel is not null)
+            {
+                stokvelOptions.Add((stokvel.Id, stokvel.Name));
+            }
+        }
+
+        catalogueEntries = (await PlanCatalogueService.GetPublicPlansAsync()).ToList();
+
+        if (stokvelOptions.Count > 0)
+        {
+            selectedStokvelId = stokvelOptions[0].Id;
+            await LoadStokvelBillingDataAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task OnStokvelChangedAsync(ChangeEventArgs args)
+    {
+        if (Guid.TryParse(args.Value?.ToString(), out var stokvelId))
+        {
+            selectedStokvelId = stokvelId;
+            actionMessage = null;
+            showCancelConfirm = false;
+            await LoadStokvelBillingDataAsync();
+        }
+    }
+
+    private async Task LoadStokvelBillingDataAsync()
+    {
+        isOfficeBearer = await MemberAccessService.IsOfficeBearerAsync(currentUserId!, selectedStokvelId);
+        snapshot = await EntitlementService.GetSnapshotAsync(selectedStokvelId);
+        paymentSetup = await PaymentSetupService.GetStatusAsync(selectedStokvelId, currentUserId!);
+        managementLink = await SubscriptionService.GetManagementLinkAsync(selectedStokvelId);
+
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var subscription = await db.OrganisationSubscriptions
+            .AsNoTracking()
+            .Include(s => s.SubscriptionPlan)
+            .Include(s => s.PendingPlanChangePlan)
+            .Where(s => s.StokvelId == selectedStokvelId)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        currentPlan = subscription?.SubscriptionPlan;
+        pendingPlanChangeName = subscription?.PendingPlanChangePlan?.Name;
+        pendingPlanChangeEffectiveAt = subscription?.PendingPlanChangeEffectiveAt;
+        accessUntilDate = subscription?.CurrentPeriodEndsAt ?? subscription?.TrialEndsAt ?? DateTime.UtcNow;
+
+        var currentUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId);
+        subscriptionBillingEmail = subscription?.BillingEmail ?? currentUser?.Email;
+        subscriptionCardholderName = subscription?.CardholderName ?? currentUser?.FullName ?? "Cardholder";
+        netcashAccountHolderName = subscriptionCardholderName;
+        netcashBankAccountName = subscriptionCardholderName;
+        netcashEmailAddress = subscriptionBillingEmail ?? string.Empty;
+
+        if (subscription is not null)
+        {
+            invoices = await db.SubscriptionInvoices
+                .AsNoTracking()
+                .Where(i => i.OrganisationSubscriptionId == subscription.Id)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+
+            payments = await db.SubscriptionPayments
+                .AsNoTracking()
+                .Where(p => p.OrganisationSubscriptionId == subscription.Id)
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
+        }
+        else
+        {
+            invoices = [];
+            payments = [];
+        }
+    }
+
+    private async Task UpdatePaymentMethodAsync()
+    {
+        isBusy = true;
+        var callbackUrl = NavigationManager.ToAbsoluteUri("/billing/payment-callback").ToString();
+
+        var result = await PaymentSetupService.StartAsync(
+            selectedStokvelId, currentUserId!, subscriptionBillingEmail ?? string.Empty,
+            subscriptionCardholderName ?? "Cardholder", null, callbackUrl, "/subscription");
+
+        isBusy = false;
+
+        if (!result.Success || string.IsNullOrWhiteSpace(result.SetupUrl))
+        {
+            actionSucceeded = false;
+            actionMessage = result.Message ?? "Could not start card update. Please try again.";
+            return;
+        }
+
+        NavigationManager.NavigateTo(result.SetupUrl, forceLoad: true);
+    }
+
+    private void ShowNetcashSetup()
+    {
+        showNetcashSetup = true;
+        actionMessage = null;
+    }
+
+    private void HideNetcashSetup()
+    {
+        showNetcashSetup = false;
+        ClearSensitiveNetcashInput();
+    }
+
+    private async Task SubmitNetcashMandateAsync()
+    {
+        isBusy = true;
+        var result = await NetcashMandateService.SubmitAsync(selectedStokvelId, currentUserId!, new(
+            netcashAccountHolderName, netcashIsSouthAfricanId, netcashDebtorIdentification,
+            netcashBankAccountName, netcashBranchCode, netcashBankAccountNumber, netcashBankAccountType,
+            netcashMobileNumber, netcashEmailAddress, netcashConsentAccepted, BillingTermsVersion.Current));
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message;
+        showNetcashSetup = false;
+        ClearSensitiveNetcashInput();
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private async Task RefreshNetcashMandateAsync()
+    {
+        isBusy = true;
+        var result = await NetcashMandateService.RefreshAsync(selectedStokvelId, currentUserId!);
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message;
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private async Task CancelNetcashMandateAsync()
+    {
+        isBusy = true;
+        var result = await NetcashMandateService.CancelAsync(selectedStokvelId, currentUserId!);
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message;
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private void ClearSensitiveNetcashInput()
+    {
+        netcashDebtorIdentification = string.Empty;
+        netcashBranchCode = string.Empty;
+        netcashBankAccountNumber = string.Empty;
+        netcashMobileNumber = string.Empty;
+        netcashConsentAccepted = false;
+    }
+
+    private async Task SelectOrChangePlanAsync(string planCode)
+    {
+        isBusy = true;
+        var result = snapshot?.Status is SubscriptionStatus.LegacyUnsubscribed or SubscriptionStatus.PendingPaymentMethod
+            ? await SubscriptionService.SelectPlanAsync(selectedStokvelId, planCode, BillingTermsVersion.Current, currentUserId!)
+            : await SubscriptionService.ChangePlanAsync(selectedStokvelId, planCode, currentUserId!);
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message ?? (result.Success ? "Plan changed." : "Could not change plan.");
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private async Task ActivateTrialAsync()
+    {
+        isBusy = true;
+        var result = await SubscriptionService.ActivateTrialAsync(
+            selectedStokvelId, BillingTermsVersion.Current, currentUserId!);
+        isBusy = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message ?? (result.Success ? "Trial started." : "Could not start trial.");
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private async Task ConfirmCancelAsync()
+    {
+        isBusy = true;
+        var result = await SubscriptionService.CancelAsync(selectedStokvelId, atPeriodEnd: true, cancelReason, currentUserId!);
+        isBusy = false;
+        showCancelConfirm = false;
+        actionSucceeded = result.Success;
+        actionMessage = result.Message ?? (result.Success ? "Subscription cancelled." : "Could not cancel subscription.");
+        await LoadStokvelBillingDataAsync();
+    }
+
+    private string BuildDocumentLink(string documentType, Guid documentId)
+    {
+        var token = InvoiceDownloadTokenService.CreateToken(documentType, documentId);
+        return $"/api/billing/documents/{documentType}/{documentId}?token={Uri.EscapeDataString(token)}";
+    }
+
+    private static string FormatCurrency(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+}

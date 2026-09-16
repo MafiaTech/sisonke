@@ -48,7 +48,7 @@ else
             <h1>Treasurer Task List</h1>
             <p>Financial items requiring capture, confirmation or follow-up.</p>
         </div>
-        <div class="d-flex flex-wrap gap-2">
+        <div class="sisonke-header-actions">
             <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
             <a class="sisonke-btn sisonke-btn-outline" href="#payout-audit">Payout Audit</a>
             <a class="sisonke-btn sisonke-btn-gold" href="@($"/finance-summary/{StokvelId}")">Finance Summary Report</a>
@@ -56,7 +56,12 @@ else
         </div>
     </section>
 
-    @if (outstandingFines.Count == 0 && approvedClaimsAwaitingPayout.Count == 0 && RotationalPayoutTask is null)
+    @if (canManagePayments)
+    {
+        <Sisonke.Web.Components.Pages.Contributions.TreasurerPaymentProofs StokvelId="StokvelId" PendingCountChanged="RefreshPaymentQueueSummaryAsync" />
+    }
+
+    @if (outstandingFines.Count == 0 && approvedClaimsAwaitingPayout.Count == 0 && RotationalPayoutTask is null && (!canManagePayments || pendingProofCount == 0))
     {
         <div class="sisonke-alert sisonke-alert-green mb-4">
             No pending finance tasks. Everything is up to date.
@@ -485,6 +490,12 @@ else
 </style>
 
 @code {
+    private int pendingProofCount = -1;
+    private async Task RefreshPaymentQueueSummaryAsync(int count)
+    {
+        pendingProofCount = count;
+        outstandingFines = await FineService.GetOutstandingFinesByStokvelIdAsync(StokvelId);
+    }
     private bool isLoading = true;
     private bool isBackfillingPayoutAudits;
     private bool isConfirmingRotationalPayout;
@@ -511,7 +522,7 @@ else
     private int RotationalPayoutTaskCount => RotationalPayoutTask is null ? 0 : 1;
     private int CurrentMonthPaidContributionCount => currentMonthContributions.Count(contribution => contribution.Status == PaymentStatus.Paid);
     private int CurrentMonthOpenContributionCount => currentMonthContributions.Count(contribution =>
-        contribution.Status is PaymentStatus.Unpaid or PaymentStatus.PartiallyPaid or PaymentStatus.Late);
+        contribution.OutstandingAmount > 0 && contribution.Status is PaymentStatus.Unpaid or PaymentStatus.PartiallyPaid or PaymentStatus.Late);
 
     [Parameter]
     public Guid StokvelId { get; set; }

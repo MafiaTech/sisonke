@@ -1,0 +1,61 @@
+@* UI enforcement surface for the entitlement engine (Phase 2). Hides or disables an action the
+   backend would also reject — never the only check; the application service and/or API endpoint
+   behind this UI must call IEntitlementService itself. *@
+@using Sisonke.Web.Services.Entitlements
+@inject IEntitlementService EntitlementService
+
+@if (isLoading)
+{
+    @* Avoid a flash of locked content while the first decision loads. *@
+}
+else if (decision is { Allowed: true })
+{
+    @ChildContent
+}
+else if (Locked is not null)
+{
+    @Locked(decision!)
+}
+else if (ShowDefaultUpgradeAffordance)
+{
+    <div class="feature-gate-locked alert alert-light border d-flex justify-content-between align-items-center gap-3" role="alert">
+        <span><i class="bi bi-lock-fill me-2 text-muted"></i>@decision!.Message</span>
+        @if (!string.IsNullOrWhiteSpace(decision.UpgradeToPlanCode))
+        {
+            <a class="btn btn-sm btn-outline-primary flex-shrink-0" href="/subscription">Upgrade to unlock</a>
+        }
+    </div>
+}
+
+@code {
+    private EntitlementDecision? decision;
+    private bool isLoading = true;
+
+    [Parameter, EditorRequired]
+    public Guid StokvelId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string FeatureCode { get; set; } = string.Empty;
+
+    /// <summary>For numeric features: the increment this render would need if it led to a write. Ignored otherwise.</summary>
+    [Parameter]
+    public int RequestedUsage { get; set; } = 1;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Custom locked-state content. Receives the denial decision. Overrides ShowDefaultUpgradeAffordance.</summary>
+    [Parameter]
+    public RenderFragment<EntitlementDecision>? Locked { get; set; }
+
+    /// <summary>When true (default) and no Locked fragment is supplied, renders a generic "Upgrade to unlock" banner.</summary>
+    [Parameter]
+    public bool ShowDefaultUpgradeAffordance { get; set; } = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        decision = await EntitlementService.AuthorizeAsync(StokvelId, FeatureCode, RequestedUsage);
+        isLoading = false;
+    }
+}

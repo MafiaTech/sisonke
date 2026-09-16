@@ -4,6 +4,12 @@
 
 @inject NavigationManager NavigationManager
 
+<AuthorizeView>
+    <Authorized>
+        <LegacyMigrationPrompt />
+    </Authorized>
+</AuthorizeView>
+
 <div class="sisonke-app-shell sisonke-shell sisonke-role-member">
     <input id="sisonke-mobile-nav-toggle" class="sisonke-mobile-nav-toggle" type="checkbox" aria-hidden="true" />
     <label class="sisonke-mobile-menu-button sisonke-mobile-menu-button--floating" for="sisonke-mobile-nav-toggle" aria-label="Open navigation">

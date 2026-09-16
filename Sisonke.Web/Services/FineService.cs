@@ -5,10 +5,20 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class FineService(ApplicationDbContext context, AuditLogService auditLogService)
+public class FineService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditLogService auditLogService)
 {
+    private readonly ApplicationDbContext? transactionContext;
+    // Explicit short-lived transaction/legacy callers only. DI uses the factory constructor.
+    public FineService(ApplicationDbContext context, AuditLogService auditLogService) : this((IDbContextFactory<ApplicationDbContext>)null!, auditLogService)
+    {
+        transactionContext = context;
+    }
+
     public async Task<List<FineType>> GetFineTypesByStokvelIdAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 
@@ -27,7 +37,10 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
 
     public async Task<List<MemberFine>> GetMemberFinesAsync(Guid memberId)
     {
-        return await context.MemberFines
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
+        return await context.MemberFines.AsNoTracking()
             .Include(memberFine => memberFine.FineType)
             .Where(memberFine => memberFine.MemberId == memberId)
             .OrderByDescending(memberFine => memberFine.FineDate)
@@ -36,6 +49,9 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
 
     public async Task<List<MemberFine>> GetOutstandingFinesByStokvelIdAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
@@ -47,7 +63,7 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
             return [];
         }
 
-        return await context.MemberFines
+        return await context.MemberFines.AsNoTracking()
             .Include(memberFine => memberFine.Member)
             .Include(memberFine => memberFine.FineType)
             .Where(memberFine =>
@@ -60,6 +76,9 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
 
     public async Task<int> GetOutstandingFineCountByStokvelIdAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
@@ -79,6 +98,9 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
 
     public async Task<MemberFine?> GetMemberFineByIdAsync(Guid memberFineId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         return await context.MemberFines
             .Include(memberFine => memberFine.FineType)
             .Include(memberFine => memberFine.Member)
@@ -92,6 +114,9 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
         string reason,
         DateTime fineDate)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var member = await context.Members
             .SingleOrDefaultAsync(existingMember => existingMember.Id == memberId);
 
@@ -129,8 +154,13 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
         return memberFine;
     }
 
-    public async Task<MemberFine?> MarkFineAsPaidAsync(Guid memberFineId)
+    public async Task<MemberFine?> MarkFineAsPaidAsync(Guid memberFineId, string? actor = null, Guid? stokvelId = null, DateTime? paymentDate = null)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
+        await using var ownedTransaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
         var memberFine = await context.MemberFines
             .SingleOrDefaultAsync(existingMemberFine => existingMemberFine.Id == memberFineId);
 
@@ -139,18 +169,26 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
             return null;
         }
 
+        await context.Entry(memberFine).ReloadAsync();
+        var stokvel = await context.Stokvels.AsNoTracking().FirstOrDefaultAsync(s =>
+            s.TenantId == memberFine.TenantId && (!stokvelId.HasValue || s.Id == stokvelId));
+        if (memberFine.Status != FineStatus.Unpaid || stokvel is null) return null;
+        if (actor is not null && !await new MemberAccessService(context).CanManagePaymentsAsync(actor, stokvel.Id)) return null;
         memberFine.Status = FineStatus.Paid;
-        memberFine.PaidDate = DateTime.Today;
+        memberFine.PaidDate = paymentDate?.Date ?? DateTime.Today;
 
+        auditLogService.Stage(context, actor, stokvel.Id, "FinePaid", "MemberFine", memberFine.Id, $"Fine marked paid for R {memberFine.Amount:N2}.");
         await context.SaveChangesAsync();
-        var stokvel = await context.Stokvels.AsNoTracking().FirstOrDefaultAsync(existingStokvel => existingStokvel.TenantId == memberFine.TenantId);
-        await auditLogService.RecordAsync(null, stokvel?.Id, "FinePaid", "MemberFine", memberFine.Id, $"Fine marked paid for R {memberFine.Amount:N2}.");
+        if (ownedTransaction is not null) await ownedTransaction.CommitAsync();
 
         return memberFine;
     }
 
     public async Task<MemberFine?> VoidFineAsync(Guid memberFineId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var memberFine = await context.MemberFines
             .SingleOrDefaultAsync(existingMemberFine => existingMemberFine.Id == memberFineId);
 
@@ -170,6 +208,9 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
 
     public async Task EnsureDefaultFineTypesForStokvelAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 
@@ -239,6 +280,9 @@ public class FineService(ApplicationDbContext context, AuditLogService auditLogS
 
     public async Task<decimal> GetOutstandingFinesTotalByStokvelIdAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 

@@ -1,0 +1,129 @@
+/* =====================================================================
+   SISONKE BRAND THEME — matches www.sisonkestokvel.co.za exactly
+   Loaded AFTER sisonke-enterprise.css / sisonke-auth.css so it only
+   fills gaps (plain Bootstrap components not covered by those files).
+   Palette sampled from the official Sisonke logo.
+   ===================================================================== */
+
+:root {
+  /* Core brand palette (from logo) */
+  --sk-navy-950: #041B3D;   /* darkest navy — footers, deep bands   */
+  --sk-navy-900: #062F66;   /* PRIMARY brand navy                    */
+  --sk-navy-800: #0B3E82;   /* hover state of primary                */
+  --sk-navy-100: #DCE6F2;
+  --sk-navy-50:  #EEF3F9;   /* tinted panels, icon chips             */
+
+  --sk-gold:        #CA950A; /* PRIMARY action / CTA colour          */
+  --sk-gold-bright: #EFBF3A; /* coin gold — highlights, badges       */
+  --sk-gold-soft:   #F6E7B8; /* soft badge backgrounds               */
+  --sk-gold-deep:   #9A7108; /* gold hover state                     */
+
+  --sk-teal:      #027D8A;   /* tagline / secondary accent           */
+  --sk-teal-soft: #DCEFF1;
+
+  --sk-green:      #399D39;  /* success / "available"                */
+  --sk-green-soft: #E4F2E3;
+
+  /* Neutrals */
+  --sk-paper:      #FAF8F2;  /* app background (warm ivory)          */
+  --sk-paper-deep: #F2EFE5;
+  --sk-white:      #FFFFFF;
+  --sk-ink:        #1B2433;  /* main text                            */
+  --sk-ink-soft:   #4B5568;  /* secondary text                       */
+
+  /* Semantic */
+  --sk-danger:  #B3261E;
+  --sk-warning: #CA950A;
+  --sk-success: #399D39;
+  --sk-info:    #027D8A;
+
+  /* Shape & elevation */
+  --sk-radius:    14px;
+  --sk-radius-lg: 22px;
+  --sk-shadow: 0 1px 2px rgba(6,47,102,.06), 0 12px 32px -12px rgba(6,47,102,.18);
+
+  /* Typography (loaded via Google Fonts in the layout head) */
+  --sk-font-display: "Archivo", system-ui, sans-serif;
+  --sk-font-body: "Instrument Sans", system-ui, -apple-system, sans-serif;
+
+  /* Map onto Bootstrap 5 variables so plain (non-sisonke-classed) components restyle */
+  --bs-primary: #062F66;
+  --bs-primary-rgb: 6, 47, 102;
+  --bs-secondary: #4B5568;
+  --bs-success: #399D39;
+  --bs-success-rgb: 57, 157, 57;
+  --bs-info: #027D8A;
+  --bs-info-rgb: 2, 125, 138;
+  --bs-warning: #CA950A;
+  --bs-warning-rgb: 202, 149, 10;
+  --bs-danger: #B3261E;
+  --bs-link-color: #027D8A;
+  --bs-link-hover-color: #062F66;
+}
+
+/* ---------- Buttons (plain Bootstrap, not sisonke-styled) ---------- */
+.btn-primary:not(.sisonke-btn) {
+  background: var(--sk-navy-900);
+  border-color: var(--sk-navy-900);
+}
+.btn-primary:not(.sisonke-btn):hover,
+.btn-primary:not(.sisonke-btn):focus,
+.btn-primary:not(.sisonke-btn):active {
+  background: var(--sk-navy-800) !important;
+  border-color: var(--sk-navy-800) !important;
+}
+
+.btn-gold, .btn-cta {
+  background: var(--sk-gold);
+  border-color: var(--sk-gold);
+  color: #FFFDF5;
+}
+.btn-gold:hover, .btn-cta:hover {
+  background: var(--sk-gold-deep);
+  border-color: var(--sk-gold-deep);
+  color: #FFFFFF;
+}
+
+/* ---------- Badges / status pills (plain Bootstrap fallback) ---------- */
+.badge.bg-success:not([class*="sisonke-"]) { background: var(--sk-green-soft) !important; color: #20641F !important; }
+.badge.bg-warning:not([class*="sisonke-"]) { background: var(--sk-gold-soft) !important; color: var(--sk-gold-deep) !important; }
+.badge.bg-info:not([class*="sisonke-"])    { background: var(--sk-teal-soft) !important; color: var(--sk-teal) !important; }
+.badge.bg-danger:not([class*="sisonke-"])  { background: #F7DEDC !important; color: var(--sk-danger) !important; }
+
+/* ---------- Identity / auth pages (generic fallback wrapper classes) ---------- */
+.auth-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 560px at 88% -10%, rgba(239,191,58,.16), transparent 60%),
+    linear-gradient(180deg, var(--sk-paper) 0%, var(--sk-paper-deep) 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.auth-card {
+  background: var(--sk-white);
+  border: 1px solid rgba(6,47,102,.12);
+  border-radius: var(--sk-radius-lg);
+  box-shadow: var(--sk-shadow);
+  padding: 40px 36px;
+  max-width: 440px; width: 100%;
+}
+.auth-card .brand-logo { width: 72px; height: 72px; margin: 0 auto 12px; display: block; }
+
+/* ---------- Mobile ergonomics (the phone IS the app) ---------- */
+@media (max-width: 768px) {
+  .btn, .sisonke-btn, .sm-btn-primary, .sm-btn-outline {
+    min-height: 44px;
+  }
+  .form-control, .form-select,
+  input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="tel"], input[type="date"],
+  textarea, select {
+    font-size: 16px;
+  }
+  .table-responsive { -webkit-overflow-scrolling: touch; }
+}
+
+/* ---------- Utility ---------- */
+.text-brand  { color: var(--sk-navy-900) !important; }
+.text-gold   { color: var(--sk-gold-deep) !important; }
+.text-teal   { color: var(--sk-teal) !important; }
+.bg-brand    { background: var(--sk-navy-900) !important; color: var(--sk-paper); }
+.bg-paper    { background: var(--sk-paper) !important; }

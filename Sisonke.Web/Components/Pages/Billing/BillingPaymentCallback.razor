@@ -1,0 +1,90 @@
+@page "/billing/payment-callback"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Billing
+@inject ISubscriptionPaymentSetupService PaymentSetupService
+@inject SubscriptionService SubscriptionService
+@inject MemberAccessService MemberAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Confirming Payment Method...</PageTitle>
+
+<div class="loading-state">
+    <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    Confirming your payment method...
+</div>
+
+@code {
+    @* New payment-method setup uses a protected, user-bound State value. StokvelId/Intent remain
+       temporarily for the existing onboarding flow and are independently membership-checked. *@
+
+    [SupplyParameterFromQuery]
+    public Guid? StokvelId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Reference { get; set; }
+
+    [SupplyParameterFromQuery(Name = "trxref")]
+    public string? TrxRef { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? State { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Intent { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Redirect { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var reference = Reference ?? TrxRef;
+        var redirectTarget = string.IsNullOrWhiteSpace(Redirect) || !Redirect.StartsWith('/') || Redirect.StartsWith("//")
+            ? "/subscription"
+            : Redirect;
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var actorUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(reference) || string.IsNullOrWhiteSpace(actorUserId))
+        {
+            NavigationManager.NavigateTo(redirectTarget, replace: true);
+            return;
+        }
+
+        PaymentSetupCompletionResult result;
+        if (!string.IsNullOrWhiteSpace(State))
+        {
+            result = await PaymentSetupService.CompleteAsync(State, reference, actorUserId);
+            redirectTarget = result.RedirectPath ?? redirectTarget;
+        }
+        else if (StokvelId is { } stokvelId && await MemberAccessService.IsOfficeBearerAsync(actorUserId, stokvelId))
+        {
+            var legacyResult = string.Equals(Intent, "payment-method-update", StringComparison.OrdinalIgnoreCase)
+                ? await SubscriptionService.CompletePaymentMethodUpdateAsync(stokvelId, reference)
+                : await SubscriptionService.CompleteCardAuthorisationAsync(stokvelId, reference);
+            result = new(legacyResult.Success, redirectTarget, legacyResult.Message);
+        }
+        else
+        {
+            result = PaymentSetupCompletionResult.Failed("Payment setup could not be correlated to an authorized stokvel.");
+        }
+
+        if (result.Success)
+        {
+            NavigationManager.NavigateTo(redirectTarget, replace: true);
+            return;
+        }
+
+        var separator = redirectTarget.Contains('?') ? "&" : "?";
+        NavigationManager.NavigateTo(
+            $"{redirectTarget}{separator}step=3&error={Uri.EscapeDataString(result.Message ?? "Card authorisation failed.")}",
+            replace: true);
+    }
+}

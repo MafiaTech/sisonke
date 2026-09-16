@@ -1,0 +1,262 @@
+@* Phase 5 §C — shown once per session (deferrable via sessionStorage, reappears next login;
+   no permanent-dismiss control exists) to an authenticated user who administers a
+   LegacyUnsubscribed organisation. Office bearers get the opt-in CTA (into the same onboarding
+   wizard, entering at Step 2 since the org already exists); everyone else is told to ask their
+   chairperson/treasurer, with a share link. Rendered from MainLayout so it appears on first
+   authenticated page load each session. *@
+@rendermode InteractiveServer
+@implements IDisposable
+@using System.Security.Claims
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services
+@using Sisonke.Web.Services.Entitlements
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberAccessService MemberAccessService
+@inject StokvelService StokvelService
+@inject IEntitlementService EntitlementService
+@inject IJSRuntime JsRuntime
+@inject NavigationManager NavigationManager
+@inject ILogger<LegacyMigrationPrompt> Logger
+
+@if (showSubscriptionPrompt)
+{
+    <div class="legacy-migration-overlay">
+        <div class="legacy-migration-card" @onclick:stopPropagation="true">
+            <div class="legacy-migration-icon"><i class="bi bi-megaphone-fill"></i></div>
+            <h2>Sisonke subscription plans are now available</h2>
+            <p>
+                Select your plan for <strong>@legacyStokvelName</strong> and receive 60 days free.
+                No debit will occur until you select a plan, accept the subscription terms and authorise a payment method.
+            </p>
+
+            @if (isOfficeBearer)
+            {
+                <div class="d-flex gap-2 justify-content-center flex-wrap mt-3">
+                    <button type="button" class="sisonke-btn sisonke-btn-outline" disabled="@isProcessingPrompt" @onclick="RemindMeLaterAsync">Remind me later</button>
+                    <button type="button" class="sisonke-btn sisonke-btn-primary" disabled="@isProcessingPrompt" @onclick="SelectPlanAsync">Select your plan</button>
+                </div>
+            }
+            else
+            {
+                <div class="sisonke-alert sisonke-alert-blue text-start mt-3">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    Ask your chairperson or treasurer to complete this. Share this link with them:
+                    <div class="legacy-migration-share-link mt-2">
+                        <code>@ShareLink</code>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-center mt-3">
+                    <button type="button" class="sisonke-btn sisonke-btn-outline" disabled="@isProcessingPrompt" @onclick="RemindMeLaterAsync">Remind me later</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<style>
+    .legacy-migration-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(6, 47, 102, .55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1080;
+        padding: 1rem;
+    }
+
+    .legacy-migration-card {
+        background: #fff;
+        border-radius: var(--sk-radius-lg);
+        box-shadow: var(--sk-shadow-lg);
+        max-width: 480px;
+        width: 100%;
+        padding: 2rem;
+        text-align: center;
+    }
+
+    .legacy-migration-icon {
+        width: 3.5rem;
+        height: 3.5rem;
+        border-radius: 50%;
+        background: var(--sk-green-50);
+        color: var(--sk-green-800);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin: 0 auto 1rem;
+    }
+
+    .legacy-migration-card h2 {
+        font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--sk-text);
+        margin-bottom: .75rem;
+    }
+
+    .legacy-migration-card p {
+        color: var(--sk-text-muted);
+        font-size: .9rem;
+        line-height: 1.55;
+        margin: 0;
+    }
+
+    .legacy-migration-share-link {
+        word-break: break-all;
+        font-size: .8rem;
+    }
+</style>
+
+@code {
+    private const string SessionStorageKey = "sisonke-legacy-migration-deferred";
+
+    private bool showSubscriptionPrompt;
+    private bool isProcessingPrompt;
+    private bool isOfficeBearer;
+    private Guid legacyStokvelId;
+    private string? legacyStokvelName;
+    private readonly CancellationTokenSource lifetime = new();
+    private CancellationToken disposalToken;
+    private bool initialized;
+    protected override void OnInitialized() => disposalToken = lifetime.Token;
+    public void Dispose()
+    {
+        if (disposalToken.IsCancellationRequested) return;
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+
+    private string ShareLink => NavigationManager.ToAbsoluteUri($"/register-stokvel/{legacyStokvelId}").ToString();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // sessionStorage requires interactive rendering. Render timing is not a DbContext lock:
+        // all database work below uses independent operation contexts.
+        if (!firstRender || initialized || disposalToken.IsCancellationRequested) return;
+        initialized = true;
+        try
+        {
+            await LoadLegacyMigrationStateAsync();
+            if (!disposalToken.IsCancellationRequested) StateHasChanged();
+        }
+        catch (OperationCanceledException) when (disposalToken.IsCancellationRequested) { }
+    }
+    private async Task LoadLegacyMigrationStateAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().WaitAsync(disposalToken);
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        bool alreadyDeferred;
+        try
+        {
+            var deferred = await JsRuntime.InvokeAsync<string?>("sessionStorage.getItem", disposalToken, SessionStorageKey);
+            alreadyDeferred = deferred == "true";
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // Defensive — JS interop should be available here, but treat any failure as not-yet-deferred.
+            alreadyDeferred = false;
+        }
+
+        if (alreadyDeferred)
+        {
+            return;
+        }
+
+        disposalToken.ThrowIfCancellationRequested();
+        var memberships = await MemberAccessService.GetLinkedMembershipsForUserAsync(userId).WaitAsync(disposalToken);
+        var seenTenants = new HashSet<Guid>();
+
+        foreach (var member in memberships)
+        {
+            if (!seenTenants.Add(member.TenantId))
+            {
+                continue;
+            }
+
+            disposalToken.ThrowIfCancellationRequested();
+            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId, disposalToken);
+            if (stokvel is null)
+            {
+                continue;
+            }
+
+            disposalToken.ThrowIfCancellationRequested();
+            var snapshot = await EntitlementService.GetSnapshotAsync(stokvel.Id, disposalToken);
+            if (snapshot.Status != SubscriptionStatus.LegacyUnsubscribed)
+            {
+                continue;
+            }
+
+            disposalToken.ThrowIfCancellationRequested();
+            legacyStokvelId = stokvel.Id;
+            legacyStokvelName = stokvel.Name;
+            isOfficeBearer = await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id).WaitAsync(disposalToken);
+            disposalToken.ThrowIfCancellationRequested();
+            showSubscriptionPrompt = true;
+            break;
+        }
+    }
+
+    private async Task RemindMeLaterAsync()
+    {
+        if (isProcessingPrompt || disposalToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        isProcessingPrompt = true;
+
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("sessionStorage.setItem", disposalToken, SessionStorageKey, "true");
+        }
+        catch (OperationCanceledException) when (disposalToken.IsCancellationRequested) { }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // Best-effort — if JS interop isn't available the prompt simply reappears next render.
+            Logger.LogDebug(ex, "Could not persist legacy subscription prompt deferral for stokvel {StokvelId}.", legacyStokvelId);
+        }
+        finally
+        {
+            if (!disposalToken.IsCancellationRequested)
+            {
+                showSubscriptionPrompt = false;
+                isProcessingPrompt = false;
+            }
+        }
+    }
+
+    private async Task SelectPlanAsync()
+    {
+        if (isProcessingPrompt || disposalToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        isProcessingPrompt = true;
+
+        try
+        {
+            showSubscriptionPrompt = false;
+            await JsRuntime.InvokeVoidAsync("sessionStorage.setItem", disposalToken, SessionStorageKey, "true");
+            if (!disposalToken.IsCancellationRequested) NavigationManager.NavigateTo($"/register-stokvel/{legacyStokvelId}");
+        }
+        catch (OperationCanceledException) when (disposalToken.IsCancellationRequested) { }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            Logger.LogDebug(ex, "Could not persist legacy subscription prompt selection for stokvel {StokvelId}.", legacyStokvelId);
+            if (!disposalToken.IsCancellationRequested) NavigationManager.NavigateTo($"/register-stokvel/{legacyStokvelId}");
+        }
+        finally
+        {
+            if (!disposalToken.IsCancellationRequested) isProcessingPrompt = false;
+        }
+    }
+}

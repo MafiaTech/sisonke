@@ -6,14 +6,20 @@ using Sisonke.Web.Services.Dto;
 
 namespace Sisonke.Web.Services;
 
-public class FinanceReportService(
-    ApplicationDbContext context,
-    ContributionPaymentService contributionPaymentService,
-    FineService fineService,
-    FuneralClaimService funeralClaimService)
+public class FinanceReportService(IDbContextFactory<ApplicationDbContext> dbFactory, ContributionPaymentService contributionPaymentService, FineService fineService, FuneralClaimService funeralClaimService)
 {
+    private readonly ApplicationDbContext? transactionContext;
+    // Explicit short-lived transaction/legacy callers only. DI uses the factory constructor.
+    public FinanceReportService(ApplicationDbContext context, ContributionPaymentService contributionPaymentService, FineService fineService, FuneralClaimService funeralClaimService) : this((IDbContextFactory<ApplicationDbContext>)null!, contributionPaymentService, fineService, funeralClaimService)
+    {
+        transactionContext = context;
+    }
+
     public async Task<ReportingMvpDto> GetReportingMvpAsync(string currentUserId, Guid? requestedStokvelId, DateTime? fromDate, DateTime? toDate)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var from = (fromDate ?? DateTime.Today.AddMonths(-6)).Date;
         var to = (toDate ?? DateTime.Today).Date;
         if (to < from)
@@ -162,6 +168,9 @@ public class FinanceReportService(
 
     public async Task<FinanceSummaryReportDto> GetFinanceSummaryReportAsync(Guid stokvelId, int year, int month)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (year < 1 || month is < 1 or > 12)
         {
             return new FinanceSummaryReportDto
@@ -211,6 +220,9 @@ public class FinanceReportService(
 
     public async Task<MemberFinancialStatementDto?> GetMemberFinancialStatementAsync(Guid memberId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
@@ -239,7 +251,7 @@ public class FinanceReportService(
             ? await GetRotationalContributionStatementLinesAsync(stokvelId, member.Id)
             : await GetMonthlyContributionStatementLinesAsync(stokvel.TenantId, member.Id);
 
-        var fines = await context.MemberFines
+        var fines = await context.MemberFines.AsNoTracking()
             .Include(fine => fine.FineType)
             .Where(fine =>
                 fine.MemberId == member.Id &&
@@ -298,6 +310,9 @@ public class FinanceReportService(
 
     private async Task<List<ReportingStokvelOptionDto>> GetLinkedStokvelOptionsAsync(string currentUserId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(currentUserId))
         {
             return [];
@@ -340,6 +355,9 @@ public class FinanceReportService(
 
     private async Task<List<ReportingContributionLineDto>> GetContributionLinesAsync(Stokvel stokvel, IReadOnlyCollection<Guid> memberIds, DateTime from, DateTime to, IReadOnlyDictionary<Guid, string> memberNames)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (memberIds.Count == 0)
         {
             return [];
@@ -417,7 +435,7 @@ public class FinanceReportService(
                 Expected = contribution.ExpectedAmount,
                 Paid = contribution.PaidAmount,
                 Outstanding = contribution.OutstandingAmount,
-                Status = GetEffectivePaymentStatus(contribution.Status, contribution.DueDate) == PaymentStatus.Late ? "Overdue" : contribution.Status.ToString(),
+                Status = ContributionStatus.Label(contribution.Status, contribution.ExpectedAmount, contribution.OutstandingAmount, contribution.DueDate),
                 Reference = referenceByContributionId.GetValueOrDefault(contribution.Id)
             })
             .ToList();
@@ -450,6 +468,9 @@ public class FinanceReportService(
 
     private async Task<List<ReportingFineLineDto>> GetFineLinesAsync(Guid tenantId, IReadOnlyCollection<Guid> memberIds, DateTime from, DateTime to, IReadOnlyDictionary<Guid, string> memberNames)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var fines = await context.MemberFines.AsNoTracking()
             .Include(fine => fine.FineType)
             .Where(fine =>
@@ -477,6 +498,9 @@ public class FinanceReportService(
 
     private async Task<List<ReportingLoanLineDto>> GetLoanLinesAsync(Guid stokvelId, IReadOnlyCollection<Guid> memberIds, DateTime from, DateTime to)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var loans = await context.MemberLoans.AsNoTracking()
             .Include(loan => loan.Member)
             .Include(loan => loan.Guarantors)
@@ -525,6 +549,9 @@ public class FinanceReportService(
 
     private async Task<ReportingWalletReportDto> GetWalletReportAsync(Guid stokvelId, IReadOnlyCollection<Guid> memberIds, DateTime from, DateTime to, IReadOnlyDictionary<Guid, string> memberNames)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var wallets = await context.MemberSurplusWallets.AsNoTracking()
             .Where(wallet => wallet.StokvelId == stokvelId && memberIds.Contains(wallet.MemberId) && wallet.IsActive)
             .ToListAsync();
@@ -594,6 +621,9 @@ public class FinanceReportService(
 
     private async Task<List<ReportingPayoutLineDto>> GetPayoutLinesAsync(Stokvel stokvel, IReadOnlyCollection<Guid> memberIds, DateTime from, DateTime to, IReadOnlyDictionary<Guid, string> memberNames)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var rotationalPayouts = await context.RotationalPayouts.AsNoTracking()
             .Where(payout =>
                 payout.StokvelId == stokvel.Id &&
@@ -641,6 +671,9 @@ public class FinanceReportService(
 
     private async Task<ReportingAttendanceReportDto> GetAttendanceReportAsync(Guid tenantId, IReadOnlyCollection<Guid> memberIds, DateTime from, DateTime to, IReadOnlyDictionary<Guid, string> memberNames)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var attendanceRows = await context.MeetingAttendances.AsNoTracking()
             .Include(attendance => attendance.Meeting)
             .Where(attendance =>
@@ -695,6 +728,9 @@ public class FinanceReportService(
 
     private async Task<ReportingBurialReportDto> GetBurialReportAsync(Stokvel stokvel, IReadOnlyCollection<Guid> memberIds, DateTime from, DateTime to, IReadOnlyDictionary<Guid, string> memberNames)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (memberIds.Count == 0)
         {
             return new ReportingBurialReportDto();
@@ -786,7 +822,10 @@ public class FinanceReportService(
 
     private async Task<List<ContributionArrearsLineDto>> GetMonthlyContributionStatementLinesAsync(Guid tenantId, Guid memberId)
     {
-        var contributions = await context.MemberContributions
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
+        var contributions = await context.MemberContributions.AsNoTracking()
             .Include(contribution => contribution.ContributionCycle)
             .Where(contribution =>
                 contribution.MemberId == memberId &&
@@ -811,7 +850,6 @@ public class FinanceReportService(
             .Select(contribution =>
             {
                 latestPaymentByContributionId.TryGetValue(contribution.Id, out var latestPayment);
-                var effectiveStatus = GetEffectivePaymentStatus(contribution.Status, contribution.ContributionCycle.DueDate);
 
                 return new ContributionArrearsLineDto
                 {
@@ -823,7 +861,7 @@ public class FinanceReportService(
                     PaidAmount = contribution.PaidAmount,
                     Balance = contribution.OutstandingAmount,
                     DueDate = contribution.ContributionCycle.DueDate,
-                    Status = effectiveStatus == PaymentStatus.Late ? "Overdue" : effectiveStatus.ToString(),
+                    Status = contribution.StatusLabel,
                     Reference = latestPayment?.Reference
                 };
             })
@@ -832,6 +870,9 @@ public class FinanceReportService(
 
     private async Task<List<ContributionArrearsLineDto>> GetRotationalContributionStatementLinesAsync(Guid stokvelId, Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var payments = await context.RotationalContributionPayments
             .AsNoTracking()
             .Include(payment => payment.Cycle)
@@ -868,16 +909,6 @@ public class FinanceReportService(
                 };
             })
             .ToList();
-    }
-
-    private static PaymentStatus GetEffectivePaymentStatus(PaymentStatus status, DateTime dueDate)
-    {
-        if (dueDate < DateTime.Today && status is PaymentStatus.Unpaid or PaymentStatus.PartiallyPaid)
-        {
-            return PaymentStatus.Late;
-        }
-
-        return status;
     }
 
     private static string GetRotationalPaymentStatementStatus(ContributionPaymentStatus status, DateTime? dueDate)

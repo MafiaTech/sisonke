@@ -1,4 +1,5 @@
 @page "/register-stokvel"
+@page "/register-stokvel/{StokvelId:guid}"
 @rendermode InteractiveServer
 @attribute [Authorize]
 
@@ -13,14 +14,22 @@
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Helpers
 @using Sisonke.Web.Services
+@using Sisonke.Web.Services.Billing
+@using Sisonke.Web.Services.Billing.Paystack
 
 @inject StokvelService StokvelService
+@inject SubscriptionService SubscriptionService
+@inject PlanCatalogueService PlanCatalogueService
+@inject PaystackOptions PaystackOptions
+@inject AuthSettings AuthSettings
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject UserManager<ApplicationUser> UserManager
 @inject MemberAccountLinkingService MemberAccountLinkingService
 @inject MemberService MemberService
+@inject IHttpContextAccessor HttpContextAccessor
 @inject IServiceScopeFactory ScopeFactory
+@inject ILogger<RegisterStokvel> Logger
 
 <PageTitle>Register New Stokvel</PageTitle>
 
@@ -50,24 +59,20 @@ else
         </div>
 
         <div class="rw-steps">
-            <div class="rw-step @(currentWizardStep == 1 ? "rw-step-active" : currentWizardStep > 1 ? "rw-step-done" : "")">
-                <div class="rw-step-circle">
-                    @if (currentWizardStep > 1) { <i class="bi bi-check-lg"></i> } else { <span>1</span> }
+            @for (var step = 1; step <= 4; step++)
+            {
+                var stepNumber = step;
+                <div class="rw-step @(currentWizardStep == stepNumber ? "rw-step-active" : currentWizardStep > stepNumber ? "rw-step-done" : "")">
+                    <div class="rw-step-circle">
+                        @if (currentWizardStep > stepNumber) { <i class="bi bi-check-lg"></i> } else { <span>@stepNumber</span> }
+                    </div>
+                    <div class="rw-step-label">@StepLabel(stepNumber)</div>
                 </div>
-                <div class="rw-step-label">User Details</div>
-            </div>
-            <div class="rw-step-connector @(currentWizardStep > 1 ? "rw-step-connector-done" : "")"></div>
-            <div class="rw-step @(currentWizardStep == 2 ? "rw-step-active" : currentWizardStep > 2 ? "rw-step-done" : "")">
-                <div class="rw-step-circle">
-                    @if (currentWizardStep > 2) { <i class="bi bi-check-lg"></i> } else { <span>2</span> }
-                </div>
-                <div class="rw-step-label">Stokvel Type</div>
-            </div>
-            <div class="rw-step-connector @(currentWizardStep > 2 ? "rw-step-connector-done" : "")"></div>
-            <div class="rw-step @(currentWizardStep == 3 ? "rw-step-active" : "")">
-                <div class="rw-step-circle"><span>3</span></div>
-                <div class="rw-step-label">Review</div>
-            </div>
+                @if (stepNumber < 4)
+                {
+                    <div class="rw-step-connector @(currentWizardStep > stepNumber ? "rw-step-connector-done" : "")"></div>
+                }
+            }
         </div>
 
         <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">
@@ -84,18 +89,30 @@ else
     {
         <AlertBanner Type="warning" Title="@wizardValidationMessage" Message="" Icon="bi bi-exclamation-triangle-fill" />
     }
+    @if (!string.IsNullOrWhiteSpace(Error) && currentWizardStep == 3)
+    {
+        <AlertBanner Type="danger" Title="Card authorisation was not completed." Message="@Error" Icon="bi bi-x-circle-fill" />
+    }
 
-    <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" FormName="RegisterStokvelForm">
+    <EditForm Model="@model" FormName="RegisterStokvelForm">
         <DataAnnotationsValidator />
 
-        <!-- ══════════════ STEP 1 — User Details ══════════════ -->
+        <!-- ══════════════ STEP 1 — Organisation ══════════════ -->
         @if (currentWizardStep == 1)
         {
             <div class="rw-step-panel">
                 <div class="rw-step-title">
-                    <h1>Stokvel Details</h1>
+                    <h1>Create Your Organisation</h1>
                     <p>Tell us about your stokvel and who will be the first office bearer.</p>
                 </div>
+
+                @if (isExistingOrganisation)
+                {
+                    <div class="sisonke-alert sisonke-alert-blue mb-3">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        This organisation is already created — these details are locked. Continue to select a plan below.
+                    </div>
+                }
 
                 @if (string.IsNullOrWhiteSpace(currentUser.IdNumber))
                 {
@@ -105,13 +122,25 @@ else
                     </div>
                 }
 
+                @if (AuthSettings.RequireConfirmedAccount && currentUser.EmailConfirmed == false)
+                {
+                    <div class="sisonke-alert sisonke-alert-gold mb-3 d-flex align-items-start gap-2">
+                        <i class="bi bi-envelope-exclamation-fill mt-1"></i>
+                        <div>
+                            Please verify your email address before continuing.
+                            <a href="/Account/ResendEmailConfirmation">Resend confirmation email</a>.
+                        </div>
+                    </div>
+                }
+
                 <!-- Stokvel identity -->
+                <fieldset disabled="@isExistingOrganisation">
                 <div class="sisonke-card mb-3">
                     <div class="sisonke-card-body">
                         <div class="sisonke-card-head mb-3">
                             <div>
                                 <h2>Stokvel Identity</h2>
-                                <p>Give your stokvel a name and describe its purpose.</p>
+                                <p>@GetIdentityPrompt()</p>
                             </div>
                         </div>
                         <div class="sisonke-grid sisonke-grid-2">
@@ -119,11 +148,20 @@ else
                                 <label class="form-label" for="stokvel-name">
                                     Stokvel name <span class="text-danger">*</span>
                                 </label>
-                                <InputText id="stokvel-name" class="form-control" placeholder="e.g. Mahlalela Burial Society" @bind-Value="model.Name" />
+                                <InputText id="stokvel-name" class="form-control" placeholder="@GetStokvelNamePlaceholder()" @bind-Value="model.Name" />
                                 <ValidationMessage For="@(() => model.Name)" class="text-danger small" />
                             </div>
                             <div class="member-form-field">
-                                <label class="form-label" for="expected-member-count">Expected total members</label>
+                                <label class="form-label" for="registration-type">Registration type</label>
+                                <select id="registration-type" class="form-select" @bind="model.Archetype">
+                                    @foreach (var option in archetypeOptions)
+                                    {
+                                        <option value="@option.Archetype" disabled="@option.IsComingSoon">@option.Title</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="expected-member-count">Estimated total members</label>
                                 <InputNumber id="expected-member-count" class="form-control" TValue="int?"
                                     Value="@model.ExpectedMemberCount"
                                     ValueChanged="@((int? v) => OnExpectedMemberCountChangedAsync(v))"
@@ -159,10 +197,50 @@ else
                                     Description <span class="text-muted fw-normal">(optional)</span>
                                 </label>
                                 <InputTextArea id="description" class="form-control" rows="2"
-                                    placeholder="Brief description of the stokvel's purpose and goals."
+                                    placeholder="@GetDescriptionPlaceholder()"
                                     @bind-Value="model.Description" />
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Stokvel category -->
+                <div class="sisonke-card mb-3">
+                    <div class="sisonke-card-body">
+                        <div class="sisonke-card-head mb-3">
+                            <div>
+                                <h2>Stokvel Category</h2>
+                                <p>Selected type: <strong>@(SelectedArchetypeOption?.Title ?? "Burial Society")</strong>. Choose the category that best describes how your group will save and share money.</p>
+                            </div>
+                        </div>
+                        <InputRadioGroup @bind-Value="model.Archetype">
+                            <div class="archetype-grid">
+                                @foreach (var option in archetypeOptions)
+                                {
+                                    var isSelected = model.Archetype == option.Archetype && !option.IsComingSoon;
+                                    <label class="archetype-card @(isSelected ? "archetype-card-selected" : "") @(option.IsComingSoon ? "archetype-card-soon" : "")">
+                                        <InputRadio class="visually-hidden" Value="@option.Archetype" disabled="@option.IsComingSoon" />
+                                        <div class="archetype-card-top">
+                                            <div class="archetype-icon-wrap">
+                                                <i class="bi @option.Icon"></i>
+                                            </div>
+                                            @if (isSelected)
+                                            {
+                                                <div class="archetype-check">
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="archetype-title">@option.Title</div>
+                                        <div class="archetype-description">@option.Description</div>
+                                        @if (option.IsComingSoon)
+                                        {
+                                            <span class="@GetArchetypeBadgeClass(option)">@option.StatusText</span>
+                                        }
+                                    </label>
+                                }
+                            </div>
+                        </InputRadioGroup>
                     </div>
                 </div>
 
@@ -171,7 +249,7 @@ else
                     <div class="sisonke-card-body">
                         <div class="sisonke-card-head mb-3">
                             <div>
-                                <h2>Office Bearer Details</h2>
+                                <h2>Primary Contact / Office Bearer</h2>
                                 <p>You will be linked to this stokvel as the first office bearer and creator.</p>
                             </div>
                             <div class="rw-creator-pill">
@@ -259,316 +337,236 @@ else
                         </div>
                     </div>
                 </div>
+                </fieldset>
 
                 <div class="rw-step-actions">
                     <a class="sisonke-btn sisonke-btn-outline" href="/my-workspace">Cancel</a>
-                    <button type="button" class="sisonke-btn sisonke-btn-primary rw-btn-next" @onclick="GoToStep2">
-                        Continue to Stokvel Type <i class="bi bi-arrow-right ms-2"></i>
+                    <button type="button" class="sisonke-btn sisonke-btn-primary rw-btn-next" @onclick="GoToStep2Async" disabled="@isSaving">
+                        @if (isSaving) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                        Continue to Plan <i class="bi bi-arrow-right ms-2"></i>
                     </button>
                 </div>
             </div>
         }
 
-        <!-- ══════════════ STEP 2 — Stokvel Type & Package ══════════════ -->
+        <!-- ══════════════ STEP 2 — Select Plan ══════════════ -->
         @if (currentWizardStep == 2)
         {
             <div class="rw-step-panel">
                 <div class="rw-step-title">
-                    <h1>Choose Your Stokvel Type</h1>
-                    <p>Select the type that best describes how your group will save and share money.</p>
+                    <h1>Select Your Plan</h1>
+                    <p>Every plan includes a 60-day free trial. No monthly subscription fee is charged now. Paystack processes a R1 card-verification transaction and Sisonke immediately requests its refund.</p>
                 </div>
 
-                <!-- Archetype selector -->
-                <div class="sisonke-card mb-3">
-                    <div class="sisonke-card-body">
-                        <InputRadioGroup @bind-Value="model.Archetype">
-                            <div class="archetype-grid">
-                                @foreach (var option in archetypeOptions)
-                                {
-                                    var isSelected = model.Archetype == option.Archetype && !option.IsComingSoon;
-                                    <label class="archetype-card @(isSelected ? "archetype-card-selected" : "") @(option.IsComingSoon ? "archetype-card-soon" : "")">
-                                        <InputRadio class="visually-hidden" Value="@option.Archetype" disabled="@option.IsComingSoon" />
-                                        <div class="archetype-card-top">
-                                            <div class="archetype-icon-wrap">
-                                                <i class="bi @option.Icon"></i>
-                                            </div>
-                                            @if (isSelected)
-                                            {
-                                                <div class="archetype-check">
-                                                    <i class="bi bi-check-circle-fill"></i>
-                                                </div>
-                                            }
+                @if (packageSelectionFailed)
+                {
+                    <AlertBanner Type="warning" Title="Please select a plan to continue." Message="" Icon="bi bi-exclamation-triangle-fill" />
+                }
+
+                @if (memberCountWarningPlan is not null)
+                {
+                    <div class="sisonke-alert sisonke-alert-gold mb-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Your estimated @model.ExpectedMemberCount members exceeds the selected plan's limit.
+                        Consider <strong>@memberCountWarningPlan.Name</strong> instead, which supports up to
+                        @(memberCountWarningPlan.MaximumMembers?.ToString() ?? "unlimited") members.
+                    </div>
+                }
+
+                <div class="row g-3 mb-3">
+                    @foreach (var entry in catalogueEntries)
+                    {
+                        var plan = entry.Plan;
+                        var isSelected = selectedPlanId == plan.Id;
+                        var isRecommended = plan.Code == PlanCodes.Professional;
+
+                        <div class="col-12 col-md-6 col-lg-3">
+                            <div class="plan-card @(isSelected ? "plan-selected" : "") @(isRecommended && !isSelected ? "plan-recommended" : "") h-100"
+                                 role="button"
+                                 tabindex="0"
+                                 @onclick="@(() => SelectPlan(plan.Id))">
+                                <div class="card-body p-4 d-flex flex-column">
+                                    @if (isRecommended)
+                                    {
+                                        <div class="text-center mb-2">
+                                            <span class="sisonke-badge sisonke-badge-gold">Recommended</span>
                                         </div>
-                                        <div class="archetype-title">@option.Title</div>
-                                        <div class="archetype-description">@option.Description</div>
-                                        @if (option.IsComingSoon)
+                                    }
+                                    <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                        <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
+                                        @if (isSelected)
                                         {
-                                            <span class="@GetArchetypeBadgeClass(option)">@option.StatusText</span>
+                                            <i class="bi bi-check-circle-fill" style="color:var(--sk-success);font-size:1.1rem;flex-shrink:0"></i>
                                         }
-                                    </label>
-                                }
-                            </div>
-                        </InputRadioGroup>
-
-                        @if (model.Archetype == StokvelArchetype.Rotational)
-                        {
-                            <div class="sisonke-alert sisonke-alert-blue mt-3 d-flex align-items-start gap-2">
-                                <i class="bi bi-lightbulb-fill mt-1" style="flex-shrink:0"></i>
-                                <div>
-                                    <strong>Rotational Stokvels</strong> help members track contributions, payout order and next recipient transparently.
-                                    Members contribute regularly and the full pot is paid to one member in turn.
+                                    </div>
+                                    <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
+                                    <div class="plan-price mb-1">
+                                        @if (plan.IsCustomPricing)
+                                        {
+                                            <span style="font-size:1.1rem">Custom pricing</span>
+                                        }
+                                        else
+                                        {
+                                            @FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span>
+                                        }
+                                    </div>
+                                    @if (!plan.IsCustomPricing)
+                                    {
+                                        <p class="text-muted small mb-3">60 days free. First charge @FirstChargeDate.ToString("d MMMM yyyy").</p>
+                                    }
+                                    <ul class="plan-features mt-auto mb-0">
+                                        @foreach (var feature in entry.Features.Where(f => f.DataType == FeatureDataType.Boolean && f.IsEnabled).Take(8))
+                                        {
+                                            <li><i class="bi bi-check2 me-2" style="color:var(--sk-success)"></i>@feature.Name</li>
+                                        }
+                                    </ul>
                                 </div>
                             </div>
-                        }
-                        else if (model.Archetype == StokvelArchetype.BurialSociety)
-                        {
-                            <div class="sisonke-alert sisonke-alert-green mt-3 d-flex align-items-start gap-2">
-                                <i class="bi bi-heart-fill mt-1" style="flex-shrink:0"></i>
-                                <div>
-                                    <strong>Burial Society</strong> enables funeral claims, dependents and member contributions.
-                                    Rotation and lending features stay off for this stokvel type.
-                                </div>
-                            </div>
-                        }
-                    </div>
+                        </div>
+                    }
                 </div>
 
-                <!-- Subscription plans -->
-                <div class="sisonke-card mb-3">
-                    <div class="sisonke-card-body">
-                        <div class="sisonke-card-head mb-3">
-                            <div>
-                                <h2>Choose Your Plan</h2>
-                                <p>Select the package that fits your expected membership size.</p>
-                            </div>
-                            @if (packageSelectionFailed)
-                            {
-                                <span class="text-danger small fw-semibold">Plan selection required</span>
-                            }
-                        </div>
-
-                        @if (subscriptionPlans.Count == 0)
-                        {
-                            <AlertBanner Type="info" Title="No subscription packages are configured yet."
-                                Message="Please ask the platform administrator to configure packages."
-                                Icon="bi bi-info-circle-fill" />
-                        }
-                        else
-                        {
-                            <div class="row g-3">
-                                @foreach (var plan in subscriptionPlans)
-                                {
-                                    var isPlanSelected = model.SubscriptionPlanId == plan.Id;
-                                    var isPopular      = IsMostPopularPlan(plan.Name);
-                                    var features       = GetPlanFeatures(plan.Name);
-
-                                    <div class="col-12 col-md-4">
-                                        <div class="plan-card @(isPlanSelected ? "plan-selected" : "") @(isPopular && !isPlanSelected ? "plan-recommended" : "") @(isPopular ? "plan-popular-wrap" : "") h-100"
-                                             @onclick="@(() => SelectSubscriptionPlan(plan.Id))">
-                                            <div class="card-body p-4 d-flex flex-column">
-                                                @if (isPopular)
-                                                {
-                                                    <div class="text-center mb-2">
-                                                        <span class="sisonke-badge sisonke-badge-gold">Most Popular</span>
-                                                    </div>
-                                                }
-                                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                                                    <h3 class="h6 mb-0 fw-700">@plan.Name</h3>
-                                                    @if (isPlanSelected)
-                                                    {
-                                                        <i class="bi bi-check-circle-fill" style="color:var(--sk-success);font-size:1.1rem;flex-shrink:0"></i>
-                                                    }
-                                                </div>
-                                                <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
-                                                <div class="plan-price mb-3">
-                                                    @FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span>
-                                                </div>
-                                                <ul class="plan-features mt-auto mb-0">
-                                                    @foreach (var feat in features)
-                                                    {
-                                                        <li>
-                                                            <i class="bi bi-check2 me-2" style="color:var(--sk-success)"></i>@feat
-                                                        </li>
-                                                    }
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        }
-                    </div>
+                <div class="sisonke-alert sisonke-alert-blue mb-3">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    Payment processing fees for member collections (contributions, claims payouts) are separate from your
+                    Sisonke subscription and are never bundled into the plan price above.
                 </div>
 
                 <div class="rw-step-actions">
-                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="GoBackToStep1">
-                        <i class="bi bi-arrow-left me-2"></i>Back to User Details
-                    </button>
-                    <button type="button" class="sisonke-btn sisonke-btn-primary rw-btn-next" @onclick="GoToStep3">
-                        Continue to Review <i class="bi bi-arrow-right ms-2"></i>
+                    @if (!isExistingOrganisation)
+                    {
+                        <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="GoBackToStep1">
+                            <i class="bi bi-arrow-left me-2"></i>Back to Organisation
+                        </button>
+                    }
+                    <button type="button" class="sisonke-btn sisonke-btn-primary rw-btn-next" @onclick="ContinueToBillingAsync" disabled="@isSaving">
+                        Continue to Billing <i class="bi bi-arrow-right ms-2"></i>
                     </button>
                 </div>
             </div>
         }
 
-        <!-- ══════════════ STEP 3 — Final Review ══════════════ -->
+        <!-- ══════════════ STEP 3 — Billing Method ══════════════ -->
         @if (currentWizardStep == 3)
         {
             <div class="rw-step-panel">
                 <div class="rw-step-title">
-                    <h1>Review &amp; Confirm</h1>
-                    <p>Check the details before creating your stokvel.</p>
+                    <h1>Add Billing Method</h1>
+                    <p>Your card details are captured securely on Paystack's hosted page — Sisonke never stores your card number, expiry date or CVV.</p>
                 </div>
 
-                <ValidationSummary class="alert alert-danger mb-3" />
-
-                <!-- Type + plan summary row -->
-                <div class="row g-3 mb-3">
-                    <div class="col-12 col-md-6">
-                        <div class="sisonke-card h-100">
-                            <div class="sisonke-card-body">
-                                <div class="detail-mini-label mb-2">Stokvel Type</div>
-                                @if (SelectedArchetypeOption is not null)
-                                {
-                                    <div class="d-flex align-items-center gap-2 mb-2">
-                                        <div class="rw-review-icon">
-                                            <i class="bi @SelectedArchetypeOption.Icon"></i>
-                                        </div>
-                                        <div>
-                                            <div class="fw-700">@SelectedArchetypeOption.Title</div>
-                                        </div>
-                                    </div>
-                                    <p class="text-muted small mb-0">@SelectedArchetypeOption.Description</p>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <div class="sisonke-card h-100">
-                            <div class="sisonke-card-body">
-                                <div class="detail-mini-label mb-2">Selected Plan</div>
-                                @if (SelectedPlan is not null)
-                                {
-                                    <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <div class="fw-700">@SelectedPlan.Name</div>
-                                        @if (IsMostPopularPlan(SelectedPlan.Name))
-                                        {
-                                            <span class="sisonke-badge sisonke-badge-gold">Most Popular</span>
-                                        }
-                                    </div>
-                                    <div class="plan-price" style="font-size:1.35rem">
-                                        @FormatCurrency(SelectedPlan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span>
-                                    </div>
-                                    <p class="text-muted small mt-1 mb-0">@GetMemberRangeText(SelectedPlan)</p>
-                                }
-                                else
-                                {
-                                    <span class="text-danger small">No plan selected — go back to Step 2.</span>
-                                }
-                            </div>
-                        </div>
-                    </div>
+                <div class="sisonke-alert sisonke-alert-blue mb-3">
+                    <i class="bi bi-credit-card-2-front me-2"></i>
+                    A recurring-capable card is required for the subscription. Ozow EFT and Capitec Pay work for member
+                    contribution collections, but cannot be used to authorise this subscription.
                 </div>
 
-                <!-- Stokvel details summary -->
                 <div class="sisonke-card mb-3">
                     <div class="sisonke-card-body">
-                        <div class="form-section-title mb-3">Stokvel Details</div>
-                        <div class="row g-3">
-                            <div class="col-6 col-md-3">
-                                <div class="detail-mini-label">Stokvel Name</div>
-                                <div class="fw-600">@Display(model.Name)</div>
+                        <div class="sisonke-card-head mb-3">
+                            <h2>Billing Details</h2>
+                        </div>
+                        <div class="sisonke-grid sisonke-grid-2">
+                            <div class="member-form-field">
+                                <label class="form-label" for="cardholder-name">
+                                    Cardholder name <span class="text-danger">*</span>
+                                </label>
+                                <InputText id="cardholder-name" class="form-control" @bind-Value="model.CardholderName" />
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="detail-mini-label">Province</div>
-                                <div class="fw-600">@Display(model.Province)</div>
+                            <div class="member-form-field">
+                                <label class="form-label" for="billing-email">
+                                    Billing email <span class="text-danger">*</span>
+                                </label>
+                                <InputText id="billing-email" class="form-control" @bind-Value="model.BillingEmail" />
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="detail-mini-label">Town / Area</div>
-                                <div class="fw-600">@Display(model.TownOrArea)</div>
+                            <div class="member-form-field register-form-wide">
+                                <label class="form-label" for="billing-address">Billing address</label>
+                                <InputTextArea id="billing-address" class="form-control" rows="2" @bind-Value="model.BillingAddress" />
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="detail-mini-label">Expected Members</div>
-                                <div class="fw-600">@(model.ExpectedMemberCount?.ToString() ?? "Not specified")</div>
-                            </div>
-                            @if (!string.IsNullOrWhiteSpace(model.Description))
-                            {
-                                <div class="col-12">
-                                    <div class="detail-mini-label">Description</div>
-                                    <div class="text-muted small">@model.Description</div>
-                                </div>
-                            }
                         </div>
                     </div>
                 </div>
 
-                @if (HasBankingDetails())
+                @if (SelectedCatalogueEntry is not null)
                 {
-                    <div class="sisonke-card mb-3">
-                        <div class="sisonke-card-body">
-                            <div class="form-section-title mb-3">Banking Details</div>
-                            <div class="row g-3">
-                                <div class="col-6 col-md-3">
-                                    <div class="detail-mini-label">Bank</div>
-                                    <div class="fw-600">@Display(model.BankName)</div>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <div class="detail-mini-label">Account Holder</div>
-                                    <div class="fw-600">@Display(model.AccountHolderName)</div>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <div class="detail-mini-label">Account Number</div>
-                                    <div class="fw-600">@StokvelBankingDetailsService.MaskAccountNumber(model.AccountNumber)</div>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <div class="detail-mini-label">Account Type</div>
-                                    <div class="fw-600">@GetBankAccountTypeLabel(model.AccountType)</div>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <div class="detail-mini-label">Branch Code</div>
-                                    <div class="fw-600">@Display(model.BranchCode)</div>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <div class="detail-mini-label">Payment Reference</div>
-                                    <div class="fw-600">@Display(model.PaymentReferenceFormat)</div>
-                                </div>
-                            </div>
+                    <div class="rw-billing-summary mb-3">
+                        <div class="rw-billing-summary-row">
+                            <span>Plan</span>
+                            <strong>@SelectedCatalogueEntry.Plan.Name</strong>
                         </div>
+                        <div class="rw-billing-summary-row">
+                            <span>Amount after trial</span>
+                            <strong>@FormatCurrency(SelectedCatalogueEntry.Plan.MonthlyPrice)/month</strong>
+                        </div>
+                        <div class="rw-billing-summary-row">
+                            <span>Trial ends</span>
+                            <strong>@FirstChargeDate.ToString("d MMMM yyyy")</strong>
+                        </div>
+                        <div class="rw-billing-summary-row">
+                            <span>First billing date</span>
+                            <strong>@FirstChargeDate.ToString("d MMMM yyyy")</strong>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">Cancel before this date and you will not be charged.</p>
                     </div>
                 }
 
-                <!-- Creator summary -->
                 <div class="sisonke-card mb-3">
                     <div class="sisonke-card-body">
-                        <div class="form-section-title mb-3">Office Bearer</div>
-                        <div class="row g-3">
-                            <div class="col-6 col-md-3">
-                                <div class="detail-mini-label">Full Name</div>
-                                <div class="fw-600">@Display(model.CreatorFullName)</div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="detail-mini-label">Cellphone</div>
-                                <div class="fw-600">@SensitiveDataMasker.MaskPhoneNumber(model.CreatorCellphoneNumber)</div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="detail-mini-label">Email</div>
-                                <div class="fw-600">@SensitiveDataMasker.MaskEmail(model.CreatorEmail)</div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="detail-mini-label">ID Number</div>
-                                <div class="fw-600">@SensitiveDataMasker.MaskIdNumber(model.CreatorIdNumber)</div>
-                            </div>
+                        <div class="form-check">
+                            <InputCheckbox id="terms-accepted" class="form-check-input" @bind-Value="model.TermsAccepted" />
+                            <label class="form-check-label small" for="terms-accepted">
+                                I accept the Sisonke subscription terms (version @BillingTermsVersion.Current), including the
+                                60-day introductory trial period and automatic monthly billing thereafter until cancelled.
+                            </label>
                         </div>
                     </div>
                 </div>
 
                 <div class="rw-step-actions">
-                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="GoBackToStep2">
-                        <i class="bi bi-arrow-left me-2"></i>Back to Stokvel Type
+                    <button type="button" class="sisonke-btn sisonke-btn-outline" @onclick="GoBackToStep2" disabled="@isSaving">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Plan
                     </button>
-                    <button class="sisonke-btn sisonke-btn-primary rw-btn-next" type="submit">
-                        <i class="bi bi-check-circle me-2"></i>Register Stokvel
+                    <button type="button" class="sisonke-btn sisonke-btn-primary rw-btn-next" @onclick="AuthoriseCardAsync" disabled="@isSaving">
+                        @if (isSaving) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                        <i class="bi bi-shield-lock-fill me-2"></i>Authorise Payment Method
                     </button>
+                </div>
+            </div>
+        }
+
+        <!-- ══════════════ STEP 4 — Complete ══════════════ -->
+        @if (currentWizardStep == 4)
+        {
+            <div class="rw-step-panel text-center">
+                <div class="rw-confirm-icon mb-3"><i class="bi bi-check-circle-fill"></i></div>
+                <div class="rw-step-title">
+                    <h1>You're All Set!</h1>
+                    <p>Your 60-day free trial has started. A confirmation email is on its way.</p>
+                </div>
+
+                @if (SelectedCatalogueEntry is not null)
+                {
+                    <div class="rw-billing-summary mb-4" style="text-align:left;max-width:420px;margin-left:auto;margin-right:auto">
+                        <div class="rw-billing-summary-row">
+                            <span>Plan</span>
+                            <strong>@SelectedCatalogueEntry.Plan.Name</strong>
+                        </div>
+                        <div class="rw-billing-summary-row">
+                            <span>Trial ends</span>
+                            <strong>@trialEndsAt?.ToString("d MMMM yyyy")</strong>
+                        </div>
+                        <div class="rw-billing-summary-row">
+                            <span>First billing date</span>
+                            <strong>@nextBillingAt?.ToString("d MMMM yyyy")</strong>
+                        </div>
+                    </div>
+                }
+
+                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                    <a class="sisonke-btn sisonke-btn-outline" href="/subscription">Manage Billing</a>
+                    <a class="sisonke-btn sisonke-btn-primary" href="/stokvel-questionnaire/@StokvelId">
+                        Continue Setup <i class="bi bi-arrow-right ms-2"></i>
+                    </a>
                 </div>
             </div>
         }
@@ -639,7 +637,7 @@ else
     flex: 1;
     justify-content: center;
     min-width: 0;
-    max-width: 560px;
+    max-width: 620px;
 }
 
 .rw-step {
@@ -678,8 +676,8 @@ else
     height: 2px;
     background: var(--sk-border);
     margin-bottom: 1.45rem;
-    min-width: 2rem;
-    max-width: 7rem;
+    min-width: 1.25rem;
+    max-width: 5rem;
     transition: background .25s;
 }
 
@@ -820,19 +818,67 @@ else
     flex: 1;
 }
 
-/* ── Plan feature list ───────────── */
+/* ── Plan cards ───────────────────── */
+.plan-card {
+    position: relative;
+    border: 2px solid var(--sk-border);
+    border-radius: var(--sk-radius);
+    background: #fff;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, transform .12s;
+    height: 100%;
+}
+
+.plan-card:hover {
+    border-color: var(--sk-green-600);
+    box-shadow: var(--sk-shadow);
+    transform: translateY(-1px);
+}
+
+.plan-selected {
+    border-color: var(--sk-green-800) !important;
+    box-shadow: 0 0 0 3px rgba(27,67,50,.12), var(--sk-shadow) !important;
+    background: var(--sk-green-50) !important;
+}
+
+.plan-recommended {
+    border-color: var(--sk-gold);
+}
+
+.plan-price {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--sk-green-800);
+}
+
 .plan-features {
     list-style: none;
     padding: 0;
     margin: 0;
-    font-size: .875rem;
+    font-size: .82rem;
     color: var(--sk-text-muted);
 }
 
 .plan-features li { padding: .2rem 0; }
 
-.plan-popular-wrap {
-    position: relative;
+/* ── Billing summary / confirmation ─ */
+.rw-billing-summary {
+    background: var(--sk-green-50);
+    border: 1px solid var(--sk-green-100);
+    border-radius: var(--sk-radius);
+    padding: 1.1rem 1.4rem;
+}
+
+.rw-billing-summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: .3rem 0;
+    font-size: .9rem;
+}
+
+.rw-confirm-icon {
+    font-size: 3.5rem;
+    color: var(--sk-success);
 }
 
 /* ── Review step ─────────────────── */
@@ -868,29 +914,88 @@ else
 </style>
 
 @code {
+    [Parameter]
+    public Guid? StokvelId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Step { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Error { get; set; }
+
     private readonly RegisterStokvelFormModel model = new();
     private List<string> provinces = SouthAfricanLocations.GetProvinces();
     private List<string> towns = new();
-    private List<SubscriptionPlan> subscriptionPlans = [];
+    private List<PlanCatalogueEntry> catalogueEntries = [];
     private ApplicationUser? currentUser;
-    private Guid? recommendedPlanId;
     private bool saveFailed;
     private bool packageSelectionFailed;
     private bool isLoading = true;
+    private bool isSaving;
+    private bool isExistingOrganisation;
+    private Guid? selectedPlanId;
     private int currentWizardStep = 1;
     private string? wizardValidationMessage;
+    private string? capturedIpAddress;
+    private DateTime? trialEndsAt;
+    private DateTime? nextBillingAt;
+    private SubscriptionPlan? memberCountWarningPlan;
 
     private ArchetypeOption? SelectedArchetypeOption =>
         archetypeOptions.FirstOrDefault(a => a.Archetype == model.Archetype);
 
-    private SubscriptionPlan? SelectedPlan =>
-        model.SubscriptionPlanId is null ? null
-        : subscriptionPlans.FirstOrDefault(p => p.Id == model.SubscriptionPlanId);
+    private PlanCatalogueEntry? SelectedCatalogueEntry =>
+        selectedPlanId is null ? null
+        : catalogueEntries.FirstOrDefault(entry => entry.Plan.Id == selectedPlanId.Value);
 
-    private void GoToStep2()
+    private DateTime FirstChargeDate => DateTime.UtcNow.AddDays(PaystackOptions.TrialDays).Date;
+
+    private void SelectPlan(Guid planId)
+    {
+        var selectedPlan = catalogueEntries.Select(entry => entry.Plan).FirstOrDefault(plan => plan.Id == planId);
+        if (selectedPlan?.Code is null)
+        {
+            wizardValidationMessage = "The selected subscription plan is no longer available.";
+            selectedPlanId = null;
+            model.SelectedPlanCode = null;
+            return;
+        }
+
+        selectedPlanId = selectedPlan.Id;
+        model.SelectedPlanCode = selectedPlan.Code;
+        packageSelectionFailed = false;
+        wizardValidationMessage = null;
+        memberCountWarningPlan = catalogueEntries
+            .Select(e => e.Plan)
+            .FirstOrDefault(p => p.MaximumMembers != null && model.ExpectedMemberCount > p.MaximumMembers && p.Id == planId)
+            is not null
+            ? catalogueEntries.Select(e => e.Plan).FirstOrDefault(p =>
+                p.MaximumMembers == null || model.ExpectedMemberCount <= p.MaximumMembers)
+            : null;
+    }
+
+    private async Task OnExpectedMemberCountChangedAsync(int? expectedMemberCount)
+    {
+        model.ExpectedMemberCount = expectedMemberCount;
+        if (selectedPlanId is not null)
+        {
+            SelectPlan(selectedPlanId.Value);
+        }
+        else
+        {
+            var recommended = await PlanCatalogueService.RecommendPlanForMemberCountAsync(expectedMemberCount);
+            if (recommended?.Code is not null)
+            {
+                selectedPlanId = recommended.Id;
+                model.SelectedPlanCode = recommended.Code;
+            }
+        }
+    }
+
+    private async Task GoToStep2Async()
     {
         wizardValidationMessage = null;
-        packageSelectionFailed = false;
+        saveFailed = false;
 
         if (string.IsNullOrWhiteSpace(model.Name))
         {
@@ -902,9 +1007,9 @@ else
             wizardValidationMessage = "Please enter the office bearer's full name to continue.";
             return;
         }
-        if (string.IsNullOrWhiteSpace(model.CreatorCellphoneNumber))
+        if (string.IsNullOrWhiteSpace(model.CreatorCellphoneNumber) || !IsValidSaMobile(model.CreatorCellphoneNumber))
         {
-            wizardValidationMessage = "Please enter the office bearer's cellphone number to continue.";
+            wizardValidationMessage = "Please enter a valid South African cellphone number (e.g. 0821234567).";
             return;
         }
         var bankingValidation = ValidateBankingDetails();
@@ -913,19 +1018,46 @@ else
             wizardValidationMessage = bankingValidation;
             return;
         }
-        currentWizardStep = 2;
-    }
 
-    private void GoToStep3()
-    {
-        wizardValidationMessage = null;
-        if (model.SubscriptionPlanId is null)
+        if (isExistingOrganisation)
         {
-            packageSelectionFailed = true;
+            currentWizardStep = 2;
             return;
         }
-        packageSelectionFailed = false;
-        currentWizardStep = 3;
+
+        isSaving = true;
+        var createdStokvel = await StokvelService.RegisterStokvelAsync(
+            model.Name, StokvelService.MapArchetypeToStokvelType(model.Archetype), model.Archetype,
+            model.Province, model.TownOrArea, model.EstablishedDate, model.ExpectedMemberCount,
+            model.Description, BuildBankingDetailsForCreate(), currentUser!.Id,
+            string.IsNullOrWhiteSpace(model.RegistrationType) ? null : Enum.Parse<StokvelRegistrationType>(model.RegistrationType));
+
+        if (createdStokvel is null)
+        {
+            isSaving = false;
+            saveFailed = true;
+            return;
+        }
+
+        var creatorMember = await MemberService.EnsureCreatorMemberForStokvelAsync(
+            createdStokvel.Id, currentUser.Id, model.CreatorFullName,
+            model.CreatorEmail ?? currentUser.Email, model.CreatorCellphoneNumber,
+            model.CreatorIdNumber, model.CreatorResidentialArea);
+
+        if (creatorMember is null)
+        {
+            isSaving = false;
+            saveFailed = true;
+            return;
+        }
+
+        await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(currentUser.Id, model.CreatorIdNumber);
+
+        StokvelId = createdStokvel.Id;
+        isExistingOrganisation = true;
+        isSaving = false;
+        currentWizardStep = 2;
+        NavigationManager.NavigateTo($"/register-stokvel/{StokvelId}", replace: true);
     }
 
     private void GoBackToStep1()
@@ -934,10 +1066,134 @@ else
         currentWizardStep = 1;
     }
 
+    private async Task ContinueToBillingAsync()
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        wizardValidationMessage = null;
+        packageSelectionFailed = false;
+
+        if (selectedPlanId is null)
+        {
+            packageSelectionFailed = true;
+            wizardValidationMessage = "Please select a subscription plan.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var selectedPlan = await PlanCatalogueService.GetActivePlanAsync(selectedPlanId.Value);
+            if (selectedPlan?.Code is null)
+            {
+                selectedPlanId = null;
+                model.SelectedPlanCode = null;
+                wizardValidationMessage = "The selected subscription plan is no longer available.";
+                packageSelectionFailed = true;
+                return;
+            }
+
+            selectedPlanId = selectedPlan.Id;
+            model.SelectedPlanCode = selectedPlan.Code;
+            Logger.LogInformation(
+                "Subscription plan selected during stokvel registration. StokvelId: {StokvelId}, PlanId: {PlanId}, WizardStep: {WizardStep}",
+                StokvelId, selectedPlanId, currentWizardStep);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(
+                ex,
+                "Failed to validate selected subscription plan. StokvelId: {StokvelId}, PlanId: {PlanId}, WizardStep: {WizardStep}",
+                StokvelId, selectedPlanId, currentWizardStep);
+            wizardValidationMessage = "We could not validate that subscription plan. Please try again.";
+            return;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+
+        packageSelectionFailed = false;
+        model.BillingEmail ??= model.CreatorEmail ?? currentUser?.Email;
+        model.CardholderName ??= model.CreatorFullName;
+        currentWizardStep = 3;
+        await InvokeAsync(StateHasChanged);
+    }
+
     private void GoBackToStep2()
     {
         wizardValidationMessage = null;
         currentWizardStep = 2;
+    }
+
+    private async Task AuthoriseCardAsync()
+    {
+        wizardValidationMessage = null;
+
+        if (string.IsNullOrWhiteSpace(model.CardholderName) || string.IsNullOrWhiteSpace(model.BillingEmail))
+        {
+            wizardValidationMessage = "Please enter the cardholder name and billing email.";
+            return;
+        }
+        if (!model.TermsAccepted)
+        {
+            wizardValidationMessage = "Please accept the subscription terms to continue.";
+            return;
+        }
+        if (StokvelId is null || model.SelectedPlanCode is null)
+        {
+            wizardValidationMessage = "Something went wrong — please start again from the plan step.";
+            return;
+        }
+
+        isSaving = true;
+
+        var selectResult = await SubscriptionService.SelectPlanAsync(
+            StokvelId.Value, model.SelectedPlanCode, BillingTermsVersion.Current, currentUser!.Id, capturedIpAddress);
+
+        if (!selectResult.Success)
+        {
+            isSaving = false;
+            wizardValidationMessage = selectResult.Message;
+            return;
+        }
+
+        // Persist cardholder name / billing address (display-only — never card data) directly,
+        // since SelectPlanAsync's signature only carries plan/terms fields.
+        await using (var scope = ScopeFactory.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Data.ApplicationDbContext>();
+            var subscription = await db.OrganisationSubscriptions
+                .Where(s => s.StokvelId == StokvelId.Value)
+                .OrderByDescending(s => s.CreatedAt)
+                .FirstOrDefaultAsync();
+            if (subscription is not null)
+            {
+                subscription.CardholderName = model.CardholderName;
+                subscription.BillingAddress = model.BillingAddress;
+                subscription.UpdatedAt = DateTime.UtcNow;
+                subscription.RowVersion = Guid.NewGuid().ToByteArray();
+                await db.SaveChangesAsync();
+            }
+        }
+
+        var callbackUrl = NavigationManager.ToAbsoluteUri(
+            $"/billing/payment-callback?intent=onboarding&stokvelId={StokvelId}&redirect={Uri.EscapeDataString($"/register-stokvel/{StokvelId}")}").ToString();
+
+        var authResult = await SubscriptionService.BeginCardAuthorisationAsync(
+            StokvelId.Value, model.BillingEmail, model.CardholderName, model.CreatorCellphoneNumber, callbackUrl);
+
+        if (!authResult.Success || string.IsNullOrWhiteSpace(authResult.AuthorisationUrl))
+        {
+            isSaving = false;
+            wizardValidationMessage = authResult.Message ?? "Could not start card authorisation. Please try again.";
+            return;
+        }
+
+        NavigationManager.NavigateTo(authResult.AuthorisationUrl, forceLoad: true);
     }
 
     private readonly List<ArchetypeOption> archetypeOptions =
@@ -955,8 +1211,10 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        capturedIpAddress = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var userId = authState.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (!string.IsNullOrWhiteSpace(userId))
         {
@@ -972,8 +1230,71 @@ else
             model.CreatorResidentialArea = currentUser.ResidentialArea;
         }
 
-        subscriptionPlans = await LoadPublicSubscriptionPlansAsync();
+        catalogueEntries = (await PlanCatalogueService.GetPublicPlansAsync()).ToList();
+
+        if (StokvelId is not null)
+        {
+            await ResolveResumeStateAsync(StokvelId.Value);
+        }
+
         isLoading = false;
+    }
+
+    private async Task ResolveResumeStateAsync(Guid stokvelId)
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<Data.ApplicationDbContext>();
+
+        var stokvel = await db.Stokvels.AsNoTracking().FirstOrDefaultAsync(s => s.Id == stokvelId);
+        if (stokvel is null)
+        {
+            StokvelId = null;
+            return;
+        }
+
+        isExistingOrganisation = true;
+        model.Name = stokvel.Name;
+        model.Archetype = stokvel.Archetype;
+        model.Province = stokvel.Province;
+        model.TownOrArea = stokvel.TownOrArea;
+        model.EstablishedDate = stokvel.EstablishedDate;
+        model.ExpectedMemberCount = stokvel.ExpectedMemberCount;
+        model.Description = stokvel.Description;
+        model.RegistrationType = stokvel.RegistrationType?.ToString();
+
+        var subscription = await db.OrganisationSubscriptions
+            .AsNoTracking()
+            .Include(s => s.SubscriptionPlan)
+            .Where(s => s.StokvelId == stokvelId)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (subscription is null || subscription.Status == SubscriptionStatus.LegacyUnsubscribed)
+        {
+            currentWizardStep = 2;
+            return;
+        }
+
+        if (subscription.Status == SubscriptionStatus.Trialing)
+        {
+            selectedPlanId = subscription.SubscriptionPlanId;
+            model.SelectedPlanCode = subscription.SubscriptionPlan?.Code;
+            trialEndsAt = subscription.TrialEndsAt;
+            nextBillingAt = subscription.NextBillingAt;
+            currentWizardStep = 4;
+            return;
+        }
+
+        if (subscription.Status == SubscriptionStatus.PendingPaymentMethod && subscription.SubscriptionPlan?.Code is not null)
+        {
+            selectedPlanId = subscription.SubscriptionPlanId;
+            model.SelectedPlanCode = subscription.SubscriptionPlan.Code;
+            currentWizardStep = 3;
+            return;
+        }
+
+        // Any other status (Active, PastDue, etc.) means onboarding already completed previously.
+        NavigationManager.NavigateTo("/subscription", replace: true);
     }
 
     private void OnProvinceChanged(ChangeEventArgs args)
@@ -983,103 +1304,22 @@ else
         model.TownOrArea = null;
     }
 
-    private async Task OnExpectedMemberCountChangedAsync(int? expectedMemberCount)
-    {
-        model.ExpectedMemberCount = expectedMemberCount;
-        var recommendedPlan = await LoadRecommendedSubscriptionPlanAsync(model.ExpectedMemberCount);
-        recommendedPlanId = recommendedPlan?.Id;
-        if (recommendedPlan is not null)
-        {
-            model.SubscriptionPlanId = recommendedPlan.Id;
-            packageSelectionFailed = false;
-        }
-    }
-
-    private void SelectSubscriptionPlan(Guid subscriptionPlanId)
-    {
-        model.SubscriptionPlanId = subscriptionPlanId;
-        packageSelectionFailed = false;
-    }
-
-    private async Task HandleValidSubmit()
-    {
-        saveFailed = false;
-        packageSelectionFailed = false;
-
-        if (currentUser is null) { saveFailed = true; return; }
-        if (model.SubscriptionPlanId is null) { packageSelectionFailed = true; currentWizardStep = 2; return; }
-        var bankingValidation = ValidateBankingDetails();
-        if (bankingValidation is not null)
-        {
-            wizardValidationMessage = bankingValidation;
-            currentWizardStep = 1;
-            return;
-        }
-
-        var createdStokvel = await StokvelService.RegisterStokvelAsync(
-            model.Name, StokvelService.MapArchetypeToStokvelType(model.Archetype), model.Archetype, model.Province, model.TownOrArea,
-            model.EstablishedDate, model.ExpectedMemberCount,
-            model.SubscriptionPlanId.Value, model.Description, BuildBankingDetailsForCreate(), currentUser.Id);
-
-        if (createdStokvel is null) { saveFailed = true; return; }
-
-        var creatorMember = await MemberService.EnsureCreatorMemberForStokvelAsync(
-            createdStokvel.Id,
-            currentUser.Id,
-            model.CreatorFullName,
-            model.CreatorEmail ?? currentUser.Email,
-            model.CreatorCellphoneNumber,
-            model.CreatorIdNumber,
-            model.CreatorResidentialArea);
-
-        if (creatorMember is null) { saveFailed = true; return; }
-
-        await MemberAccountLinkingService.RefreshUserMembershipLinksAsync(currentUser.Id, model.CreatorIdNumber);
-        NavigationManager.NavigateTo($"/stokvel-questionnaire/{createdStokvel.Id}");
-    }
-
     private async Task<ApplicationUser?> LoadCurrentUserAsync(string currentUserId)
     {
         await using var scope = ScopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<Data.ApplicationDbContext>();
         return await db.Users.AsNoTracking().FirstOrDefaultAsync(user => user.Id == currentUserId);
-    }
-
-    private async Task<List<SubscriptionPlan>> LoadPublicSubscriptionPlansAsync()
-    {
-        await using var scope = ScopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.SubscriptionPlans
-            .AsNoTracking()
-            .Where(p => p.IsActive && p.Name != "Pilot")
-            .OrderBy(p => p.MinMembers)
-            .ToListAsync();
-    }
-
-    private async Task<SubscriptionPlan?> LoadRecommendedSubscriptionPlanAsync(int? expectedMemberCount)
-    {
-        if (expectedMemberCount is null || expectedMemberCount < 1) return null;
-        await using var scope = ScopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.SubscriptionPlans
-            .AsNoTracking()
-            .Where(p =>
-                p.IsActive && p.Name != "Pilot" &&
-                expectedMemberCount >= p.MinMembers &&
-                (p.MaxMembers == null || expectedMemberCount <= p.MaxMembers))
-            .OrderBy(p => p.MinMembers)
-            .FirstOrDefaultAsync();
     }
 
     private sealed class RegisterStokvelFormModel
     {
         [Required][MaxLength(150)] public string Name { get; set; } = string.Empty;
         public StokvelArchetype Archetype { get; set; } = StokvelArchetype.BurialSociety;
+        public string? RegistrationType { get; set; }
         [MaxLength(100)] public string? Province { get; set; }
         [MaxLength(100)] public string? TownOrArea { get; set; }
         public DateTime? EstablishedDate { get; set; }
         public int? ExpectedMemberCount { get; set; }
-        public Guid? SubscriptionPlanId { get; set; }
         [MaxLength(500)] public string? Description { get; set; }
         [Required][MaxLength(150)] public string CreatorFullName { get; set; } = string.Empty;
         [Required][MaxLength(30)] public string CreatorCellphoneNumber { get; set; } = string.Empty;
@@ -1093,27 +1333,76 @@ else
         [MaxLength(20)] public string? BranchCode { get; set; }
         [MaxLength(100)] public string? BranchName { get; set; }
         [MaxLength(200)] public string? PaymentReferenceFormat { get; set; }
+
+        public string? SelectedPlanCode { get; set; }
+
+        [MaxLength(150)] public string? CardholderName { get; set; }
+        [MaxLength(256)] public string? BillingEmail { get; set; }
+        [MaxLength(400)] public string? BillingAddress { get; set; }
+        public bool TermsAccepted { get; set; }
     }
+
+    private static bool IsValidSaMobile(string value) =>
+        System.Text.RegularExpressions.Regex.IsMatch(value.Trim(), @"^(\+27|0)[6-8][0-9]{8}$");
 
     private static string FormatCurrency(decimal amount) =>
         amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
 
     private static string GetMemberRangeText(SubscriptionPlan plan) =>
-        plan.MaxMembers is null ? $"{plan.MinMembers}+ members" : $"{plan.MinMembers}–{plan.MaxMembers} members";
+        plan.MaximumMembers is null ? "Unlimited members" : $"Up to {plan.MaximumMembers} members";
 
     private static string Display(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "Not captured" : value;
 
-    private static bool IsMostPopularPlan(string? planName) =>
-        string.Equals(planName, "standard", StringComparison.OrdinalIgnoreCase);
+    private static string StepLabel(int step) => step switch
+    {
+        1 => "Organisation",
+        2 => "Plan",
+        3 => "Billing",
+        4 => "Complete",
+        _ => string.Empty
+    };
 
-    private static IReadOnlyList<string> GetPlanFeatures(string? planName) =>
-        planName?.ToLowerInvariant() switch
+    private string GetIdentityPrompt() =>
+        model.Archetype switch
         {
-            "basic"    => ["Up to 20 members", "Basic reporting", "Mobile app access", "Email support"],
-            "standard" => ["Up to 50 members", "Advanced reporting", "Mobile app access", "Priority email support", "Data backup"],
-            "premium"  => ["Up to 100 members", "Advanced reporting & analytics", "Mobile app access", "Priority support (email & phone)", "Data backup & export"],
-            _          => []
+            StokvelArchetype.Rotational => "Name the rotational stokvel and describe how members will contribute and take turns receiving payouts.",
+            StokvelArchetype.SavingsClub => "Name the savings club and describe the goal members are saving towards.",
+            StokvelArchetype.Grocery => "Name the grocery stokvel and describe the buying or distribution goal.",
+            StokvelArchetype.InvestmentClub => "Name the investment club and describe the shared investment goal.",
+            StokvelArchetype.Education => "Name the education stokvel and describe the school or learning costs it supports.",
+            StokvelArchetype.Borrowing => "Name the borrowing stokvel and describe how members will access and repay funds.",
+            StokvelArchetype.Travel => "Name the travel stokvel and describe the trip or travel goal.",
+            StokvelArchetype.SocialClub => "Name the social club and describe the activities members organise together.",
+            _ => "Name the burial society and describe its funeral support purpose."
+        };
+
+    private string GetStokvelNamePlaceholder() =>
+        model.Archetype switch
+        {
+            StokvelArchetype.Rotational => "e.g. Khula Monthly Rotational Stokvel",
+            StokvelArchetype.SavingsClub => "e.g. Ikageng Year-End Savings Club",
+            StokvelArchetype.Grocery => "e.g. Masakhane Grocery Stokvel",
+            StokvelArchetype.InvestmentClub => "e.g. Siyakhula Investment Club",
+            StokvelArchetype.Education => "e.g. Bokamoso Education Stokvel",
+            StokvelArchetype.Borrowing => "e.g. Thuthukani Borrowing Stokvel",
+            StokvelArchetype.Travel => "e.g. Vuka Travel Stokvel",
+            StokvelArchetype.SocialClub => "e.g. Ubuntu Social Club",
+            _ => "e.g. Mahlalela Burial Society"
+        };
+
+    private string GetDescriptionPlaceholder() =>
+        model.Archetype switch
+        {
+            StokvelArchetype.Rotational => "Monthly contributions, payout order, payout frequency and how turns are managed.",
+            StokvelArchetype.SavingsClub => "Savings goal, contribution rhythm and when members expect to withdraw.",
+            StokvelArchetype.Grocery => "Contribution rhythm, grocery list planning and distribution approach.",
+            StokvelArchetype.InvestmentClub => "Investment objective, contribution rhythm and governance approach.",
+            StokvelArchetype.Education => "Education costs covered, contribution rhythm and payment timing.",
+            StokvelArchetype.Borrowing => "Borrowing purpose, repayment expectations and approval rules.",
+            StokvelArchetype.Travel => "Travel destination or goal, contribution rhythm and planned travel date.",
+            StokvelArchetype.SocialClub => "Events, activities or community goals the group will organise.",
+            _ => "Funeral support purpose, dependents or covered lives, and monthly contribution expectations."
         };
 
     private static string GetArchetypeBadgeClass(ArchetypeOption option) =>

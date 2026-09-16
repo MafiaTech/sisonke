@@ -1,0 +1,188 @@
+@page "/pricing"
+
+@using Sisonke.Web.Data
+@using Sisonke.Web.Data.Enums
+@using Sisonke.Web.Services.Billing
+@using Sisonke.Web.Services.Billing.Paystack
+@inject PlanCatalogueService PlanCatalogueService
+@inject PaystackOptions PaystackOptions
+
+<PageTitle>Pricing — Sisonke</PageTitle>
+
+<div class="pricing-hero">
+    <div class="pricing-eyebrow"><i class="bi bi-stars me-2"></i>Simple, transparent pricing</div>
+    <h1 class="pricing-headline">Every plan starts with a 60-day free trial</h1>
+    <p class="pricing-sub">
+        A payment method is required to start your trial, but you will not be charged during the trial.
+        Your subscription continues monthly automatically after the trial — cancel before your billing date
+        to avoid the next charge. Payment processing fees for member collections are billed separately.
+    </p>
+    <div class="sisonke-alert sisonke-alert-blue pricing-sample-wording">
+        <i class="bi bi-quote me-2"></i>
+        R499/month after your 60-day free trial. Your first payment date will be shown before you authorise
+        the subscription. Cancel from your billing page before renewal.
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading-state">
+        <div class="spinner-border spinner-border-sm" role="status" style="color:var(--sk-green-700)">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading plans...
+    </div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        @foreach (var entry in entries)
+        {
+            var plan = entry.Plan;
+            var isRecommended = plan.Code == PlanCodes.Professional;
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="pricing-plan-card @(isRecommended ? "pricing-plan-recommended" : "") h-100">
+                    @if (isRecommended)
+                    {
+                        <div class="text-center mb-2"><span class="sisonke-badge sisonke-badge-gold">Recommended</span></div>
+                    }
+                    <h3 class="h6 fw-700 mb-1">@plan.Name</h3>
+                    <p class="text-muted small mb-2">@GetMemberRangeText(plan)</p>
+                    <div class="plan-price mb-1">
+                        @if (plan.IsCustomPricing)
+                        {
+                            <span style="font-size:1.1rem">Custom pricing</span>
+                        }
+                        else
+                        {
+                            @FormatCurrency(plan.MonthlyPrice)<span class="text-muted fw-normal" style="font-size:.875rem">/mo</span>
+                        }
+                    </div>
+                    @if (!plan.IsCustomPricing)
+                    {
+                        <p class="text-muted small mb-3">
+                            60 days free. First charge @FirstChargeDate.ToString("d MMMM yyyy"). Cancel before then and you will not be charged.
+                        </p>
+                    }
+                    <AuthorizeView>
+                        <Authorized>
+                            <a class="sisonke-btn sisonke-btn-primary w-100" href="/register-stokvel">Get started</a>
+                        </Authorized>
+                        <NotAuthorized>
+                            <a class="sisonke-btn sisonke-btn-primary w-100" href="/Account/Register">Get started free</a>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="sisonke-card mb-4">
+        <div class="sisonke-card-body p-0">
+            <div class="table-responsive">
+                <table class="table pricing-compare-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            @foreach (var entry in entries)
+                            {
+                                <th class="text-center">@entry.Plan.Name</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var group in featureRows.GroupBy(f => f.Category))
+                        {
+                            <tr class="pricing-compare-category-row">
+                                <td colspan="@(entries.Count + 1)">@group.Key</td>
+                            </tr>
+                            @foreach (var feature in group)
+                            {
+                                <tr>
+                                    <td>@feature.Name</td>
+                                    @foreach (var entry in entries)
+                                    {
+                                        <td class="text-center">@RenderCell(FindFeature(entry, feature.Code))</td>
+                                    }
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="sisonke-alert sisonke-alert-blue mb-4">
+    <i class="bi bi-info-circle-fill me-2"></i>
+    Payment processing fees for member collections (contributions, claims payouts) are separate from your
+    Sisonke subscription and are never bundled into the plan prices above.
+</div>
+
+<style>
+    .pricing-hero { text-align: center; max-width: 720px; margin: 0 auto 2.5rem; }
+    .pricing-eyebrow { display: inline-flex; align-items: center; font-size: .8125rem; font-weight: 600; color: var(--sk-green-700); background: var(--sk-green-50); border: 1px solid var(--sk-green-100); padding: .3rem .875rem; border-radius: 99px; margin-bottom: 1.25rem; }
+    .pricing-headline { font-family: "Playfair Display", Georgia, "Times New Roman", serif; font-size: 2.25rem; font-weight: 800; color: var(--sk-text); margin-bottom: .75rem; }
+    .pricing-sub { color: var(--sk-text-muted); font-size: 1rem; line-height: 1.6; margin-bottom: 1.25rem; }
+    .pricing-sample-wording { text-align: left; font-style: italic; }
+    .pricing-plan-card { border: 2px solid var(--sk-border); border-radius: var(--sk-radius); background: #fff; padding: 1.5rem; display: flex; flex-direction: column; }
+    .pricing-plan-recommended { border-color: var(--sk-gold); }
+    .plan-price { font-size: 1.5rem; font-weight: 800; color: var(--sk-green-800); }
+    .pricing-compare-table th, .pricing-compare-table td { padding: .6rem 1rem; vertical-align: middle; }
+    .pricing-compare-category-row td { background: var(--sk-green-50); font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--sk-green-800); }
+</style>
+
+@code {
+    private List<PlanCatalogueEntry> entries = [];
+    private List<(string Code, string Name, string Category)> featureRows = [];
+    private bool isLoading = true;
+
+    private DateTime FirstChargeDate => DateTime.UtcNow.AddDays(PaystackOptions.TrialDays).Date;
+
+    protected override async Task OnInitializedAsync()
+    {
+        entries = (await PlanCatalogueService.GetPublicPlansAsync()).ToList();
+
+        // Union of every feature code seen across the catalogue, ordered by category then name —
+        // this is what makes the table regenerate itself when a feature is added to the seeded
+        // catalogue, with no code change (Phase 5 brief requirement).
+        featureRows = entries
+            .SelectMany(e => e.Features)
+            .GroupBy(f => f.Code)
+            .Select(g => (g.Key, g.First().Name, g.First().Category))
+            .OrderBy(f => f.Category)
+            .ThenBy(f => f.Name)
+            .ToList();
+
+        isLoading = false;
+    }
+
+    private static PlanFeatureView? FindFeature(PlanCatalogueEntry entry, string code) =>
+        entry.Features.FirstOrDefault(f => f.Code == code);
+
+    private static string GetMemberRangeText(Sisonke.Web.Data.Entities.SubscriptionPlan plan) =>
+        plan.MaximumMembers is null ? "Unlimited members" : $"Up to {plan.MaximumMembers} members";
+
+    private static string FormatCurrency(decimal amount) =>
+        amount.ToString("C0", new System.Globalization.CultureInfo("en-ZA"));
+
+    private static MarkupString RenderCell(PlanFeatureView? feature)
+    {
+        if (feature is null)
+        {
+            return new MarkupString("<span class=\"text-muted\">—</span>");
+        }
+
+        return feature.DataType switch
+        {
+            FeatureDataType.Boolean => feature.IsEnabled
+                ? new MarkupString("<i class=\"bi bi-check2\" style=\"color:var(--sk-success)\"></i>")
+                : new MarkupString("<span class=\"text-muted\">—</span>"),
+            FeatureDataType.Numeric => new MarkupString(feature.LimitValue?.ToString() ?? "Unlimited"),
+            FeatureDataType.Enum => new MarkupString(feature.EnumValue ?? "—"),
+            _ => new MarkupString("—")
+        };
+    }
+}

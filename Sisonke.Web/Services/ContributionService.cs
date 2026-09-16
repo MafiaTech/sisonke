@@ -5,10 +5,20 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class ContributionService(ApplicationDbContext context)
+public class ContributionService(IDbContextFactory<ApplicationDbContext> dbFactory)
 {
+    private readonly ApplicationDbContext? transactionContext;
+    // Explicit short-lived transaction/legacy callers only. DI uses the factory constructor.
+    public ContributionService(ApplicationDbContext context) : this((IDbContextFactory<ApplicationDbContext>)null!)
+    {
+        transactionContext = context;
+    }
+
     public async Task<ContributionRule?> GetActiveContributionRuleByStokvelIdAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 
@@ -17,14 +27,15 @@ public class ContributionService(ApplicationDbContext context)
             return null;
         }
 
-        return await context.Set<ContributionRule>()
-            .SingleOrDefaultAsync(rule =>
-                rule.TenantId == stokvel.TenantId &&
-                rule.IsActive);
+        return await ContributionRuleResolver.ResolveAsync(context, stokvel.TenantId, DateTime.Today);
     }
 
     public async Task<ContributionRule?> SaveContributionRuleAsync(Guid stokvelId, ContributionRule rule)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
+        if (rule.Amount < 0 || rule.DueDayOfMonth is < 1 or > 31) return null;
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 
@@ -61,6 +72,9 @@ public class ContributionService(ApplicationDbContext context)
 
     public async Task<decimal> GetExpectedMonthlyContributionsByStokvelIdAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .SingleOrDefaultAsync(existingStokvel => existingStokvel.Id == stokvelId);
 
@@ -69,10 +83,7 @@ public class ContributionService(ApplicationDbContext context)
             return 0;
         }
 
-        var rule = await context.Set<ContributionRule>()
-            .SingleOrDefaultAsync(contributionRule =>
-                contributionRule.TenantId == stokvel.TenantId &&
-                contributionRule.IsActive);
+        var rule = await ContributionRuleResolver.ResolveAsync(context, stokvel.TenantId, DateTime.Today);
 
         if (rule is null)
         {

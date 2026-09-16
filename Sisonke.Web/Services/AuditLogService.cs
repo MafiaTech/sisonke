@@ -9,6 +9,18 @@ public class AuditLogService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     ILogger<AuditLogService> logger)
 {
+    // Stage an audit in the caller's transaction for financial workflows that must fail atomically.
+    public void Stage(ApplicationDbContext context, string? userId, Guid stokvelId,
+        string actionType, string entityType, Guid entityId, string summary)
+    {
+        context.AuditLogEntries.Add(new AuditLogEntry
+        {
+            UserId = userId, StokvelId = stokvelId, ActionType = Trim(actionType, 100),
+            EntityType = Trim(entityType, 100), EntityId = entityId,
+            Summary = Trim(summary, 1000), TimestampUtc = DateTime.UtcNow
+        });
+    }
+
     public async Task RecordAsync(
         string? userId,
         Guid? stokvelId,

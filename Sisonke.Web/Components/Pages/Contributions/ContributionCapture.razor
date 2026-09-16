@@ -50,7 +50,7 @@ else
                 }
             </div>
         </div>
-        <div class="d-flex flex-wrap gap-2">
+        <div class="sisonke-header-actions">
             <a class="sisonke-btn sisonke-btn-outline" href="@($"/stokvel-dashboard/{StokvelId}")">Back to Dashboard</a>
             <a class="sisonke-btn sisonke-btn-outline" href="@($"/treasurer-tasks/{StokvelId}")">Finance Tasks</a>
         </div>
@@ -59,6 +59,14 @@ else
     @if (!string.IsNullOrWhiteSpace(successMessage))
     {
         <div class="sisonke-alert sisonke-alert-green" role="alert">@successMessage</div>
+    }
+
+    @if (monthSummary.MonthlyContributionAmount <= 0)
+    {
+        <div class="sisonke-alert sisonke-alert-gold" role="status">
+            No positive monthly contribution amount is configured for this period. No payment due.
+            <a href="@($"/contribution-rules/{StokvelId}")">Review contribution rules</a> before generating monthly records.
+        </div>
     }
 
     @if (!string.IsNullOrWhiteSpace(warningMessage))
@@ -227,7 +235,7 @@ else
                                     <td>@FormatZAR(contribution.ExpectedAmount)</td>
                                     <td>@FormatZAR(contribution.PaidAmount)</td>
                                     <td>@FormatZAR(contribution.OutstandingAmount)</td>
-                                    <td><span class="@GetPaymentStatusBadgeClass(contribution.Status)">@GetPaymentStatusText(contribution.Status)</span></td>
+                                    <td><span class="@contribution.StatusBadgeClass">@contribution.StatusLabel</span></td>
                                     <td>@(contribution.FullyPaidDate?.ToString("dd MMM yyyy") ?? "-")</td>
                                     <td class="text-muted small">
                                         @(capturesByContributionId.TryGetValue(contribution.Id, out var capturedBy) && !string.IsNullOrWhiteSpace(capturedBy) ? capturedBy : "-")

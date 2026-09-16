@@ -127,3 +127,79 @@
 .text-teal   { color: var(--sk-teal) !important; }
 .bg-brand    { background: var(--sk-navy-900) !important; color: var(--sk-paper); }
 .bg-paper    { background: var(--sk-paper) !important; }
+
+/* Shared header, badge and form rhythm. Preserve the existing Sisonke palette and typefaces. */
+.sisonke-hero-card,
+.sisonke-page-header,
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem;
+}
+.sisonke-hero-card > div { min-width: 0; max-width: 100%; }
+.sisonke-hero-card > div:first-child { flex: 1 1 22rem; }
+.sisonke-header-meta,
+.sisonke-header-actions,
+.sisonke-hero-card .d-flex {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .625rem;
+    max-width: 100%;
+    min-width: 0;
+}
+.sisonke-header-meta { margin-top: 1rem; }
+.sisonke-header-actions { flex: 0 1 auto; }
+.sisonke-header-actions > :is(a, button),
+.sisonke-hero-card > .d-flex > :is(a, button) {
+    min-height: 2.5rem;
+    height: auto;
+    line-height: 1.4;
+    padding: .625rem 1rem;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.sisonke-badge,
+.status-pill,
+.status-badge,
+.mw-badge,
+.sm-badge,
+.role-badge,
+.header-pill,
+.statement-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .3rem;
+    line-height: 1.4;
+    padding: .375rem .625rem;
+    height: auto;
+    max-width: 100%;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.form-label,
+.member-form-label,
+.sm-form-label,
+.mw-form-label {
+    display: inline-block;
+    font-size: .875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: .5rem;
+    height: auto;
+    vertical-align: middle;
+}
+.sisonke-currency-input { flex-wrap: nowrap; align-items: stretch; max-width: 100%; }
+.sisonke-currency-input > .form-control { flex: 1 1 auto; width: 1%; min-width: 0; text-align: right; }
+.sisonke-currency-input > .input-group-text { flex: 0 0 auto; display: flex; align-items: center; line-height: 1.4; }
+@media (max-width: 576px) {
+    .sisonke-header-actions { width: 100%; }
+    .sisonke-header-actions > :is(a, button) { flex: 1 1 12rem; }
+    .sisonke-header-meta > *, .sisonke-hero-card .sisonke-badge { white-space: normal; overflow-wrap: anywhere; }
+}
+
+.member-payment-list article { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.member-payment-list .sisonke-header-meta { gap: .625rem 1rem; margin-top: .5rem; }

@@ -115,7 +115,7 @@ else
             <i class="bi bi-info-circle-fill mt-1"></i>
             <div>
                 <strong>No linked memberships found yet.</strong>
-                <div>Make sure your ID number matches the one captured by your stokvel secretary.</div>
+                <div>@GetNoMembershipMessage()</div>
             </div>
         </div>
     }
@@ -420,5 +420,17 @@ else
         }
 
         return user.Email;
+    }
+
+    private string GetNoMembershipMessage()
+    {
+        var email = currentUser?.Email;
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return "We could not find a stokvel membership linked to your account. Please ask your stokvel secretary to confirm the email address registered for you.";
+        }
+
+        return $"We could not find a stokvel membership linked to {SensitiveDataMasker.MaskEmail(email)}. Please ask your stokvel secretary to confirm the email address registered for you.";
     }
 }

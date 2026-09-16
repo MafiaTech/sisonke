@@ -13,10 +13,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Embedded (not loose files) so DatabaseScriptDeployer can read them identically in dev and
+         after publish, regardless of working directory/content root. -->
+    <EmbeddedResource Include="Database\Scripts\StoredProcedures\*.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Development-only settings (local DB credentials) must never ship in a publish/deploy package. -->
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
     <Content Remove="artifacts\**" />
     <None Remove="artifacts\**" />
+    <Content Remove="App_Data\payment-proofs\**" />
+    <None Remove="App_Data\payment-proofs\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,6 +43,10 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8" PrivateAssets="all" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.10" />
+    <PackageReference Include="QuestPDF" Version="2026.7.2" />
+    <PackageReference Include="System.ServiceModel.Http" Version="10.0.652802" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
     <PackageReference Include="WebPush" Version="1.0.13" />
   </ItemGroup>
 

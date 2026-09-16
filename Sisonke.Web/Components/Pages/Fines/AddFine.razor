@@ -1,5 +1,6 @@
 @page "/add-fine/{MemberId:guid}"
 @rendermode InteractiveServer
+@implements IDisposable
 @attribute [Authorize]
 
 @using System.Security.Claims
@@ -8,9 +9,11 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Sisonke.Web.Data.Entities
 @using Sisonke.Web.Services
+@using Microsoft.EntityFrameworkCore
+@using Sisonke.Web.Data
 
 @inject FineService FineService
-@inject MemberService MemberService
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject NavigationManager NavigationManager
 @inject StokvelService StokvelService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -121,25 +124,33 @@ else
     private bool isLoading = true;
     private bool saveFailed;
     private bool canManageFines;
+    private bool disposed;
+    public void Dispose() => disposed = true;
 
     [Parameter]
     public Guid MemberId { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        member = await MemberService.GetMemberByIdAsync(MemberId);
+        // This page needs only the member identity, not a circuit-long member-editing context.
+        await using (var context = await DbFactory.CreateDbContextAsync())
+            member = await context.Members.AsNoTracking().SingleOrDefaultAsync(m => m.Id == MemberId);
+        if (disposed) return;
 
         if (member is not null)
         {
             var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+            if (disposed) return;
             if (stokvel is not null)
             {
                 var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                if (disposed) return;
                 var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
                 if (!string.IsNullOrWhiteSpace(userId))
                 {
                     canManageFines = await MemberAccessService.CanManageFinesAsync(userId, stokvel.Id);
+                    if (disposed) return;
                 }
 
                 if (!canManageFines)
@@ -149,10 +160,12 @@ else
                 }
 
                 fineTypes = await FineService.GetFineTypesByStokvelIdAsync(stokvel.Id);
+                if (disposed) return;
 
                 if (fineTypes.Count == 0)
                 {
                     await FineService.EnsureDefaultFineTypesForStokvelAsync(stokvel.Id);
+                    if (disposed) return;
                     fineTypes = await FineService.GetFineTypesByStokvelIdAsync(stokvel.Id);
                 }
             }
@@ -163,13 +176,14 @@ else
 
     private async Task HandleValidSubmit()
     {
-        if (!canManageFines)
+        if (!canManageFines || disposed)
         {
             return;
         }
 
         saveFailed = false;
         var savedFine = await FineService.AddMemberFineAsync(MemberId, model.FineTypeId, model.Amount, model.Reason, model.FineDate);
+        if (disposed) return;
         if (savedFine is null) { saveFailed = true; return; }
         NavigationManager.NavigateTo($"/member-profile/{MemberId}");
     }

@@ -4,6 +4,11 @@ namespace Sisonke.Web.Data.Entities;
 
 public class MemberContribution
 {
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string StatusLabel => ContributionStatus.Label(Status, ExpectedAmount, OutstandingAmount, ContributionCycle.DueDate);
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string StatusBadgeClass => ContributionStatus.BadgeClass(Status, ExpectedAmount, OutstandingAmount, ContributionCycle.DueDate);
+
     public Guid Id { get; set; }
 
     public Guid TenantId { get; set; }

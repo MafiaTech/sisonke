@@ -12,10 +12,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Stokvel> Stokvels => Set<Stokvel>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<FeatureDefinition> FeatureDefinitions => Set<FeatureDefinition>();
+    public DbSet<PlanFeature> PlanFeatures => Set<PlanFeature>();
+    public DbSet<OrganisationSubscription> OrganisationSubscriptions => Set<OrganisationSubscription>();
+    public DbSet<SubscriptionPaymentMethod> SubscriptionPaymentMethods => Set<SubscriptionPaymentMethod>();
+    public DbSet<SubscriptionInvoice> SubscriptionInvoices => Set<SubscriptionInvoice>();
+    public DbSet<SubscriptionInvoiceLine> SubscriptionInvoiceLines => Set<SubscriptionInvoiceLine>();
+    public DbSet<SubscriptionPayment> SubscriptionPayments => Set<SubscriptionPayment>();
+    public DbSet<SubscriptionEvent> SubscriptionEvents => Set<SubscriptionEvent>();
+    public DbSet<SubscriptionUsage> SubscriptionUsages => Set<SubscriptionUsage>();
+    public DbSet<BillingWebhookEvent> BillingWebhookEvents => Set<BillingWebhookEvent>();
+    public DbSet<PromotionalTrial> PromotionalTrials => Set<PromotionalTrial>();
+    public DbSet<InvoiceNumberCounter> InvoiceNumberCounters => Set<InvoiceNumberCounter>();
+    public DbSet<TrialReminderSent> TrialReminderSents => Set<TrialReminderSent>();
+    public DbSet<JobExecutionLock> JobExecutionLocks => Set<JobExecutionLock>();
     public DbSet<Member> Members => Set<Member>();
     public DbSet<MemberWarning> MemberWarnings => Set<MemberWarning>();
     public DbSet<NextOfKin> NextOfKinRecords => Set<NextOfKin>();
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
+    public DbSet<MemberDocument> MemberDocuments => Set<MemberDocument>();
     public DbSet<MemberDependent> MemberDependents => Set<MemberDependent>();
     public DbSet<FuneralClaim> FuneralClaims => Set<FuneralClaim>();
     public DbSet<FuneralClaimDocument> FuneralClaimDocuments => Set<FuneralClaimDocument>();
@@ -25,6 +40,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ContributionCycle> ContributionCycles => Set<ContributionCycle>();
     public DbSet<MemberContribution> MemberContributions => Set<MemberContribution>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ContributionPaymentSubmission> ContributionPaymentSubmissions => Set<ContributionPaymentSubmission>();
+    public DbSet<PaymentProofDocument> PaymentProofDocuments => Set<PaymentProofDocument>();
     public DbSet<ContributionPaymentAudit> ContributionPaymentAudits => Set<ContributionPaymentAudit>();
     public DbSet<ClaimPayoutAudit> ClaimPayoutAudits => Set<ClaimPayoutAudit>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
@@ -70,6 +87,31 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        var submission = builder.Entity<ContributionPaymentSubmission>();
+        submission.ToTable("ContributionPaymentSubmissions", t => t.HasCheckConstraint("CK_PaymentSubmission_Obligation",
+            "([ObligationType] = 1 AND [MemberContributionId] IS NOT NULL AND [MemberFineId] IS NULL) OR ([ObligationType] = 2 AND [MemberFineId] IS NOT NULL AND [MemberContributionId] IS NULL AND [PaymentId] IS NULL)"));
+        submission.Property(s => s.ObligationType).HasDefaultValue(PaymentObligationType.Contribution);
+        submission.HasOne(s => s.MemberFine).WithMany().HasForeignKey(s => s.MemberFineId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.Tenant).WithMany().HasForeignKey(s => s.TenantId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.Stokvel).WithMany().HasForeignKey(s => s.StokvelId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.Member).WithMany().HasForeignKey(s => s.MemberId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.MemberContribution).WithMany().HasForeignKey(s => s.MemberContributionId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.Payment).WithMany().HasForeignKey(s => s.PaymentId).OnDelete(DeleteBehavior.Restrict);
+        submission.Property(s => s.Amount).HasPrecision(18, 2);
+        submission.Property(s => s.Status).IsConcurrencyToken();
+        submission.HasIndex(s => new { s.TenantId, s.StokvelId, s.Status, s.SubmittedAt });
+        submission.HasIndex(s => s.Status);
+        submission.HasIndex(s => s.SubmittedAt);
+        // One outstanding verification per contribution; a rejection permits a corrected submission.
+        submission.HasIndex(s => s.MemberContributionId).IsUnique().HasFilter("[Status] = 1 AND [MemberContributionId] IS NOT NULL");
+        submission.HasIndex(s => s.MemberFineId).IsUnique().HasFilter("[Status] = 1 AND [MemberFineId] IS NOT NULL");
+        submission.HasIndex(s => s.PaymentId).IsUnique().HasFilter("[PaymentId] IS NOT NULL");
+
+        var proof = builder.Entity<PaymentProofDocument>();
+        proof.HasOne(d => d.Tenant).WithMany().HasForeignKey(d => d.TenantId).OnDelete(DeleteBehavior.Restrict);
+        proof.HasOne(d => d.ContributionPaymentSubmission).WithMany(s => s.Documents)
+            .HasForeignKey(d => d.ContributionPaymentSubmissionId).OnDelete(DeleteBehavior.Restrict);
 
         var identityV3CredentialType = typeof(IdentityUser).Assembly
             .GetTypes()
@@ -206,6 +248,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany(m => m.Beneficiaries)
             .HasForeignKey(b => b.MemberId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MemberDocument>()
+            .HasOne(d => d.Member)
+            .WithMany()
+            .HasForeignKey(d => d.MemberId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MemberDocument>()
+            .HasIndex(d => new { d.MemberId, d.UploadedAt });
 
         builder.Entity<MemberDependent>()
             .HasOne(d => d.Member)
@@ -640,6 +691,210 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .Property(p => p.MonthlyPrice).HasPrecision(18, 2);
         builder.Entity<SubscriptionPlan>()
             .Property(p => p.AnnualPrice).HasPrecision(18, 2);
+
+        // ── Subscription Billing & Plan Entitlements ─────────────────────────
+        // SubscriptionPlan: Code is the new catalogue key (STARTER/GROWING/PROFESSIONAL/
+        // ENTERPRISE). Legacy member-count tier rows (Pilot/Basic/Standard/Premium) keep
+        // Code = null; SQL Server allows multiple NULLs through a unique index, so this does
+        // not conflict with uniqueness among the new Code-based rows.
+        builder.Entity<SubscriptionPlan>()
+            .HasIndex(p => p.Code)
+            .IsUnique();
+
+        builder.Entity<FeatureDefinition>()
+            .HasIndex(f => f.Code)
+            .IsUnique();
+
+        builder.Entity<PlanFeature>()
+            .HasOne(pf => pf.SubscriptionPlan)
+            .WithMany(p => p.PlanFeatures)
+            .HasForeignKey(pf => pf.SubscriptionPlanId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<PlanFeature>()
+            .HasOne(pf => pf.FeatureDefinition)
+            .WithMany(f => f.PlanFeatures)
+            .HasForeignKey(pf => pf.FeatureDefinitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<PlanFeature>()
+            .HasIndex(pf => new { pf.SubscriptionPlanId, pf.FeatureDefinitionId })
+            .IsUnique();
+
+        builder.Entity<OrganisationSubscription>()
+            .HasOne(s => s.Stokvel)
+            .WithMany()
+            .HasForeignKey(s => s.StokvelId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<OrganisationSubscription>()
+            .HasOne(s => s.SubscriptionPlan)
+            .WithMany(p => p.OrganisationSubscriptions)
+            .HasForeignKey(s => s.SubscriptionPlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<OrganisationSubscription>()
+            .HasOne(s => s.PendingPlanChangePlan)
+            .WithMany()
+            .HasForeignKey(s => s.PendingPlanChangePlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // One live subscription per stokvel: every status except Cancelled (4) and Expired (5) is
+        // listed explicitly so a stokvel can be re-subscribed after cancelling/expiring without
+        // violating the index. Written as a positive IN list, not "NOT IN (4, 5)" — SQL Server's
+        // filtered-index predicate grammar does not accept NOT (confirmed against a real Azure SQL
+        // Database: "Incorrect syntax near 'NOT'"; SQLite's more permissive CREATE INDEX ... WHERE
+        // never caught this in dev/tests). If a new SubscriptionStatus value is added, it must be
+        // appended to this list too.
+        builder.Entity<OrganisationSubscription>()
+            .HasIndex(s => s.StokvelId)
+            .IsUnique()
+            .HasFilter("[Status] IN (0, 1, 2, 3, 6, 7, 8)");
+
+        // Not IsRowVersion() — that maps to SQL Server's store-generated `rowversion` type,
+        // which SQLite (used in dev/tests) cannot satisfy. See RowVersion's XML doc comment.
+        builder.Entity<OrganisationSubscription>()
+            .Property(s => s.RowVersion)
+            .IsConcurrencyToken();
+
+        builder.Entity<SubscriptionPaymentMethod>()
+            .HasOne(m => m.OrganisationSubscription)
+            .WithMany(s => s.PaymentMethods)
+            .HasForeignKey(m => m.OrganisationSubscriptionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SubscriptionPaymentMethod>()
+            .Property(m => m.ProviderMandateReference)
+            .HasMaxLength(150);
+
+        builder.Entity<SubscriptionPaymentMethod>()
+            .Property(m => m.ProviderPaymentMethodReference)
+            .HasMaxLength(150);
+
+        builder.Entity<SubscriptionPaymentMethod>()
+            .Property(m => m.MaskedDisplay)
+            .HasMaxLength(100);
+
+        builder.Entity<SubscriptionPaymentMethod>()
+            .HasIndex(m => new { m.Provider, m.ProviderMandateReference });
+
+        builder.Entity<SubscriptionPaymentMethod>()
+            .HasIndex(m => new { m.Provider, m.ProviderPaymentMethodReference });
+
+        builder.Entity<SubscriptionInvoice>()
+            .HasOne(i => i.OrganisationSubscription)
+            .WithMany(s => s.Invoices)
+            .HasForeignKey(i => i.OrganisationSubscriptionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SubscriptionInvoice>()
+            .HasIndex(i => i.InvoiceNumber)
+            .IsUnique();
+
+        builder.Entity<SubscriptionInvoice>()
+            .Property(i => i.SubTotal).HasPrecision(18, 2);
+        builder.Entity<SubscriptionInvoice>()
+            .Property(i => i.VatAmount).HasPrecision(18, 2);
+        builder.Entity<SubscriptionInvoice>()
+            .Property(i => i.Total).HasPrecision(18, 2);
+
+        builder.Entity<SubscriptionInvoiceLine>()
+            .HasOne(l => l.SubscriptionInvoice)
+            .WithMany(i => i.Lines)
+            .HasForeignKey(l => l.SubscriptionInvoiceId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SubscriptionInvoiceLine>()
+            .Property(l => l.UnitPrice).HasPrecision(18, 2);
+        builder.Entity<SubscriptionInvoiceLine>()
+            .Property(l => l.LineTotal).HasPrecision(18, 2);
+
+        builder.Entity<SubscriptionPayment>()
+            .HasOne(p => p.OrganisationSubscription)
+            .WithMany(s => s.Payments)
+            .HasForeignKey(p => p.OrganisationSubscriptionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SubscriptionPayment>()
+            .HasOne(p => p.SubscriptionInvoice)
+            .WithMany(i => i.Payments)
+            .HasForeignKey(p => p.SubscriptionInvoiceId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SubscriptionPayment>()
+            .HasIndex(p => p.ProviderReference)
+            .IsUnique();
+
+        builder.Entity<SubscriptionPayment>()
+            .Property(p => p.ProviderRequestReference)
+            .HasMaxLength(150);
+
+        builder.Entity<SubscriptionPayment>()
+            .HasIndex(p => new { p.Provider, p.ProviderTransactionId });
+
+        builder.Entity<SubscriptionPayment>()
+            .HasIndex(p => new { p.Provider, p.ProviderRequestReference });
+
+        builder.Entity<SubscriptionPayment>()
+            .Property(p => p.Amount).HasPrecision(18, 2);
+
+        builder.Entity<SubscriptionEvent>()
+            .HasOne(e => e.OrganisationSubscription)
+            .WithMany(s => s.Events)
+            .HasForeignKey(e => e.OrganisationSubscriptionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SubscriptionEvent>()
+            .HasIndex(e => new { e.OrganisationSubscriptionId, e.OccurredAt });
+
+        builder.Entity<SubscriptionUsage>()
+            .HasOne(u => u.OrganisationSubscription)
+            .WithMany(s => s.UsageRecords)
+            .HasForeignKey(u => u.OrganisationSubscriptionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SubscriptionUsage>()
+            .HasIndex(u => new { u.OrganisationSubscriptionId, u.FeatureCode, u.PeriodStart })
+            .IsUnique();
+
+        builder.Entity<BillingWebhookEvent>()
+            .HasIndex(w => w.ProviderEventId)
+            .IsUnique();
+
+        builder.Entity<PromotionalTrial>()
+            .HasOne(t => t.AppliesToPlan)
+            .WithMany()
+            .HasForeignKey(t => t.AppliesToPlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<PromotionalTrial>()
+            .HasIndex(t => t.Code)
+            .IsUnique();
+
+        // Year is the app-supplied calendar year, not a database identity column — without this,
+        // EF's default convention for an unconfigured int PK treats it as auto-increment, which
+        // would silently ignore the Year value InvoiceNumberGenerator sets.
+        builder.Entity<InvoiceNumberCounter>()
+            .Property(c => c.Year)
+            .ValueGeneratedNever();
+
+        builder.Entity<InvoiceNumberCounter>()
+            .HasKey(c => c.Year);
+
+        // ── Phase 4: trial reminders, dunning, job locking ───────────────────
+        builder.Entity<TrialReminderSent>()
+            .HasOne(t => t.OrganisationSubscription)
+            .WithMany()
+            .HasForeignKey(t => t.OrganisationSubscriptionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TrialReminderSent>()
+            .HasIndex(t => new { t.OrganisationSubscriptionId, t.Bucket })
+            .IsUnique();
+
+        // JobName is an app-supplied string, not a database identity column.
+        builder.Entity<JobExecutionLock>()
+            .HasKey(l => l.JobName);
 
         builder.Entity<FineType>()
             .Property(f => f.DefaultAmount).HasPrecision(18, 2);

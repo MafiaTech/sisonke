@@ -10,6 +10,7 @@
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
 @using Sisonke.Web.Services.Dto
+@using Sisonke.Web.Services.Entitlements
 
 @inject FuneralClaimService FuneralClaimService
 @inject ClaimEligibilityService ClaimEligibilityService
@@ -18,6 +19,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject MemberAccessService MemberAccessService
 @inject NavigationManager NavigationManager
+@inject IEntitlementService EntitlementService
 
 <PageTitle>Claim Details</PageTitle>
 
@@ -1132,10 +1134,12 @@ else
 
                 if (stokvelId is not null)
                 {
+                    var hasBasicClaims = await EntitlementService.HasFeatureAsync(stokvelId.Value, Sisonke.Web.Data.FeatureCodes.ClaimsBasic);
+                    var hasFullWorkflow = await EntitlementService.HasFeatureAsync(stokvelId.Value, Sisonke.Web.Data.FeatureCodes.ClaimsFullWorkflow);
                     canManageStokvel = await MemberAccessService.CanManageStokvelAsync(userId, stokvelId.Value);
-                    canReviewClaim = await MemberAccessService.CanReviewClaimsAsync(userId, stokvelId.Value);
-                    canApproveClaim = await MemberAccessService.CanApproveClaimsAsync(userId, stokvelId.Value);
-                    canManagePayments = await MemberAccessService.CanManagePaymentsAsync(userId, stokvelId.Value);
+                    canReviewClaim = hasFullWorkflow && await MemberAccessService.CanReviewClaimsAsync(userId, stokvelId.Value);
+                    canApproveClaim = hasFullWorkflow && await MemberAccessService.CanApproveClaimsAsync(userId, stokvelId.Value);
+                    canManagePayments = hasFullWorkflow && await MemberAccessService.CanManagePaymentsAsync(userId, stokvelId.Value);
                     canViewPayoutAuditTrail = await MemberAccessService.CanViewFinancialsAsync(userId, stokvelId.Value);
                     var canViewFinancials = canViewPayoutAuditTrail;
                     canViewClaimEligibilityAssessment = canReviewClaim || canApproveClaim || canManagePayments || canViewFinancials || canManageStokvel;
@@ -1146,14 +1150,17 @@ else
                 canViewClaim = canViewClaim || canManageStokvel;
 
                 canAttemptSubmitClaim =
+                    stokvelId is not null &&
+                    await EntitlementService.HasFeatureAsync(stokvelId.Value, Sisonke.Web.Data.FeatureCodes.ClaimsBasic) &&
                     IsClaimSubmittableByStatus(claim.Status) &&
                     (isOwnMemberClaim || canManageStokvel);
 
                 canSubmitClaim = hasDeathCertificate && canAttemptSubmitClaim;
 
                 canUploadDocuments =
-                    (isOwnMemberClaim && IsClaimUploadableByMemberStatus(claim.Status)) ||
-                    canManageStokvel;
+                    stokvelId is not null &&
+                    await EntitlementService.HasFeatureAsync(stokvelId.Value, Sisonke.Web.Data.FeatureCodes.ClaimsBasic) &&
+                    ((isOwnMemberClaim && IsClaimUploadableByMemberStatus(claim.Status)) || canManageStokvel);
             }
 
             secretaryReviewModel.ReviewNotes = claim.SecretaryReviewNotes;

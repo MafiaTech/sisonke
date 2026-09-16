@@ -42,7 +42,12 @@ public sealed class WebPushSender(
         {
             title = message.Subject ?? string.Empty,
             body = message.Body,
-            url = $"/{message.EntityType.ToLowerInvariant()}/{message.EntityId}"
+            url = message.Type switch
+            {
+                NotificationType.ContributionPaymentProofSubmitted or NotificationType.MemberPaymentProofSubmitted when message.StokvelId.HasValue => $"/treasurer-tasks/{message.StokvelId.Value}#payment-proofs",
+                NotificationType.ContributionPaymentProofApproved or NotificationType.ContributionPaymentProofRejected or NotificationType.MemberPaymentProofApproved or NotificationType.MemberPaymentProofRejected => "/my-workspace",
+                _ => $"/{message.EntityType.ToLowerInvariant()}/{message.EntityId}"
+            }
         });
 
         var vapidDetails = new VapidDetails(options.Subject, options.PublicKey, options.PrivateKey);

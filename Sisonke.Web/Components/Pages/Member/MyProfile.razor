@@ -210,6 +210,7 @@ else
         <!-- ── Beneficiaries ── -->
         <div class="sm-section-header sm-fade-up">
             <span class="sm-section-title">Beneficiaries</span>
+            <span class="sm-badge sm-badge-gray">Editable</span>
         </div>
         <div class="sm-card sm-fade-up sm-mb-20">
             <div class="sm-card-body">
@@ -232,6 +233,9 @@ else
                                 {
                                     <span style="color:var(--sm-muted);margin-left:8px;font-family:'DM Mono',monospace;font-size:12px;">@SensitiveDataMasker.MaskIdNumber(ben.IdNumber)</span>
                                 }
+                                <a class="sm-btn-link ms-2" href="@($"/edit-beneficiary/{ben.Id}?returnUrl={Uri.EscapeDataString($"/member-portal/my-profile/{MemberId}")}")">
+                                    <i class="bi bi-pencil me-1"></i>Edit
+                                </a>
                             </span>
                         </div>
                     }

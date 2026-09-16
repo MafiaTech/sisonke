@@ -5,8 +5,15 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class MemberAccessService(ApplicationDbContext context)
+public class MemberAccessService(IDbContextFactory<ApplicationDbContext> dbFactory)
 {
+    private readonly ApplicationDbContext? transactionContext;
+    // Explicit short-lived transaction/legacy callers only. DI uses the factory constructor.
+    public MemberAccessService(ApplicationDbContext context) : this((IDbContextFactory<ApplicationDbContext>)null!)
+    {
+        transactionContext = context;
+    }
+
     private static bool IsOfficeBearerRole(string? role)
     {
         return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
@@ -155,6 +162,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<Member?> GetLinkedMemberForUserAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return null;
@@ -185,6 +195,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<List<Member>> GetLinkedMembershipsForUserAsync(string userId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return [];
@@ -202,6 +215,33 @@ public class MemberAccessService(ApplicationDbContext context)
         var member = await GetLinkedMemberForUserAsync(userId, stokvelId);
 
         return member is not null && IsOfficeBearerRole(member.DefaultRole.ToString());
+    }
+
+    /// <summary>
+    /// Every active office bearer for the stokvel — the recipient set for subscription billing
+    /// notifications (never ordinary members). Reuses the same role check as IsOfficeBearerAsync
+    /// rather than a separate/looser list.
+    /// </summary>
+    public async Task<List<Member>> GetOfficeBearersAsync(Guid stokvelId)
+    {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
+        var stokvel = await context.Stokvels
+            .Where(existingStokvel => existingStokvel.Id == stokvelId)
+            .OrderBy(existingStokvel => existingStokvel.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (stokvel is null)
+        {
+            return [];
+        }
+
+        var members = await context.Members
+            .Where(member => member.TenantId == stokvel.TenantId && member.Status == MemberStatus.Active)
+            .ToListAsync();
+
+        return members.Where(member => IsOfficeBearerRole(member.DefaultRole.ToString())).ToList();
     }
 
     public async Task<bool> IsOrdinaryMemberAsync(string userId, Guid stokvelId)
@@ -253,6 +293,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanViewOwnMemberProfileAsync(string userId, Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -264,6 +307,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanManageOwnDependentsAsync(string userId, Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
             return false;
 
@@ -285,6 +331,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanViewMemberProfileAsync(string userId, Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -313,6 +362,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<Guid?> GetStokvelIdForMemberAsync(Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var member = await context.Members
             .Where(existingMember => existingMember.Id == memberId)
             .OrderBy(existingMember => existingMember.CreatedAt)
@@ -366,6 +418,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanMakeDisciplinaryDecisionAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -410,6 +465,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanManageMinutesAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -443,6 +501,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanApproveMinutesAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -475,6 +536,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanViewApprovedMinutesAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -632,31 +696,23 @@ public class MemberAccessService(ApplicationDbContext context)
             return DashboardAccess.Denied;
 
         var linkedMember = await GetLinkedMemberForUserAsync(userId, stokvelId);
-        var canManage = await CanViewFullDashboardAsync(userId, stokvelId);
+        var role = linkedMember?.DefaultRole.ToString();
+        var canManage = linkedMember is not null && IsOfficeBearerRole(role);
 
         if (!canManage)
             return new DashboardAccess(false, linkedMember, false, false, false, false, false, false, false, false);
 
-        var canViewSecretaryTasks = await CanViewSecretaryTasksAsync(userId, stokvelId);
-        var canViewChairpersonTasks = await CanViewChairpersonTasksAsync(userId, stokvelId);
-        var canManageMeetings = await CanManageMeetingsAsync(userId, stokvelId);
-        var canReviewClaims = await CanReviewClaimsAsync(userId, stokvelId);
-        var canManageAttendance = await CanManageAttendanceAsync(userId, stokvelId);
-        var canViewTreasurerTasks = await CanViewTreasurerTasksAsync(userId, stokvelId);
-        var canManagePayments = await CanManagePaymentsAsync(userId, stokvelId);
-        var canViewFinancials = await CanViewFinancialsAsync(userId, stokvelId);
-
         return new DashboardAccess(
             CanManageDashboard: true,
             LinkedMember: linkedMember,
-            CanViewSecretaryTasks: canViewSecretaryTasks,
-            CanViewChairpersonTasks: canViewChairpersonTasks,
-            CanManageMeetings: canManageMeetings,
-            CanReviewClaims: canReviewClaims,
-            CanManageAttendance: canManageAttendance,
-            CanViewTreasurerTasks: canViewTreasurerTasks,
-            CanManagePayments: canManagePayments,
-            CanViewFinancials: canViewFinancials
+            CanViewSecretaryTasks: CanViewSecretaryTasksRole(role),
+            CanViewChairpersonTasks: CanViewChairpersonTasksRole(role),
+            CanManageMeetings: CanManageMeetingsRole(role),
+            CanReviewClaims: CanReviewClaimsRole(role),
+            CanManageAttendance: CanManageMeetingsRole(role),
+            CanViewTreasurerTasks: CanViewTreasurerTasksRole(role),
+            CanManagePayments: CanManagePaymentsRole(role),
+            CanViewFinancials: CanViewFinancialsRole(role)
         );
     }
 }

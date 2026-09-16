@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Sisonke.Web.Data.Enums;
+using Sisonke.Web.Services;
 using Sisonke.Web.Services.Notifications;
 using Sisonke.Web.Tests.TestSupport;
 
@@ -9,6 +11,9 @@ public class NotificationEnqueuerTests
 {
     private static readonly Guid EntityId = Guid.NewGuid();
     private const string EntityType = "RotationalPayout";
+
+    private static NotificationEnqueuer CreateEnqueuer() => new(
+        new NotificationEmailTemplateRenderer(new AppSettings(), NullLogger<NotificationEmailTemplateRenderer>.Instance));
 
     [Theory]
     [InlineData(NotificationType.TaskAssigned)]
@@ -24,7 +29,7 @@ public class NotificationEnqueuerTests
         var member = TestData.CreateMember(context, webPushEnabled: false);
         await context.SaveChangesAsync();
 
-        var enqueuer = new NotificationEnqueuer();
+        var enqueuer = CreateEnqueuer();
         await enqueuer.EnqueueAsync(
             context, type, member.Id, stokvelId: null, EntityType, EntityId,
             subject: "Subject", body: "Body");
@@ -46,7 +51,7 @@ public class NotificationEnqueuerTests
         var member = TestData.CreateMember(context, webPushEnabled: false);
         await context.SaveChangesAsync();
 
-        var enqueuer = new NotificationEnqueuer();
+        var enqueuer = CreateEnqueuer();
         await enqueuer.EnqueueAsync(
             context, NotificationType.TaskAssigned, member.Id, stokvelId: null, EntityType, EntityId,
             subject: "Subject", body: "Body");
@@ -73,7 +78,7 @@ public class NotificationEnqueuerTests
 
         await using (var enqueueContext = db.CreateContext())
         {
-            var enqueuer = new NotificationEnqueuer();
+            var enqueuer = CreateEnqueuer();
             await enqueuer.EnqueueAsync(
                 enqueueContext, NotificationType.TaskAssigned, memberId, stokvelId: null, EntityType, EntityId,
                 subject: "Subject", body: "Body");
@@ -94,7 +99,7 @@ public class NotificationEnqueuerTests
         var member = TestData.CreateMember(context, emailEnabled: false, webPushEnabled: true);
         await context.SaveChangesAsync();
 
-        var enqueuer = new NotificationEnqueuer();
+        var enqueuer = CreateEnqueuer();
         await enqueuer.EnqueueAsync(
             context, NotificationType.TaskAssigned, member.Id, stokvelId: null, EntityType, EntityId,
             subject: "Subject", body: "Body");
@@ -112,7 +117,7 @@ public class NotificationEnqueuerTests
         var member = TestData.CreateMember(context, emailEnabled: false, webPushEnabled: false);
         await context.SaveChangesAsync();
 
-        var enqueuer = new NotificationEnqueuer();
+        var enqueuer = CreateEnqueuer();
         await enqueuer.EnqueueAsync(
             context, NotificationType.TaskAssigned, member.Id, stokvelId: null, EntityType, EntityId,
             subject: "Subject", body: "Body");
@@ -129,7 +134,7 @@ public class NotificationEnqueuerTests
         var member = TestData.CreateMember(context, emailEnabled: true, webPushEnabled: true);
         await context.SaveChangesAsync();
 
-        var enqueuer = new NotificationEnqueuer();
+        var enqueuer = CreateEnqueuer();
         await enqueuer.EnqueueAsync(
             context, NotificationType.TaskAssigned, member.Id, stokvelId: null, EntityType, EntityId,
             subject: "Subject", body: "Body");
