@@ -149,7 +149,7 @@ else
                             <span><strong>@OpenFinesCount outstanding fine(s)</strong><small>Review your fine details below.</small></span>
                         </a>
                     }
-                    @if ((currentMonthContribution is not null && currentMonthContribution.Balance <= 0) && NextMeeting is null && OpenFinesCount == 0)
+                    @if ((currentMonthContribution is not null && currentMonthContribution.Balance <= 0) && overdueContributions.Count == 0 && NextMeeting is null && OpenFinesCount == 0)
                     {
                         <div class="dashboard-empty dashboard-empty--success"><i class="bi bi-check-circle"></i><span>You are all caught up. Nothing needs your attention.</span></div>
                     }
@@ -335,11 +335,9 @@ else
                     }
                     else
                     {
-                        <div class="contribution-friendly-status @(currentMonthContribution.Balance <= 0 ? "is-current" : "needs-attention")">
-                            <i class="bi @(currentMonthContribution.Balance <= 0 ? "bi-check-circle" : "bi-exclamation-circle")"></i>
-                            <span>@(currentMonthContribution.Balance <= 0
-                                ? "You are up to date with your contributions. Thank you!"
-                                : "You have an outstanding contribution for this month.")</span>
+                        <div class="contribution-friendly-status @(currentMonthContribution.Balance <= 0 && overdueContributions.Count == 0 ? "is-current" : "needs-attention")">
+                            <i class="bi @(currentMonthContribution.Balance <= 0 && overdueContributions.Count == 0 ? "bi-check-circle" : "bi-exclamation-circle")"></i>
+                            <span>@Sisonke.Web.Data.ContributionStatus.MemberMessage(currentMonthContribution.ExpectedAmount, currentMonthContribution.Balance, overdueContributions.Count > 0)</span>
                         </div>
                         <div class="mw-smini">
                             <div class="mw-smini-block">
@@ -362,11 +360,11 @@ else
                         </div>
                         <div class="mw-p-row">
                             <span class="mw-p-lbl">Status</span>
-                            <span class="@GetPaymentStatusBadgeClass(currentMonthContribution.Status)">@GetPaymentStatusText(currentMonthContribution.Status)</span>
+                            <span class="@(stokvel.EnableRotation ? GetPaymentStatusBadgeClass(currentMonthContribution.Status) : currentMonthContribution.StatusBadgeClass)">@(stokvel.EnableRotation ? GetPaymentStatusText(currentMonthContribution.Status) : currentMonthContribution.StatusLabel)</span>
                         </div>
                         <div class="mw-p-row">
                             <span class="mw-p-lbl">Paid Date</span>
-                            <span class="mw-p-val">@(currentMonthContribution.PaidDate?.ToString("dd MMM yyyy") ?? "Not fully paid")</span>
+                            <span class="mw-p-val">@(currentMonthContribution.ExpectedAmount <= 0 && currentMonthContribution.Balance <= 0 ? "Not applicable" : currentMonthContribution.PaidDate?.ToString("dd MMM yyyy") ?? "Not fully paid")</span>
                         </div>
                         <div class="mw-p-row">
                             <span class="mw-p-lbl">Reference</span>
@@ -376,6 +374,10 @@ else
 
                     <div class="mw-div"></div>
                     <div class="mw-card-lbl mb-2">Contribution History</div>
+                    @if (!stokvel.EnableRotation && canSubmitPaymentProof)
+                    {
+                        <Sisonke.Web.Components.Pages.Contributions.MemberPaymentProofs StokvelId="stokvel.Id" BalancesRefreshed="RefreshMonthlyContributionsAsync" />
+                    }
                     @if (recentContributions.Count == 0)
                     {
                         <div class="sisonke-alert sisonke-alert-blue mb-0">
@@ -405,7 +407,7 @@ else
                                             <td>@FormatCurrency(contribution.ExpectedAmount)</td>
                                             <td>@FormatCurrency(contribution.PaidAmount)</td>
                                             <td>@FormatCurrency(contribution.Balance)</td>
-                                            <td><span class="@GetPaymentStatusBadgeClass(contribution.Status)">@GetPaymentStatusText(contribution.Status)</span></td>
+                                            <td><span class="@(stokvel.EnableRotation ? GetPaymentStatusBadgeClass(contribution.Status) : contribution.StatusBadgeClass)">@(stokvel.EnableRotation ? GetPaymentStatusText(contribution.Status) : contribution.StatusLabel)</span></td>
                                             <td>@(contribution.PaidDate?.ToString("dd MMM yyyy") ?? "-")</td>
                                             <td>@(string.IsNullOrWhiteSpace(contribution.PaymentReference) ? "-" : contribution.PaymentReference)</td>
                                         </tr>
@@ -460,6 +462,12 @@ else
                             </div>
                         </div>
                         <div class="mw-div"></div>
+                        @if (canSubmitPaymentProof)
+                        {
+                            <Sisonke.Web.Components.Payments.MemberPaymentPanel StokvelId="stokvel.Id" ObligationType="PaymentObligationType.Fine" BalancesRefreshed="RefreshFinesAsync" />
+                        }
+                        else
+                        {
                         @foreach (var fine in memberFines.OrderByDescending(fine => fine.FineDate).Take(4))
                         {
                             <div class="mw-lrow">
@@ -473,6 +481,7 @@ else
                                     <span class="@GetFineStatusBadgeClass(fine.Status)">@fine.Status</span>
                                 </div>
                             </div>
+                        }
                         }
                     }
                     <div class="mw-div"></div>
@@ -707,7 +716,7 @@ else
                             {
                                 <tr class="@(contribution.MemberId == MemberId ? "member-current-row" : null)">
                                     <td>@Display(contribution.Member?.FullName) @(contribution.MemberId == MemberId ? "(You)" : null)</td>
-                                    <td><span class="@GetPaymentStatusBadgeClass(contribution.Status)">@GetPaymentStatusText(contribution.Status)</span></td>
+                                    <td><span class="@contribution.StatusBadgeClass">@contribution.StatusLabel</span></td>
                                     <td>@FormatCurrency(contribution.PaidAmount)</td>
                                     <td>@(contribution.FullyPaidDate?.ToString("dd MMM yyyy") ?? "Pending")</td>
                                 </tr>
@@ -987,12 +996,23 @@ else
 </script>
 
 @code {
+    private bool canSubmitPaymentProof;
+    private async Task RefreshMonthlyContributionsAsync()
+    {
+        if (stokvel is null || stokvel.EnableRotation) return;
+        memberContributions = await ContributionPaymentService.GetContributionsByMemberIdAsync(MemberId);
+        overdueContributions = await ContributionPaymentService.GetOverdueContributionsByMemberIdAsync(MemberId);
+        recentContributions = memberContributions.Take(6).ToList();
+        currentMonthContribution = memberContributions.FirstOrDefault(c => c.ContributionYear == DateTime.Today.Year && c.ContributionMonth == DateTime.Today.Month);
+        currentMonthStokvelContributions = await ContributionPaymentService.GetMonthlyContributionsAsync(stokvel.Id, DateTime.Today.Year, DateTime.Today.Month);
+    }
     [Parameter]
     public Guid MemberId { get; set; }
 
     private Member? member;
     private Stokvel? stokvel;
     private RotationalPayoutOrderSummary rotationOrderSummary = new(false, 0, null, null, null);
+    private async Task RefreshFinesAsync() => memberFines = await FineService.GetMemberFinesAsync(MemberId);
     private List<MemberFine> memberFines = [];
     private List<FuneralClaim> memberClaims = [];
     private List<MemberDependent> dependents = [];
@@ -1054,6 +1074,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        canSubmitPaymentProof = false;
         isLoading = true;
         isAllowed = false;
         member = null;
@@ -1108,6 +1129,7 @@ else
             return;
         }
 
+        canSubmitPaymentProof = (await MemberAccessService.GetLinkedMemberForUserAsync(userId, stokvel.Id))?.Id == MemberId;
         memberFines = await FineService.GetMemberFinesAsync(MemberId);
         memberClaims = stokvel.EnableClaims ? await FuneralClaimService.GetClaimsByMemberIdAsync(MemberId) : [];
         dependents = stokvel.EnableDependents ? await MemberService.GetDependentsByMemberIdAsync(MemberId) : [];

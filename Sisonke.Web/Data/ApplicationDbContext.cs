@@ -40,6 +40,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ContributionCycle> ContributionCycles => Set<ContributionCycle>();
     public DbSet<MemberContribution> MemberContributions => Set<MemberContribution>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ContributionPaymentSubmission> ContributionPaymentSubmissions => Set<ContributionPaymentSubmission>();
+    public DbSet<PaymentProofDocument> PaymentProofDocuments => Set<PaymentProofDocument>();
     public DbSet<ContributionPaymentAudit> ContributionPaymentAudits => Set<ContributionPaymentAudit>();
     public DbSet<ClaimPayoutAudit> ClaimPayoutAudits => Set<ClaimPayoutAudit>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
@@ -85,6 +87,31 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        var submission = builder.Entity<ContributionPaymentSubmission>();
+        submission.ToTable("ContributionPaymentSubmissions", t => t.HasCheckConstraint("CK_PaymentSubmission_Obligation",
+            "([ObligationType] = 1 AND [MemberContributionId] IS NOT NULL AND [MemberFineId] IS NULL) OR ([ObligationType] = 2 AND [MemberFineId] IS NOT NULL AND [MemberContributionId] IS NULL AND [PaymentId] IS NULL)"));
+        submission.Property(s => s.ObligationType).HasDefaultValue(PaymentObligationType.Contribution);
+        submission.HasOne(s => s.MemberFine).WithMany().HasForeignKey(s => s.MemberFineId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.Tenant).WithMany().HasForeignKey(s => s.TenantId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.Stokvel).WithMany().HasForeignKey(s => s.StokvelId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.Member).WithMany().HasForeignKey(s => s.MemberId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.MemberContribution).WithMany().HasForeignKey(s => s.MemberContributionId).OnDelete(DeleteBehavior.Restrict);
+        submission.HasOne(s => s.Payment).WithMany().HasForeignKey(s => s.PaymentId).OnDelete(DeleteBehavior.Restrict);
+        submission.Property(s => s.Amount).HasPrecision(18, 2);
+        submission.Property(s => s.Status).IsConcurrencyToken();
+        submission.HasIndex(s => new { s.TenantId, s.StokvelId, s.Status, s.SubmittedAt });
+        submission.HasIndex(s => s.Status);
+        submission.HasIndex(s => s.SubmittedAt);
+        // One outstanding verification per contribution; a rejection permits a corrected submission.
+        submission.HasIndex(s => s.MemberContributionId).IsUnique().HasFilter("[Status] = 1 AND [MemberContributionId] IS NOT NULL");
+        submission.HasIndex(s => s.MemberFineId).IsUnique().HasFilter("[Status] = 1 AND [MemberFineId] IS NOT NULL");
+        submission.HasIndex(s => s.PaymentId).IsUnique().HasFilter("[PaymentId] IS NOT NULL");
+
+        var proof = builder.Entity<PaymentProofDocument>();
+        proof.HasOne(d => d.Tenant).WithMany().HasForeignKey(d => d.TenantId).OnDelete(DeleteBehavior.Restrict);
+        proof.HasOne(d => d.ContributionPaymentSubmission).WithMany(s => s.Documents)
+            .HasForeignKey(d => d.ContributionPaymentSubmissionId).OnDelete(DeleteBehavior.Restrict);
 
         var identityV3CredentialType = typeof(IdentityUser).Assembly
             .GetTypes()

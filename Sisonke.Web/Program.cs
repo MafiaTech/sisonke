@@ -297,22 +297,22 @@ if (isSqlite)
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlite(connectionString)
                .ConfigureWarnings(w =>
-                   w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+                   w.Ignore(RelationalEventId.PendingModelChangesWarning)), optionsLifetime: ServiceLifetime.Singleton);
     builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
         options.UseSqlite(connectionString)
                .ConfigureWarnings(w =>
                    w.Ignore(RelationalEventId.PendingModelChangesWarning)),
-        ServiceLifetime.Scoped);
+        ServiceLifetime.Singleton);
 }
 else
 {
     connectionString = rawConnectionString;
 
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlServer(connectionString));
+        options.UseSqlServer(connectionString), optionsLifetime: ServiceLifetime.Singleton);
     builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
         options.UseSqlServer(connectionString),
-        ServiceLifetime.Scoped);
+        ServiceLifetime.Singleton);
 }
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -382,10 +382,13 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddScoped<StokvelService>();
 builder.Services.AddScoped<MemberService>();
-builder.Services.AddScoped<FineService>();
-builder.Services.AddScoped<ContributionService>();
-builder.Services.AddScoped<ContributionPaymentService>();
-builder.Services.AddScoped<FinanceReportService>();
+builder.Services.AddScoped<FineService>(sp => new(sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>(), sp.GetRequiredService<AuditLogService>()));
+builder.Services.AddScoped<ContributionService>(sp => new(sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>()));
+builder.Services.AddScoped<ContributionPaymentService>(sp => new(sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>(), sp.GetRequiredService<MemberAccessService>(), sp.GetRequiredService<AuditLogService>()));
+builder.Services.AddScoped<PaymentProofStorage>();
+builder.Services.AddScoped<ContributionPaymentSubmissionService>();
+builder.Services.AddScoped<MemberPaymentSubmissionService>(sp => sp.GetRequiredService<ContributionPaymentSubmissionService>());
+builder.Services.AddScoped<FinanceReportService>(sp => new(sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>(), sp.GetRequiredService<ContributionPaymentService>(), sp.GetRequiredService<FineService>(), sp.GetRequiredService<FuneralClaimService>()));
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<AdminControlsService>();
 builder.Services.AddScoped<QuestionnaireService>();
@@ -402,7 +405,7 @@ builder.Services.AddScoped<FuneralClaimService>();
 builder.Services.AddScoped<ClaimEligibilityService>();
 builder.Services.AddScoped<MemberAccountLinkingService>();
 builder.Services.AddScoped<SisonkeCurrentUserService>();
-builder.Services.AddScoped<MemberAccessService>();
+builder.Services.AddScoped<MemberAccessService>(sp => new(sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>()));
 builder.Services.AddScoped<StokvelArchetypeConfigurationService>();
 builder.Services.AddScoped<RotationalStokvelService>();
 builder.Services.AddScoped<RotationalConfigurationService>();
@@ -695,6 +698,9 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapGet("/api/payment-proofs/{stokvelId:guid}/{documentId:guid}", PaymentProofDownloadEndpoint.HandleAsync)
+    .RequireAuthorization();
 
 app.MapGet("/health", async (
     ApplicationDbContext context,

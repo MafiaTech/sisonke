@@ -23,6 +23,8 @@
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
     <Content Remove="artifacts\**" />
     <None Remove="artifacts\**" />
+    <Content Remove="App_Data\payment-proofs\**" />
+    <None Remove="App_Data\payment-proofs\**" />
   </ItemGroup>
 
   <ItemGroup>

@@ -6,13 +6,23 @@ using Sisonke.Web.Services.Dto;
 
 namespace Sisonke.Web.Services;
 
-public class ContributionPaymentService(ApplicationDbContext context, MemberAccessService memberAccessService, AuditLogService auditLogService)
+public class ContributionPaymentService(IDbContextFactory<ApplicationDbContext> dbFactory, MemberAccessService memberAccessService, AuditLogService auditLogService)
 {
+    private readonly ApplicationDbContext? transactionContext;
+    // Explicit short-lived transaction/legacy callers only. DI uses the factory constructor.
+    public ContributionPaymentService(ApplicationDbContext context, MemberAccessService memberAccessService, AuditLogService auditLogService) : this((IDbContextFactory<ApplicationDbContext>)null!, memberAccessService, auditLogService)
+    {
+        transactionContext = context;
+    }
+
     public async Task<List<MemberContribution>> EnsureMonthlyContributionRecordsAsync(
         Guid stokvelId,
         int year,
         int month)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (year < 1 || month is < 1 or > 12)
         {
             return [];
@@ -31,15 +41,13 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
         var periodStart = new DateTime(year, month, 1);
         var periodEnd = periodStart.AddMonths(1).AddDays(-1);
-        var rule = await context.ContributionRules
-            .Where(contributionRule =>
-                contributionRule.TenantId == stokvel.TenantId &&
-                contributionRule.IsActive)
-            .OrderByDescending(contributionRule => contributionRule.EffectiveFrom)
-            .ThenByDescending(contributionRule => contributionRule.CreatedAt)
-            .FirstOrDefaultAsync();
+        var ruleDate = periodStart.Year == DateTime.Today.Year && periodStart.Month == DateTime.Today.Month ? DateTime.Today : periodEnd;
+        var rule = await ContributionRuleResolver.ResolveAsync(context, stokvel.TenantId, ruleDate);
+        // Missing configuration is not a zero-rand obligation. Leave existing history untouched.
+        if (rule is null || rule.Amount <= 0)
+            return await GetMonthlyContributionsAsync(stokvelId, year, month);
 
-        var dueDay = Math.Clamp(rule?.DueDayOfMonth ?? 7, 1, DateTime.DaysInMonth(year, month));
+        var dueDay = Math.Clamp(rule.DueDayOfMonth, 1, DateTime.DaysInMonth(year, month));
         var cycle = await context.ContributionCycles
             .Where(existingCycle =>
                 existingCycle.TenantId == stokvel.TenantId &&
@@ -77,7 +85,20 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
             .Select(memberContribution => memberContribution.MemberId)
             .ToListAsync();
 
-        var expectedAmount = rule?.Amount ?? 0;
+        var expectedAmount = rule.Amount;
+        // Explicit generation can repair legacy, never-paid zero placeholders for this period.
+        // Never reprice real obligations, exemptions, write-offs or contributions with payments.
+        var placeholders = await context.MemberContributions.Where(c => c.ContributionCycleId == cycle.Id &&
+            c.Member.Status == MemberStatus.Active &&
+            c.ExpectedAmount <= 0 && c.PaidAmount == 0 && c.OutstandingAmount <= 0 &&
+            (c.Status == PaymentStatus.Unpaid || c.Status == PaymentStatus.Late) &&
+            !context.Payments.Any(p => p.MemberContributionId == c.Id)).ToListAsync();
+        foreach (var placeholder in placeholders)
+        {
+            placeholder.ExpectedAmount = expectedAmount;
+            placeholder.OutstandingAmount = expectedAmount;
+            placeholder.Status = PaymentStatus.Unpaid;
+        }
         var now = DateTime.UtcNow;
         var newContributions = members
             .Where(member => !existingMemberIds.Contains(member.Id))
@@ -95,7 +116,7 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
             })
             .ToList();
 
-        if (newContributions.Count > 0)
+        if (newContributions.Count > 0 || placeholders.Count > 0)
         {
             context.MemberContributions.AddRange(newContributions);
             await context.SaveChangesAsync();
@@ -109,6 +130,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         int year,
         int month)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (year < 1 || month is < 1 or > 12)
         {
             return [];
@@ -127,7 +151,7 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
         var periodStart = new DateTime(year, month, 1);
 
-        return await context.MemberContributions
+        return await context.MemberContributions.AsNoTracking()
             .Include(memberContribution => memberContribution.Member)
             .Include(memberContribution => memberContribution.ContributionCycle)
             .Where(memberContribution =>
@@ -139,6 +163,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<MemberContribution?> GetContributionPaymentByIdAsync(Guid contributionPaymentId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         return await context.MemberContributions
             .Include(memberContribution => memberContribution.Member)
             .Include(memberContribution => memberContribution.ContributionCycle)
@@ -149,6 +176,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<Guid?> GetStokvelIdForContributionPaymentAsync(Guid contributionPaymentId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var contribution = await context.MemberContributions
             .Where(memberContribution => memberContribution.Id == contributionPaymentId)
             .OrderBy(memberContribution => memberContribution.CreatedAt)
@@ -173,6 +203,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         int year,
         int month)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (year < 1 || month is < 1 or > 12)
         {
             return new ContributionMonthSummaryDto();
@@ -192,13 +225,8 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         var activeMemberCount = await context.Members.CountAsync(member =>
             member.TenantId == stokvel.TenantId &&
             member.Status == MemberStatus.Active);
-        var rule = await context.ContributionRules
-            .Where(contributionRule =>
-                contributionRule.TenantId == stokvel.TenantId &&
-                contributionRule.IsActive)
-            .OrderByDescending(contributionRule => contributionRule.EffectiveFrom)
-            .ThenByDescending(contributionRule => contributionRule.CreatedAt)
-            .FirstOrDefaultAsync();
+        var ruleDate = year == DateTime.Today.Year && month == DateTime.Today.Month ? DateTime.Today : new DateTime(year, month, 1).AddMonths(1).AddDays(-1);
+        var rule = await ContributionRuleResolver.ResolveAsync(context, stokvel.TenantId, ruleDate);
         var contributions = await GetMonthlyContributionsAsync(stokvelId, year, month);
         var generatedExpectedTotal = contributions.Sum(contribution => contribution.ExpectedAmount);
         var monthlyContributionAmount = rule?.Amount ??
@@ -209,7 +237,8 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         var actualContributions = contributions.Sum(contribution => contribution.PaidAmount);
         var outstandingContributions = Math.Max(0, expectedContributions - actualContributions);
         var effectiveStatuses = contributions
-            .Select(contribution => GetEffectivePaymentStatus(contribution.Status, contribution.ContributionCycle.DueDate))
+            .Where(contribution => !ContributionStatus.NoPaymentDue(contribution.ExpectedAmount, contribution.OutstandingAmount))
+            .Select(contribution => ContributionStatus.Effective(contribution.Status, contribution.OutstandingAmount, contribution.ContributionCycle.DueDate))
             .ToList();
 
         return new ContributionMonthSummaryDto
@@ -235,6 +264,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<List<ContributionMonthlyTrendDto>> GetContributionTrendsAsync(Guid stokvelId, int monthsBack = 6)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .AsNoTracking()
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
@@ -283,6 +315,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     private async Task<List<ContributionMonthlyTrendDto>> GetRotationalContributionTrendsAsync(Guid stokvelId, int cyclesBack)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var cycleCount = Math.Max(1, cyclesBack);
         var cycles = await context.RotationalContributionCycles
             .AsNoTracking()
@@ -361,6 +396,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         int year,
         int month)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (year < 1 || month is < 1 or > 12)
         {
             return null;
@@ -380,7 +418,10 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<List<ContributionPaymentSummary>> GetContributionsByMemberIdAsync(Guid memberId)
     {
-        var contributions = await context.MemberContributions
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
+        var contributions = await context.MemberContributions.AsNoTracking()
             .Include(memberContribution => memberContribution.ContributionCycle)
             .Where(memberContribution => memberContribution.MemberId == memberId)
             .OrderByDescending(memberContribution => memberContribution.ContributionCycle.PeriodStart)
@@ -420,7 +461,8 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
                     ExpectedAmount = contribution.ExpectedAmount,
                     PaidAmount = contribution.PaidAmount,
                     Balance = contribution.OutstandingAmount,
-                    Status = GetEffectivePaymentStatus(contribution.Status, contribution.ContributionCycle.DueDate),
+                    Status = ContributionStatus.Effective(contribution.Status, contribution.OutstandingAmount, contribution.ContributionCycle.DueDate),
+                    DueDate = contribution.ContributionCycle.DueDate,
                     PaidDate = contribution.FullyPaidDate ?? latestPayment?.PaymentDate,
                     PaymentReference = latestPayment?.Reference
                 };
@@ -430,6 +472,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<ContributionPaymentSummary?> GetCurrentMonthContributionAsync(Guid memberId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
@@ -476,6 +521,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<int> MarkOverdueContributionsAsync(Guid stokvelId, int year, int month, Guid capturedByMemberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (year < 1 || month is < 1 or > 12)
         {
             return 0;
@@ -499,6 +547,7 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
             .Where(memberContribution =>
                 memberContribution.TenantId == stokvel.TenantId &&
                 memberContribution.ContributionCycle.PeriodStart == periodStart &&
+                memberContribution.OutstandingAmount > 0 &&
                 memberContribution.ContributionCycle.DueDate < today &&
                 (memberContribution.Status == PaymentStatus.Unpaid ||
                     memberContribution.Status == PaymentStatus.PartiallyPaid))
@@ -534,6 +583,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<List<MemberContribution>> GetOverdueContributionsByStokvelIdAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
@@ -557,6 +609,7 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
                         memberContribution.Status == PaymentStatus.Unpaid) ||
                     (memberContribution.ContributionCycle.DueDate < today &&
                         memberContribution.Status == PaymentStatus.PartiallyPaid)))
+            .Where(memberContribution => memberContribution.OutstandingAmount > 0)
             .OrderBy(memberContribution => memberContribution.ContributionCycle.DueDate)
             .ThenBy(memberContribution => memberContribution.Member.FullName)
             .ToListAsync();
@@ -564,6 +617,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<List<MemberContribution>> GetOverdueContributionsByMemberIdAsync(Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var today = DateTime.Today;
 
         return await context.MemberContributions
@@ -571,6 +627,7 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
             .Include(memberContribution => memberContribution.ContributionCycle)
             .Where(memberContribution =>
                 memberContribution.MemberId == memberId &&
+                memberContribution.OutstandingAmount > 0 &&
                 (memberContribution.Status == PaymentStatus.Late ||
                     (memberContribution.ContributionCycle.DueDate < today &&
                         memberContribution.Status == PaymentStatus.Unpaid) ||
@@ -583,6 +640,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<decimal> GetTotalOutstandingByStokvelIdAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
@@ -608,13 +668,23 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         decimal amountPaid,
         string? paymentReference,
         string? notes,
-        string capturedByUserId)
+        string capturedByUserId,
+        DateTime? paymentDate = null,
+        Guid? stokvelId = null)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (amountPaid <= 0 || string.IsNullOrWhiteSpace(capturedByUserId))
         {
             return null;
         }
 
+        // Manual capture and proof approval must both read and write the current balance under
+        // a transaction. Reload also protects a long-lived Blazor context from stale tracked rows.
+        await using var ownedTransaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable)
+            : null;
         var memberContribution = await context.MemberContributions
             .Include(existingContribution => existingContribution.Member)
             .Where(existingContribution => existingContribution.Id == memberContributionId)
@@ -625,8 +695,11 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
             return null;
         }
 
+        await context.Entry(memberContribution).ReloadAsync();
+
         var stokvel = await context.Stokvels
             .Where(existingStokvel => existingStokvel.TenantId == memberContribution.TenantId)
+            .Where(existingStokvel => !stokvelId.HasValue || existingStokvel.Id == stokvelId.Value)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
             .ThenBy(existingStokvel => existingStokvel.Name)
             .FirstOrDefaultAsync();
@@ -653,7 +726,7 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
             MemberContributionId = memberContribution.Id,
             MemberId = memberContribution.MemberId,
             Amount = amountPaid,
-            PaymentDate = DateTime.Today,
+            PaymentDate = paymentDate?.Date ?? DateTime.Today,
             Reference = paymentReference,
             CapturedByUserId = capturedByUserId,
             CreatedAt = DateTime.UtcNow
@@ -690,13 +763,25 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
         });
 
         await context.SaveChangesAsync();
-        await auditLogService.RecordAsync(capturedByUserId, stokvel.Id, "ContributionPaymentCaptured", "MemberContribution", memberContribution.Id, $"Contribution payment captured for R {amountPaid:N2}.");
+        if (context.Database.CurrentTransaction is not null)
+        {
+            auditLogService.Stage(context, capturedByUserId, stokvel.Id, "ContributionPaymentCaptured", "MemberContribution", memberContribution.Id, $"Contribution payment captured for R {amountPaid:N2}.");
+            await context.SaveChangesAsync();
+        }
+        else
+        {
+            await auditLogService.RecordAsync(capturedByUserId, stokvel.Id, "ContributionPaymentCaptured", "MemberContribution", memberContribution.Id, $"Contribution payment captured for R {amountPaid:N2}.");
+        }
 
+        if (ownedTransaction is not null) await ownedTransaction.CommitAsync();
         return memberContribution;
     }
 
     public async Task<Dictionary<Guid, string?>> GetLatestCapturesByContributionIdsAsync(IEnumerable<Guid> contributionIds)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var ids = contributionIds.ToList();
 
         if (ids.Count == 0)
@@ -719,6 +804,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<List<ContributionPaymentAudit>> GetAuditTrailByContributionPaymentIdAsync(Guid contributionPaymentId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         return await context.ContributionPaymentAudits
             .Include(audit => audit.ContributionPayment)
                 .ThenInclude(contribution => contribution!.ContributionCycle)
@@ -732,6 +820,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<List<ContributionPaymentAudit>> GetAuditTrailByMemberIdAsync(Guid memberId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         return await context.ContributionPaymentAudits
             .Include(audit => audit.ContributionPayment)
                 .ThenInclude(contribution => contribution!.ContributionCycle)
@@ -747,6 +838,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
     public async Task<List<ContributionPaymentAudit>> GetAuditTrailByStokvelIdAsync(Guid stokvelId, int take = 100)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         return await context.ContributionPaymentAudits
             .Include(audit => audit.ContributionPayment)
                 .ThenInclude(contribution => contribution!.ContributionCycle)
@@ -759,16 +853,6 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
             .ToListAsync();
     }
 
-    private static PaymentStatus GetEffectivePaymentStatus(PaymentStatus status, DateTime dueDate)
-    {
-        if (dueDate < DateTime.Today && status is PaymentStatus.Unpaid or PaymentStatus.PartiallyPaid)
-        {
-            return PaymentStatus.Late;
-        }
-
-        return status;
-    }
-
     private static string GetAuditStatusText(PaymentStatus status)
     {
         return status == PaymentStatus.Late ? "Overdue" : status.ToString();
@@ -777,6 +861,9 @@ public class ContributionPaymentService(ApplicationDbContext context, MemberAcce
 
 public sealed class ContributionPaymentSummary
 {
+    public DateTime DueDate { get; set; }
+    public string StatusLabel => ContributionStatus.Label(Status, ExpectedAmount, Balance, DueDate);
+    public string StatusBadgeClass => ContributionStatus.BadgeClass(Status, ExpectedAmount, Balance, DueDate);
     public Guid Id { get; set; }
     public int ContributionYear { get; set; }
     public int ContributionMonth { get; set; }

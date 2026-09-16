@@ -79,7 +79,7 @@ public sealed class LegacyMigrationPromptTests : BunitContext
     {
         Services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(new TestDbContextFactory(db));
         Services.AddScoped(_ => db.CreateContext());
-        Services.AddScoped<MemberAccessService>();
+        Services.AddScoped<MemberAccessService>(sp => new(sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>()));
         Services.AddScoped<StokvelArchetypeConfigurationService>();
         Services.AddScoped<StokvelService>();
         Services.AddScoped<IEntitlementUsageProvider, EntitlementUsageProvider>();
@@ -92,6 +92,69 @@ public sealed class LegacyMigrationPromptTests : BunitContext
             new TestAuthenticationStateProvider(new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, UserId)],
                 authenticationType: "Test"))));
+    }
+
+    [Fact]
+    public async Task DisposalDuringAuthenticationDoesNotResumePromptWork()
+    {
+        using var db = new SqliteTestDatabase();
+        SeedLegacyOfficeBearer(db);
+        ConfigureServices(db);
+        var auth = new TaskCompletionSource<AuthenticationState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Services.AddSingleton<AuthenticationStateProvider>(new DelayedAuthentication(auth.Task));
+        var component = Render<LegacyMigrationPrompt>();
+        await DisposeComponentsAsync();
+        auth.SetResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, UserId)], "Test"))));
+        await Renderer.Dispatcher.InvokeAsync(() => { });
+        Assert.Empty(JSInterop.Invocations);
+        Assert.False(Renderer.UnhandledException.IsCompleted);
+    }
+
+    [Fact]
+    public void PromptRerenderDoesNotLoadSessionTwice()
+    {
+        using var db = new SqliteTestDatabase();
+        SeedLegacyOfficeBearer(db); ConfigureServices(db);
+        JSInterop.Setup<string?>("sessionStorage.getItem", "sisonke-legacy-migration-deferred").SetResult("true");
+        var component = Render<LegacyMigrationPrompt>();
+        component.Render(); component.Render();
+        Assert.Single(JSInterop.Invocations);
+    }
+
+    [Fact]
+    public async Task AddFineLoadsCreatesAndCanBeMountedRepeatedly()
+    {
+        using var db = new SqliteTestDatabase();
+        SeedLegacyOfficeBearer(db); ConfigureServices(db);
+        Guid memberId;
+        using (var seed = db.CreateContext())
+        {
+            var member = seed.Members.Single(); member.DefaultRole = SisonkeRole.Treasurer; memberId = member.Id; seed.SaveChanges();
+        }
+        Services.AddScoped<AuditLogService>();
+        Services.AddSingleton<ILogger<AuditLogService>>(NullLogger<AuditLogService>.Instance);
+        Services.AddScoped<FineService>(sp => new(sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>(), sp.GetRequiredService<AuditLogService>()));
+        for (var i = 0; i < 3; i++)
+        {
+            var component = Render<Sisonke.Web.Components.Pages.Fines.AddFine>(p => p.Add(c => c.MemberId, memberId));
+            component.WaitForAssertion(() => Assert.NotEmpty(component.FindAll("#fine-type")));
+            if (i == 0)
+            {
+                using var check = db.CreateContext();
+                component.Find("#fine-type").Change(check.FineTypes.First().Id.ToString());
+                component.Find("#amount").Change("50");
+                component.Find("#reason").Change("Late Coming");
+                component.Find("form").Submit();
+                component.WaitForAssertion(() => Assert.Single(check.MemberFines.AsNoTracking()));
+            }
+            await DisposeComponentsAsync();
+        }
+        Assert.False(Renderer.UnhandledException.IsCompleted);
+    }
+
+    private sealed class DelayedAuthentication(Task<AuthenticationState> state) : AuthenticationStateProvider
+    {
+        public override Task<AuthenticationState> GetAuthenticationStateAsync() => state;
     }
 
     private static Guid SeedLegacyOfficeBearer(SqliteTestDatabase db)

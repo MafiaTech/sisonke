@@ -5,6 +5,7 @@
    chairperson/treasurer, with a share link. Rendered from MainLayout so it appears on first
    authenticated page load each session. *@
 @rendermode InteractiveServer
+@implements IDisposable
 @using System.Security.Claims
 @using Sisonke.Web.Data.Enums
 @using Sisonke.Web.Services
@@ -116,35 +117,35 @@
     private bool isOfficeBearer;
     private Guid legacyStokvelId;
     private string? legacyStokvelName;
+    private readonly CancellationTokenSource lifetime = new();
+    private CancellationToken disposalToken;
+    private bool initialized;
+    protected override void OnInitialized() => disposalToken = lifetime.Token;
+    public void Dispose()
+    {
+        if (disposalToken.IsCancellationRequested) return;
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
 
     private string ShareLink => NavigationManager.ToAbsoluteUri($"/register-stokvel/{legacyStokvelId}").ToString();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Deliberately NOT in OnInitializedAsync: this component is rendered from MainLayout as a
-        // sibling of @Body (the actual page). MemberAccessService is Scoped and holds a single
-        // ApplicationDbContext for the whole circuit (not an IDbContextFactory) — if this
-        // component's data load ran concurrently with the page's own OnInitializedAsync (which
-        // very often also calls MemberAccessService, e.g. StokvelDashboard.razor), both would
-        // race on the same DbContext instance and throw "A second operation was started on this
-        // context instance before a previous operation completed." Waiting for firstRender means
-        // this only runs once the entire initial render — including the page content — has
-        // already finished, so there is nothing left to race with. This also sidesteps needing
-        // the try/catch around JS interop below for anything other than defensive belt-and-braces,
-        // since JS interop is guaranteed available by the time OnAfterRenderAsync fires (unlike
-        // OnInitializedAsync during prerendering).
-        if (!firstRender)
+        // sessionStorage requires interactive rendering. Render timing is not a DbContext lock:
+        // all database work below uses independent operation contexts.
+        if (!firstRender || initialized || disposalToken.IsCancellationRequested) return;
+        initialized = true;
+        try
         {
-            return;
+            await LoadLegacyMigrationStateAsync();
+            if (!disposalToken.IsCancellationRequested) StateHasChanged();
         }
-
-        await LoadLegacyMigrationStateAsync();
-        StateHasChanged();
+        catch (OperationCanceledException) when (disposalToken.IsCancellationRequested) { }
     }
-
     private async Task LoadLegacyMigrationStateAsync()
     {
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().WaitAsync(disposalToken);
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
         {
@@ -154,10 +155,10 @@
         bool alreadyDeferred;
         try
         {
-            var deferred = await JsRuntime.InvokeAsync<string?>("sessionStorage.getItem", SessionStorageKey);
+            var deferred = await JsRuntime.InvokeAsync<string?>("sessionStorage.getItem", disposalToken, SessionStorageKey);
             alreadyDeferred = deferred == "true";
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
         {
             // Defensive — JS interop should be available here, but treat any failure as not-yet-deferred.
             alreadyDeferred = false;
@@ -168,7 +169,8 @@
             return;
         }
 
-        var memberships = await MemberAccessService.GetLinkedMembershipsForUserAsync(userId);
+        disposalToken.ThrowIfCancellationRequested();
+        var memberships = await MemberAccessService.GetLinkedMembershipsForUserAsync(userId).WaitAsync(disposalToken);
         var seenTenants = new HashSet<Guid>();
 
         foreach (var member in memberships)
@@ -178,21 +180,25 @@
                 continue;
             }
 
-            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId);
+            disposalToken.ThrowIfCancellationRequested();
+            var stokvel = await StokvelService.GetStokvelByTenantIdAsync(member.TenantId, disposalToken);
             if (stokvel is null)
             {
                 continue;
             }
 
-            var snapshot = await EntitlementService.GetSnapshotAsync(stokvel.Id);
+            disposalToken.ThrowIfCancellationRequested();
+            var snapshot = await EntitlementService.GetSnapshotAsync(stokvel.Id, disposalToken);
             if (snapshot.Status != SubscriptionStatus.LegacyUnsubscribed)
             {
                 continue;
             }
 
+            disposalToken.ThrowIfCancellationRequested();
             legacyStokvelId = stokvel.Id;
             legacyStokvelName = stokvel.Name;
-            isOfficeBearer = await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id);
+            isOfficeBearer = await MemberAccessService.IsOfficeBearerAsync(userId, stokvel.Id).WaitAsync(disposalToken);
+            disposalToken.ThrowIfCancellationRequested();
             showSubscriptionPrompt = true;
             break;
         }
@@ -200,7 +206,7 @@
 
     private async Task RemindMeLaterAsync()
     {
-        if (isProcessingPrompt)
+        if (isProcessingPrompt || disposalToken.IsCancellationRequested)
         {
             return;
         }
@@ -209,23 +215,27 @@
 
         try
         {
-            await JsRuntime.InvokeVoidAsync("sessionStorage.setItem", SessionStorageKey, "true");
+            await JsRuntime.InvokeVoidAsync("sessionStorage.setItem", disposalToken, SessionStorageKey, "true");
         }
-        catch (InvalidOperationException ex)
+        catch (OperationCanceledException) when (disposalToken.IsCancellationRequested) { }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
         {
             // Best-effort — if JS interop isn't available the prompt simply reappears next render.
             Logger.LogDebug(ex, "Could not persist legacy subscription prompt deferral for stokvel {StokvelId}.", legacyStokvelId);
         }
         finally
         {
-            showSubscriptionPrompt = false;
-            isProcessingPrompt = false;
+            if (!disposalToken.IsCancellationRequested)
+            {
+                showSubscriptionPrompt = false;
+                isProcessingPrompt = false;
+            }
         }
     }
 
     private async Task SelectPlanAsync()
     {
-        if (isProcessingPrompt)
+        if (isProcessingPrompt || disposalToken.IsCancellationRequested)
         {
             return;
         }
@@ -235,17 +245,18 @@
         try
         {
             showSubscriptionPrompt = false;
-            await JsRuntime.InvokeVoidAsync("sessionStorage.setItem", SessionStorageKey, "true");
-            NavigationManager.NavigateTo($"/register-stokvel/{legacyStokvelId}");
+            await JsRuntime.InvokeVoidAsync("sessionStorage.setItem", disposalToken, SessionStorageKey, "true");
+            if (!disposalToken.IsCancellationRequested) NavigationManager.NavigateTo($"/register-stokvel/{legacyStokvelId}");
         }
-        catch (InvalidOperationException ex)
+        catch (OperationCanceledException) when (disposalToken.IsCancellationRequested) { }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
         {
             Logger.LogDebug(ex, "Could not persist legacy subscription prompt selection for stokvel {StokvelId}.", legacyStokvelId);
-            NavigationManager.NavigateTo($"/register-stokvel/{legacyStokvelId}");
+            if (!disposalToken.IsCancellationRequested) NavigationManager.NavigateTo($"/register-stokvel/{legacyStokvelId}");
         }
         finally
         {
-            isProcessingPrompt = false;
+            if (!disposalToken.IsCancellationRequested) isProcessingPrompt = false;
         }
     }
 }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sisonke.Web.Data;
 
@@ -11,9 +12,11 @@ using Sisonke.Web.Data;
 namespace Sisonke.Web.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916090329_AddContributionPaymentProofs")]
+    partial class AddContributionPaymentProofs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -680,10 +683,7 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("MemberContributionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("MemberFineId")
+                    b.Property<Guid>("MemberContributionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("MemberId")
@@ -692,11 +692,6 @@ namespace Sisonke.Web.Data.Migrations
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
-
-                    b.Property<int>("ObligationType")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
 
                     b.Property<DateTime>("PaymentDate")
                         .HasColumnType("datetime2");
@@ -744,11 +739,7 @@ namespace Sisonke.Web.Data.Migrations
 
                     b.HasIndex("MemberContributionId")
                         .IsUnique()
-                        .HasFilter("[Status] = 1 AND [MemberContributionId] IS NOT NULL");
-
-                    b.HasIndex("MemberFineId")
-                        .IsUnique()
-                        .HasFilter("[Status] = 1 AND [MemberFineId] IS NOT NULL");
+                        .HasFilter("[Status] = 1");
 
                     b.HasIndex("MemberId");
 
@@ -764,10 +755,7 @@ namespace Sisonke.Web.Data.Migrations
 
                     b.HasIndex("TenantId", "StokvelId", "Status", "SubmittedAt");
 
-                    b.ToTable("ContributionPaymentSubmissions", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_PaymentSubmission_Obligation", "([ObligationType] = 1 AND [MemberContributionId] IS NOT NULL AND [MemberFineId] IS NULL) OR ([ObligationType] = 2 AND [MemberFineId] IS NOT NULL AND [MemberContributionId] IS NULL AND [PaymentId] IS NULL)");
-                        });
+                    b.ToTable("ContributionPaymentSubmissions");
                 });
 
             modelBuilder.Entity("Sisonke.Web.Data.Entities.ContributionRule", b =>
@@ -4904,12 +4892,8 @@ namespace Sisonke.Web.Data.Migrations
                     b.HasOne("Sisonke.Web.Data.Entities.MemberContribution", "MemberContribution")
                         .WithMany()
                         .HasForeignKey("MemberContributionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Sisonke.Web.Data.Entities.MemberFine", "MemberFine")
-                        .WithMany()
-                        .HasForeignKey("MemberFineId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Sisonke.Web.Data.Entities.Member", "Member")
                         .WithMany()
@@ -4937,8 +4921,6 @@ namespace Sisonke.Web.Data.Migrations
                     b.Navigation("Member");
 
                     b.Navigation("MemberContribution");
-
-                    b.Navigation("MemberFine");
 
                     b.Navigation("Payment");
 

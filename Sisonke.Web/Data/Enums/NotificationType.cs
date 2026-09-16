@@ -18,5 +18,11 @@ public enum NotificationType
     PlanChanged = 14,
     SubscriptionCancelled = 15,
     UsageWarning = 16,
-    LegacyMigrationReminder = 17
+    LegacyMigrationReminder = 17,
+    ContributionPaymentProofSubmitted = 18,
+    ContributionPaymentProofApproved = 19,
+    ContributionPaymentProofRejected = 20,
+    MemberPaymentProofSubmitted = 21,
+    MemberPaymentProofApproved = 22,
+    MemberPaymentProofRejected = 23
 }

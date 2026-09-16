@@ -62,6 +62,10 @@ public sealed class NotificationEmailTemplateRenderer(
     {
         return type switch
         {
+            NotificationType.ContributionPaymentProofSubmitted or NotificationType.MemberPaymentProofSubmitted when stokvelId.HasValue =>
+                new NotificationCta($"/treasurer-tasks/{stokvelId.Value}#payment-proofs", "Review payment proof"),
+            NotificationType.ContributionPaymentProofApproved or NotificationType.ContributionPaymentProofRejected or NotificationType.MemberPaymentProofApproved or NotificationType.MemberPaymentProofRejected =>
+                new NotificationCta("/my-workspace", "View my payments"),
             NotificationType.MinutesPublished =>
                 new NotificationCta($"/meeting-minutes/{entityId}", "View minutes"),
             NotificationType.MeetingReminder =>

@@ -1,0 +1,102 @@
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sisonke.Web.Data.Entities
+@using Sisonke.Web.Services
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MemberPaymentSubmissionService Submissions
+@inject ILogger<TreasurerPaymentProofs> Logger
+
+<section class="sisonke-card mb-4" id="payment-proofs">
+    <div class="sisonke-card-body">
+        <h2>Payment verification queue</h2>
+        <p>Check the proof against money received before approving. Approval records payment against the identified obligation.</p>
+        @if (error is not null) { <div class="sisonke-alert sisonke-alert-gold" role="alert">@error</div> }
+        @if (message is not null) { <div class="sisonke-alert sisonke-alert-green" role="status">@message</div> }
+        <button class="sisonke-btn sisonke-btn-outline mb-3" disabled="@busy" @onclick="RefreshAsync">Refresh proofs</button>
+        @if (pending.Count == 0 && error is null) { <p>No proofs awaiting verification.</p> }
+        <div class="table-responsive">
+            <table class="sisonke-table">
+                <thead><tr><th>Member / payment for</th><th>Payment type</th><th>Current outstanding</th><th>Submitted</th><th>Payment date / reference</th><th>Submitted date</th><th>Status / proof</th><th>Actions</th></tr></thead>
+                <tbody>
+                @foreach (var item in pending)
+                {
+                    <tr>
+                        <td>@item.Member.FullName<div class="text-muted">@item.PaymentFor</div></td>
+                        <td>@item.ObligationType</td><td>R @item.Outstanding.ToString("N2")</td><td>R @item.Amount.ToString("N2")</td>
+                        <td>@item.PaymentDate.ToString("dd MMM yyyy")<div>@item.PaymentReference</div></td><td>@item.SubmittedAt.ToString("dd MMM yyyy HH:mm") UTC</td>
+                        <td>Awaiting Treasurer verification
+                            @foreach (var doc in item.Documents) { <div><a href="@($"/api/payment-proofs/{StokvelId}/{doc.Id}")" target="_blank" rel="noopener">View Proof</a></div> }
+                            @if (!string.IsNullOrWhiteSpace(item.Notes)) { <details><summary>Notes</summary>@item.Notes</details> }
+                        </td>
+                        <td><div class="d-flex flex-wrap gap-2">
+                            <button class="sisonke-btn sisonke-btn-primary" disabled="@busy" @onclick="() => ReviewAsync(item.Id, false)">Approve</button>
+                            <button class="sisonke-btn sisonke-btn-outline" disabled="@busy" @onclick="() => SelectReject(item.Id)">Reject</button>
+                        </div></td>
+                    </tr>
+                    @if (rejectId == item.Id)
+                    {
+                        <tr><td colspan="8"><label for="proof-rejection" class="form-label">Rejection reason (required)</label>
+                            <textarea id="proof-rejection" class="form-control" maxlength="1000" @bind="reason" disabled="@busy"></textarea>
+                            <button class="sisonke-btn sisonke-btn-outline mt-2" disabled="@busy" @onclick="() => ReviewAsync(item.Id, true)">Confirm rejection</button>
+                            <button class="sisonke-btn sisonke-btn-outline mt-2" disabled="@busy" @onclick="() => rejectId = null">Cancel</button>
+                        </td></tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter] public Guid StokvelId { get; set; }
+    [Parameter] public EventCallback<int> PendingCountChanged { get; set; }
+    private List<ContributionPaymentSubmission> pending = [];
+    private string userId = "", reason = "";
+    private string? error, message;
+    private Guid? rejectId;
+    private bool busy;
+    private Guid? loadedStokvelId;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedStokvelId == StokvelId) return;
+        loadedStokvelId = StokvelId;
+        pending = []; rejectId = null; message = null;
+        userId = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        await RefreshAsync();
+    }
+    private async Task LoadAsync()
+    {
+        pending = await Submissions.GetPendingAsync(userId, StokvelId);
+        await PendingCountChanged.InvokeAsync(pending.Count);
+    }
+    private async Task RefreshAsync()
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await LoadAsync(); } catch (Exception ex) { ShowError(ex); }
+        finally { busy = false; }
+    }
+    private void SelectReject(Guid id) { rejectId = id; reason = ""; }
+    private async Task ReviewAsync(Guid id, bool reject)
+    {
+        if (busy) return;
+        busy = true; error = null; message = null;
+        try
+        {
+            if (reject) await Submissions.RejectAsync(userId, StokvelId, id, reason);
+            else await Submissions.ApproveAsync(userId, StokvelId, id);
+            rejectId = null;
+            message = reject ? "Proof rejected. The obligation is unchanged." : "Payment verified and recorded.";
+            await LoadAsync();
+        }
+        catch (Exception ex) { ShowError(ex); }
+        finally { busy = false; }
+    }
+    private void ShowError(Exception ex)
+    {
+        Logger.LogWarning(ex, "Payment proof review failed for stokvel {StokvelId}", StokvelId);
+        error = ex is InvalidOperationException ? ex.Message : "Unable to review this proof. Check your access, then refresh to check its current status.";
+    }
+}
+

@@ -1,0 +1,6 @@
+@using Sisonke.Web.Components.Payments
+<MemberPaymentPanel StokvelId="StokvelId" BalancesRefreshed="BalancesRefreshed" />
+@code {
+    [Parameter] public Guid StokvelId { get; set; }
+    [Parameter] public EventCallback BalancesRefreshed { get; set; }
+}

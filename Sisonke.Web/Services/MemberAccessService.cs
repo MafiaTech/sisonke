@@ -5,8 +5,15 @@ using Sisonke.Web.Data.Enums;
 
 namespace Sisonke.Web.Services;
 
-public class MemberAccessService(ApplicationDbContext context)
+public class MemberAccessService(IDbContextFactory<ApplicationDbContext> dbFactory)
 {
+    private readonly ApplicationDbContext? transactionContext;
+    // Explicit short-lived transaction/legacy callers only. DI uses the factory constructor.
+    public MemberAccessService(ApplicationDbContext context) : this((IDbContextFactory<ApplicationDbContext>)null!)
+    {
+        transactionContext = context;
+    }
+
     private static bool IsOfficeBearerRole(string? role)
     {
         return role?.Trim().Equals("Chairperson", StringComparison.OrdinalIgnoreCase) == true ||
@@ -155,6 +162,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<Member?> GetLinkedMemberForUserAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return null;
@@ -185,6 +195,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<List<Member>> GetLinkedMembershipsForUserAsync(string userId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return [];
@@ -211,6 +224,9 @@ public class MemberAccessService(ApplicationDbContext context)
     /// </summary>
     public async Task<List<Member>> GetOfficeBearersAsync(Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var stokvel = await context.Stokvels
             .Where(existingStokvel => existingStokvel.Id == stokvelId)
             .OrderBy(existingStokvel => existingStokvel.CreatedAt)
@@ -277,6 +293,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanViewOwnMemberProfileAsync(string userId, Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -288,6 +307,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanManageOwnDependentsAsync(string userId, Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
             return false;
 
@@ -309,6 +331,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanViewMemberProfileAsync(string userId, Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -337,6 +362,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<Guid?> GetStokvelIdForMemberAsync(Guid memberId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         var member = await context.Members
             .Where(existingMember => existingMember.Id == memberId)
             .OrderBy(existingMember => existingMember.CreatedAt)
@@ -390,6 +418,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanMakeDisciplinaryDecisionAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -434,6 +465,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanManageMinutesAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -467,6 +501,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanApproveMinutesAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;
@@ -499,6 +536,9 @@ public class MemberAccessService(ApplicationDbContext context)
 
     public async Task<bool> CanViewApprovedMinutesAsync(string userId, Guid stokvelId)
     {
+        await using var operation = await DbContextOperation.OpenAsync(dbFactory, transactionContext);
+        var context = operation.Context;
+
         if (string.IsNullOrWhiteSpace(userId))
         {
             return false;

@@ -155,12 +155,10 @@ else
                         </div>
                     }
 
-                    <!-- TODO: wire to per-member contribution history when ContributionService.GetMemberContributionsAsync is available -->
-                    <p class="sm-section-label" style="margin-top:12px;">Payment History</p>
-                    <div class="sm-empty" style="padding:16px 0;">
-                        <span class="sm-empty-icon" style="font-size:20px;">📊</span>
-                        <p class="sm-empty-text" style="font-size:12px;">Payment history coming soon.</p>
-                    </div>
+                    @if (stokvel is not null && !stokvel.EnableRotation)
+                    {
+                        <Sisonke.Web.Components.Pages.Contributions.MemberPaymentProofs StokvelId="stokvel.Id" />
+                    }
                 </div>
             </div>
 
@@ -291,43 +289,12 @@ else
                         </div>
                     }
 
-                    @if (fines.Count > 0)
+                    @if (stokvel is not null)
                     {
-                        <div class="sm-divider"></div>
-                        @foreach (var fine in fines.Take(4))
-                        {
-                            <div class="sm-fine-item">
-                                <div class="sm-fine-icon @(fine.Status == FineStatus.Paid ? "sm-fine-icon-paid" : "")">
-                                    @if (fine.Status == FineStatus.Paid)
-                                    {
-                                        <i class="bi bi-check-lg"></i>
-                                    }
-                                    else
-                                    {
-                                        <i class="bi bi-exclamation-lg"></i>
-                                    }
-                                </div>
-                                <div class="sm-fine-info">
-                                    <div class="sm-fine-reason">@fine.Reason</div>
-                                    <div class="sm-fine-date">@fine.FineDate.ToString("d MMM yyyy")</div>
-                                </div>
-                                <div>
-                                    <div class="sm-fine-amount">R @fine.Amount.ToString("N0")</div>
-                                    @if (fine.Status == FineStatus.Paid)
-                                    {
-                                        <div style="text-align:right;"><span class="sm-badge sm-badge-green" style="font-size:10px;">Paid</span></div>
-                                    }
-                                    else
-                                    {
-                                        <div style="text-align:right;"><span class="sm-badge sm-badge-red" style="font-size:10px;">Unpaid</span></div>
-                                    }
-                                </div>
-                            </div>
-                        }
+                        <Sisonke.Web.Components.Payments.MemberPaymentPanel StokvelId="stokvel.Id" ObligationType="PaymentObligationType.Fine" BalancesRefreshed="RefreshFinesAsync" />
                     }
                 </div>
             </div>
-
             <!-- Card: My Profile Summary -->
             <div class="sm-card sm-fade-up">
                 <div class="sm-card-head">
@@ -523,6 +490,7 @@ else
     private Member? member;
     private Stokvel? stokvel;
     private ContributionRule? contributionRule;
+    private async Task RefreshFinesAsync() => fines = await FineService.GetMemberFinesAsync(MemberId);
     private List<MemberFine> fines = [];
     private List<Meeting> upcomingMeetings = [];
     private Dictionary<Guid, AttendanceStatus?> myAttendanceByMeeting = new();

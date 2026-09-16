@@ -314,9 +314,9 @@ public class StokvelService(
         return (true, null);
     }
 
-    public async Task<Stokvel?> GetStokvelByTenantIdAsync(Guid tenantId)
+    public async Task<Stokvel?> GetStokvelByTenantIdAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        await using var context = await dbFactory.CreateDbContextAsync();
+        await using var context = await dbFactory.CreateDbContextAsync(cancellationToken);
 
         return await context.Stokvels
             .Include(stokvel => stokvel.Tenant)
@@ -324,7 +324,7 @@ public class StokvelService(
                 stokvel.TenantId == tenantId &&
                 stokvel.IsActive)
             .OrderBy(stokvel => stokvel.Name)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<TenantSubscription?> GetActiveSubscriptionByStokvelIdAsync(Guid stokvelId)
