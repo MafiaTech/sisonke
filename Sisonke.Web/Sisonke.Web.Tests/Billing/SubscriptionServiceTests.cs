@@ -84,6 +84,29 @@ public class SubscriptionServiceTests
     }
 
     [Fact]
+    public async Task CompleteCardAuthorisationAsync_MismatchedVerifiedAmount_IsRejectedWithoutTrialOrSubscription()
+    {
+        using var harness = new SubscriptionServiceTestHarness();
+        await harness.Entitlements.SeedCatalogueAsync();
+        var (stokvelId, adminUserId, _) = await SeedStokvelWithMembersAsync(harness);
+        await harness.Sut.SelectPlanAsync(stokvelId, PlanCodes.Growing, "v1", adminUserId);
+        await harness.Sut.BeginCardAuthorisationAsync(stokvelId, "chair@example.com", "Jane Chair", null, "https://app.sisonke/callback");
+        harness.BillingProvider.VerificationToReturn = harness.BillingProvider.VerificationToReturn with { AmountMinorUnits = 999 };
+
+        var result = await harness.Sut.CompleteCardAuthorisationAsync(stokvelId, "ref-1");
+
+        Assert.False(result.Success);
+        Assert.Empty(harness.BillingProvider.RefundedReferences);
+        Assert.Equal(0, harness.BillingProvider.CreateSubscriptionCalls);
+        await using var context = harness.Entitlements.CreateContext();
+        var subscription = await context.OrganisationSubscriptions.SingleAsync(value => value.StokvelId == stokvelId);
+        Assert.Equal(SubscriptionStatus.PendingPaymentMethod, subscription.Status);
+        Assert.False(subscription.TrialOptedIn);
+        Assert.Empty(await context.SubscriptionPaymentMethods.ToListAsync());
+        Assert.Empty(await context.SubscriptionPayments.ToListAsync());
+    }
+
+    [Fact]
     public async Task ChangePlanAsync_DowngradeOverCapacity_IsBlockedWithSpecificMessage()
     {
         using var harness = new SubscriptionServiceTestHarness();

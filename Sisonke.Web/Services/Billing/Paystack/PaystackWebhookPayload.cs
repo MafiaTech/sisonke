@@ -63,11 +63,24 @@ public sealed class PaystackWebhookPayload
     public string? Status => GetString(Data, "status");
     public string? EmailToken => GetString(Data, "email_token");
     public decimal? AmountMinorUnits => GetDecimal(Data, "amount");
+    public string? Currency => GetString(Data, "currency");
     public DateTime? NextPaymentDate => GetDateTime(Data, "next_payment_date");
     public DateTime? PeriodStart => GetDateTime(Data, "period_start");
     public DateTime? PeriodEnd => GetDateTime(Data, "period_end");
-    public string? InvoiceCode => GetRawValue(Data, "id");
+    public string? InvoiceCode => GetString(Data, "invoice_code") ?? GetRawValue(Data, "id");
     public string? TransactionReference => GetString(Data, "transaction", "reference") ?? GetString(Data, "reference");
+
+    /// <summary>
+    /// Minimal payload retained after terminal processing. The signed raw body is needed while
+    /// an event is retryable, but must not become a permanent store of authorization tokens,
+    /// card metadata or customer details.
+    /// </summary>
+    public string CreateSafeDiagnosticJson() => JsonSerializer.Serialize(new
+    {
+        @event = EventType ?? "unknown",
+        provider_reference = Reference ?? TransactionReference,
+        status = Status
+    });
 
     private static string? GetString(JsonElement element, string property)
     {

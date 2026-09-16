@@ -62,6 +62,7 @@ public sealed class BillingWebhookProcessor(
                 break;
 
             case PaystackWebhookEventTypes.RefundPending:
+            case PaystackWebhookEventTypes.RefundProcessing:
             case PaystackWebhookEventTypes.RefundProcessed:
             case PaystackWebhookEventTypes.RefundFailed:
                 await HandleRefundAsync(context, webhookEvent.EventType, payload, ct);
@@ -78,6 +79,16 @@ public sealed class BillingWebhookProcessor(
 
     private async Task HandleChargeSuccessAsync(ApplicationDbContext context, PaystackWebhookPayload payload, CancellationToken ct)
     {
+        // A successful R1 card-verification transaction is payment-method setup, not a Sisonke
+        // subscription fee. It is verified server-side by the callback and refunded; it must
+        // never create SubscriptionPayment history or move Trialing to Active, regardless of
+        // whether its webhook wins the callback race.
+        if (IsPaymentSetupReference(payload.Reference))
+        {
+            logger.LogInformation("Ignoring Paystack charge.success for a payment-method setup transaction.");
+            return;
+        }
+
         var subscription = await FindSubscriptionAsync(context, payload, ct);
         if (subscription is null)
         {
@@ -91,6 +102,23 @@ public sealed class BillingWebhookProcessor(
             return;
         }
 
+        if (subscription.SubscriptionPlan is null)
+        {
+            logger.LogWarning("charge.success could not be reconciled because subscription {SubscriptionId} has no plan.", subscription.Id);
+            return;
+        }
+
+        var expectedAmountMinorUnits = (long)Math.Round(
+            subscription.SubscriptionPlan.MonthlyPrice * 100m, MidpointRounding.AwayFromZero);
+        if (payload.AmountMinorUnits != expectedAmountMinorUnits ||
+            !string.Equals(payload.Currency, "ZAR", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning(
+                "Ignoring Paystack charge.success whose amount or currency does not match subscription {SubscriptionId}.",
+                subscription.Id);
+            return;
+        }
+
         var existingPayment = await context.SubscriptionPayments
             .SingleOrDefaultAsync(p => p.ProviderReference == payload.Reference, ct);
 
@@ -101,6 +129,20 @@ public sealed class BillingWebhookProcessor(
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
+        if (subscription.CurrentPeriodStartedAt is { } currentPeriodStart &&
+            subscription.CurrentPeriodEndsAt is { } currentPeriodEnd &&
+            now >= currentPeriodStart && now < currentPeriodEnd &&
+            await context.SubscriptionPayments.AnyAsync(p =>
+                p.OrganisationSubscriptionId == subscription.Id &&
+                p.Status == SubscriptionPaymentStatus.Succeeded &&
+                p.PaidAt >= currentPeriodStart && p.PaidAt < currentPeriodEnd, ct))
+        {
+            logger.LogWarning(
+                "Ignoring a second successful Paystack charge for subscription {SubscriptionId} in the same billing period.",
+                subscription.Id);
+            return;
+        }
+
         var invoice = await FindLatestOpenInvoiceAsync(context, subscription.Id, ct);
         var wasInDunning = subscription.DunningStartedAt is not null;
 
@@ -136,6 +178,13 @@ public sealed class BillingWebhookProcessor(
         subscription.LastSuccessfulPaymentAt = now;
         subscription.DunningStartedAt = null;
         subscription.GracePeriodEndsAt = null;
+        subscription.CurrentPeriodStartedAt = invoice?.PeriodStart ?? now;
+        subscription.CurrentPeriodEndsAt = invoice?.PeriodEnd ?? now.AddMonths(1);
+        subscription.NextBillingAt = subscription.CurrentPeriodEndsAt;
+        // Makes concurrent differently-referenced charges contend on the subscription's
+        // optimistic concurrency token. A loser rolls back its payment insert and is safely
+        // re-evaluated against the period guard on retry.
+        subscription.RowVersion = Guid.NewGuid().ToByteArray();
 
         var plan = subscription.SubscriptionPlan;
 
@@ -172,6 +221,10 @@ public sealed class BillingWebhookProcessor(
             }
         }
     }
+
+    private static bool IsPaymentSetupReference(string? reference) =>
+        reference?.StartsWith("sisonke-setup-", StringComparison.Ordinal) == true ||
+        reference?.StartsWith("sisonke-auth-", StringComparison.Ordinal) == true;
 
     private async Task HandleInvoiceCreateAsync(ApplicationDbContext context, PaystackWebhookPayload payload, CancellationToken ct)
     {

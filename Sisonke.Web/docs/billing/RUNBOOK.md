@@ -14,12 +14,14 @@ convention. **Secrets are never committed to source control** — `appsettings.j
 
 | Section | Key | Purpose | Secret? |
 |---|---|---|---|
-| `Paystack` | `SecretKey` | Paystack API bearer token | **Yes** — Key Vault / App Service config only |
-| `Paystack` | `WebhookSecret` | HMAC-SHA512 key verifying inbound webhook signatures | **Yes** |
+| `SubscriptionPayments` | `DefaultProvider` | Provider used when a subscription has none; default `Paystack` | No |
+| `SubscriptionPayments` | `TestMode` | When true, Paystack setup requires an `sk_test_` key and a verified `domain=test` transaction | No |
+| `Paystack` | `SecretKey` | Paystack API bearer token and HMAC-SHA512 webhook signing key | **Yes** — Key Vault / App Service config only |
+| `Paystack` | `WebhookSecret` | Legacy unused property retained for configuration compatibility; Paystack does not issue a separate webhook signing secret | Do not configure |
 | `Paystack` | `PublicKey` | Safe to expose client-side; unused server-side today (card entry is Paystack-hosted) | No |
 | `Paystack` | `BaseUrl` | Paystack API base (default `https://api.paystack.co`) | No |
 | `Paystack` | `Currency` | Default `ZAR` | No |
-| `Paystack` | `TrialDays` | Default `60` — drives every trial-length calculation across onboarding, pricing, and jobs | No |
+| `Paystack` | `TrialDays` | Legacy option retained at default `60`; current trial lifecycle uses the centralized 60-day business rule | No |
 | `Paystack` | `CardVerificationAmountMinorUnits` | Default `100` (R1.00) — real charge-then-refund used to capture a reusable authorisation | No |
 | `Entitlements` | `LegacyGraceCutoverUtc` | Date legacy (`LegacyUnsubscribed`) organisations lose grace access and fall to the `NoSubscription` deny path. Defaults to `DateTime.MaxValue` (never expires) — **must be set explicitly** before the cutover is meant to bite | No |
 | `Entitlements` | `LegacyEquivalentPlanCode` | Plan code legacy orgs are evaluated against during grace (default `GROWING`) | No |
@@ -35,30 +37,30 @@ multi-instance Azure App Service deployment, confirm Data Protection keys are pe
 shared location (Azure Blob Storage / Key Vault) — if keys aren't shared across instances,
 download links issued by one instance will fail validation on another.
 
-Startup fails fast (outside Development) if `Paystack:WebhookSecret` is unset — see `Program.cs`.
+Startup fails fast (outside Development) if `Paystack:SecretKey` is unset — see `Program.cs`.
 
 ## 2. Webhook URL registration
 
 - **Endpoint:** `POST /api/billing/webhooks/paystack` (anonymous at the ASP.NET Core level —
-  authentication is the HMAC-SHA512 signature check against `Paystack:WebhookSecret`, not a
+  authentication is the HMAC-SHA512 signature check against `Paystack:SecretKey`, not a
   Sisonke user session).
 - Register this URL (`https://<your-domain>/api/billing/webhooks/paystack`) in the Paystack
   dashboard under Settings → API Keys & Webhooks.
 - Subscribe to at minimum: `charge.success`, `invoice.create`, `invoice.update`,
   `invoice.payment_failed`, `subscription.create`, `subscription.disable`, and the refund events
-  (`refund.pending`, `refund.processed`, `refund.failed`).
-- **Two event names are unverified** (flagged since Phase 3, still unresolved):
-  `PaystackWebhookEventTypes.cs` guesses at the "subscription not renewing" event name and
-  whether `subscription.enable` exists. Use Paystack's dashboard "Send test webhook" feature to
-  confirm the exact strings before relying on either — a wrong string just means that event is
-  silently recorded as `Ignored`, not a processing error.
+  (`refund.pending`, `refund.processing`, `refund.processed`, `refund.failed`).
+- The official Paystack webhook/subscription documentation confirms
+  `subscription.not_renew` and `subscription.expiring_cards`; no `subscription.enable` event is
+  used. Compare signed test-mode deliveries with these mappings before live charging is enabled.
 
 ## 3. How to replay a webhook
 
-Every inbound webhook is recorded in `BillingWebhookEvents` (`Provider`, `ProviderEventId`,
-`EventType`, `RawPayload`, `SignatureValid`, `ProcessingStatus`, `ErrorMessage`) **before**
-processing — the handler always returns `200` fast so Paystack doesn't retry on its own schedule
-once the row exists (see `PaystackWebhookEndpoint` in `Program.cs`).
+Every signature-valid webhook is recorded in `BillingWebhookEvents` (`Provider`,
+`ProviderEventId`, `EventType`, `RawPayload`, `SignatureValid`, `ProcessingStatus`,
+`ErrorMessage`) **before** processing. The signed raw body is retained only while processing is
+retryable; terminal rows retain a safe diagnostic summary rather than authorization/card/customer
+payload data. Invalid signatures are rejected and not persisted. The handler returns `200` fast
+for accepted events and replays (see `PaystackWebhookEndpoint` in `Program.cs`).
 
 To replay a webhook that failed processing (`ProcessingStatus = Failed`) or that never got a
 chance to process:

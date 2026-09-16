@@ -20,7 +20,7 @@ public sealed class NetcashPaymentSetupProvider(NetcashOptions options) : ISubsc
         Task.FromResult(PaymentSetupResult.Unavailable(Provider,
             "Choose DebiCheck on the Billing & Subscription page to submit a mandate."));
 
-    public Task<PaymentMethodStatusResult> GetPaymentMethodStatusAsync(string providerReference, CancellationToken ct = default) =>
+    public Task<PaymentMethodStatusResult> GetPaymentMethodStatusAsync(PaymentMethodStatusRequest request, CancellationToken ct = default) =>
         Task.FromResult(new PaymentMethodStatusResult(
             false, Provider, SubscriptionPaymentMethodType.Unknown, MandateStatus.None,
             null, null, false, null, null, null, null, null, null,

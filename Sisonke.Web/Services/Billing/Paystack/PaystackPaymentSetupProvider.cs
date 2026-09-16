@@ -7,12 +7,18 @@ namespace Sisonke.Web.Services.Billing.Paystack;
 public sealed class PaystackPaymentSetupProvider(
     IBillingProvider billingProvider,
     PaystackOptions options,
+    SubscriptionPaymentOptions subscriptionPaymentOptions,
     ILogger<PaystackPaymentSetupProvider> logger) : ISubscriptionPaymentProvider
 {
     public SubscriptionProvider Provider => SubscriptionProvider.Paystack;
     public string DisplayName => "Paystack";
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(options.SecretKey);
-    public string UnavailableMessage => "Payment setup is not configured in this environment.";
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(options.SecretKey) &&
+        (!subscriptionPaymentOptions.TestMode || options.SecretKey.StartsWith("sk_test_", StringComparison.Ordinal));
+    public string UnavailableMessage => subscriptionPaymentOptions.TestMode &&
+        !string.IsNullOrWhiteSpace(options.SecretKey) &&
+        !options.SecretKey.StartsWith("sk_test_", StringComparison.Ordinal)
+            ? "Payment setup requires a Paystack test key in this environment."
+            : "Payment setup is not configured in this environment.";
 
     public async Task<PaymentSetupResult> StartPaymentMethodSetupAsync(PaymentSetupRequest request, CancellationToken ct = default)
     {
@@ -43,7 +49,8 @@ public sealed class PaystackPaymentSetupProvider(
         }
     }
 
-    public async Task<PaymentMethodStatusResult> GetPaymentMethodStatusAsync(string providerReference, CancellationToken ct = default)
+    public async Task<PaymentMethodStatusResult> GetPaymentMethodStatusAsync(
+        PaymentMethodStatusRequest request, CancellationToken ct = default)
     {
         if (!IsConfigured)
         {
@@ -52,7 +59,7 @@ public sealed class PaystackPaymentSetupProvider(
 
         try
         {
-            var verified = await billingProvider.VerifyAuthorisationAsync(providerReference, ct);
+            var verified = await billingProvider.VerifyAuthorisationAsync(request.ProviderReference, ct);
             if (!verified.Success || string.IsNullOrWhiteSpace(verified.AuthorizationCode))
             {
                 return Failed("Payment method setup could not be verified.");
@@ -63,18 +70,38 @@ public sealed class PaystackPaymentSetupProvider(
                 return Failed("This card cannot be used for recurring billing. Please use another payment method.");
             }
 
+            if (!string.Equals(verified.Reference, request.ProviderReference, StringComparison.Ordinal) ||
+                verified.AmountMinorUnits != options.CardVerificationAmountMinorUnits ||
+                !string.Equals(verified.Currency, options.Currency, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(verified.Channel, "card", StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(request.ExpectedBillingEmail) &&
+                 !string.Equals(verified.CustomerEmail, request.ExpectedBillingEmail, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(request.ExpectedCustomerReference) &&
+                 !string.Equals(verified.CustomerCode, request.ExpectedCustomerReference, StringComparison.Ordinal)))
+            {
+                logger.LogWarning("Paystack payment setup verification did not match the server-side setup expectations.");
+                return Failed("Payment method setup details did not match the original request.", "verification_mismatch");
+            }
+
+            if (subscriptionPaymentOptions.TestMode &&
+                !string.Equals(verified.Domain, "test", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning("Paystack returned a non-test transaction while subscription payment test mode is enabled.");
+                return Failed("Payment method setup was not completed in Paystack test mode.", "not_test_mode");
+            }
+
             try
             {
-                await billingProvider.RefundTransactionAsync(providerReference, ct);
+                await billingProvider.RefundTransactionAsync(request.ProviderReference, ct);
             }
             catch (Exception ex) when (ex is PaystackApiException or HttpRequestException or TaskCanceledException)
             {
-                logger.LogError(ex, "Paystack verification refund requires attention for reference {Reference}.", providerReference);
+                logger.LogError(ex, "Paystack verification refund requires attention for the verified setup transaction.");
             }
 
             return new(
                 true, Provider, SubscriptionPaymentMethodType.Card, MandateStatus.Active,
-                verified.AuthorizationCode, providerReference, true,
+                verified.AuthorizationCode, request.ProviderReference, true,
                 string.IsNullOrWhiteSpace(verified.Last4) ? "Card on file" : $"Card ending {verified.Last4}",
                 verified.CardBrand, verified.Last4, verified.ExpiryMonth, verified.ExpiryYear,
                 verified.Bank, null, null);
@@ -89,9 +116,9 @@ public sealed class PaystackPaymentSetupProvider(
     public bool IsPaymentReady(SubscriptionPaymentMethod method) =>
         method.Provider == Provider && SubscriptionPaymentReadiness.IsReady(method);
 
-    private PaymentMethodStatusResult Failed(string message) => new(
+    private PaymentMethodStatusResult Failed(string message, string errorCode = "setup_failed") => new(
         false, Provider, SubscriptionPaymentMethodType.Unknown, MandateStatus.Failed,
-        null, null, false, null, null, null, null, null, null, "setup_failed", message);
+        null, null, false, null, null, null, null, null, null, errorCode, message);
 
     private static string DescribeFailure(Exception ex) =>
         ex is PaystackApiException { StatusCode: 401 or 403 }

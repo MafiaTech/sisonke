@@ -79,6 +79,10 @@ public sealed class PaymentSetupServiceTests : IDisposable
         Assert.Equal("safe-provider-token", method.ProviderPaymentMethodReference);
         Assert.Equal(provider.LastRequest.CorrelationReference, method.ProviderMandateReference);
         Assert.Equal(1, await verify.SubscriptionPaymentMethods.CountAsync());
+        Assert.Equal(0, await verify.SubscriptionPayments.CountAsync());
+        var unchangedSubscription = await verify.OrganisationSubscriptions.SingleAsync(value => value.Id == method.OrganisationSubscriptionId);
+        Assert.Equal(SubscriptionStatus.Trialing, unchangedSubscription.Status);
+        Assert.True(unchangedSubscription.TrialOptedIn);
     }
 
     [Fact]
@@ -136,6 +140,48 @@ public sealed class PaymentSetupServiceTests : IDisposable
         Assert.Contains("not configured", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ReplacingPaymentMethod_RetainsHistorySubscriptionAndTrialDates_WithoutCharging()
+    {
+        var seeded = await SeedAsync();
+        DateTime? originalTrialStart;
+        DateTime? originalTrialEnd;
+        Guid subscriptionId;
+        await using (var before = database.CreateContext())
+        {
+            var subscription = await before.OrganisationSubscriptions.SingleAsync(value => value.StokvelId == seeded.StokvelId);
+            subscriptionId = subscription.Id;
+            originalTrialStart = subscription.TrialStartedAt;
+            originalTrialEnd = subscription.TrialEndsAt;
+        }
+
+        await CompleteSetupAsync(seeded, "safe-provider-token-1");
+        await CompleteSetupAsync(seeded, "safe-provider-token-2");
+
+        await using var verify = database.CreateContext();
+        var subscriptionAfter = await verify.OrganisationSubscriptions
+            .Include(value => value.PaymentMethods)
+            .SingleAsync(value => value.StokvelId == seeded.StokvelId);
+        Assert.Equal(subscriptionId, subscriptionAfter.Id);
+        Assert.Equal(originalTrialStart, subscriptionAfter.TrialStartedAt);
+        Assert.Equal(originalTrialEnd, subscriptionAfter.TrialEndsAt);
+        Assert.Equal(SubscriptionStatus.Trialing, subscriptionAfter.Status);
+        Assert.Equal(2, subscriptionAfter.PaymentMethods.Count);
+        Assert.Single(subscriptionAfter.PaymentMethods, value => value.IsDefault);
+        Assert.Equal("safe-provider-token-2", subscriptionAfter.PaymentMethods.Single(value => value.IsDefault).ProviderPaymentMethodReference);
+        Assert.Empty(await verify.SubscriptionPayments.ToListAsync());
+    }
+
+    private async Task CompleteSetupAsync((Guid StokvelId, string AdminId) seeded, string providerToken)
+    {
+        provider.StatusToken = providerToken;
+        var start = await sut.StartAsync(seeded.StokvelId, seeded.AdminId, "billing@example.test", "Test Admin", null,
+            "https://localhost/billing/payment-callback", "/subscription");
+        Assert.True(start.Success);
+        var protectedState = GetQueryValue(provider.LastRequest!.CallbackUrl, "state");
+        Assert.True((await sut.CompleteAsync(protectedState, provider.LastRequest.CorrelationReference, seeded.AdminId)).Success);
+    }
+
     private async Task<(Guid StokvelId, string AdminId)> SeedAsync()
     {
         await using var context = database.CreateContext();
@@ -174,6 +220,7 @@ public sealed class PaymentSetupServiceTests : IDisposable
         public bool IsConfiguredValue { get; set; } = true;
         public bool IsConfigured => IsConfiguredValue;
         public string UnavailableMessage => "Payment setup is not configured in this environment.";
+        public string StatusToken { get; set; } = "safe-provider-token";
         public PaymentSetupRequest? LastRequest { get; private set; }
 
         public Task<PaymentSetupResult> StartPaymentMethodSetupAsync(PaymentSetupRequest request, CancellationToken ct = default)
@@ -183,9 +230,9 @@ public sealed class PaymentSetupServiceTests : IDisposable
                 "customer-safe-ref", request.CorrelationReference, null, null));
         }
 
-        public Task<PaymentMethodStatusResult> GetPaymentMethodStatusAsync(string providerReference, CancellationToken ct = default) =>
+        public Task<PaymentMethodStatusResult> GetPaymentMethodStatusAsync(PaymentMethodStatusRequest request, CancellationToken ct = default) =>
             Task.FromResult(new PaymentMethodStatusResult(true, Provider, SubscriptionPaymentMethodType.Card,
-                MandateStatus.Active, "safe-provider-token", providerReference, true,
+                MandateStatus.Active, StatusToken, request.ProviderReference, true,
                 "Card ending 4242", "visa", "4242", 12, 2030, "Test Bank", null, null));
 
         public bool IsPaymentReady(SubscriptionPaymentMethod method) =>

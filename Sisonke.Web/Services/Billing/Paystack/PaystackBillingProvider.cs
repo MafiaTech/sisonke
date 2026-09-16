@@ -85,6 +85,10 @@ public sealed class PaystackBillingProvider(HttpClient httpClient, ILogger<Payst
         return new VerifiedAuthorisation(
             Success: string.Equals(data.Status, "success", StringComparison.OrdinalIgnoreCase),
             Reference: data.Reference,
+            AmountMinorUnits: data.Amount,
+            Currency: data.Currency,
+            Domain: data.Domain,
+            Channel: data.Channel ?? authorization?.Channel,
             AuthorizationCode: authorization?.AuthorizationCode,
             Reusable: authorization?.Reusable ?? false,
             CardBrand: authorization?.CardType,
@@ -92,7 +96,8 @@ public sealed class PaystackBillingProvider(HttpClient httpClient, ILogger<Payst
             ExpiryMonth: expMonth == 0 ? null : expMonth,
             ExpiryYear: expYear == 0 ? null : expYear,
             Bank: authorization?.Bank,
-            CustomerEmail: data.Customer?.Email);
+            CustomerEmail: data.Customer?.Email,
+            CustomerCode: data.Customer?.CustomerCode);
     }
 
     public async Task RefundTransactionAsync(string reference, CancellationToken ct = default)

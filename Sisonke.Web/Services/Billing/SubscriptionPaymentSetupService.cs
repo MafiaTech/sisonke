@@ -152,7 +152,8 @@ public sealed class SubscriptionPaymentSetupService(
             return PaymentSetupCompletionResult.Failed("The selected payment provider is unavailable.");
         }
 
-        var status = await provider.GetPaymentMethodStatusAsync(providerReference, ct);
+        var status = await provider.GetPaymentMethodStatusAsync(new(
+            providerReference, subscription.ProviderCustomerCode, subscription.BillingEmail), ct);
         if (!status.Success || string.IsNullOrWhiteSpace(status.ProviderPaymentMethodReference))
         {
             return PaymentSetupCompletionResult.Failed(status.Message ?? "Payment method setup could not be verified.");

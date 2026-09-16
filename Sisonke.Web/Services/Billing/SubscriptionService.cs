@@ -106,10 +106,14 @@ public sealed class SubscriptionService(
             if (string.IsNullOrEmpty(subscription.ProviderCustomerCode))
             {
                 subscription.ProviderCustomerCode = await billingProvider.EnsureCustomerAsync(stokvelId, email, name, phone, ct);
-                subscription.BillingEmail = email;
-                Touch(subscription, timeProvider.GetUtcNow().UtcDateTime);
-                await context.SaveChangesAsync(ct);
             }
+
+            // Paystack requires the same email used to create the reusable authorization when it
+            // is charged later. Persist the server-supplied setup email even for an existing
+            // customer, then compare it during callback verification.
+            subscription.BillingEmail = email;
+            Touch(subscription, timeProvider.GetUtcNow().UtcDateTime);
+            await context.SaveChangesAsync(ct);
 
             var start = await billingProvider.StartCardAuthorisationAsync(
                 subscription.ProviderCustomerCode!, email, paystackOptions.CardVerificationAmountMinorUnits, callbackUrl, ct);
@@ -214,9 +218,10 @@ public sealed class SubscriptionService(
             return SubscriptionActionResult.Failed(DescribeProviderFailure(ex));
         }
 
-        if (!verification.Success || verification.AuthorizationCode is null)
+        if (!IsExpectedCardSetupVerification(subscription, reference, verification))
         {
-            return SubscriptionActionResult.Failed("Card authorisation could not be verified. Please try again.");
+            logger.LogWarning("Paystack card authorization did not match the server-side setup expectations for subscription {SubscriptionId}.", subscription.Id);
+            return SubscriptionActionResult.Failed("Card authorisation could not be verified against the original setup request. Please try again.");
         }
 
         if (!verification.Reusable)
@@ -244,7 +249,7 @@ public sealed class SubscriptionService(
             }
 
             subscriptionResult = await billingProvider.CreateSubscriptionAsync(
-                subscription.ProviderCustomerCode!, plan.ProviderPlanCode, verification.AuthorizationCode, trialEnds, ct);
+                subscription.ProviderCustomerCode!, plan.ProviderPlanCode, verification.AuthorizationCode!, trialEnds, ct);
         }
         catch (Exception ex) when (IsProviderFailure(ex))
         {
@@ -442,9 +447,11 @@ public sealed class SubscriptionService(
             {
                 customerCode = await billingProvider.EnsureCustomerAsync(stokvelId, email, name, phone, ct);
                 subscription.ProviderCustomerCode = customerCode;
-                Touch(subscription, timeProvider.GetUtcNow().UtcDateTime);
-                await context.SaveChangesAsync(ct);
             }
+
+            subscription.BillingEmail = email;
+            Touch(subscription, timeProvider.GetUtcNow().UtcDateTime);
+            await context.SaveChangesAsync(ct);
 
             var start = await billingProvider.StartCardAuthorisationAsync(
                 customerCode, email, paystackOptions.CardVerificationAmountMinorUnits, callbackUrl, ct);
@@ -478,9 +485,10 @@ public sealed class SubscriptionService(
             return SubscriptionActionResult.Failed(DescribeProviderFailure(ex));
         }
 
-        if (!verification.Success || verification.AuthorizationCode is null)
+        if (!IsExpectedCardSetupVerification(subscription, reference, verification))
         {
-            return SubscriptionActionResult.Failed("Card authorisation could not be verified. Please try again.");
+            logger.LogWarning("Paystack payment-method update did not match the server-side setup expectations for subscription {SubscriptionId}.", subscription.Id);
+            return SubscriptionActionResult.Failed("Card authorisation could not be verified against the original setup request. Please try again.");
         }
 
         if (!verification.Reusable)
@@ -573,6 +581,19 @@ public sealed class SubscriptionService(
             logger.LogError(ex, "Failed to refund card verification charge {Reference} for stokvel {StokvelId}.", reference, stokvelId);
         }
     }
+
+    private bool IsExpectedCardSetupVerification(
+        OrganisationSubscription subscription, string requestedReference, VerifiedAuthorisation verification) =>
+        verification.Success &&
+        !string.IsNullOrWhiteSpace(verification.AuthorizationCode) &&
+        string.Equals(verification.Reference, requestedReference, StringComparison.Ordinal) &&
+        verification.AmountMinorUnits == paystackOptions.CardVerificationAmountMinorUnits &&
+        string.Equals(verification.Currency, paystackOptions.Currency, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(verification.Channel, "card", StringComparison.OrdinalIgnoreCase) &&
+        (!string.IsNullOrWhiteSpace(subscription.ProviderCustomerCode) &&
+         string.Equals(verification.CustomerCode, subscription.ProviderCustomerCode, StringComparison.Ordinal)) &&
+        (!string.IsNullOrWhiteSpace(subscription.BillingEmail) &&
+         string.Equals(verification.CustomerEmail, subscription.BillingEmail, StringComparison.OrdinalIgnoreCase));
 
     private async Task<(int Usage, int Limit, string Description)?> FindDowngradeBlockerAsync(
         ApplicationDbContext context, Guid stokvelId, SubscriptionPlan targetPlan, CancellationToken ct)

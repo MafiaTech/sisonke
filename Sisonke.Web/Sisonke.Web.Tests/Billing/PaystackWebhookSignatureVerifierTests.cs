@@ -42,7 +42,7 @@ public class PaystackWebhookSignatureVerifierTests
     }
 
     [Fact]
-    public void MissingWebhookSecretConfigured_IsRejected()
+    public void MissingIntegrationSecretKey_IsRejected()
     {
         var signature = ComputeSignature(Body, Secret);
 

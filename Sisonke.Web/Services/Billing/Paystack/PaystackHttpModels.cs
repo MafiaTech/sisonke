@@ -56,6 +56,10 @@ internal sealed class PaystackInitializeTransactionData
 
 internal sealed class PaystackVerifyTransactionData
 {
+    public long Amount { get; set; }
+    public string? Currency { get; set; }
+    public string? Domain { get; set; }
+    public string? Channel { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Reference { get; set; } = string.Empty;
     public string? GatewayResponse { get; set; }
@@ -80,11 +84,13 @@ internal sealed class PaystackAuthorizationData
     public string? ExpYear { get; set; }
     public string? CardType { get; set; }
     public string? Bank { get; set; }
+    public string? Channel { get; set; }
 }
 
 internal sealed class PaystackCustomerSummary
 {
     public string? Email { get; set; }
+    public string? CustomerCode { get; set; }
 }
 
 internal sealed class PaystackRefundRequest

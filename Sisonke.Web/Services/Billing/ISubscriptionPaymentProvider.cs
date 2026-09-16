@@ -17,7 +17,8 @@ public interface ISubscriptionPaymentProvider
     string UnavailableMessage { get; }
 
     Task<PaymentSetupResult> StartPaymentMethodSetupAsync(PaymentSetupRequest request, CancellationToken ct = default);
-    Task<PaymentMethodStatusResult> GetPaymentMethodStatusAsync(string providerReference, CancellationToken ct = default);
+    Task<PaymentMethodStatusResult> GetPaymentMethodStatusAsync(
+        PaymentMethodStatusRequest request, CancellationToken ct = default);
     bool IsPaymentReady(SubscriptionPaymentMethod method);
 }
 

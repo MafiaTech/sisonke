@@ -122,7 +122,7 @@ else
                             {
                                 <span>&mdash; @paymentSetup.MaskedDisplay</span>
                             }
-                            @if (paymentSetup.MandateStatus != MandateStatus.None)
+                            @if (paymentSetup.Provider == SubscriptionProvider.Netcash && paymentSetup.MandateStatus != MandateStatus.None)
                             {
                                 <span>&mdash; mandate @paymentSetup.MandateStatus</span>
                             }
@@ -134,7 +134,11 @@ else
                     }
                     @if (snapshot.IsTrial)
                     {
-                        <p class="text-muted small">Complete setup before the trial ends. You will not be charged during the trial.</p>
+                        <div class="sisonke-alert sisonke-alert-gold small">
+                            <strong>NO CHARGE DURING THE FREE TRIAL.</strong>
+                            No monthly subscription fee is collected. Paystack processes a R1 card-verification
+                            transaction to obtain a reusable authorization and Sisonke immediately requests its refund.
+                        </div>
                     }
                     @if (paymentSetup?.ProviderAvailable == true && paymentSetup.Provider != SubscriptionProvider.Netcash)
                     {

@@ -5,12 +5,16 @@ namespace Sisonke.Web.Tests.TestSupport;
 public sealed class FakeBillingProvider : IBillingProvider
 {
     public VerifiedAuthorisation VerificationToReturn { get; set; } = new(
-        Success: true, Reference: "ref-1", AuthorizationCode: "AUTH_1", Reusable: true,
-        CardBrand: "visa", Last4: "4242", ExpiryMonth: 12, ExpiryYear: 2030, Bank: "Test Bank", CustomerEmail: "chair@example.com");
+        Success: true, Reference: "ref-1", AmountMinorUnits: 100, Currency: "ZAR", Domain: "test", Channel: "card",
+        AuthorizationCode: "AUTH_1", Reusable: true, CardBrand: "visa", Last4: "4242",
+        ExpiryMonth: 12, ExpiryYear: 2030, Bank: "Test Bank", CustomerEmail: "chair@example.com", CustomerCode: "CUS_fake");
+
+    public Exception? VerificationException { get; set; }
 
     public List<string> RefundedReferences { get; } = [];
     public List<string> CancelledSubscriptionCodes { get; } = [];
     public List<(string AuthorizationCode, long AmountMinorUnits, string Reference)> ChargeAttempts { get; } = [];
+    public int CreateSubscriptionCalls { get; private set; }
 
     /// <summary>Dequeued in order for successive ChargeAuthorisationAsync calls; falls back to ChargeResultToReturn once empty.</summary>
     public Queue<ChargeResult> ChargeResultsQueue { get; } = new();
@@ -32,7 +36,9 @@ public sealed class FakeBillingProvider : IBillingProvider
         Task.FromResult(new CardAuthorisationStart("https://checkout.paystack.com/fake", reference, "access-1"));
 
     public Task<VerifiedAuthorisation> VerifyAuthorisationAsync(string reference, CancellationToken ct = default) =>
-        Task.FromResult(VerificationToReturn);
+        VerificationException is null
+            ? Task.FromResult(VerificationToReturn with { Reference = VerificationToReturn.Reference == "ref-1" ? reference : VerificationToReturn.Reference })
+            : Task.FromException<VerifiedAuthorisation>(VerificationException);
 
     public Task RefundTransactionAsync(string reference, CancellationToken ct = default)
     {
@@ -41,8 +47,11 @@ public sealed class FakeBillingProvider : IBillingProvider
     }
 
     public Task<ProviderSubscriptionResult> CreateSubscriptionAsync(
-        string customerCode, string planCode, string authorizationCode, DateTime startDate, CancellationToken ct = default) =>
-        Task.FromResult(new ProviderSubscriptionResult("SUB_fake", "tok_fake", startDate));
+        string customerCode, string planCode, string authorizationCode, DateTime startDate, CancellationToken ct = default)
+    {
+        CreateSubscriptionCalls++;
+        return Task.FromResult(new ProviderSubscriptionResult("SUB_fake", "tok_fake", startDate));
+    }
 
     public Task CancelSubscriptionAsync(string subscriptionCode, string emailToken, CancellationToken ct = default)
     {

@@ -10,7 +10,7 @@ namespace Sisonke.Web.Tests.Billing;
 public class BillingWebhookProcessorTests
 {
     private const string ChargeSuccessBody = """
-        {"event":"charge.success","data":{"id":555001,"reference":"chg_ref_1","amount":24900,
+        {"event":"charge.success","data":{"id":555001,"reference":"chg_ref_1","amount":24900,"currency":"ZAR",
         "customer":{"customer_code":"CUS_test1"}}}
         """;
 
@@ -102,6 +102,99 @@ public class BillingWebhookProcessorTests
 
         Assert.Null(exception);
         Assert.Equal(WebhookProcessingStatus.Ignored, webhookEvent.ProcessingStatus);
+    }
+
+    [Fact]
+    public async Task PaymentSetupChargeSuccess_DoesNotCreatePaymentOrEndTrial()
+    {
+        using var harness = new BillingWebhookTestHarness();
+        var (stokvelId, _) = await SeedTrialingSubscriptionAsync(harness);
+        const string body = """
+            {"event":"charge.success","data":{"id":555003,"reference":"sisonke-setup-abc123","amount":100,
+            "currency":"ZAR","customer":{"customer_code":"CUS_test1"}}}
+            """;
+
+        await using (var context = harness.Entitlements.CreateContext())
+        {
+            await harness.Processor.ProcessAsync(context, BuildEvent(PaystackWebhookEventTypes.ChargeSuccess, body),
+                PaystackWebhookPayload.TryParse(body)!, CancellationToken.None);
+            await context.SaveChangesAsync();
+        }
+
+        await using var verify = harness.Entitlements.CreateContext();
+        Assert.Empty(await verify.SubscriptionPayments.ToListAsync());
+        Assert.Equal(SubscriptionStatus.Trialing,
+            (await verify.OrganisationSubscriptions.SingleAsync(value => value.StokvelId == stokvelId)).Status);
+    }
+
+    [Theory]
+    [InlineData(100, "ZAR")]
+    [InlineData(24900, "USD")]
+    public async Task ChargeSuccess_WithWrongAmountOrCurrency_IsRejected(decimal amount, string currency)
+    {
+        using var harness = new BillingWebhookTestHarness();
+        var (stokvelId, _) = await SeedTrialingSubscriptionAsync(harness);
+        var body = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            @event = "charge.success",
+            data = new
+            {
+                id = 555004,
+                reference = "charge-mismatch",
+                amount,
+                currency,
+                customer = new { customer_code = "CUS_test1" }
+            }
+        });
+
+        await using (var context = harness.Entitlements.CreateContext())
+        {
+            await harness.Processor.ProcessAsync(context, BuildEvent(PaystackWebhookEventTypes.ChargeSuccess, body),
+                PaystackWebhookPayload.TryParse(body)!, CancellationToken.None);
+            await context.SaveChangesAsync();
+        }
+
+        await using var verify = harness.Entitlements.CreateContext();
+        Assert.Empty(await verify.SubscriptionPayments.ToListAsync());
+        Assert.Equal(SubscriptionStatus.Trialing,
+            (await verify.OrganisationSubscriptions.SingleAsync(value => value.StokvelId == stokvelId)).Status);
+    }
+
+    [Fact]
+    public async Task DifferentSuccessfulReferences_InSameBillingPeriod_CreateOneLogicalPayment()
+    {
+        using var harness = new BillingWebhookTestHarness();
+        var (stokvelId, _) = await SeedTrialingSubscriptionAsync(harness);
+
+        await ProcessChargeAsync(harness, "billing-period-charge-1", 555010);
+        await ProcessChargeAsync(harness, "billing-period-charge-2", 555011);
+
+        await using var verify = harness.Entitlements.CreateContext();
+        var subscription = await verify.OrganisationSubscriptions.SingleAsync(value => value.StokvelId == stokvelId);
+        Assert.Equal(SubscriptionStatus.Active, subscription.Status);
+        Assert.NotNull(subscription.CurrentPeriodStartedAt);
+        Assert.NotNull(subscription.CurrentPeriodEndsAt);
+        Assert.Single(await verify.SubscriptionPayments.Where(value => value.OrganisationSubscriptionId == subscription.Id).ToListAsync());
+    }
+
+    private static async Task ProcessChargeAsync(BillingWebhookTestHarness harness, string reference, long id)
+    {
+        var body = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            @event = "charge.success",
+            data = new
+            {
+                id,
+                reference,
+                amount = 24900,
+                currency = "ZAR",
+                customer = new { customer_code = "CUS_test1" }
+            }
+        });
+        await using var context = harness.Entitlements.CreateContext();
+        await harness.Processor.ProcessAsync(context, BuildEvent(PaystackWebhookEventTypes.ChargeSuccess, body),
+            PaystackWebhookPayload.TryParse(body)!, CancellationToken.None);
+        await context.SaveChangesAsync();
     }
 
     private static BillingWebhookEvent BuildEvent(string eventType, string rawBody) => new()

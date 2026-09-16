@@ -59,6 +59,10 @@ public class TrialOptInPersistenceTests
         var begin = await harness.Sut.BeginCardAuthorisationAsync(
             stokvelId, "billing@example.com", "Billing Admin", null, "https://app.sisonke/callback");
         Assert.True(begin.Success);
+        harness.BillingProvider.VerificationToReturn = harness.BillingProvider.VerificationToReturn with
+        {
+            CustomerEmail = "billing@example.com"
+        };
         var complete = await harness.Sut.CompleteCardAuthorisationAsync(stokvelId, "trial-opt-in-reference");
         Assert.True(complete.Success);
 

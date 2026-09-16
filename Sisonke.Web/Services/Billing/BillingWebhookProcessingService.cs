@@ -62,6 +62,7 @@ public sealed class BillingWebhookProcessingService(
 
                 await processor.ProcessAsync(context, webhookEvent, payload, ct);
                 webhookEvent.ProcessedAt = DateTime.UtcNow;
+                webhookEvent.RawPayload = payload.CreateSafeDiagnosticJson();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -74,6 +75,7 @@ public sealed class BillingWebhookProcessingService(
                 if (webhookEvent.ProcessingStatus == WebhookProcessingStatus.Failed)
                 {
                     webhookEvent.ProcessedAt = DateTime.UtcNow;
+                    webhookEvent.RawPayload = payload?.CreateSafeDiagnosticJson() ?? "{\"event\":\"unparseable\"}";
                 }
 
                 logger.LogError(ex, "Failed to process billing webhook event {WebhookEventId} ({EventType}).", webhookEvent.Id, webhookEvent.EventType);

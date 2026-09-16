@@ -47,6 +47,10 @@ public sealed record CardAuthorisationStart(string AuthorisationUrl, string Refe
 public sealed record VerifiedAuthorisation(
     bool Success,
     string Reference,
+    long AmountMinorUnits,
+    string? Currency,
+    string? Domain,
+    string? Channel,
     string? AuthorizationCode,
     bool Reusable,
     string? CardBrand,
@@ -54,7 +58,8 @@ public sealed record VerifiedAuthorisation(
     int? ExpiryMonth,
     int? ExpiryYear,
     string? Bank,
-    string? CustomerEmail);
+    string? CustomerEmail,
+    string? CustomerCode);
 
 public sealed record ProviderSubscriptionResult(string SubscriptionCode, string EmailToken, DateTime? NextPaymentDate);
 

@@ -54,9 +54,9 @@ public class PaystackBillingProviderTests
         var (provider, handler, _) = CreateProvider();
         handler.SetResponse(HttpMethod.Get, "transaction/verify/ref-123", HttpStatusCode.OK,
             """
-            {"status":true,"message":"ok","data":{"status":"success","reference":"ref-123",
-            "authorization":{"authorization_code":"AUTH_xyz","reusable":true,"last4":"4242","exp_month":"12","exp_year":"2030","card_type":"visa","bank":"Test Bank"},
-            "customer":{"email":"chair@example.com"}}}
+            {"status":true,"message":"ok","data":{"domain":"test","status":"success","reference":"ref-123","amount":100,"currency":"ZAR","channel":"card",
+            "authorization":{"authorization_code":"AUTH_xyz","reusable":true,"last4":"4242","exp_month":"12","exp_year":"2030","card_type":"visa","bank":"Test Bank","channel":"card"},
+            "customer":{"email":"chair@example.com","customer_code":"CUS_abc123"}}}
             """);
 
         var result = await provider.VerifyAuthorisationAsync("ref-123");
@@ -67,6 +67,11 @@ public class PaystackBillingProviderTests
         Assert.Equal("4242", result.Last4);
         Assert.Equal(12, result.ExpiryMonth);
         Assert.Equal(2030, result.ExpiryYear);
+        Assert.Equal(100, result.AmountMinorUnits);
+        Assert.Equal("ZAR", result.Currency);
+        Assert.Equal("test", result.Domain);
+        Assert.Equal("card", result.Channel);
+        Assert.Equal("CUS_abc123", result.CustomerCode);
     }
 
     [Fact]

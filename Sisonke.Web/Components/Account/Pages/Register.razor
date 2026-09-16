@@ -152,7 +152,7 @@
                         </div>
 
                         <div class="auth-field">
-                            <label class="auth-label" for="Input.IdNumber">ID Number</label>
+                            <label class="auth-label" for="Input.IdNumber">ID Number (optional)</label>
                             <div class="auth-input-wrapper">
                                 <span class="auth-input-icon">🪪</span>
                                 <InputText @bind-Value="Input.IdNumber"
@@ -161,7 +161,7 @@
                                            autocomplete="off"
                                            inputmode="numeric"
                                            maxlength="13"
-                                           placeholder="13-digit SA ID" />
+                                           placeholder="13-digit SA ID (optional)" />
                             </div>
                             @StepError(nameof(Input.IdNumber))
                         </div>
@@ -288,7 +288,7 @@
                             <div class="auth-review-value">@(string.IsNullOrWhiteSpace(Input.FullName) ? "—" : Input.FullName)</div>
                             <div class="auth-review-label mt-3">Email</div>
                             <div class="auth-review-value">@(string.IsNullOrWhiteSpace(Input.Email) ? "—" : Input.Email)</div>
-                            <div class="auth-review-label mt-3">ID Number</div>
+                            <div class="auth-review-label mt-3">ID Number (optional)</div>
                             <div class="auth-review-value">@SensitiveDataMasker.MaskIdNumber(Input.IdNumber)</div>
                             <p class="auth-review-note">
                                 Click below to create your account.
@@ -520,9 +520,8 @@
         [Display(Name = "Email")]
         public string Email { get; set; } = "";
 
-        [Required(ErrorMessage = "ID number is required.")]
         [SaIdNumber]
-        [Display(Name = "ID Number")]
+        [Display(Name = "ID Number (optional)")]
         public string IdNumber { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Cellphone number is required.")]

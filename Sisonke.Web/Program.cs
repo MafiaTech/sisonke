@@ -51,13 +51,13 @@ var subscriptionPaymentOptions = builder.Configuration.GetSection("SubscriptionP
 var netcashOptions = builder.Configuration.GetSection("Netcash").Get<NetcashOptions>() ?? new NetcashOptions();
 var invoicingOptions = builder.Configuration.GetSection("Invoicing").Get<InvoicingOptions>() ?? new InvoicingOptions();
 
-// Fail loudly outside Development if the webhook secret is missing — a missing secret would
-// otherwise mean every webhook silently fails signature verification (401) with no obvious cause.
-if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(paystackOptions.WebhookSecret))
+// Paystack signs webhook bodies with the integration secret key (HMAC-SHA512); it does not issue
+// a separate webhook signing secret. Fail loudly outside Development if that key is absent.
+if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(paystackOptions.SecretKey))
 {
     throw new InvalidOperationException(
-        "Paystack:WebhookSecret is not configured. Set it via Azure App Service configuration or Key Vault " +
-        "(Paystack__WebhookSecret) — never in appsettings.json. The app will not start without it outside Development.");
+        "Paystack:SecretKey is not configured. Set it via Azure App Service configuration or Key Vault " +
+        "(Paystack__SecretKey) — never in appsettings.json. The app will not start without it outside Development.");
 }
 
 builder.Services.AddHttpContextAccessor();
@@ -1024,7 +1024,7 @@ internal static class PaystackWebhookEndpoint
         }
 
         var signatureHeader = httpContext.Request.Headers["x-paystack-signature"].FirstOrDefault();
-        var isSignatureValid = PaystackWebhookSignatureVerifier.IsValid(rawBody, signatureHeader, options.WebhookSecret);
+        var isSignatureValid = PaystackWebhookSignatureVerifier.IsValid(rawBody, signatureHeader, options.SecretKey);
 
         var payload = PaystackWebhookPayload.TryParse(rawBody);
         var eventType = payload?.EventType ?? "unknown";
@@ -1033,22 +1033,6 @@ internal static class PaystackWebhookEndpoint
         if (!isSignatureValid)
         {
             logger.LogWarning("Paystack webhook signature invalid for event {EventType}.", eventType);
-
-            context.BillingWebhookEvents.Add(new BillingWebhookEvent
-            {
-                Id = Guid.NewGuid(),
-                Provider = SubscriptionProvider.Paystack,
-                ProviderEventId = providerEventId,
-                EventType = eventType,
-                RawPayload = rawBody,
-                SignatureValid = false,
-                ProcessingStatus = WebhookProcessingStatus.Failed,
-                ErrorMessage = "Invalid signature.",
-                ProcessedAt = DateTime.UtcNow,
-                ReceivedAt = DateTime.UtcNow
-            });
-            await context.SaveChangesAsync(ct);
-
             return Results.Unauthorized();
         }
 
@@ -1057,7 +1041,7 @@ internal static class PaystackWebhookEndpoint
 
         if (!alreadyReceived)
         {
-            context.BillingWebhookEvents.Add(new BillingWebhookEvent
+            var webhookEvent = new BillingWebhookEvent
             {
                 Id = Guid.NewGuid(),
                 Provider = SubscriptionProvider.Paystack,
@@ -1067,8 +1051,23 @@ internal static class PaystackWebhookEndpoint
                 SignatureValid = true,
                 ProcessingStatus = WebhookProcessingStatus.Received,
                 ReceivedAt = DateTime.UtcNow
-            });
-            await context.SaveChangesAsync(ct);
+            };
+            context.BillingWebhookEvents.Add(webhookEvent);
+            try
+            {
+                await context.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Another instance may have inserted the same provider event between the read
+                // and write. Confirm that specific replay before treating the unique-index race
+                // as harmless; unrelated database failures still propagate.
+                context.Entry(webhookEvent).State = EntityState.Detached;
+                if (!await context.BillingWebhookEvents.AnyAsync(e => e.ProviderEventId == providerEventId, ct))
+                {
+                    throw;
+                }
+            }
         }
 
         // Always 200 fast, whether newly recorded or a replay — BillingWebhookProcessingService
@@ -1341,9 +1340,8 @@ internal sealed class RegisterSubmitInput
     [Display(Name = "Email")]
     public string? Email { get; set; }
 
-    [Required(ErrorMessage = "ID number is required.")]
     [SaIdNumber]
-    [Display(Name = "ID Number")]
+    [Display(Name = "ID Number (optional)")]
     public string? IdNumber { get; set; }
 
     [Required(ErrorMessage = "Cellphone number is required.")]

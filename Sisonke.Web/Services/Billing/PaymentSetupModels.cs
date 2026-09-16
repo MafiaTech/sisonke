@@ -29,6 +29,16 @@ public sealed record PaymentSetupResult(
         new(false, provider, null, null, null, "provider_unavailable", message);
 }
 
+/// <summary>
+/// Server-derived expectations used to verify a provider-hosted setup. None of these values are
+/// accepted from browser callback parameters; the subscription and protected setup state are
+/// resolved first by SubscriptionPaymentSetupService.
+/// </summary>
+public sealed record PaymentMethodStatusRequest(
+    string ProviderReference,
+    string? ExpectedCustomerReference,
+    string? ExpectedBillingEmail);
+
 public sealed record PaymentMethodStatusResult(
     bool Success,
     SubscriptionProvider Provider,
